@@ -7,6 +7,7 @@ import projectOptions from 'virtual:iwsdk-project';
 import { FixedStepLoop } from './sim/fixed-step';
 import { Diagnostics, mountReportPanel } from './platform/diagnostics';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from './platform/iwsdk-input-visuals';
+import { HandRecorder, offerDownload } from './platform/hand-recorder';
 import { XRHandReader } from './platform/xr-hands';
 import { JointDots } from './view/joint-dots';
 
@@ -40,7 +41,14 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
   });
-  world.renderer.xr.addEventListener('sessionend', () => diagnostics.sessionEnded());
+  world.renderer.xr.addEventListener('sessionend', () => {
+    diagnostics.sessionEnded();
+    recorder?.finish();
+  });
+
+  const recorder = HandRecorder.fromUrl();
+  if (recorder) recorder.onFinished = offerDownload;
+  const head: [number, number, number] = [0, 0, 0];
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
@@ -53,6 +61,11 @@ async function start(): Promise<void> {
       if (frame && refSpace) {
         hands.update(frame, refSpace, this.world.player.matrixWorld);
         hideIwsdkHandMeshes(this.world);
+        if (recorder) {
+          const viewer = frame.getViewerPose(refSpace)?.transform.position;
+          if (viewer) [head[0], head[1], head[2]] = [viewer.x, viewer.y, viewer.z];
+          recorder.frame(performance.now(), hands.hands.left, hands.hands.right, viewer ? head : null);
+        }
       }
       sim.advance(delta);
       dots.update(handList);
@@ -62,5 +75,5 @@ async function start(): Promise<void> {
   world.registerSystem(FrameDriverSystem, { priority: 10 });
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
-  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics } });
+  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder } });
 }

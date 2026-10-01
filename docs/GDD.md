@@ -185,6 +185,14 @@ The decisions are recorded in [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)
 - **Versions:** IWSDK is pinned to exactly 1.0.0, and three.js is IWSDK's `super-three@0.181.0` fork. There is never a second copy of three.
 - **Fallback:** plain three.js + `@iwsdk/xr-input`. The entry file is about 54 lines and was tested in the emulator; see ADR 0002.
 
+### Test devices
+
+We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pico-as-stand-in-test-device.md).
+
+- **Develop on the Pico, confirm on a Quest.** Working on Pico means it will probably work on Quest, but only a Quest run proves it. A Quest check (remote tester or a borrowed headset) closes each milestone that matters, and always comes before submission.
+- **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected. Plane labels are only a hint. Nothing may work on one headset and break on the other.
+- **Testing order:** IWER emulator for logic, webcam for hand shapes (planned), Pico for real-device behaviour, Quest for final confirmation.
+
 ### Stack
 
 | Area | Choice |
@@ -248,6 +256,8 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 - Chapter progress, discovered creatures and solutions found are saved in browser storage.
 
 ### Open questions
+
+- [ ] Which Pico model do we have (Pico 4, 4 Ultra, Neo 3)? The first diagnostics report's user agent will tell us.
 
 - [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission. Also ask about the plain three.js + `@iwsdk/xr-input` fallback, which may raise the same question Babylon.js did.
 
@@ -329,7 +339,7 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Milestones (7 weeks to 19 Nov)
 
-1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hands, passthrough, table and wall detection, lantern placement. Host the early build on GitHub Pages (HTTPS) with a "Copy report" diagnostics button, and have a remote Quest tester run it and send back the report, which answers the Quest-only risks below. Confirm submission rules.
+1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hands, passthrough, table and wall detection, lantern placement. Run it on the Pico and collect its diagnostics report and a hand recording. Host the build on GitHub Pages (HTTPS) and, if a remote Quest tester is available, have them send a report too. Confirm submission rules.
 
 2.  **Week 2 (to 15 Oct):** Planar shadow rendering and the 2D plane-space game layer, working in both stage modes.
 
@@ -345,7 +355,7 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Risks
 
-Everything in the IWSDK spike ran in the emulator only. The rows marked *Quest-only* can only be answered on a real headset, through the remote tester's diagnostics report in week 1.
+Everything in the IWSDK spike ran in the emulator only. The rows marked *Device* need a real headset. The Pico answers them first, but only a Quest run confirms them for the judges' device (see Test devices).
 
 | Risk | Impact | Mitigation |
 |----|----|----|
@@ -356,9 +366,11 @@ Everything in the IWSDK spike ran in the emulator only. The rows marked *Quest-o
 | Slow cold start in Quest Browser | Medium | Small initial bundle; stream chapter assets after the lantern appears |
 | Anchor persistence unreliable | Medium | Store gallery relative to detected surfaces |
 | Scope creep | Medium | One chapter only; feature freeze end of week 6 |
-| *Quest-only:* real passthrough and cold start in Quest Browser over Wi-Fi | Medium | Report checks `alpha-blend` and time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
-| *Quest-only:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
-| *Quest-only:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
-| *Quest-only:* room-setup planes missing or noisy near the player; plane normal sign | High | Report lists planes with labels, size, distance and normal direction; tabletop default; normal is flipped toward the viewer in code |
-| *Quest-only:* persistent anchors across browser restarts | Medium | Report creates, persists and restores a probe anchor; gallery stored relative to detected surfaces if it fails |
-| *Quest-only:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
+| *Device:* real passthrough and cold start in the headset browser over Wi-Fi | Medium | Report checks `alpha-blend` and time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
+| *Device:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
+| *Device:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
+| *Device:* room-setup planes missing or noisy near the player; plane normal sign | High | Report lists planes with labels, size, distance and normal direction; tabletop default; normal is flipped toward the viewer in code |
+| *Device:* persistent anchors across browser restarts | Medium | Report creates, persists and restores a probe anchor; gallery stored relative to detected surfaces if it fails |
+| *Device:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
+| Works on Pico but not on Quest (different browser, tracker and chip) | High | Standard WebXR only, everything feature-detected; Quest check at each milestone and before submission; compare Pico and Quest reports |
+| No Quest available before submission | High | Line up a remote Quest tester (or borrow a headset) by week 4 at the latest; the submission checklist requires a fresh Quest 3S test |

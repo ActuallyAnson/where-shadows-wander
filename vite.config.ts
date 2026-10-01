@@ -21,7 +21,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: process.env.NODE_ENV !== 'production',
-    target: 'esnext',
+    // Not esnext: other headset browsers (Pico) may run an older Chromium than
+    // Quest Browser. Chrome 100 still covers WebXR hands, anchors and planes.
+    target: ['es2022', 'chrome100'],
     rollupOptions: { input: './index.html' },
   },
   esbuild: { target: 'esnext' },

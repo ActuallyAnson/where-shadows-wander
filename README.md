@@ -6,7 +6,7 @@ A seated, hands-only mixed reality puzzle game: light a tiny lantern on your rea
 
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
-- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md)
+- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md)
 
 ## Develop
 
@@ -43,14 +43,20 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 `npm run check:boundaries` enforces the "No" rows.
 
-## Remote Quest testing
+## Testing on a headset
 
-Every push to `main` deploys to GitHub Pages over HTTPS (`.github/workflows/pages.yml`). One-time setup: in the repo settings, under Pages, set Source to "GitHub Actions".
+We have a Pico now and no Quest yet. Develop on the Pico; confirm on a Quest before milestones and submission. See [ADR 0003](docs/adr/0003-pico-as-stand-in-test-device.md).
 
-For the tester, on a Quest 3 / 3S:
+**Pico on your own Wi-Fi (fastest):** run `npm run dev`, then in the Pico browser open `https://<your laptop's LAN IP>:8081` (it's printed when the server starts) and accept the certificate warning once.
 
-1. Open the Pages URL in Quest Browser. Make sure room setup (Space Setup) is done.
+**Any headset, from GitHub Pages:** every push to `main` deploys over HTTPS (`.github/workflows/pages.yml`). One-time setup: in the repo settings, under Pages, set Source to "GitHub Actions".
+
+Steps on the headset (Pico or Quest):
+
+1. Open the link in the headset browser. Make sure the headset's room or space setup is done.
 2. Press **Enter XR** and allow hand tracking and spatial data. Put the controllers down.
 3. Look around the room for about 30 seconds and move your hands in front of you. Orange dots should follow your finger joints.
-4. Leave XR (press the Meta button and exit), then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
-5. Close Quest Browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This tests anchor persistence.
+4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
+5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This tests anchor persistence.
+
+To record hand data, add `?record=20` to the link (`?record=20&note=fist then flat hand` to label it). After leaving XR, press **Download recording**, then open the file in the Hand Recording Player.
