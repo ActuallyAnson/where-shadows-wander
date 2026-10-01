@@ -191,7 +191,8 @@ We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pi
 
 - **Develop on the Pico, confirm on a Quest.** Working on Pico means it will probably work on Quest, but only a Quest run proves it. A Quest check (remote tester or a borrowed headset) closes each milestone that matters, and always comes before submission.
 - **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected. Plane labels are only a hint. Nothing may work on one headset and break on the other.
-- **Testing order:** IWER emulator for logic, webcam for hand shapes (planned), Pico for real-device behaviour, Quest for final confirmation.
+- **Testing order:** IWER emulator for logic, the webcam hand bench for hand shapes, Pico for real-device behaviour, Quest for final confirmation.
+- **Hand data without a headset:** the webcam hand bench (`webcam.html`) tracks hands from a laptop camera and converts them to the same 25-joint data the game reads. Headset sessions and the bench can both save hand recordings for replay in tests and in the Hand Recording Player. See [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
 
 ### Stack
 
@@ -239,7 +240,9 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger spread | Angle between adjacent finger directions |
 | Palm orientation | Derived palm normal relative to the stage plane |
 
-- Each shape is a set of ranges on these features, hand-tuned and tested on several people.
+First implementation (`src/contracts/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
+
+- Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
 - A shape must match continuously for about 0.4 s to commit (1 s for companions).
 
@@ -343,7 +346,7 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 2.  **Week 2 (to 15 Oct):** Planar shadow rendering and the 2D plane-space game layer, working in both stage modes.
 
-3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Test with at least 3 other people.
+3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Develop on the webcam hand bench, check against Pico recordings, and test with at least 3 other people (the bench works on any laptop).
 
 4.  **Week 4 (to 29 Oct):** Traveller and puzzles 1–3, including the wordless tutorial.
 
@@ -359,7 +362,7 @@ Everything in the IWSDK spike ran in the emulator only. The rows marked *Device*
 
 | Risk | Impact | Mitigation |
 |----|----|----|
-| Shape recognition feels unreliable to new players | High | Week 3 stranger tests; tolerance slider; physical-outline collision for simple roles |
+| Shape recognition feels unreliable to new players | High | Week 3 stranger tests on the webcam bench and the Pico; replay saved hand recordings as regression tests; tolerance slider; physical-outline collision for simple roles |
 | No usable wall in the judge's room | High | Tabletop theatre is the default mode |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
 | Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |

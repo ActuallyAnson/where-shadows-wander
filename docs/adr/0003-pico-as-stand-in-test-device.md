@@ -26,7 +26,7 @@ To keep that rule true, the code follows the WebXR standard, not one headset:
 | Layer | Tool | Answers | When |
 |---|---|---|---|
 | Logic | IWER emulator, unit tests | Does our code work? | Every change |
-| Hand shapes | Webcam (MediaPipe, planned) | Does the classifier recognise real hand shapes? | Daily from week 3 |
+| Hand shapes | Webcam hand bench (`webcam.html`, see [ADR 0004](0004-webcam-bench-and-hand-recordings.md)) | Does the classifier recognise real hand shapes? | Daily from week 3 |
 | Real device | **Pico** | Passthrough, real hand jitter and dropouts, real room planes, anchors, frame rate, comfort | Several times a week |
 | Target device | Remote Quest tester (or a borrowed Quest) | Quest Browser quirks, Quest tracking, Quest 3S performance | End of each milestone, and before submission |
 

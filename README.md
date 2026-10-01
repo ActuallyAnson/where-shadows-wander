@@ -6,7 +6,7 @@ A seated, hands-only mixed reality puzzle game: light a tiny lantern on your rea
 
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
-- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md)
+- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md)
 
 ## Develop
 
@@ -36,12 +36,13 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 | Folder | What | May import IWSDK / three.js |
 |---|---|---|
-| `src/contracts` | Data shapes shared by platform and gameplay (hand: 25 joints + derived palm) | No |
+| `src/contracts` | Data shared by platform and gameplay: hand (25 joints + derived palm), shape features, recording format | No |
 | `src/sim` | Fixed-timestep loop and, later, the 2D simulation | No |
 | `src/game` | Gameplay (from week 2) | No |
-| `src/platform` | Raw WebXR reads, IWSDK workarounds, diagnostics | Yes |
+| `src/platform` | Raw WebXR reads, IWSDK workarounds, diagnostics, hand recorder, webcam (MediaPipe) conversion | Yes |
 | `src/view` | Plain three.js objects | Yes |
 | `src/main.ts` | `World.create` and the single driver system | Yes |
+| `src/webcam` | Webcam hand bench page (`webcam.html`), dev tool | No IWSDK |
 
 `npm run check:boundaries` enforces the "No" rows.
 
