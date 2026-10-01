@@ -23,13 +23,13 @@ IWSDK is young: 1.0.0 shipped on 24 Sep 2026, npm's `latest` tag still points at
 
 ### What IWSDK does not do
 
-- **Gameplay and simulation never import IWSDK or three.js.** `src/contracts`, `src/sim` and `src/game` are plain TypeScript. `npm run check:boundaries` (`scripts/check-boundaries.mjs`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, or our `platform`/`view` folders.
+- **Gameplay and simulation never import IWSDK or three.js.** `src/hands`, `src/sim` and `src/game` are plain TypeScript. `npm run check:boundaries` (`scripts/check-boundaries.mjs`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, or our `platform`/`view` folders.
 - **No game state in the ECS.** `src/components.ts` and the scene JSON stay empty. The view layer uses plain three.js objects (`InstancedMesh`, custom `ShaderMaterial`) added with `world.scene.add`. Use an IWSDK ECS feature only when it clearly saves work. The trade-off is that IWSDK's editor and `ecs` CLI don't see our objects.
 - **Hand data comes from raw WebXR** (`frame.fillPoses`), not IWSDK's input, grab or gesture systems.
 
 ### Hands: 25 joints, derived palm
 
-WebXR Hand Input exposes **25 joints** per hand. OpenXR's 26th joint (`palm`) is not exposed in any browser. The hand contract (`src/contracts/hand.ts`) and the classifier use the 25 joints, and `derivePalm()` computes the palm from joint positions:
+WebXR Hand Input exposes **25 joints** per hand. OpenXR's 26th joint (`palm`) is not exposed in any browser. The hand data format (`src/hands/hand.ts`) and the classifier use the 25 joints, and `derivePalm()` computes the palm from joint positions:
 
 - position: midpoint of the middle-finger metacarpal and proximal joints
 - forward: wrist to the middle-finger knuckle

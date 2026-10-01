@@ -4,7 +4,7 @@
 // inside immersive-ar). Each section answers one of the Quest-only unknowns
 // listed in docs/GDD.md (Risks).
 import type { WebGLRenderer } from '@iwsdk/core';
-import type { HandFrame, Handedness } from '../contracts/hand';
+import type { HandFrame, Handedness } from '../hands/hand';
 import { AnchorProbe, localStorageHandleStore } from './anchor-probe';
 import { RingBuffer } from './ring-buffer';
 

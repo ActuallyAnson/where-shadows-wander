@@ -37,7 +37,7 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 | Folder | What | May import IWSDK / three.js |
 |---|---|---|
-| `src/contracts` | Data shared by platform and gameplay: hand (25 joints + derived palm), shape features, recording format | No |
+| `src/hands` | Data shared by platform and gameplay: hand (25 joints + derived palm), shape features, recording format | No |
 | `src/sim` | Fixed-timestep loop and, later, the 2D simulation | No |
 | `src/game` | Gameplay (from week 2) | No |
 | `src/platform` | Raw WebXR reads, IWSDK workarounds, diagnostics, hand recorder, webcam (MediaPipe) conversion | Yes |

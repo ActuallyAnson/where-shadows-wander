@@ -1,5 +1,5 @@
-// Hand data contract between the XR platform layer (which fills it) and the
-// classifier/gameplay (which read it). Plain TypeScript: no IWSDK, no three.js.
+// Hand data shared by every hand source (headset, webcam, recordings), which
+// fill it, and the classifier and gameplay, which read it. Plain TypeScript: no IWSDK, no three.js.
 //
 // WebXR Hand Input exposes 25 joints per hand. OpenXR's 26th joint, "palm", is
 // not exposed by any browser, so the palm is derived (see derivePalm).

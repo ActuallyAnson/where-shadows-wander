@@ -1,8 +1,8 @@
-// Reads WebXR hand joints into the HandFrame contract. Uses only the raw WebXR
+// Reads WebXR hand joints into the HandFrame format. Uses only the raw WebXR
 // XRFrame/XRHand API (not IWSDK's input, grab or gesture systems), so it runs
 // unchanged under the plain three.js fallback (docs/adr/0002-plain-threejs-fallback.md).
 import { Matrix4 } from '@iwsdk/core';
-import { createHandFrame, JOINT_COUNT, JOINT_NAMES, type HandFrame, type Handedness } from '../contracts/hand';
+import { createHandFrame, JOINT_COUNT, JOINT_NAMES, type HandFrame, type Handedness } from '../hands/hand';
 
 // fillPoses/fillJointRadii are in the Hand Input spec but missing from @types/webxr.
 type FrameWithFill = XRFrame & {

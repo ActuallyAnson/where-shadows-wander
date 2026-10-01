@@ -1,7 +1,7 @@
 // Debug view: one small dot per tracked joint, so a tester can see hand tracking
 // working once IWSDK's hand models are hidden. Plain three.js, one draw call.
 import { InstancedMesh, Matrix4, MeshBasicMaterial, SphereGeometry } from '@iwsdk/core';
-import { JOINT_COUNT, type HandFrame } from '../contracts/hand';
+import { JOINT_COUNT, type HandFrame } from '../hands/hand';
 
 export class JointDots {
   readonly mesh: InstancedMesh;

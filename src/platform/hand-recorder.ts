@@ -2,8 +2,8 @@
 // ?record=<seconds> (default 10). Recording starts when the first hand is
 // tracked and stops after that many seconds or when the session ends. The page
 // then shows a "Download recording" button (DOM isn't visible inside XR).
-import { createRecording, recordFrame, type HandRecording } from '../contracts/hand-recording';
-import type { HandFrame } from '../contracts/hand';
+import { createRecording, recordFrame, type HandRecording } from '../hands/hand-recording';
+import type { HandFrame } from '../hands/hand';
 
 export class HandRecorder {
   recording: HandRecording | null = null;

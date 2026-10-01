@@ -3,9 +3,9 @@
 import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
 import wasmLoaderPath from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
 import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
-import { createHandFrame, derivePalm, type HandFrame, type Handedness } from '../contracts/hand';
-import { FINGER_NAMES, handFeatures, roughShape } from '../contracts/hand-features';
-import { createRecording, recordFrame, type HandRecording } from '../contracts/hand-recording';
+import { createHandFrame, derivePalm, type HandFrame, type Handedness } from '../hands/hand';
+import { FINGER_NAMES, handFeatures, roughShape } from '../hands/hand-features';
+import { createRecording, recordFrame, type HandRecording } from '../hands/hand-recording';
 import { handednessFromLabel, mediapipeToHandFrame } from '../platform/mediapipe-hands';
 
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';

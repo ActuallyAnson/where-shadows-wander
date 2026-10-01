@@ -112,7 +112,7 @@ npm run build   # production build into dist/
 ```
 
 `npm run check` fails if:
-- code in `src/contracts`, `src/sim` or `src/game` imports IWSDK, three.js or platform code (gameplay stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
+- code in `src/hands`, `src/sim` or `src/game` imports IWSDK, three.js or platform code (gameplay stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
 - a second copy of three.js gets installed;
 - a test fails.
 

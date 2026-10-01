@@ -1,10 +1,10 @@
 // Converts MediaPipe Hand Landmarker output (21 landmarks per hand, from a
-// webcam) into the HandFrame contract (25 WebXR joints), so the classifier and
+// webcam) into the HandFrame format (25 WebXR joints), so the classifier and
 // the webcam test page see the same data shape as on a headset.
 //
 // Caveats compared with a headset: depth comes from one camera (approximate),
 // the viewpoint is the webcam's (facing the player), and the noise differs.
-import { JOINT_COUNT, type HandFrame, type Handedness } from '../contracts/hand';
+import { JOINT_COUNT, type HandFrame, type Handedness } from '../hands/hand';
 
 /** A MediaPipe landmark: image coords are 0..1 (x right, y down); world coords are metres. */
 export interface Landmark {

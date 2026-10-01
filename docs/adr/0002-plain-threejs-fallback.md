@@ -12,7 +12,7 @@
 
 ## Decision
 
-Keep a known, tested fallback: **plain three.js (`super-three@0.181.0`) + `@iwsdk/xr-input`**, with no `@iwsdk/core`, no ECS and no IWSDK Vite plugin. We don't build it now. We keep it cheap by holding the ADR 0001 boundary: gameplay, sim and contracts never import IWSDK or three.js, and hand data comes from raw WebXR (`frame.fillPoses`).
+Keep a known, tested fallback: **plain three.js (`super-three@0.181.0`) + `@iwsdk/xr-input`**, with no `@iwsdk/core`, no ECS and no IWSDK Vite plugin. We don't build it now. We keep it cheap by holding the ADR 0001 boundary: gameplay, sim and the shared hand code never import IWSDK or three.js, and hand data comes from raw WebXR (`frame.fillPoses`).
 
 ### What the fallback replaces
 

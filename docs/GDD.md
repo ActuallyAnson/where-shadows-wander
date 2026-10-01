@@ -240,7 +240,7 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger spread | Angle between adjacent finger directions |
 | Palm orientation | Derived palm normal relative to the stage plane |
 
-First implementation (`src/contracts/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
+First implementation (`src/hands/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
 
 - Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 

@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const PURE_DIRS = ['src/contracts', 'src/sim', 'src/game'];
+const PURE_DIRS = ['src/hands', 'src/sim', 'src/game'];
 const FORBIDDEN = [
   { re: /^@iwsdk\//, why: 'IWSDK' },
   { re: /^(three|super-three)(\/|$)/, why: 'three.js' },

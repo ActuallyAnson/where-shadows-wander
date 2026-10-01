@@ -13,15 +13,15 @@ The pose classifier (GDD, week 3) needs real hands making real shapes: flat hand
 
 ### 1. Every hand source produces the same `HandFrame`
 
-The classifier only reads `HandFrame` (`src/contracts/hand.ts`: 25 WebXR joints in metres, scene space). Each source converts into it:
+The classifier only reads `HandFrame` (`src/hands/hand.ts`: 25 WebXR joints in metres, scene space). Each source converts into it:
 
 | Source | Code | Where it runs |
 |---|---|---|
 | Headset (Pico, Quest), emulator | `src/platform/xr-hands.ts` (raw WebXR) | The game, `index.html` |
 | Webcam | `src/platform/mediapipe-hands.ts` (MediaPipe) | The webcam bench, `webcam.html` |
-| Recording | `replayInto()` in `src/contracts/hand-recording.ts` | Unit tests, and later the classifier tuning tools |
+| Recording | `replayInto()` in `src/hands/hand-recording.ts` | Unit tests, and later the classifier tuning tools |
 
-Shape features live in `src/contracts/hand-features.ts` (finger curl, thumb–index gap, finger spread) and `derivePalm()` in `hand.ts`. They are pure TypeScript, so the game, the bench and tests all compute exactly the same numbers.
+Shape features live in `src/hands/hand-features.ts` (finger curl, thumb–index gap, finger spread) and `derivePalm()` in `hand.ts`. They are pure TypeScript, so the game, the bench and tests all compute exactly the same numbers.
 
 ### 2. Webcam hand bench (`webcam.html`)
 
@@ -36,7 +36,7 @@ Shape features live in `src/contracts/hand-features.ts` (finger curl, thumb–in
 
 ### 3. Hand recordings (`.handrec.json`)
 
-- Format in `src/contracts/hand-recording.ts`: joint positions in whole millimetres per frame (null when a hand isn't fully tracked), joints tracked per hand, headset position, a timestamp, the browser's user agent and a free-text note. About 45 KB per second for two hands.
+- Format in `src/hands/hand-recording.ts`: joint positions in whole millimetres per frame (null when a hand isn't fully tracked), joints tracked per hand, headset position, a timestamp, the browser's user agent and a free-text note. About 45 KB per second for two hands.
 - **On a headset:** add `?record=<seconds>` (and optionally `&note=...`) to the game URL. Recording starts when the first hand is tracked. After leaving XR, the page offers **Download recording**.
 - **On the webcam bench:** **Record**, then **Stop and download**.
 - **Viewing:** the Hand Recording Player page opens any `.handrec.json` and replays it in 3D with feature traces over time.

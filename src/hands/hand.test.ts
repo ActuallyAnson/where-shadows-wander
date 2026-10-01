@@ -22,7 +22,7 @@ function flatHand(handedness: Handedness) {
   return hand;
 }
 
-describe('hand contract', () => {
+describe('hand data', () => {
   it('has 25 joints and a parent for each', () => {
     expect(JOINT_NAMES).toHaveLength(25);
     expect(JOINT_PARENT).toHaveLength(25);
