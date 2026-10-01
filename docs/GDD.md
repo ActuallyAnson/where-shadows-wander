@@ -174,6 +174,17 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 Where Shadows Wander is a 2D game running on a single plane in 3D space, which keeps rendering cheap and lets the tabletop and wall modes share all game code.
 
+### Architecture
+
+The decisions are recorded in [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md) and [ADR 0002](adr/0002-plain-threejs-fallback.md).
+
+- **IWSDK** provides the XR session, the emulator and scene understanding (planes, anchors), and possibly spatial audio. Nothing else.
+- **Gameplay and simulation never import IWSDK or three.js.** They are plain TypeScript, and a build check enforces this.
+- **View layer:** plain three.js objects (`InstancedMesh`, custom shaders). IWSDK's ECS is used only where it clearly saves work.
+- **Loop:** the simulation runs on our own fixed-timestep loop, driven by a single IWSDK system once per display frame.
+- **Versions:** IWSDK is pinned to exactly 1.0.0, and three.js is IWSDK's `super-three@0.181.0` fork. There is never a second copy of three.
+- **Fallback:** plain three.js + `@iwsdk/xr-input`. The entry file is about 54 lines and was tested in the emulator; see ADR 0002.
+
 ### Stack
 
 | Area | Choice |
@@ -182,7 +193,7 @@ Where Shadows Wander is a 2D game running on a single plane in 3D space, which k
 | Session | immersive-ar (passthrough) |
 | XR features | Hand tracking, plane detection, mesh detection (optional), anchors |
 | 2D physics | Lightweight 2D library or a small custom solver in plane space |
-| Hosting | Static site (e.g. GitHub Pages or Vercel), opened in Quest Browser |
+| Hosting | Static HTTPS site on GitHub Pages, deployed by the Actions workflow (classic Jekyll Pages drops IWSDK's `_virtual_*` chunk), opened in Quest Browser |
 | Performance | Minimum 60 fps (judging requirement), target 72 fps |
 
 ### Plane-space game
@@ -238,7 +249,7 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 
 ### Open questions
 
-- [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission.
+- [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission. Also ask about the plain three.js + `@iwsdk/xr-input` fallback, which may raise the same question Babylon.js did.
 
 - [ ] Verify persistent anchor support in the current Quest Browser on device.
 
@@ -318,7 +329,7 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Milestones (7 weeks to 19 Nov)
 
-1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell on device: hands, passthrough, table and wall detection, lantern placement. Confirm submission rules.
+1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hands, passthrough, table and wall detection, lantern placement. Host the early build on GitHub Pages (HTTPS) with a "Copy report" diagnostics button, and have a remote Quest tester run it and send back the report, which answers the Quest-only risks below. Confirm submission rules.
 
 2.  **Week 2 (to 15 Oct):** Planar shadow rendering and the 2D plane-space game layer, working in both stage modes.
 
@@ -334,11 +345,20 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Risks
 
+Everything in the IWSDK spike ran in the emulator only. The rows marked *Quest-only* can only be answered on a real headset, through the remote tester's diagnostics report in week 1.
+
 | Risk | Impact | Mitigation |
 |----|----|----|
 | Shape recognition feels unreliable to new players | High | Week 3 stranger tests; tolerance slider; physical-outline collision for simple roles |
 | No usable wall in the judge's room | High | Tabletop theatre is the default mode |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
+| Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |
 | Slow cold start in Quest Browser | Medium | Small initial bundle; stream chapter assets after the lantern appears |
 | Anchor persistence unreliable | Medium | Store gallery relative to detected surfaces |
 | Scope creep | Medium | One chapter only; feature freeze end of week 6 |
+| *Quest-only:* real passthrough and cold start in Quest Browser over Wi-Fi | Medium | Report checks `alpha-blend` and time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
+| *Quest-only:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
+| *Quest-only:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
+| *Quest-only:* room-setup planes missing or noisy near the player; plane normal sign | High | Report lists planes with labels, size, distance and normal direction; tabletop default; normal is flipped toward the viewer in code |
+| *Quest-only:* persistent anchors across browser restarts | Medium | Report creates, persists and restores a probe anchor; gallery stored relative to detected surfaces if it fails |
+| *Quest-only:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
