@@ -1,0 +1,140 @@
+# Getting started
+
+How to run Where Shadows Wander on your laptop, test it without a headset, and try it on a Pico or Quest. For why things are built this way, see the [ADRs](adr/) and the [GDD](GDD.md).
+
+## 1. What you need
+
+- **Node.js** 22.12 or newer 22.x (the repo's `.nvmrc` says `22.12.0`). Node 20.19+ and 24+ also work.
+- **Google Chrome** on your laptop.
+- **Git**, and access to the GitHub repo.
+- Optional: a **webcam** (for hand shapes), a **Pico or Quest** headset on the same Wi-Fi as your laptop.
+
+## 2. First-time setup
+
+```sh
+git clone https://github.com/ActuallyAnson/where-shadow-wander.git
+cd where-shadow-wander
+nvm use            # if you use nvm; picks Node from .nvmrc
+npm ci             # installs the exact versions in package-lock.json
+npm run check      # should end with all tests passing
+```
+
+Use `npm ci`, not `npm install`, so you get exactly the pinned versions. IWSDK and three.js are pinned on purpose (see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
+
+## 3. Start the dev server
+
+```sh
+npm run dev
+```
+
+You'll see something like:
+
+```
+➜  Local:   https://localhost:8081/
+➜  Network: https://192.168.1.95:8081/
+[IWSDK] Runtime ready at https://localhost:8081/
+```
+
+- **Local** is for your laptop. **Network** is your laptop's Wi-Fi address, for a headset.
+- A separate Chromium window may open. That's IWSDK's managed browser, used by the scripted tests in section 8. You can ignore it.
+- Lines saying `Sourcemap ... points to missing source files` are harmless.
+- Stop with **Ctrl+C**. If port 8081 stays busy afterwards, run `npm run dev:down`.
+
+## 4. Try it in the emulator (no headset)
+
+The dev server adds IWER, an emulated Quest 3 with hands, sitting in a fake living room.
+
+1. Open **https://localhost:8081/** in your own Chrome, not the managed window.
+2. Chrome warns "Your connection is not private". The dev server uses a self-signed certificate. Click **Advanced**, then **Proceed to localhost**.
+3. Click **Enter XR**. The fake room appears behind the app, standing in for passthrough.
+4. In the emulator toolbar, open the input menu and choose **Hands**. Orange dots appear on each finger joint.
+5. Use the hand panels to try pose presets, the pinch slider, and the move/rotate handles.
+6. Exit XR, then press **Copy report** (bottom left) to see what the app measured: hands, planes, anchors, frame rate.
+
+The emulator's hands are perfect and synthetic. It's for checking that code works, not how tracking feels.
+
+## 5. Test hand shapes with your webcam
+
+1. With `npm run dev` running, open **https://localhost:8081/webcam.html**.
+2. Press **Start camera** and allow camera access. The first start downloads the hand model (about 8 MB).
+3. Make shapes: flat hand, fist, pinch, palm up and down. The panel shows each hand's shape guess, palm direction, thumb–index gap, finger spread and finger curl.
+4. **Record**, then **Stop and download**, saves a `.handrec.json` file.
+
+Video stays in your browser. Webcam depth is approximate and the camera sees your hands from the front, so use this for shapes, not tracking quality. Details: [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
+
+## 6. Try it on a headset
+
+We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-in-test-device.md)).
+
+**Over your Wi-Fi (fastest):**
+
+1. Put the laptop and headset on the same Wi-Fi, and run `npm run dev`.
+2. In the headset browser, open the **Network** address from section 3, e.g. `https://192.168.1.95:8081/`.
+3. Accept the certificate warning (usually **Advanced**, then **Proceed**; the wording varies by browser).
+4. Make sure the headset's room or space setup is done.
+5. Press **Enter XR**, allow hand tracking and spatial data, and put the controllers down.
+6. Look around for about 30 seconds and move your hands in front of you. Orange dots should follow your fingers.
+7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
+
+**From the hosted build:** once GitHub Pages is set up (section 10), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
+
+**To record hand data on a headset,** add `?record=20` to the address, for example `https://192.168.1.95:8081/?record=20&note=fist then flat hand`. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR, press **Download recording**.
+
+## 7. View a recording
+
+Open a `.handrec.json` in the Hand Recording Player (ask the project owner for the link; it's a private page they share). It replays the hands in 3D, with the classifier's features plotted over time. Gaps in the traces mean a hand wasn't fully tracked.
+
+Keep recordings in `recordings/`. That folder is gitignored, so recordings don't bloat the repo.
+
+## 8. Scripted emulator tests
+
+With `npm run dev` running, you can drive the emulator from a second terminal:
+
+```sh
+npx iwsdk xr enter
+npx iwsdk xr set-input-mode --input-json '{"mode":"hand"}'
+npx iwsdk xr animate-to --input-json '{"device":"hand-right","position":{"x":0.1,"y":1.35,"z":-0.35},"duration":1.5}'
+npx iwsdk xr animate-to --input-json '{"device":"hand-right","orientation":{"roll":-170},"duration":1}'
+npx iwsdk xr set-select-value --input-json '{"device":"hand-right","value":1}'   # pinch
+npx iwsdk xr set-connected --input-json '{"device":"hand-left","connected":false}' # lose a hand
+npx iwsdk browser run scripts/read-report.mjs    # what the app measured
+npx iwsdk browser run scripts/census.mjs         # what is drawn
+npx iwsdk browser screenshot
+```
+
+`npx iwsdk xr --help` lists every command.
+
+## 9. Before you commit
+
+```sh
+npm run check   # typecheck, import boundaries, single three.js, unit tests
+npm run build   # production build into dist/
+```
+
+`npm run check` fails if:
+- code in `src/contracts`, `src/sim` or `src/game` imports IWSDK, three.js or platform code (gameplay stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
+- a second copy of three.js gets installed;
+- a test fails.
+
+Commit messages use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
+
+To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open http://localhost:4173/where-shadow-wander/.
+
+## 10. Deploying
+
+Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is then at https://actuallyanson.github.io/where-shadow-wander/ (and the webcam bench at `.../webcam.html`).
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "Your connection is not private" | Expected with the dev server. Click **Advanced → Proceed**. |
+| Port 8081 already in use | `npm run dev:down`, then `npm run dev` again. |
+| No **Enter XR** button in desktop Chrome | Use the dev server (`npm run dev`), which adds the emulator. The hosted build only offers XR on a headset. |
+| No orange dots in the emulator | Switch the emulator's input to **Hands**. |
+| No orange dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
+| Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
+| Webcam bench says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
+| Webcam bench stuck on "Loading hand model" | The model downloads from Google on first start. Check your internet connection. |
+| `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
+| Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |
