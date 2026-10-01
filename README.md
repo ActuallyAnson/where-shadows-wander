@@ -28,6 +28,8 @@ npx iwsdk browser run scripts/read-report.mjs   # diagnostics report
 npx iwsdk browser run scripts/census.mjs        # what is drawn (IWSDK hand meshes and rays should be hidden)
 ```
 
+**Test hand shapes with your webcam (no headset):** with `npm run dev` running, open https://localhost:8081/webcam.html, press **Start camera** and allow camera access. It shows the game's hand features (palm direction, pinch gap, finger spread and curl) live. **Record** saves a `.handrec.json` you can open in the Hand Recording Player. Depth from one camera is approximate, so use it for shapes, not tracking quality.
+
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open `http://localhost:4173/where-shadow-wander/`.
 
 ### Code layout

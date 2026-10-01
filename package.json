@@ -22,6 +22,7 @@
   "devDependencies": {
     "@iwsdk/cli": "1.0.0",
     "@iwsdk/vite-plugin-dev": "1.0.0",
+    "@mediapipe/tasks-vision": "1.0.1",
     "@types/three": "0.181.0",
     "@types/webxr": "0.5.24",
     "typescript": "5.9.3",

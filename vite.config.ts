@@ -24,7 +24,7 @@ export default defineConfig({
     // Not esnext: other headset browsers (Pico) may run an older Chromium than
     // Quest Browser. Chrome 100 still covers WebXR hands, anchors and planes.
     target: ['es2022', 'chrome100'],
-    rollupOptions: { input: './index.html' },
+    rollupOptions: { input: { main: './index.html', webcam: './webcam.html' } },
   },
   esbuild: { target: 'esnext' },
   resolve: {
