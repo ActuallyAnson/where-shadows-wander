@@ -5,6 +5,8 @@
 // listed in docs/GDD.md (Risks).
 import type { WebGLRenderer } from '@iwsdk/core';
 import type { HandFrame, Handedness } from '../contracts/hand';
+import { AnchorProbe, localStorageHandleStore } from './anchor-probe';
+import { RingBuffer } from './ring-buffer';
 
 const STORAGE_KEY = 'wsw.diagnostics.v1';
 const ANCHOR_KEY = 'wsw.diagnostics.anchor-uuid';
@@ -28,18 +30,15 @@ interface HandStats {
 export class Diagnostics {
   private readonly report: Json;
   private readonly errors: string[] = [];
-  private readonly intervals: number[] = [];
-  private readonly cpu: number[] = [];
+  private readonly intervals = new RingBuffer(WINDOW);
+  private readonly cpu = new RingBuffer(WINDOW);
   private readonly handStats: Record<Handedness, HandStats> = { left: newHandStats(), right: newHandStats() };
   private lastFrameAt = 0;
   private xrFrames = 0;
   private sessionStartedAt = 0;
   private lastSaveAt = 0;
   private planeCount = -1;
-  private anchorProbe: 'idle' | 'running' | 'done' = 'idle';
-  private anchorResult: Json = {};
-  private anchor: XRAnchor | null = null;
-  private anchorTracking = { framesWithPose: 0, framesWithoutPose: 0, lastPositionRef: null as number[] | null };
+  private readonly anchorProbe = new AnchorProbe(localStorageHandleStore(ANCHOR_KEY), () => this.save());
   private sessionInfo: Json | null = null;
   private sessionCount = 0;
   private extra: () => Json = () => ({});
@@ -75,14 +74,10 @@ export class Diagnostics {
     this.sessionCount++;
     this.sessionStartedAt = performance.now();
     this.xrFrames = 0;
-    this.intervals.length = 0;
-    this.cpu.length = 0;
+    this.intervals.clear();
+    this.cpu.clear();
     this.lastFrameAt = 0;
     this.planeCount = -1;
-    this.anchorProbe = 'idle';
-    this.anchor = null;
-    this.anchorResult = {};
-    this.anchorTracking = { framesWithPose: 0, framesWithoutPose: 0, lastPositionRef: null };
     this.handStats.left = newHandStats();
     this.handStats.right = newHandStats();
     const s = session as XRSession & { enabledFeatures?: string[]; supportedFrameRates?: Float32Array };
@@ -117,14 +112,15 @@ export class Diagnostics {
       if (this.sessionInfo) this.sessionInfo.msToFirstXrFrame = Math.round(now - this.sessionStartedAt);
     }
     this.xrFrames++;
-    if (this.lastFrameAt) push(this.intervals, now - this.lastFrameAt);
+    if (this.lastFrameAt) this.intervals.push(now - this.lastFrameAt);
     this.lastFrameAt = now;
-    push(this.cpu, cpuMs);
+    this.cpu.push(cpuMs);
     if (this.sessionInfo) this.sessionInfo.frameRate = frame.session.frameRate ?? null;
 
-    for (const h of ['left', 'right'] as const) trackHand(this.handStats[h], hands[h]);
+    trackHand(this.handStats.left, hands.left);
+    trackHand(this.handStats.right, hands.right);
     this.snapshotPlanes(frame, refSpace);
-    this.probeAnchor(frame, refSpace);
+    this.anchorProbe.step(frame, refSpace);
 
     if (now - this.lastSaveAt > SAVE_EVERY_MS) this.save();
   }
@@ -145,15 +141,15 @@ export class Diagnostics {
         ? {
             xrFrames: this.xrFrames,
             fpsAvg: r3(this.xrFrames / Math.max(elapsedS, 1e-3)),
-            intervalMsAvg: r3(avg(this.intervals)),
-            intervalMsP95: r3(pct(this.intervals, 0.95)),
-            intervalMsMax: r3(Math.max(0, ...this.intervals)),
-            ourCpuMsAvg: r3(avg(this.cpu)),
-            ourCpuMsP95: r3(pct(this.cpu, 0.95)),
+            intervalMsAvg: r3(this.intervals.mean()),
+            intervalMsP95: r3(this.intervals.percentile(0.95)),
+            intervalMsMax: r3(this.intervals.max()),
+            ourCpuMsAvg: r3(this.cpu.mean()),
+            ourCpuMsP95: r3(this.cpu.percentile(0.95)),
           }
         : null,
       hands: { left: handSummary(this.handStats.left), right: handSummary(this.handStats.right) },
-      anchors: this.anchorResult,
+      anchors: { ...this.anchorProbe.result, tracking: this.anchorProbe.tracking() },
       ...this.extra(),
       errors: [...this.errors],
     };
@@ -236,77 +232,6 @@ export class Diagnostics {
     this.report.planes = { count: planes.size, list };
   }
 
-  /**
-   * Creates one anchor half a metre in front of the start pose and asks for a
-   * persistent handle. On the next session (even after a browser restart) it
-   * tries to restore that handle first. The emulator fakes persistence with
-   * localStorage, so only a device run answers this.
-   */
-  private probeAnchor(frame: XRFrame, refSpace: XRReferenceSpace): void {
-    if (this.anchor) {
-      // A restore can resolve and still never track, so count frames with a pose.
-      const pose = frame.getPose(this.anchor.anchorSpace, refSpace);
-      const t = this.anchorTracking;
-      if (pose) {
-        t.framesWithPose++;
-        const p = pose.transform.position;
-        t.lastPositionRef = [r3(p.x), r3(p.y), r3(p.z)];
-      } else {
-        t.framesWithoutPose++;
-      }
-      this.anchorResult.tracking = t;
-    }
-    if (this.anchorProbe !== 'idle') return;
-    this.anchorProbe = 'running';
-    const session = frame.session as XRSession & {
-      restorePersistentAnchor?: (uuid: string) => Promise<XRAnchor>;
-      persistentAnchors?: readonly string[];
-    };
-    const a = this.anchorResult;
-    a.createAnchor = typeof frame.createAnchor === 'function';
-    a.restorePersistentAnchor = typeof session.restorePersistentAnchor === 'function';
-    a.persistentAnchorsAtStart = session.persistentAnchors ? [...session.persistentAnchors] : 'unsupported';
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(ANCHOR_KEY);
-    } catch {
-      // ignore
-    }
-    a.savedUuid = saved;
-    const run = async () => {
-      if (saved && session.restorePersistentAnchor) {
-        try {
-          this.anchor = await session.restorePersistentAnchor(saved);
-          a.restored = true;
-          return;
-        } catch (e) {
-          a.restoreError = String(e);
-        }
-      }
-      if (!frame.createAnchor) return;
-      const anchor = await frame.createAnchor(new XRRigidTransform({ x: 0, y: 0.8, z: -0.5 }), refSpace);
-      a.created = !!anchor;
-      this.anchor = anchor ?? null;
-      const persistable = anchor as XRAnchor & { requestPersistentHandle?: () => Promise<string> };
-      if (persistable?.requestPersistentHandle) {
-        const uuid = await persistable.requestPersistentHandle();
-        a.persistedUuid = uuid;
-        try {
-          localStorage.setItem(ANCHOR_KEY, uuid);
-        } catch {
-          // ignore
-        }
-      } else {
-        a.persistedUuid = 'requestPersistentHandle unsupported';
-      }
-    };
-    run()
-      .catch((e) => (a.error = String(e)))
-      .finally(() => {
-        this.anchorProbe = 'done';
-        this.save();
-      });
-  }
 }
 
 /**
@@ -396,10 +321,4 @@ function handSummary(s: HandStats): Json {
   return rest;
 }
 
-function push(arr: number[], v: number): void {
-  arr.push(v);
-  if (arr.length > WINDOW) arr.shift();
-}
-const avg = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
-const pct = (a: number[], p: number) => (a.length ? [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * p))] : 0);
 const r3 = (n: number) => Math.round(n * 1000) / 1000;

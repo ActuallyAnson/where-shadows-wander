@@ -23,7 +23,10 @@ export function hideIwsdkHandMeshes(world: World): void {
 }
 
 function hideSkinned(root: Object3D | undefined): void {
-  root?.traverse((o) => {
-    if ((o as { isSkinnedMesh?: boolean }).isSkinnedMesh && o.visible) o.visible = false;
-  });
+  root?.traverse(hideIfSkinned);
+}
+
+// Module-level so traverse() doesn't get a new closure every frame.
+function hideIfSkinned(o: Object3D): void {
+  if ((o as { isSkinnedMesh?: boolean }).isSkinnedMesh && o.visible) o.visible = false;
 }

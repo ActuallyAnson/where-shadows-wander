@@ -25,12 +25,12 @@ export class XRHandReader {
    * @param originMatrix matrixWorld of the XR origin (world.player): reference space to scene.
    */
   update(frame: XRFrame, refSpace: XRReferenceSpace, originMatrix: Matrix4): void {
-    for (const h of [this.hands.left, this.hands.right]) {
-      h.tracked = false;
-      h.validJoints = 0;
-    }
+    this.hands.left.tracked = this.hands.right.tracked = false;
+    this.hands.left.validJoints = this.hands.right.validJoints = 0;
     const f = frame as FrameWithFill;
-    for (const source of frame.session.inputSources) {
+    const sources = frame.session.inputSources;
+    for (let s = 0; s < sources.length; s++) {
+      const source = sources[s];
       const xrHand = source.hand;
       if (!xrHand || (source.handedness !== 'left' && source.handedness !== 'right')) continue;
       const hand = this.hands[source.handedness];
