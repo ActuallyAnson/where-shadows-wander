@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-*/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Certificates and signing keys (dev HTTPS certs, Android/TWA signing)
+.iwsdk/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Packaged builds
+*.apk
+*.aab
+
+# Large recorded hand-tracking data (keep small fixtures elsewhere, or use Git LFS)
+recordings/
+*.handrec
+*.handrec.json
+
+# Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
