@@ -74,7 +74,9 @@ export const PRESETS: Readonly<Record<PresetName, Readonly<HandPose>>> = {
   cup: pose([f(0.4, -2), f(0.4, 0), f(0.4, 2), f(0.4, 4)], thumb(0.3, 25, 10), 180),
   spread: pose([f(0.03, -15), f(0.03, -3), f(0.03, 9), f(0.03, 22)], thumb(0.05, 60)),
   rabbit: pose([f(0.03, -8), f(0.03, 6), f(0.6, 2), f(0.6, -4)], thumb(0, 30, 0, 1, 'ring')),
-  fox: pose([f(0.03, -2), f(0.03, 0), f(0.03, 2), f(0.03, 4)], thumb(0, 10, 75)),
+  // Fingers together with the thumb out to the side (an L), hand turned pinky-down so the thumb points up.
+  // (A thumb can't lift far out of the palm toward the back of the hand.)
+  fox: pose([f(0.03, -2), f(0.03, 0), f(0.03, 2), f(0.03, 4)], thumb(0, 70), -90),
 };
 
 export function clonePose(p: Readonly<HandPose>): HandPose {

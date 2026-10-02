@@ -19,6 +19,7 @@ import { createMockSource, type MockMode, type MockSourceKind } from './mock-mod
 import { replayFromFile } from './replay-source';
 import { ScriptedSource } from './scripted-source';
 import { SyntheticSource } from './synthetic-source';
+import type { WebcamSource } from './webcam-source';
 
 const PANEL_W = 320;
 const STEP_M = 0.01;
@@ -219,6 +220,8 @@ export class HandLab {
         if (arg === 'replay') file.click();
         else void this.switchSource(arg as MockSourceKind);
       } else if (act === 'hand') this.selected = arg as Handedness;
+      else if (act === 'lock' && this.mode.source.name === 'webcam')
+        (this.mode.source as WebcamSource).lockSide = arg === 'auto' ? null : (arg as Handedness);
       else if (act === 'shape') s?.setShape(this.selected, arg as PresetName);
       else if (act === 'hide') s?.setShape(this.selected, s.shapeOf(this.selected) === null ? 'relaxed' : null);
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
@@ -274,6 +277,7 @@ export class HandLab {
       <h2>Source</h2><div class="row">${sources}</div>
       ${this.message ? `<p class="msg">${this.message}</p>` : ''}
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
+      ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (66 s) and saves a labelled recording')}
@@ -281,6 +285,12 @@ export class HandLab {
       <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
     // Fill the new prompt element now rather than leaving it blank until the next live update.
     if (this.guided) this.renderLive();
+  }
+
+  /** For one hand in front of the webcam: say which it is, since MediaPipe often guesses a lone hand wrong. */
+  private lockRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
+    const lock = (this.mode.source as WebcamSource).lockSide;
+    return `<h2>One hand is <span>${lock ?? 'auto'}</span></h2><div class="row">${btn('lock', 'auto', 'Auto', lock === null)}${btn('lock', 'left', 'Left', lock === 'left')}${btn('lock', 'right', 'Right', lock === 'right')}</div>`;
   }
 
   private renderLive(): void {

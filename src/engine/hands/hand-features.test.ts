@@ -103,14 +103,16 @@ describe('hand features (classifier inputs)', () => {
     expect(handFeatures(pose('fist'))!.spreadDeg).toBeLessThan(10);
   });
 
-  it('thumb angle separates flat from fox, lifted or sideways', () => {
+  it('thumb angle separates flat from fox, with the thumb out to the side or lifted', () => {
     expect(handFeatures(pose('flat'))!.thumbFwdDeg).toBeLessThan(30);
     expect(handFeatures(pose('fox'))!.thumbFwdDeg).toBeGreaterThan(55);
-    expect(handFeatures(pose('fox'))!.thumbElev).toBeGreaterThan(0.7);
-    const sideways = clonePose(PRESETS.fox);
-    sideways.thumb.liftDeg = 0;
-    sideways.thumb.abductDeg = 75;
-    expect(handFeatures(writeHandPose(sideways, W, createHandFrame('right')))!.thumbFwdDeg).toBeGreaterThan(55);
+    expect(Math.abs(handFeatures(pose('fox'))!.thumbElev)).toBeLessThan(0.3); // out to the side, in the palm plane
+    const lifted = clonePose(PRESETS.fox);
+    lifted.thumb.abductDeg = 10;
+    lifted.thumb.liftDeg = 75;
+    const f = handFeatures(writeHandPose(lifted, W, createHandFrame('right')))!;
+    expect(f.thumbFwdDeg).toBeGreaterThan(55);
+    expect(f.thumbElev).toBeGreaterThan(0.7);
     expect(handFeatures(pose('relaxed'))!.thumbFwdDeg).toBeLessThan(45);
   });
 });

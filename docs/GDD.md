@@ -72,7 +72,7 @@ Only a fixed set of one-handed shapes is recognised. Two-handed shapes are left 
 | Cup | Palm up, fingers curled | Catches rain, embers, or fireflies and carries them |
 | Spread | Fingers spread wide | Blocks wind, holds back vines, forms a cage |
 | Rabbit | Index and middle up, others pinched to thumb | Releases the rabbit companion |
-| Fox | Fingers together, thumb up as an ear | Releases the fox companion |
+| Fox | Fingers together, thumb up as an ear (the thumb out to the side like an L, with the hand turned so it points up) | Releases the fox companion |
 
 ### How a shape is used
 
