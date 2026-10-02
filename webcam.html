@@ -207,6 +207,37 @@
         bottom: 0;
         background: currentColor;
       }
+      .prompt {
+        position: absolute;
+        left: 50%;
+        top: 16px;
+        transform: translateX(-50%);
+        display: grid;
+        gap: 2px;
+        min-width: 60%;
+        padding: 12px 54px 12px 16px;
+        border-radius: 10px;
+        background: rgba(20, 22, 28, 0.85);
+        color: #ece6d8;
+        text-align: center;
+      }
+      .prompt[hidden] {
+        display: none;
+      }
+      .prompt b {
+        font-size: 26px;
+      }
+      .prompt span {
+        color: #a8a294;
+      }
+      .prompt em {
+        position: absolute;
+        right: 16px;
+        top: 12px;
+        font: 600 26px var(--mono);
+        font-style: normal;
+        color: #f0a24a;
+      }
       .note {
         color: var(--muted);
         font-size: 12.5px;
@@ -227,6 +258,14 @@
       <div class="bar">
         <button id="start" class="primary" type="button">Start camera</button>
         <button id="rec" class="rec" type="button" disabled>Record</button>
+        <button
+          id="guide"
+          type="button"
+          disabled
+          title="Prompts every shape on each hand (66 s) and saves a labelled recording"
+        >
+          Guided recording
+        </button>
         <span class="status" id="status">Camera off</span>
       </div>
       <div class="main">
@@ -237,6 +276,7 @@
           </div>
           <video id="video" playsinline muted></video>
           <canvas id="overlay"></canvas>
+          <div class="prompt" id="prompt" hidden></div>
         </div>
         <div class="hands">
           <section class="hand" id="hand-right"></section>
