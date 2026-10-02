@@ -92,11 +92,15 @@ const projectedOk = [false, false, false, false];
  * Fills `out` from a fully tracked hand and returns it, or returns null when
  * any joint is missing (the classifier pauses rather than guessing).
  * @param stageNormal the stage's normal; up for the tabletop theatre.
+ * @param curlBias each finger's curl when the hand is held flat (FINGER_NAMES
+ *   order, from hand-calibration.ts): curl is measured from there, rescaled so a
+ *   full curl still reads 1. Removes a player's (or a tracker's) baseline bend.
  */
 export function computeHandFeatures(
   hand: HandFrame,
   out: HandFeatures,
   stageNormal: Readonly<Vec3> = WORLD_UP,
+  curlBias: ArrayLike<number> | null = null,
 ): HandFeatures | null {
   if (!hand.tracked || hand.validJoints < 25) return null;
   const p = hand.positions;
@@ -109,7 +113,9 @@ export function computeHandFeatures(
   for (let i = 0; i < FINGER_NAMES.length; i++) {
     const name = FINGER_NAMES[i];
     const full = name === 'thumb' ? FULL_CURL.thumb : FULL_CURL.finger;
-    const c = Math.min(1, bend(p, CHAINS[name]) / full);
+    const raw = Math.min(1, bend(p, CHAINS[name]) / full);
+    const b = curlBias ? curlBias[i] : 0;
+    const c = b > 0 ? Math.min(Math.max((raw - b) / (1 - b), 0), 1) : raw;
     out.curl[name] = c;
     if (name === 'thumb') continue;
     sum += c;
