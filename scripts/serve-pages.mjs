@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const [dir = 'dist', port = '4173', base = '/where-shadow-wander/'] = process.argv.slice(2);
+const [dir = 'dist', port = '4173', base = '/where-shadows-wander/'] = process.argv.slice(2);
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.wasm': 'application/wasm', '.png': 'image/png' };
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');

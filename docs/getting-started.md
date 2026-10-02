@@ -12,8 +12,8 @@ How to run Where Shadows Wander on your laptop, test it without a headset, and t
 ## 2. First-time setup
 
 ```sh
-git clone https://github.com/ActuallyAnson/where-shadow-wander.git
-cd where-shadow-wander
+git clone https://github.com/ActuallyAnson/where-shadows-wander.git
+cd where-shadows-wander
 nvm use            # if you use nvm; picks Node from .nvmrc
 npm ci             # installs the exact versions in package-lock.json
 npm run check      # should end with all tests passing
@@ -118,11 +118,11 @@ npm run build   # production build into dist/
 
 Commit messages use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`).
 
-To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open http://localhost:4173/where-shadow-wander/.
+To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open http://localhost:4173/where-shadows-wander/.
 
 ## 10. Deploying
 
-Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is then at https://actuallyanson.github.io/where-shadow-wander/ (and the webcam bench at `.../webcam.html`).
+Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is at https://actuallyanson.github.io/where-shadows-wander/ (and the webcam bench at `.../webcam.html`). The published site is public even though the repo is private.
 
 ## Troubleshooting
 
