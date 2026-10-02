@@ -5,6 +5,9 @@ A seated, hands-only mixed reality puzzle game: light a tiny lantern on your rea
 **Status:** week 1, XR shell. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, emulator, webcam, headset testing, troubleshooting.
+- [Contributing](CONTRIBUTING.md): who owns what, issues, branches, PRs, code rules
+- [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
+- [Work plan](docs/WORKPLAN.md): tasks per person per week
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
 - Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md)
@@ -34,19 +37,6 @@ npx iwsdk browser run scripts/census.mjs        # what is drawn (IWSDK hand mesh
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open `http://localhost:4173/where-shadows-wander/`.
 
 ### Code layout
-
-| Folder | Owner | What | Pure (no IWSDK / three.js) |
-|---|---|---|---|
-| `src/app` | Anson | Entry point (`World.create`, the single driver system), IWSDK manifests, no-AR notice | No |
-| `src/engine/xr` | Anson | Raw WebXR hand reading, IWSDK workarounds, hand recorder, joint dots | No |
-| `src/engine/hands` | Anson | Hand data (25 joints, derived palm), shape features, recording format, synthetic hands, One Euro filter; later the classifier | **Yes** |
-| `src/engine/shadow` | Anson | Projected-shadow renderer (week 2) | No |
-| `src/input-mock` | Anson | Hand Lab (`?mock=1`) and its hand sources, webcam bench (`webcam.html`), MediaPipe conversion and worker | No |
-| `src/engine/sim` | A | Fixed-timestep loop; later the 2D solver and entities | **Yes** |
-| `src/engine/stage` | A | StageFrame maths (3D ↔ 2D stage space) | **Yes** |
-| `src/game` | A | Gameplay: traveller, shape abilities, puzzles, companions | **Yes** |
-| `src/engine/render`, `src/engine/anim`, `src/engine/services`, `src/ui` | B | Stage renderer, animation, saves, assets, audio, UI | Adapters no; core logic yes |
-| `src/debug` | B | Diagnostics report, anchor probe, Copy report panel | No |
 
 Folders without code yet are created by their owner when needed.
 
