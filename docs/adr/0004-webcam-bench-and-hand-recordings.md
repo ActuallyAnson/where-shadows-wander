@@ -38,9 +38,19 @@ Shape features live in `src/engine/hands/hand-features.ts` (finger curl, thumb�
 
 - Format in `src/engine/hands/hand-recording.ts`: joint positions in whole millimetres per frame (null when a hand isn't fully tracked), joints tracked per hand, headset position, a timestamp, the browser's user agent and a free-text note. About 45 KB per second for two hands.
 - **On a headset:** add `?record=<seconds>` (and optionally `&note=...`) to the game URL. Recording starts when the first hand is tracked. After leaving XR, the page offers **Download recording**.
-- **On the webcam bench:** **Record**, then **Stop and download**.
+- **On the webcam bench or in the Hand Lab (`?mock=1`):** **Record**, then **Stop and download**.
 - **Viewing:** the Hand Recording Player page opens any `.handrec.json` and replays it in 3D with feature traces over time.
 - Recordings go in `recordings/`, which is gitignored. Small fixtures that tests depend on should be kept elsewhere, or in Git LFS.
+
+### 4. Update (3 Oct 2026): webcam hands in the Hand Lab
+
+Mock mode (`?mock=1`, issue #6) added the Hand Lab, which has a webcam source next to synthetic, scripted and replayed hands. Two recordings from it changed how webcam hands are processed. The bench and the Hand Lab share all of this.
+
+- **One MediaPipe run per camera frame.** It is triggered by `requestVideoFrameCallback`. `video.currentTime` moves every display frame even without a new picture, so checking it ran MediaPipe several times on the same image.
+- **Hands keep their side when the label flips.** The label is still used as is (above), but MediaPipe sometimes flips it for a frame or two: a recording showed the right hand jumping 28 cm onto the left hand's spot. `HandAssigner` (`src/input-mock/hand-assigner.ts`) keeps each hand on the side it was on during the last 300 ms, and only goes against the label when that is clearly closer (by 5 cm). With no recent history, the label decides.
+- **In the Hand Lab, MediaPipe runs in a worker, on the CPU** (`hand-landmarker.worker.ts`), with 640×360 camera frames. On the main thread it took 8–38 ms per frame and stalled drawing. With the GPU delegate in a worker, it still stalled the page (16.7 ms frames became 72 ms in a headless test), because it competes with the page's WebGL for the GPU. On the CPU in a worker the page kept 16.7 ms. The bench still runs MediaPipe on its own page.
+- **Webcam hands are smoothed for display.** Each camera frame goes through a One Euro filter (`src/engine/hands/one-euro.ts`; it keeps about 28 % of jitter at rest and lags about 1 cm behind a 0.5 m/s move). The hand then glides between camera frames, which adds at most one camera frame of delay. Recordings made from the webcam source therefore hold smoothed hands. Headset hands are never filtered this way.
+- In the Hand Lab, webcam hands are turned 180° about a point 0.5 m in front of the view, so you see them from your own side as a headset would. Turning, unlike mirroring, keeps each hand's true shape.
 
 ## What each source is good for
 

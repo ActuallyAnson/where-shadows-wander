@@ -16,7 +16,7 @@ Goal: the shell runs on the Pico with hands, passthrough and plane detection, an
 | Anson | Team docs: CONTRIBUTING, ARCHITECTURE, WORKPLAN | #2 | ✅ |
 | Anson | ESLint, Prettier, required CI | #4 | ✅ |
 | Anson | XR capability layer | #5 | |
-| Anson | Mock input mode (`?mock=1`) | #6 | |
+| Anson | Mock input mode (`?mock=1`) | #6 | ✅ |
 | Anson | Shape labels in hand recordings | #7 | |
 | B | First Pico session and its report | #8 | |
 | B | Take over CI and the Pages deploy | | |

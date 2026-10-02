@@ -1,15 +1,12 @@
 // Webcam Hand Bench: MediaPipe hands -> HandFrame -> the same features the
 // classifier will use. Runs in a normal browser tab, no headset needed.
-import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
-import wasmLoaderPath from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
-import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
-import { createHandFrame, derivePalm, type HandFrame, type Handedness } from '../engine/hands/hand';
-import { FINGER_NAMES, handFeatures, roughShape } from '../engine/hands/hand-features';
+import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
-import { handednessFromLabel, mediapipeToHandFrame } from './mediapipe-hands';
+import { downloadRecording, handCardHtml } from './hand-card';
+import { HandAssigner } from './hand-assigner';
+import { createHandLandmarker, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
+import { handednessFromLabel, resultToHands } from './mediapipe-hands';
 
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 // MediaPipe's 21-landmark skeleton, for drawing the overlay.
 // prettier-ignore
 const BONES = [
@@ -27,7 +24,7 @@ const hands: Record<Handedness, HandFrame> = { left: createHandFrame('left'), ri
 let landmarker: HandLandmarker | null = null;
 let recording: HandRecording | null = null;
 let recordStart = 0;
-let lastVideoTime = -1;
+const assigner = new HandAssigner();
 let frames = 0;
 let fpsAt = performance.now();
 let fps = 0;
@@ -41,14 +38,7 @@ async function start(): Promise<void> {
   button.disabled = true;
   try {
     status.textContent = 'Loading hand model…';
-    if (!landmarker) {
-      const fileset = { wasmLoaderPath, wasmBinaryPath } as Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
-      landmarker = await HandLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numHands: 2,
-      });
-    }
+    landmarker ??= await createHandLandmarker();
     status.textContent = 'Waiting for camera permission…';
     video.srcObject = await navigator.mediaDevices.getUserMedia({
       video: { width: 1280, height: 720, facingMode: 'user' },
@@ -58,19 +48,19 @@ async function start(): Promise<void> {
     $('empty').hidden = true;
     $<HTMLButtonElement>('rec').disabled = false;
     button.textContent = 'Camera on';
-    requestAnimationFrame(loop);
+    video.requestVideoFrameCallback(loop);
   } catch (e) {
     button.disabled = false;
     status.textContent = `Couldn't start: ${e instanceof Error ? e.message : String(e)}. Check camera permission and that no other app is using the camera.`;
   }
 }
 
+/** Runs once per new camera frame (see WebcamSource for why not once per display frame). */
 function loop(): void {
-  if (landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
+  if (landmarker && video.readyState >= 2) {
     const now = performance.now();
     const result = landmarker.detectForVideo(video, now);
-    update(result);
+    resultToHands(result, hands, assigner, now);
     draw(result);
     if (recording) recordFrame(recording, (now - recordStart) / 1000, hands.left, hands.right, null);
     frames++;
@@ -83,17 +73,7 @@ function loop(): void {
     status.textContent = `${fps.toFixed(0)} fps · ${result.landmarks.length} hand(s)${rec}`;
     render();
   }
-  requestAnimationFrame(loop);
-}
-
-function update(result: HandLandmarkerResult): void {
-  hands.left.tracked = hands.right.tracked = false;
-  hands.left.validJoints = hands.right.validJoints = 0;
-  result.landmarks.forEach((image, i) => {
-    const side = handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left');
-    if (hands[side].tracked) return; // two hands with the same label: keep the first
-    mediapipeToHandFrame(result.worldLandmarks[i], image, hands[side]);
-  });
+  video.requestVideoFrameCallback(loop);
 }
 
 function draw(result: HandLandmarkerResult): void {
@@ -120,31 +100,9 @@ function draw(result: HandLandmarkerResult): void {
 }
 
 function render(): void {
-  for (const side of ['right', 'left'] as const) $(`hand-${side}`).innerHTML = card(side);
-}
-
-function card(side: Handedness): string {
-  const color = side === 'right' ? 'var(--right)' : 'var(--left)';
-  const title = `<h2><i class="dot" style="background:${color}"></i>${side} hand</h2>`;
-  const f = handFeatures(hands[side]);
-  const palm = derivePalm(hands[side]);
-  if (!f || !palm) return `${title}<div class="shape none">Not seen</div>`;
-  const [, ny, nz] = palm.normal;
-  // Scene: +Z points from the hand toward the camera, +Y up. You sit behind the hand, so -Z is toward you.
-  const facing =
-    ny > 0.6 ? 'up' : ny < -0.6 ? 'down' : nz > 0.6 ? 'toward the camera' : nz < -0.6 ? 'toward you' : 'sideways';
-  return `${title}
-    <div class="shape">${roughShape(f)}</div>
-    <dl>
-      <dt>Palm faces</dt><dd>${facing}</dd>
-      <dt>Palm normal</dt><dd>${palm.normal.map((v) => v.toFixed(2)).join(' ')}</dd>
-      <dt>Thumb–index gap</dt><dd>${f.pinchGapMm.toFixed(0)} mm</dd>
-      <dt>Finger spread</dt><dd>${f.spreadDeg.toFixed(0)}°</dd>
-      <dt>Mean curl</dt><dd>${f.meanCurl.toFixed(2)}</dd>
-    </dl>
-    <div class="curls" style="color:${color}">${FINGER_NAMES.map(
-      (n) => `<div class="curl"><div class="b"><i style="height:${(f.curl[n] * 100).toFixed(0)}%"></i></div>${n}</div>`,
-    ).join('')}</div>`;
+  // On the bench the webcam faces you, so +Z points toward the camera.
+  for (const side of ['right', 'left'] as const)
+    $(`hand-${side}`).innerHTML = handCardHtml(hands[side], ['toward the camera', 'toward you']);
 }
 
 function toggleRecording(): void {
@@ -158,11 +116,5 @@ function toggleRecording(): void {
   const rec = recording;
   recording = null;
   button.textContent = 'Record';
-  const url = URL.createObjectURL(new Blob([JSON.stringify(rec)], { type: 'application/json' }));
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `wsw-webcam-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`,
-  });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadRecording(rec, 'wsw-webcam');
 }

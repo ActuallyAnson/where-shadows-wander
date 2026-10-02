@@ -58,6 +58,15 @@ export function recordFrame(
   });
 }
 
+/** Checks that parsed JSON is a recording this code can read, and returns it typed. Throws if not. */
+export function parseRecording(json: unknown): HandRecording {
+  const r = json as Partial<HandRecording> | null;
+  if (r?.format !== RECORDING_FORMAT) throw new Error('Not a hand recording (.handrec.json)');
+  if (r.version !== RECORDING_VERSION) throw new Error(`Unsupported recording version ${String(r.version)}`);
+  if (!Array.isArray(r.frames) || r.frames.length === 0) throw new Error('Recording has no frames');
+  return r as HandRecording;
+}
+
 /** Writes a recorded hand back into a HandFrame (for replay in tests or the emulator). */
 export function replayInto(frame: RecordedFrame, side: 'left' | 'right', out: HandFrame): HandFrame {
   const src = frame[side];

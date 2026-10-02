@@ -59,7 +59,7 @@ Say in the PR which of these you checked:
 
 - **Unit tests:** `npm test`.
 - **Emulator:** `npm run dev`, then Enter XR with hands. The scripted commands are in getting-started, section 8.
-- **Webcam bench:** for anything about hand shapes.
+- **Hand Lab (`?mock=1`):** for anything about hand shapes or hand data, with synthetic, scripted, replayed or webcam hands.
 - **Pico:** for anything about real tracking, rooms, performance or feel.
 - **Quest:** remote tester rounds at the end of weeks 3, 5 and 7.
 
