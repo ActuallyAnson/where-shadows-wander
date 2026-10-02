@@ -29,7 +29,7 @@ npx iwsdk browser run scripts/read-report.mjs   # diagnostics report
 npx iwsdk browser run scripts/census.mjs        # what is drawn (IWSDK hand meshes and rays should be hidden)
 ```
 
-**Test hand shapes with your webcam (no headset):** with `npm run dev` running, open https://localhost:8081/webcam.html, press **Start camera** and allow camera access. It shows the game's hand features (palm direction, pinch gap, finger spread and curl) live. **Record** saves a `.handrec.json` you can open in the Hand Recording Player. Depth from one camera is approximate, so use it for shapes, not tracking quality.
+**Test hands without a headset (Hand Lab):** with `npm run dev` running, open https://localhost:8081/?mock=1 in a normal browser tab, or press **Open Hand Lab** on the game page. Pick a source: **Synthetic** (click a shape or press 0–6), **Script** (every shape on each hand in turn), **Replay…** (a `.handrec.json`) or **Webcam** (your own hands, through MediaPipe). It shows the hands in 3D (drag to look around) and the game's hand features live; **Record** saves a `.handrec.json`. Webcam depth is approximate, so use it for shapes, not tracking quality. The older webcam bench (https://localhost:8081/webcam.html) shows the camera image with the tracked landmarks drawn on it.
 
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open `http://localhost:4173/where-shadows-wander/`.
 
@@ -39,9 +39,9 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 |---|---|---|---|
 | `src/app` | Anson | Entry point (`World.create`, the single driver system), IWSDK manifests, no-AR notice | No |
 | `src/engine/xr` | Anson | Raw WebXR hand reading, IWSDK workarounds, hand recorder, joint dots | No |
-| `src/engine/hands` | Anson | Hand data (25 joints, derived palm), shape features, recording format; later the classifier | **Yes** |
+| `src/engine/hands` | Anson | Hand data (25 joints, derived palm), shape features, recording format, synthetic hands, One Euro filter; later the classifier | **Yes** |
 | `src/engine/shadow` | Anson | Projected-shadow renderer (week 2) | No |
-| `src/input-mock` | Anson | Webcam hand bench (`webcam.html`), MediaPipe conversion; later `?mock=1` | No |
+| `src/input-mock` | Anson | Hand Lab (`?mock=1`) and its hand sources, webcam bench (`webcam.html`), MediaPipe conversion and worker | No |
 | `src/engine/sim` | A | Fixed-timestep loop; later the 2D solver and entities | **Yes** |
 | `src/engine/stage` | A | StageFrame maths (3D ↔ 2D stage space) | **Yes** |
 | `src/game` | A | Gameplay: traveller, shape abilities, puzzles, companions | **Yes** |
@@ -64,7 +64,7 @@ Steps on the headset (Pico or Quest):
 
 1. Open the link in the headset browser. Make sure the headset's room or space setup is done.
 2. Press **Enter XR** and allow hand tracking and spatial data. Put the controllers down.
-3. Look around the room for about 30 seconds and move your hands in front of you. Orange dots should follow your finger joints.
+3. Look around the room for about 30 seconds and move your hands in front of you. Dots should follow your finger joints (orange for the right hand, blue for the left).
 4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
 5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This tests anchor persistence.
 

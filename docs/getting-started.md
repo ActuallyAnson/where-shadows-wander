@@ -47,20 +47,30 @@ The dev server adds IWER, an emulated Quest 3 with hands, sitting in a fake livi
 1. Open **https://localhost:8081/** in your own Chrome, not the managed window.
 2. Chrome warns "Your connection is not private". The dev server uses a self-signed certificate. Click **Advanced**, then **Proceed to localhost**.
 3. Click **Enter XR**. The fake room appears behind the app, standing in for passthrough.
-4. In the emulator toolbar, open the input menu and choose **Hands**. Orange dots appear on each finger joint.
+4. In the emulator toolbar, open the input menu and choose **Hands**. Dots appear on each finger joint, orange for the right hand and blue for the left.
 5. Use the hand panels to try pose presets, the pinch slider, and the move/rotate handles.
 6. Exit XR, then press **Copy report** (bottom left) to see what the app measured: hands, planes, anchors, frame rate.
 
 The emulator's hands are perfect and synthetic. It's for checking that code works, not how tracking feels.
 
-## 5. Test hand shapes with your webcam
+## 5. Test hands without a headset: the Hand Lab
 
-1. With `npm run dev` running, open **https://localhost:8081/webcam.html**.
-2. Press **Start camera** and allow camera access. The first start downloads the hand model (about 8 MB).
-3. Make shapes: flat hand, fist, pinch, palm up and down. The panel shows each hand's shape guess, palm direction, thumb–index gap, finger spread and finger curl.
-4. **Record**, then **Stop and download**, saves a `.handrec.json` file.
+The Hand Lab is mock mode (`?mock=1`): the game runs in a normal browser with hands from a mock source instead of a headset.
 
-Video stays in your browser. Webcam depth is approximate and the camera sees your hands from the front, so use this for shapes, not tracking quality. Details: [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
+1. With `npm run dev` running, open **https://localhost:8081/?mock=1** in a normal Chrome tab, or press **Open Hand Lab** (top left) on the game page. Don't use the window `npm run dev` opens by itself: it drops `?mock=1` when the page reloads, and it doesn't save downloads to your Downloads folder.
+2. Pick a **Source** in the panel on the right:
+   - **Synthetic:** choose **Left** or **Right**, then click a shape (or press 0–6). **Hide** takes a hand away (as if tracking were lost) and **Jitter** adds a few millimetres of tracking noise. Keys: R/L pick a hand, arrows move it (Shift for depth), Q/E roll, Z/X turn, Space pauses.
+   - **Script:** every shape on the right hand, then the left, in a loop.
+   - **Replay…:** pick a `.handrec.json`, or drag one onto the page.
+   - **Webcam:** your own hands. Allow camera access; the first start downloads the hand model (about 8 MB). The status line shows the tracking rate and MediaPipe's time per frame, which runs in the background and doesn't slow the page.
+3. Drag to look around the hands, scroll to zoom. The cards show each hand's palm direction, thumb–index gap, finger spread and finger curl. The big label is the shape the hand is posed as (Synthetic and Script); the rough guess under it only knows flat, fist and open until the classifier lands.
+4. **● Record**, then **Stop and download**, saves a `.handrec.json` to your Downloads folder.
+
+You can also choose the source in the address: `?mock=1&src=script`, `?mock=1&src=webcam`, or `?mock=1&src=replay&file=recordings/emulator-demo.handrec.json`. Adding `&record=10` records ten seconds the same way a headset does.
+
+**Webcam bench.** https://localhost:8081/webcam.html is the older single-purpose page: it shows the camera image with the tracked landmarks drawn over it, and the same feature cards.
+
+Video stays in your browser. Webcam depth is approximate and the camera sees your hands from the front, so use the webcam for shapes, not tracking quality. Details: [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
 
 ## 6. Try it on a headset
 
@@ -73,7 +83,7 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 3. Accept the certificate warning (usually **Advanced**, then **Proceed**; the wording varies by browser).
 4. Make sure the headset's room or space setup is done.
 5. Press **Enter XR**, allow hand tracking and spatial data, and put the controllers down.
-6. Look around for about 30 seconds and move your hands in front of you. Orange dots should follow your fingers.
+6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
 **From the hosted build:** once GitHub Pages is set up (section 10), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
@@ -83,6 +93,8 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 ## 7. View a recording
 
 Open a `.handrec.json` in the Hand Recording Player (ask the project owner for the link; it's a private page they share). It replays the hands in 3D, with the classifier's features plotted over time. Gaps in the traces mean a hand wasn't fully tracked.
+
+To watch one with the game's own code, open the Hand Lab (section 5), press **Replay…** and pick the file, or drag it onto the page. It loops, and the cards show the features frame by frame.
 
 Keep recordings in `recordings/`. That folder is gitignored, so recordings don't bloat the repo.
 
@@ -133,10 +145,13 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 | "Your connection is not private" | Expected with the dev server. Click **Advanced → Proceed**. |
 | Port 8081 already in use | `npm run dev:down`, then `npm run dev` again. |
 | No **Enter XR** button in desktop Chrome | Use the dev server (`npm run dev`), which adds the emulator. The hosted build only offers XR on a headset. |
-| No orange dots in the emulator | Switch the emulator's input to **Hands**. |
-| No orange dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
+| No hand dots in the emulator | Switch the emulator's input to **Hands**. |
+| No hand dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
-| Webcam bench says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
-| Webcam bench stuck on "Loading hand model" | The model downloads from Google on first start. Check your internet connection. |
+| Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
+| Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
+| Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
+| Hand Lab opens as the plain game | The address lost `?mock=1` (the window `npm run dev` opens drops it on reload). Use a normal Chrome tab. |
+| Hand Lab recording didn't download | You're in the window `npm run dev` opens, which doesn't save downloads. Use a normal Chrome tab. |
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |

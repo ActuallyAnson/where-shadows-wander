@@ -53,7 +53,7 @@ The stage is a 2D world on one real surface. `StageFrame` (`engine/stage`) conve
 | `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder |
 | `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
 | `src/engine/shadow` | Anson | No | Projected-shadow renderer and collision capsules |
-| `src/input-mock` | Anson | No | Webcam bench, MediaPipe conversion, `?mock=1` hand sources |
+| `src/input-mock` | Anson | No | Hand Lab (`?mock=1`) and its hand sources, webcam bench, MediaPipe conversion and worker |
 | `src/engine/sim` | A | Yes | Fixed-step loop, 2D collision solver, entities, object pools |
 | `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D, choosing a table or wall, snapping |
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
@@ -100,5 +100,5 @@ These are starting estimates. Desktop measurements so far: our whole frame was a
 ## Builds and deploys
 
 - `npm run dev`: IWSDK's dev server with HTTPS and the IWER emulator (Quest 3, synthetic living room).
-- `npm run build`: production build in `dist/`, with two pages: `index.html` (the game) and `webcam.html` (the webcam bench, which alone loads MediaPipe). Relative URLs, so it works under a GitHub Pages subpath.
+- `npm run build`: production build in `dist/`, with two pages: `index.html` (the game, and the Hand Lab with `?mock=1`) and `webcam.html` (the webcam bench). MediaPipe loads only on the bench and in the Hand Lab's webcam worker, never in the game's first load. Relative URLs, so it works under a GitHub Pages subpath.
 - CI (`.github/workflows/ci.yml`) runs `npm run check` and a build on every PR. Merging to `main` deploys to GitHub Pages (`.github/workflows/pages.yml`).
