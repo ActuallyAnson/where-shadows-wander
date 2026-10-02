@@ -3,12 +3,13 @@
 //
 //   idle -> candidate (a clear winner; the hold timer runs) -> committed
 //
-// - Enter vs keep: a shape becomes a candidate on its normal ranges, but a
-//   candidate or committed shape stays while it's inside ranges widened by
-//   `hysteresis` units, so a hand near a boundary doesn't flicker.
-// - Switching: while X is committed, a clearly better Y is held as a candidate
-//   and only replaces X when Y commits (release(switch) then commit, in one
-//   update), so there's no gap between roles.
+// - A candidate must stay inside its normal ranges for the whole hold (it
+//   matches continuously). A committed shape stays while it's inside ranges
+//   widened by `hysteresis` units, so a hand near a boundary doesn't flicker.
+// - Switching: when the committed shape X has drifted outside its normal
+//   ranges and another shape Y leads it by the ambiguity gap, Y is held as a
+//   candidate and replaces X only when Y commits (release(switch) then commit,
+//   in one update), so there's no gap between roles.
 // - Gating: with any joint missing the classifier pauses, freezing the hold
 //   and the committed shape. A pause longer than `freezeS` cancels a
 //   candidate; longer than `lostReleaseS` releases the committed shape. It
@@ -46,7 +47,10 @@ export const DEFAULT_CLASSIFIER_CONFIG: Readonly<ClassifierConfig> = {
   lostReleaseS: 0.5,
 };
 
-/** Longest step an update may take, so a long stall can't commit a shape in one go. */
+/**
+ * Longest step an update may take, so a long stall can't commit a shape in one
+ * go. Below 10 updates a second (a struggling webcam), holds take longer in real time.
+ */
 const MAX_DT = 0.1;
 const IS_COMPANION = SHAPES.map((s) => COMPANION_SHAPES.includes(s));
 
@@ -110,13 +114,16 @@ export class ShapeClassifier {
 
     if (this.candidate >= 0) {
       const y = this.candidate;
-      if (this.keep[y] < 0) {
-        events.push('cancel', this.hand, SHAPES[y], t, this.keep[y], this.heldS);
+      if (this.margins[y] < 0) {
+        events.push('cancel', this.hand, SHAPES[y], t, this.margins[y], this.heldS);
         this.candidate = -1;
         this.heldS = 0;
-      } else if (winner >= 0 && winner !== y && this.margins[winner] >= this.keep[y] + c.ambiguityGap) {
-        events.push('cancel', this.hand, SHAPES[y], t, this.keep[y], this.heldS);
-        this.startCandidate(winner, t, events);
+      } else if (winner >= 0 && winner !== y && this.margins[winner] >= this.margins[y] + c.ambiguityGap) {
+        events.push('cancel', this.hand, SHAPES[y], t, this.margins[y], this.heldS);
+        this.candidate = -1;
+        this.heldS = 0;
+        // The new leader may be the shape that's already committed: then there's nothing to hold.
+        if (winner !== this.committed) this.startCandidate(winner, t, events);
       } else {
         this.heldS += dt;
       }
@@ -127,7 +134,8 @@ export class ShapeClassifier {
         this.startCandidate(winner, t, events);
     }
 
-    if (this.candidate >= 0 && this.heldS >= this.holdS(this.candidate)) {
+    // The epsilon stops float rounding (24 × 1/60 is just under 0.4) costing a frame.
+    if (this.candidate >= 0 && this.heldS >= this.holdS(this.candidate) - 1e-6) {
       if (this.committed >= 0)
         events.push('release', this.hand, SHAPES[this.committed], t, this.keep[this.committed], 0, 'switch');
       this.committed = this.candidate;
@@ -166,9 +174,9 @@ export class ShapeClassifier {
     s.margin = paused
       ? 0
       : this.candidate >= 0
-        ? this.keep[this.candidate]
+        ? this.margins[this.candidate]
         : this.committed >= 0
-          ? this.keep[this.committed]
+          ? this.margins[this.committed]
           : 0;
   }
 }

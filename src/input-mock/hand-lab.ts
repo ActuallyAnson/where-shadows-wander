@@ -12,7 +12,7 @@ import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
 import { downloadRecording, handCardHtml } from './hand-card';
-import { MOCK_WRIST } from './hand-source';
+import { MOCK_WRIST, type HandSource } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
 import { ScriptedSource } from './scripted-source';
@@ -82,6 +82,12 @@ export class HandLab {
     this.view.camera.setViewOffset(w, h, narrow ? 0 : PANEL_W / 2, narrow ? h * 0.22 : 0, w, h);
   }
 
+  /** Changes the hand source; the classifier starts fresh, since mock time restarts at 0. */
+  private setSource(source: HandSource): void {
+    this.mode.setSource(source);
+    this.shapes.reset();
+  }
+
   private get synthetic(): SyntheticSource | null {
     return this.mode.source instanceof SyntheticSource ? this.mode.source : null;
   }
@@ -102,7 +108,7 @@ export class HandLab {
     this.renderControls();
     try {
       const source = file ? await replayFromFile(file) : await createMockSource({ source: kind, file: '' });
-      this.mode.setSource(source);
+      this.setSource(source);
       this.onSourceChanged();
       this.message = '';
     } catch (e) {
@@ -121,7 +127,7 @@ export class HandLab {
     if (this.recording || this.guided) return;
     this.message = '';
     this.mode.paused = false;
-    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
+    if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
     this.guidedStart = this.mode.time;
     this.guided = new GuidedRecording(
       new ShapeScript(SHAPES_SCRIPT),
@@ -140,7 +146,7 @@ export class HandLab {
     if (rec.frames.length) downloadRecording(rec, 'wsw-lab-guided');
     else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
     // The run used a one-shot script; go back to the looping one the Script button promises.
-    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource());
+    if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource());
     this.renderControls();
     this.renderLive();
   }

@@ -116,11 +116,12 @@ export function packFeatures(f: HandFeatures, out: Float32Array): Float32Array {
 
 /**
  * How far inside a shape's ranges `v` is, in tolerance units, with every
- * bound moved outward by `widen` units. >= 0 matches. Capped at 1, so one
- * comfortable feature can't hide a marginal one (the minimum is taken anyway).
+ * bound moved outward by `widen` units: the tightest feature decides. >= 0
+ * matches. Not capped, so at high tolerance shapes still rank by how well
+ * they match instead of tying.
  */
 export function shapeMargin(v: Float32Array, r: ShapeRanges, widen = 0): number {
-  let margin = 1;
+  let margin = Infinity;
   for (let i = 0; i < FEATURE_COUNT; i++) {
     const s = FEATURE_SCALE[i];
     if (r.lo[i] !== -Infinity) margin = Math.min(margin, (v[i] - r.lo[i]) / s + widen);

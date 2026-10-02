@@ -7,6 +7,8 @@ import { ShapeClassifier, type ClassifierConfig } from './shape-classifier';
 import { ShapeEventQueue } from './shape-events';
 import { SHAPES, type Shape } from './shapes';
 
+export const MAX_TOLERANCE = 3;
+
 export class ShapeRecognizer {
   readonly left: ShapeClassifier;
   readonly right: ShapeClassifier;
@@ -44,9 +46,12 @@ export class ShapeRecognizer {
     this.stageNormal[2] = n[2];
   }
 
-  /** Accessibility: 1 = normal, higher widens every shape's ranges. */
+  /**
+   * Accessibility: 1 = normal, up to MAX_TOLERANCE; each step widens every
+   * shape's ranges by one unit. Beyond that the shapes overlap too much to tell apart.
+   */
   setTolerance(tolerance: number): void {
-    this.left.config.tolerance = this.right.config.tolerance = tolerance;
+    this.left.config.tolerance = this.right.config.tolerance = Math.min(Math.max(tolerance, 1), MAX_TOLERANCE);
   }
 
   setHoldTimes(verbS: number, companionS: number): void {

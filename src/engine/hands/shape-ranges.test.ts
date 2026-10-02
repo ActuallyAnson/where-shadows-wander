@@ -74,12 +74,12 @@ describe('shape ranges', () => {
     expect(classify('flat', 'right', { roll: 90, pitch: 0, yaw: 0 })).not.toBe('flat');
   });
 
-  it('margins only grow as tolerance rises, and every preset stays its own shape at tolerance 2', () => {
+  it('tolerance widens by whole units, and every preset stays its own shape up to tolerance 3', () => {
     for (const shape of SHAPES) {
       const f = handFeatures(writeHandPose(PRESETS[shape], W, createHandFrame('right')))!;
       const v = packFeatures(f, packed);
-      expect(shapeMargin(v, SHAPE_RANGES[shape], 1)).toBeGreaterThanOrEqual(shapeMargin(v, SHAPE_RANGES[shape], 0));
-      expect(bestShape(f, 2), shape).toBe(shape);
+      expect(shapeMargin(v, SHAPE_RANGES[shape], 1)).toBeCloseTo(shapeMargin(v, SHAPE_RANGES[shape], 0) + 1, 5);
+      for (const tolerance of [1, 2, 3]) expect(bestShape(f, tolerance), `${shape} at ${tolerance}`).toBe(shape);
     }
   });
 

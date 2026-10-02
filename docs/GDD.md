@@ -244,20 +244,20 @@ Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): 
 
 | Shape | Ranges (starting values, tuned with recordings) |
 |----|----|
-| Flat | mean curl ≤ 0.19, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 35° of the fingers |
+| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 35° of the fingers |
 | Fist | every finger curl ≥ 0.65 |
 | Cup | every finger curl 0.2–0.6, palm facing away from the stage (≥ 0.5) |
-| Spread | mean curl ≤ 0.19, index–pinky spread ≥ 25° |
-| Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4, thumb tip within 0.35 hand lengths of the ring or pinky tip |
-| Fox | mean curl ≤ 0.19, spread ≤ 18°, thumb ≥ 50° from the fingers |
+| Spread | mean curl ≤ 0.19 and no finger above 0.35, index–pinky spread ≥ 25° |
+| Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4, thumb tip within 0.35 hand lengths of the ring or pinky tip and at least 0.4 from the index tip |
+| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 50° from the fingers |
 
-Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider widens every range by whole units; hysteresis keeps a shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
+Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider (1 to 3) widens every range by whole units; hysteresis keeps a committed shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
 
 - Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
 - A shape must match continuously for about 0.4 s to commit (1 s for companions). Each shape emits `candidate` (recognised: the shadow starts sharpening), then `commit` or `cancel`, and later `release`.
 
-- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker. A clearly better shape replaces it only when that shape commits, so there's no gap between roles.
+- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker. If the hand drifts out of the committed shape's normal range into another shape, the new shape replaces it only when it commits, so there's no gap between roles.
 
 - Low tracking confidence pauses recognition rather than guessing: with any joint missing the hold freezes; after 0.2 s a held shape is cancelled, after 0.5 s a committed one is released.
 

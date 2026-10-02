@@ -120,6 +120,43 @@ describe('shape classifier', () => {
     expect(events).toEqual(['candidate cup', 'commit cup', 'candidate fist', 'release cup switch', 'commit fist']);
   });
 
+  it("doesn't re-commit the committed shape when a switch is abandoned", () => {
+    // Cup committed; the fingers curl toward fist (fist starts its hold), then come back:
+    // cup leads again, so fist is cancelled and cup simply stays committed.
+    const c = new ShapeClassifier('right');
+    const q = new ShapeEventQueue();
+    const f = handFeatures(writeHandPose(PRESETS.cup, W, createHandFrame('right')))!;
+    const events: string[] = [];
+    const run = (seconds: number, t0: number, curl: number | null) => {
+      if (curl !== null) {
+        f.minCurl = f.maxCurl = f.meanCurl = curl;
+        f.curl.index = f.curl.middle = f.curl.ring = f.curl.pinky = curl;
+      }
+      for (let i = 0; i < seconds * FPS; i++) {
+        q.clear();
+        c.update(f, 25, 1 / FPS, t0 + i / FPS, q);
+        for (let k = 0; k < q.count; k++) events.push(`${q.at(k).type} ${q.at(k).shape}`);
+      }
+    };
+    run(1, 0, null);
+    run(0.2, 1, 0.69);
+    run(1, 1.2, 0.45);
+    expect(events).toEqual(['candidate cup', 'commit cup', 'candidate fist', 'cancel fist']);
+    expect(c.state.committed).toBe('cup');
+  });
+
+  it('commits on time at 60 fps despite float rounding', () => {
+    const r = new ShapeRecognizer();
+    const hands = { left: createHandFrame('left'), right: createHandFrame('right') };
+    writeHandPose(PRESETS.fist, W, hands.right);
+    let commitFrame = -1;
+    for (let i = 0; i <= 60 && commitFrame < 0; i++) {
+      r.update(hands, i / 60);
+      for (let k = 0; k < r.events.count; k++) if (r.events.at(k).type === 'commit') commitFrame = i;
+    }
+    expect(commitFrame).toBe(24); // 0.4 s at 60 fps
+  });
+
   it('a jump to a distant shape releases the old one first (exit), then holds the new one', () => {
     const { events } = drive(2, (t) => (t < 1 ? 'fist' : 'spread'));
     expect(kinds(events)).toEqual([
@@ -191,8 +228,19 @@ describe('shape classifier', () => {
     r.setHoldTimes(0.2, 0.5);
     const { events } = drive(1, (t) => (t < 0.5 ? 'relaxed' : 'fist'), { recognizer: r });
     expect(events.find((e) => e.type === 'commit')!.t - 0.5).toBeCloseTo(0.2, 1);
-    r.setTolerance(2);
-    expect(r.left.config.tolerance).toBe(2);
+    // Tolerance changes results: a flat hand with the thumb out at 38° (flat allows 35°, fox needs 50°)
+    // is no shape normally, but flat with one more unit of tolerance (flat allows 43°, fox needs 42°).
+    const f = handFeatures(writeHandPose(PRESETS.flat, W, createHandFrame('right')))!;
+    f.thumbFwdDeg = 38;
+    const strict = new ShapeClassifier('right');
+    const lenient = new ShapeClassifier('right', { tolerance: 2 });
+    const q = new ShapeEventQueue();
+    strict.update(f, 25, 0, 0, q);
+    lenient.update(f, 25, 0, 0, q);
+    expect(strict.state.candidate).toBeNull();
+    expect(lenient.state.candidate).toBe('flat');
+    r.setTolerance(10);
+    expect(r.left.config.tolerance).toBe(3); // capped
   });
 
   it('reuses its event objects', () => {
@@ -208,8 +256,11 @@ describe('shape classifier', () => {
   });
 
   it("stamps events with the caller's clock", () => {
-    const { events } = drive(1, () => 'fist');
-    expect(events[0].t).toBe(0);
+    const r = new ShapeRecognizer();
+    const hands = { left: createHandFrame('left'), right: createHandFrame('right') };
+    writeHandPose(PRESETS.fist, W, hands.right);
+    r.update(hands, 1000.25);
+    expect(r.events.at(0)).toMatchObject({ type: 'candidate', t: 1000.25 });
   });
 
   it('counts commits per shape', () => {
