@@ -14,6 +14,7 @@ import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { mountLabLink } from './lab-link';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 
 const SIM_HZ = 60;
@@ -23,6 +24,7 @@ const diagnostics = new Diagnostics();
 mountReportPanel(diagnostics);
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
 if (!mockOptions) void showNoXrNoticeIfNeeded();
+if (!mockOptions && import.meta.env.DEV) mountLabLink();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.

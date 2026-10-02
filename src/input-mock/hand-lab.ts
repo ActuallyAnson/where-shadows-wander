@@ -123,7 +123,8 @@ export class HandLab {
     document.body.style.background = '#101217';
     this.root.className = 'lab';
     this.root.innerHTML = `
-      <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.</p></header>
+      <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
+        <a href="./">Back to the game</a></p></header>
       <section id="lab-controls"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
@@ -260,7 +261,7 @@ const CSS = `
 @media (max-width: 699px) { .lab { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); } }
 .lab h1 { margin: 0; font-size: 18px; font-weight: 650; }
 .lab header p, .lab .foot, .lab .keys { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
-.lab .foot a { color: var(--accent); }
+.lab .foot a, .lab header a { color: var(--accent); }
 .lab h2 { margin: 6px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .lab h2 span { text-transform: none; letter-spacing: 0; color: var(--ink); margin-left: 6px; }
 .lab .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
