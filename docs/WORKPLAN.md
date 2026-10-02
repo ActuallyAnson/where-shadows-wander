@@ -30,7 +30,7 @@ Goal: hand shadows on the stage, and a 2D world in stage space, in both stage mo
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Projected-shadow renderer and collision capsules | #9 | |
+| Anson | Projected-shadow renderer and collision capsules | #9 | ⏳ |
 | Anson | Lantern gestures (pinch to place, hand over the flame to pause) | #10 | ⏳ |
 | A | StageFrame: choosing a table or wall, snapping, placement fallback | | |
 | A | Entity system and object pools | | |
