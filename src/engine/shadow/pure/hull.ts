@@ -4,7 +4,8 @@
 /**
  * Writes the convex hull of the first `n` points of `xy` (x, y pairs) into
  * `out` as x, y pairs, counter-clockwise, and returns how many points it has.
- * `order` is scratch for `n` indices; `out` must hold 2·n numbers.
+ * `order` is scratch for `n` indices; `out` must hold 2·(n + 1) numbers (the chain
+ * briefly holds one point more than the hull).
  */
 export function convexHull(xy: ArrayLike<number>, n: number, out: Float32Array, order: Uint8Array): number {
   for (let i = 0; i < n; i++) order[i] = i;

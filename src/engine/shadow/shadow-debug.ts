@@ -1,7 +1,8 @@
 // ?debug=shadow: draws what the collision solver gets, on the stage: each
 // capsule's axis (red), each hand's outline (green), and every joint projected
-// separately by three.js's own matrix maths (blue dots). The blue dots should
-// sit on the red lines' ends: a check that the capsules match the projection.
+// separately by three.js's own matrix maths (blue dots). At shadow size 1 the
+// blue dots sit on the red lines' ends: a check of the projector's maths, stage
+// coordinates and capsule indexing. (The shader draws the capsules themselves.)
 // No allocation per frame.
 import {
   BufferAttribute,

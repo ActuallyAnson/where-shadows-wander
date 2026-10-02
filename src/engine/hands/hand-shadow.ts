@@ -24,12 +24,12 @@ export interface HandShadow {
   readonly capsules: Float32Array;
   /** Edge blur per capsule, metres: grows with the hand's distance from the stage (for the renderer). */
   readonly blur: Float32Array;
-  /** Convex hull of the joints, counter-clockwise, x, y pairs; `outlineCount` points are valid. For visuals and tests. */
+  /** Convex hull of the joints, counter-clockwise, x, y pairs; `outlineCount` points are valid (at most OUTLINE_MAX). For visuals and tests. */
   readonly outline: Float32Array;
   outlineCount: number;
   /** minX, minY, maxX, maxY of the capsules, radii included. */
   readonly bounds: Float32Array;
-  /** Mean distance of the joints from the stage plane, metres. */
+  /** Mean distance of the joints from the stage plane, metres; negative if the hand is pushed through the stage. */
   distanceM: number;
 }
 
@@ -41,7 +41,7 @@ export function createHandShadow(hand: Handedness): HandShadow {
     joints: new Float32Array(JOINT_COUNT * 2),
     capsules: new Float32Array(CAPSULES_PER_HAND * CAPSULE_STRIDE),
     blur: new Float32Array(CAPSULES_PER_HAND),
-    outline: new Float32Array(OUTLINE_MAX * 2),
+    outline: new Float32Array((OUTLINE_MAX + 1) * 2), // the hull routine needs one spare point
     outlineCount: 0,
     bounds: new Float32Array(4),
     distanceM: 0,

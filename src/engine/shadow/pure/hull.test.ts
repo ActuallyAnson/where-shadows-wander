@@ -3,7 +3,7 @@ import { convexHull } from './hull';
 
 function hull(points: number[][]) {
   const xy = new Float32Array(points.flat());
-  const out = new Float32Array(points.length * 2);
+  const out = new Float32Array((points.length + 1) * 2);
   const n = convexHull(xy, points.length, out, new Uint8Array(points.length));
   return Array.from({ length: n }, (_, i) => [out[i * 2], out[i * 2 + 1]]);
 }
@@ -43,6 +43,18 @@ describe('convex hull', () => {
       [0, 0.5],
     ]);
     expect(h).toHaveLength(4);
+  });
+
+  it('handles a set whose points are all on the hull', () => {
+    // The chain briefly holds one point more than the hull here: the buffer needs room for it.
+    const h = hull([
+      [0.2, 0.4],
+      [0.8, 0.8],
+      [0.4, 0.2],
+      [0.6, 1],
+    ]);
+    expect(h).toHaveLength(4);
+    expect(signedArea(h)).toBeGreaterThan(0);
   });
 
   it('handles fewer than three points', () => {

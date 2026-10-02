@@ -22,6 +22,8 @@ import { clearHand, type HandSource } from './hand-source';
 const CAMERA = [0, 1, 0.5];
 /** mediapipeToHandFrame places hands this far in front of the webcam; we turn them about that point. */
 const HAND_DEPTH = 0.5;
+/** Lowers webcam hands to where mock hands rest (MOCK_WRIST), over the table, in front of the paper stage. */
+const HAND_DROP = 0.2;
 
 export class WebcamSource implements HandSource {
   readonly name = 'webcam';
@@ -168,7 +170,7 @@ function copyPlaced(s: Float32Array, src: HandFrame, out: HandFrame): void {
   // 180° about the vertical through the hand-depth point: x -> -x, z -> -2·depth - z.
   for (let j = 0; j < s.length; j += 3) {
     p[j] = CAMERA[0] - s[j];
-    p[j + 1] = CAMERA[1] + s[j + 1];
+    p[j + 1] = CAMERA[1] - HAND_DROP + s[j + 1];
     p[j + 2] = CAMERA[2] - 2 * HAND_DEPTH - s[j + 2];
   }
   out.radii.set(src.radii);

@@ -1,6 +1,6 @@
 // Projects both hands onto the stage each frame, filling HandShadow (the
 // collision solver's input) without allocating. Plain TypeScript.
-import { derivePalm, createPalm, JOINT_COUNT, JOINT_PARENT, type HandFrame, type Handedness } from '../../hands/hand';
+import { JOINT, JOINT_COUNT, JOINT_PARENT, type HandFrame, type Handedness } from '../../hands/hand';
 import { CAPSULES_PER_HAND, CAPSULE_STRIDE, createHandShadow, type HandShadow } from '../../hands/hand-shadow';
 import { convexHull } from './hull';
 import { magnification, projectToStage, shadowMatrix } from './projection';
@@ -35,6 +35,8 @@ export const CAPSULE_JOINTS: readonly number[] = [
   1, 5,                        // thumb base to index base
 ];
 const MIN_RADIUS_M = 0.004;
+const PALM_A = JOINT['middle-finger-metacarpal'];
+const PALM_B = JOINT['middle-finger-phalanx-proximal'];
 const HANDS: readonly Handedness[] = ['left', 'right'];
 
 export class ShadowProjector {
@@ -49,7 +51,6 @@ export class ShadowProjector {
   private readonly mag = new Float64Array(JOINT_COUNT);
   private readonly height = new Float64Array(JOINT_COUNT);
   private readonly order = new Uint8Array(JOINT_COUNT);
-  private readonly palm = createPalm();
 
   constructor(settings: Partial<ShadowSettings> = {}) {
     this.settings = { ...DEFAULT_SHADOW_SETTINGS, ...settings };
@@ -73,29 +74,25 @@ export class ShadowProjector {
       const x = p[j * 3],
         y = p[j * 3 + 1],
         z = p[j * 3 + 2];
-      if (projectToStage(this.matrix, stage, x, y, z, this.xy) <= 1e-9) return; // behind the light
+      if (!(projectToStage(this.matrix, stage, x, y, z, this.xy) > 1e-9)) return; // behind the light
       out.joints[j * 2] = this.xy[0];
       out.joints[j * 2 + 1] = this.xy[1];
       const h = distanceToPlane(stage, x, y, z);
       this.height[j] = h;
-      this.mag[j] = magnification(lightD, h, s.blend);
+      // A joint pushed through the stage casts no smaller shadow than one on it.
+      this.mag[j] = magnification(lightD, Math.max(h, 0), s.blend);
       heightSum += h;
     }
     out.distanceM = heightSum / JOINT_COUNT;
 
-    // Shadow size: scale about the palm's shadow, so a bigger shadow stays under the hand.
+    // Shadow size: scale about the palm's shadow (between the middle finger's base and knuckle, where
+    // derivePalm puts the palm), so a bigger shadow stays under the hand.
     if (s.size !== 1) {
-      const palm = derivePalm(hand, this.palm);
-      if (
-        palm &&
-        projectToStage(this.matrix, stage, palm.position[0], palm.position[1], palm.position[2], this.xy) > 0
-      ) {
-        const cx = this.xy[0],
-          cy = this.xy[1];
-        for (let j = 0; j < JOINT_COUNT; j++) {
-          out.joints[j * 2] = cx + (out.joints[j * 2] - cx) * s.size;
-          out.joints[j * 2 + 1] = cy + (out.joints[j * 2 + 1] - cy) * s.size;
-        }
+      const cx = (out.joints[PALM_A * 2] + out.joints[PALM_B * 2]) / 2,
+        cy = (out.joints[PALM_A * 2 + 1] + out.joints[PALM_B * 2 + 1]) / 2;
+      for (let j = 0; j < JOINT_COUNT; j++) {
+        out.joints[j * 2] = cx + (out.joints[j * 2] - cx) * s.size;
+        out.joints[j * 2 + 1] = cy + (out.joints[j * 2 + 1] - cy) * s.size;
       }
     }
 

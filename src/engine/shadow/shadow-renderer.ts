@@ -6,7 +6,7 @@ import { Color, DoubleSide, Matrix4, Mesh, PlaneGeometry, ShaderMaterial, Vector
 import type { Handedness } from '../hands/hand';
 import { CAPSULES_PER_HAND, CAPSULE_STRIDE, type HandShadow } from '../hands/hand-shadow';
 import type { StagePlane } from './pure/stage-plane';
-import { MAX_CAPSULES, shadowFragment, shadowVertex } from './shadow-shader';
+import { CAPSULES_PER_SLOT, MAX_CAPSULES, shadowFragment, shadowVertex } from './shadow-shader';
 
 /** Shadows draw after the stage paper (1) and before sprites drawn on top. */
 export const SHADOW_RENDER_ORDER = 2;
@@ -19,6 +19,8 @@ export class ShadowRenderer {
   private readonly material: ShaderMaterial;
   private readonly caps = new Float32Array(MAX_CAPSULES * 4);
   private readonly radBlur = new Float32Array(MAX_CAPSULES * 2);
+  private readonly bounds = new Float32Array(2 * 4);
+  private readonly active = new Int32Array(2);
   private readonly m = new Matrix4();
 
   constructor(opacity = 0.88) {
@@ -26,7 +28,8 @@ export class ShadowRenderer {
       uniforms: {
         uCaps: { value: this.caps },
         uRadBlur: { value: this.radBlur },
-        uCount: { value: 0 },
+        uBounds: { value: this.bounds },
+        uActive: { value: this.active },
         uSize: { value: new Vector2(1, 1) },
         uColor: { value: new Color(0x000000) },
         uOpacity: { value: opacity },
@@ -46,23 +49,32 @@ export class ShadowRenderer {
 
   /** Call once per frame after the projector. */
   update(shadows: Readonly<Record<Handedness, HandShadow>>, stage: StagePlane): void {
-    let count = 0;
+    let any = false;
     for (let h = 0; h < HANDS.length; h++) {
       const s = shadows[HANDS[h]];
-      if (!s.active || !s.onStage) continue;
+      this.active[h] = s.active && s.onStage ? 1 : 0;
+      if (!this.active[h]) continue;
+      any = true;
+      let maxBlur = 0;
       for (let c = 0; c < CAPSULES_PER_HAND; c++) {
-        const o = c * CAPSULE_STRIDE;
-        this.caps[count * 4] = s.capsules[o];
-        this.caps[count * 4 + 1] = s.capsules[o + 1];
-        this.caps[count * 4 + 2] = s.capsules[o + 2];
-        this.caps[count * 4 + 3] = s.capsules[o + 3];
-        this.radBlur[count * 2] = s.capsules[o + 4];
-        this.radBlur[count * 2 + 1] = s.blur[c];
-        count++;
+        const o = c * CAPSULE_STRIDE,
+          i = h * CAPSULES_PER_SLOT + c;
+        this.caps[i * 4] = s.capsules[o];
+        this.caps[i * 4 + 1] = s.capsules[o + 1];
+        this.caps[i * 4 + 2] = s.capsules[o + 2];
+        this.caps[i * 4 + 3] = s.capsules[o + 3];
+        this.radBlur[i * 2] = s.capsules[o + 4];
+        this.radBlur[i * 2 + 1] = s.blur[c];
+        maxBlur = Math.max(maxBlur, s.blur[c]);
       }
+      // The capsules' bounds already include the radius; the soft edge reaches half a blur further.
+      const pad = maxBlur / 2;
+      this.bounds[h * 4] = s.bounds[0] - pad;
+      this.bounds[h * 4 + 1] = s.bounds[1] - pad;
+      this.bounds[h * 4 + 2] = s.bounds[2] + pad;
+      this.bounds[h * 4 + 3] = s.bounds[3] + pad;
     }
-    this.material.uniforms.uCount.value = count;
-    this.mesh.visible = count > 0;
+    this.mesh.visible = any;
     if (!this.mesh.visible) return;
 
     // The quad spans the stage: x along right × width, y along up × height, z along the normal.

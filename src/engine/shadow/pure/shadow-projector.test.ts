@@ -76,3 +76,31 @@ describe('shadow projector', () => {
     expect(far.shadows.right.distanceM).toBeGreaterThan(near.shadows.right.distanceM);
   });
 });
+
+describe('shadow projector edge cases', () => {
+  it('keeps the palm in place when the size setting grows the shadow', () => {
+    const one = new ShadowProjector({ blend: 1 }),
+      big = new ShadowProjector({ blend: 1, size: 1.5 });
+    const h = hands();
+    one.update(h, stage, LANTERN);
+    big.update(h, stage, LANTERN);
+    const palm = (s: Float32Array) => [(s[10 * 2] + s[11 * 2]) / 2, (s[10 * 2 + 1] + s[11 * 2 + 1]) / 2];
+    const [a, b] = [palm(one.shadows.right.joints), palm(big.shadows.right.joints)];
+    expect(b[0]).toBeCloseTo(a[0], 6);
+    expect(b[1]).toBeCloseTo(a[1], 6);
+  });
+
+  it('gives no shadow for a hand level with or behind a perspective lantern', () => {
+    const p = new ShadowProjector({ blend: 0 });
+    p.update(hands([0, -0.05, 0.8]), stage, LANTERN); // the hand is further from the stage than the lantern
+    expect(p.shadows.right.active).toBe(false);
+  });
+
+  it("doesn't shrink the shadow of a hand pushed through the stage", () => {
+    const p = new ShadowProjector({ blend: 0 });
+    p.update(hands([0, -0.05, -0.05]), stage, LANTERN);
+    const s = p.shadows.right;
+    expect(s.distanceM).toBeLessThan(0);
+    for (let c = 0; c < 28; c++) expect(s.capsules[c * 5 + 4]).toBeGreaterThan(0.003);
+  });
+});
