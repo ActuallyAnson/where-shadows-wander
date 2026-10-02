@@ -8,6 +8,7 @@ import { FixedStepLoop } from './sim/fixed-step';
 import { Diagnostics, mountReportPanel } from './platform/diagnostics';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from './platform/iwsdk-input-visuals';
 import { HandRecorder, offerDownload } from './platform/hand-recorder';
+import { showNoXrNoticeIfNeeded } from './platform/no-xr-notice';
 import { XRHandReader } from './platform/xr-hands';
 import { JointDots } from './view/joint-dots';
 
@@ -15,6 +16,7 @@ const SIM_HZ = 60;
 
 const diagnostics = new Diagnostics();
 mountReportPanel(diagnostics);
+void showNoXrNoticeIfNeeded();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.
