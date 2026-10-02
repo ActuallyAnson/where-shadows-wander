@@ -201,7 +201,7 @@ async function start(): Promise<void> {
           }
           const prompt = recorder.prompt;
           if (recorder.finished) panel.show(recorder.script.doneText, 0);
-          else if (prompt) panel.show(prompt.text, prompt.remaining);
+          else if (prompt) panel.show(prompt.text, prompt.remaining, recorder.script.shapeAt(prompt.index));
           else panel.show(recorder.script.waitText, 0);
         }
       }

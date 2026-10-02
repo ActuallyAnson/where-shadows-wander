@@ -2,6 +2,8 @@
 // (?record&script=shapes). Page text isn't visible inside XR, so the prompt is
 // drawn on a canvas texture on a plane in front of the wearer. It's placed
 // once, not head-locked, so it stays put while the wearer looks at their hands.
+import type { PresetName } from '../hands/synthetic-hand';
+import { drawHandSample } from './hand-sample-draw';
 import {
   CanvasTexture,
   Mesh,
@@ -67,8 +69,11 @@ export class PromptPanel {
     this.mesh.visible = true;
   }
 
-  /** Shows `text` (first line large) and a countdown. Redraws only when either changes, about once a second. */
-  show(text: string, secondsLeft: number): void {
+  /**
+   * Shows `text` (first line large), a countdown and, when given, an example
+   * picture of the shape on the left. Redraws only when the text or the second changes.
+   */
+  show(text: string, secondsLeft: number, sample: PresetName | null = null): void {
     const seconds = Math.ceil(Math.max(0, secondsLeft));
     if (text === this.lastText && seconds === this.lastSeconds) return;
     this.lastText = text;
@@ -83,20 +88,25 @@ export class PromptPanel {
     else g.rect(0, 0, w, h);
     g.fill();
     const [title, detail] = text.split('\n');
+    // With a picture, it takes the left third and the text centres in the rest.
+    const left = sample ? 170 : 0;
+    if (sample) drawHandSample(g, sample, 95, h / 2, 170, '#f0a24a');
+    const cx = left + (w - left) / 2,
+      tw = w - left - 40;
     g.fillStyle = '#ece6d8';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = '600 46px system-ui, sans-serif';
-    g.fillText(title, w / 2, detail ? 86 : h / 2 - 10, w - 40);
+    g.font = `600 ${sample ? 38 : 46}px system-ui, sans-serif`;
+    g.fillText(title, cx, detail ? 86 : h / 2 - 10, tw);
     if (detail) {
       g.fillStyle = '#a8a294';
-      g.font = '28px system-ui, sans-serif';
-      g.fillText(detail, w / 2, 150, w - 40);
+      g.font = `${sample ? 22 : 28}px system-ui, sans-serif`;
+      g.fillText(detail, cx, 150, tw);
     }
     if (seconds > 0) {
       g.fillStyle = '#f0a24a';
       g.font = '600 32px system-ui, sans-serif';
-      g.fillText(String(seconds), w / 2, 212);
+      g.fillText(String(seconds), cx, 212);
     }
     this.texture.needsUpdate = true;
   }

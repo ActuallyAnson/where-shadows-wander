@@ -8,7 +8,8 @@ import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import type { GestureDetector } from '../engine/hands/gesture-detector';
 import type { ShapeRecognizer } from '../engine/hands/shape-recognizer';
-import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
+import { SHAPE_HOW, SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
+import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
@@ -114,6 +115,9 @@ export class HandLab {
   }
 
   private onSourceChanged(): void {
+    // The guide matters most with real hands (webcam, replays); synthetic hands show the shape anyway.
+    const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
+    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
     // Synthetic hands start one-handed, like a player gesturing.
     this.synthetic?.setShape('left', null);
     const url = new URL(location.href);
@@ -196,6 +200,10 @@ export class HandLab {
       <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
         <a href="./">Back to the game</a></p></header>
       <section id="lab-controls"></section>
+      <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
+        (s) =>
+          `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
+      ).join('')}</div></details>
       <section class="hand" id="lab-gestures"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
@@ -326,7 +334,10 @@ export class HandLab {
       const p = this.guided.prompt;
       const [title, detail] = p.text.split('\n');
       const done = Math.min(Math.max((this.mode.time - this.guidedStart) / this.guided.script.duration, 0), 1);
+      const shape = this.guided.script.shapeAt(p.index);
+      const step = this.guided.script.steps[p.index];
       prompt.innerHTML =
+        (shape ? `<img src="${sampleImage(shape, '#f0a24a', step.hand)}" alt="">` : '') +
         `<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}` +
         `<em>${p.remaining > 0 ? Math.ceil(p.remaining) : ''}</em><i style="width:${(done * 100).toFixed(1)}%"></i>`;
     }
@@ -407,6 +418,14 @@ const CSS = `
   background: var(--panel); border: 1px solid var(--accent); }
 .lab .prompt[hidden] { display: none; }
 .lab .prompt b { font-size: 20px; }
+.lab .prompt img { float: left; width: 72px; height: 72px; margin-right: 10px; }
+.lab .guide { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.lab .guide summary { cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.lab .guide .shapes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+.lab .guide figure { margin: 0; display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; }
+.lab .guide img { width: 56px; height: 56px; }
+.lab .guide figcaption { font-size: 11px; color: var(--muted); }
+.lab .guide figcaption b { display: block; color: var(--ink); font-size: 12.5px; text-transform: capitalize; }
 .lab .prompt span { color: var(--muted); }
 .lab .prompt em { position: absolute; right: 14px; top: 10px; font: 600 22px ui-monospace, monospace; color: var(--accent); font-style: normal; }
 .lab .prompt i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); }
