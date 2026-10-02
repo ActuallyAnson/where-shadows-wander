@@ -117,6 +117,12 @@ describe('capabilities', () => {
     expect(c.persistentAnchors.available).toBe('yes');
   });
 
+  it('no persistent anchors when existing anchors have no persistent handle (the emulator)', () => {
+    const session = fakeSession({ enabledFeatures: ALL, restore: true, persistentAnchors: [] });
+    const { c } = run(session, { createAnchor: true, trackedAnchors: new Set([{}]) });
+    expect(c.persistentAnchors).toMatchObject({ handleRequest: 'no', available: 'no' });
+  });
+
   it('hands lost mid-session', () => {
     const session = fakeSession({ enabledFeatures: ALL, hands: ['left', 'right'] });
     const d = new CapabilityDetector();

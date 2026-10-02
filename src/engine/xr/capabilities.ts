@@ -277,7 +277,7 @@ export class CapabilityDetector {
     const c = this.capabilities;
     const p = c.persistentAnchors;
     const available: Tri =
-      c.anchors.available === 'no' || !p.restore
+      c.anchors.available === 'no' || !p.restore || p.handleRequest === 'no'
         ? 'no'
         : c.anchors.available === 'yes' && p.handleRequest !== 'no'
           ? 'yes'
