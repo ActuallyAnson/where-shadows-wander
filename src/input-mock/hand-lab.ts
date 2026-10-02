@@ -7,6 +7,7 @@ import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import type { GestureDetector } from '../engine/hands/gesture-detector';
+import { FINGER_NAMES } from '../engine/hands/hand-features';
 import type { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPE_HOW, SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { sampleImage } from '../engine/xr/hand-sample-draw';
@@ -39,6 +40,7 @@ export class HandLab {
   private readonly marker: LanternMarker;
   /** The latest gesture events, newest first (copied: the detector reuses its event objects). */
   private readonly gestureLog: string[] = [];
+  private calibrationSaved = true;
   private readonly orbit: OrbitControls;
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
@@ -59,6 +61,7 @@ export class HandLab {
     private readonly view: LabView,
   ) {
     view.scene.add(this.bones.mesh);
+    loadCalibration(shapes);
     this.marker = new LanternMarker(lantern, gestures.config.coverRadiusM);
     view.scene.add(this.marker.group);
     this.orbit = new OrbitControls(view.camera, view.canvas);
@@ -204,6 +207,14 @@ export class HandLab {
         (s) =>
           `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s, '#f0a24a', 'right', 168)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
       ).join('')}</div></details>
+      <section class="hand" id="lab-calibration">
+        <h2>Calibration <span>your straight fingers</span></h2>
+        <div class="row"><button type="button" data-act="calibrate" data-arg="left">Calibrate left</button
+        ><button type="button" data-act="calibrate" data-arg="right">Calibrate right</button
+        ><button type="button" data-act="uncalibrate" data-arg="">Clear</button></div>
+        <div id="lab-cal-status"></div>
+        <p class="keys">Hold the hand flat for 2 s: curl is then measured from your own straight. Saved in this browser.</p>
+      </section>
       <section class="hand" id="lab-gestures"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
@@ -237,7 +248,13 @@ export class HandLab {
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
-      else if (act === 'guided') {
+      else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
+      else if (act === 'uncalibrate') {
+        this.shapes.setCalibration('left', null);
+        this.shapes.setCalibration('right', null);
+        this.shapes.calibrating = null;
+        saveCalibration(this.shapes);
+      } else if (act === 'guided') {
         if (this.guided) this.finishGuided();
         else this.startGuided();
       }
@@ -315,6 +332,33 @@ export class HandLab {
           this.shapes[side].state,
           this.shapes[side].margins,
         );
+    }
+    const cal = this.root.querySelector('#lab-cal-status');
+    if (cal) {
+      const run = this.shapes.calibrating;
+      if (run && run.state !== 'collecting' && !this.calibrationSaved) {
+        if (run.state === 'done') saveCalibration(this.shapes);
+        this.calibrationSaved = true;
+      }
+      if (run?.state === 'collecting') this.calibrationSaved = false;
+      const line = (h: Handedness) => {
+        const b = this.shapes.calibration[h];
+        const on = b.some((v) => v > 0);
+        return `<dt>${h}</dt><dd>${
+          on
+            ? FINGER_NAMES.slice(1)
+                .map((n, i) => `${n.slice(0, 1)} ${b[i + 1].toFixed(2)}`)
+                .join(' · ')
+            : 'not calibrated'
+        }</dd>`;
+      };
+      const status =
+        run?.state === 'collecting'
+          ? `<p class="msg">Hold your ${run.hand} hand flat, fingers straight and together… ${(run.progress * 100).toFixed(0)}%</p>`
+          : run?.state === 'failed'
+            ? `<p class="msg">${run.reason}</p>`
+            : '';
+      cal.innerHTML = `${status}<dl>${line('left')}${line('right')}</dl>`;
     }
     const gestures = this.root.querySelector('#lab-gestures');
     if (gestures) {
@@ -456,3 +500,26 @@ const CSS = `
 .lab .curl .b { width: 100%; height: 30px; background: var(--stage); border-radius: 4px; position: relative; overflow: hidden; }
 .lab .curl .b i { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; }
 `;
+
+const CALIBRATION_KEY = 'wsw.lab.calibration.v1';
+
+/** Remembers the calibration in this browser, so it survives a reload. */
+function saveCalibration(shapes: ShapeRecognizer): void {
+  try {
+    const data = { left: Array.from(shapes.calibration.left), right: Array.from(shapes.calibration.right) };
+    localStorage.setItem(CALIBRATION_KEY, JSON.stringify(data));
+  } catch {
+    // Storage unavailable (private window): calibration lasts until reload.
+  }
+}
+
+function loadCalibration(shapes: ShapeRecognizer): void {
+  try {
+    const data = JSON.parse(localStorage.getItem(CALIBRATION_KEY) ?? 'null') as Record<Handedness, number[]> | null;
+    if (!data) return;
+    for (const h of ['left', 'right'] as const)
+      if (Array.isArray(data[h]) && data[h].length === FINGER_NAMES.length) shapes.setCalibration(h, data[h]);
+  } catch {
+    // Ignore a broken or missing entry.
+  }
+}

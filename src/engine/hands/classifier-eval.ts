@@ -19,6 +19,8 @@
 //   the label's end (a shape committed at the prompt counts as the first).
 // Labels are half-open, [start, end), so touching labels don't share a frame.
 import { createHandFrame, type Handedness } from './hand';
+import { biasFromSamples, MAX_CURL_BIAS } from './hand-calibration';
+import { computeHandFeatures, createHandFeatures, FINGER_NAMES } from './hand-features';
 import { replayInto, type HandRecording, type LabelShape, type ShapeLabel } from './hand-recording';
 import type { ClassifierConfig } from './shape-classifier';
 import { ShapeRecognizer } from './shape-recognizer';
@@ -62,6 +64,16 @@ export interface RecordingEval {
   falseCommits: FalseCommit[];
   labelledMinutes: number;
   noneMinutes: number;
+  /** Each hand's calibration, if evaluated with `calibrate` (null: no flat prompt to calibrate from, or refused). */
+  calibration: Record<Handedness, number[] | null> | null;
+}
+
+export interface EvalOptions {
+  /**
+   * Calibrate each hand from its first `flat` label, as a player would before
+   * playing (hand-calibration.ts), instead of scoring raw curl.
+   */
+  calibrate?: boolean;
 }
 
 /** Where a recording came from, by its note, then its browser's user agent. */
@@ -84,7 +96,11 @@ export function sourceOf(rec: HandRecording): EvalSource | 'replay' {
 }
 
 /** Replays one recording through a fresh classifier and scores it. */
-export function evaluateRecording(rec: HandRecording, config: Partial<ClassifierConfig> = {}): RecordingEval {
+export function evaluateRecording(
+  rec: HandRecording,
+  config: Partial<ClassifierConfig> = {},
+  options: EvalOptions = {},
+): RecordingEval {
   const result: RecordingEval = {
     source: 'skipped',
     skipped: null,
@@ -93,6 +109,7 @@ export function evaluateRecording(rec: HandRecording, config: Partial<Classifier
     falseCommits: [],
     labelledMinutes: 0,
     noneMinutes: 0,
+    calibration: null,
   };
   const source = sourceOf(rec);
   if (source === 'replay') return { ...result, skipped: 'a replay of another recording' };
@@ -117,6 +134,10 @@ export function evaluateRecording(rec: HandRecording, config: Partial<Classifier
 
   const recognizer = new ShapeRecognizer(config);
   const hands = { left: createHandFrame('left'), right: createHandFrame('right') };
+  if (options.calibrate) {
+    result.calibration = { left: calibrateFrom(rec, 'left'), right: calibrateFrom(rec, 'right') };
+    for (const h of ['left', 'right'] as const) recognizer.setCalibration(h, result.calibration[h]);
+  }
   /** Commits per hand, in order, and the committed shape after each frame (for "already committed at the prompt"). */
   const commits: { t: number; hand: Handedness; shape: Shape }[] = [];
   const committedAtPrompt = new Map<LabelResult, boolean>();
@@ -164,6 +185,24 @@ export function evaluateRecording(rec: HandRecording, config: Partial<Classifier
   }
   result.labels = results;
   return result;
+}
+
+/** A hand's calibration from its first flat label: the median raw curl per finger, or null. */
+function calibrateFrom(rec: HandRecording, hand: Handedness): number[] | null {
+  const label = rec.labels.filter((l) => l.hand === hand && l.shape === 'flat').sort((a, b) => a.start - b.start)[0];
+  if (!label) return null;
+  const frame = createHandFrame(hand);
+  const f = createHandFeatures();
+  const samples: number[][] = [];
+  for (const fr of rec.frames) {
+    if (fr.t < label.start || fr.t >= label.end) continue;
+    replayInto(fr, hand, frame);
+    if (computeHandFeatures(frame, f)) samples.push(FINGER_NAMES.map((n) => f.curl[n]));
+  }
+  if (!samples.length) return null;
+  const bias = Array.from(biasFromSamples(samples));
+  // Like the Hand Lab's calibration: a bent "flat" isn't a baseline.
+  return bias.slice(1).reduce((a, b) => a + b, 0) / 4 >= MAX_CURL_BIAS * 0.9 ? null : bias;
 }
 
 function recognised(s: { phase: string; committed: Shape | null; candidate: Shape | null }): Recognised {

@@ -4,6 +4,7 @@
 // it needs no extra tooling (and isn't type-checked by `npm run typecheck`, which
 // covers src/ only: Node's types aren't installed). Options are environment variables:
 //   EVAL_DIR=recordings                folder searched for *.handrec.json (default recordings/)
+//   EVAL_CALIBRATE=1                   calibrate each hand from its first flat prompt, as a player would
 //   EVAL_BASELINE=eval-reports/x.json  print the change from an earlier report
 //   EVAL_EXTRACT=<file>:<hand>:<start>-<end>:<name>
 //                                      cut a regression fixture into src/engine/hands/fixtures/
@@ -99,7 +100,8 @@ it('classifier evaluation', () => {
   const evals: (RecordingEval & { file: string })[] = [];
   for (const file of files) {
     try {
-      evals.push({ ...evaluateRecording(parseRecording(JSON.parse(readFileSync(file, 'utf8')))), file });
+      const options = { calibrate: env.EVAL_CALIBRATE === '1' };
+      evals.push({ ...evaluateRecording(parseRecording(JSON.parse(readFileSync(file, 'utf8'))), {}, options), file });
     } catch (e) {
       console.info(`skipped ${relative('.', file)}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -110,6 +112,7 @@ it('classifier evaluation', () => {
     throw new Error(
       evals.length ? 'None of the recordings have labels to score.' : 'None of the recordings could be read.',
     );
+  if (env.EVAL_CALIBRATE === '1') console.info("Calibrated from each hand's first flat prompt.");
   console.info(`\n${formatReport(summary)}\n`);
 
   // The worst labels per recording, to find what to look at (and cut as fixtures).
@@ -144,6 +147,7 @@ it('classifier evaluation', () => {
     reportVersion: REPORT_VERSION,
     createdAt,
     config: DEFAULT_CLASSIFIER_CONFIG,
+    calibrated: env.EVAL_CALIBRATE === '1',
     recordings: evals.map((e) => ({ file: relative('.', e.file), source: e.source, skipped: e.skipped })),
     ...summary,
     worst,
