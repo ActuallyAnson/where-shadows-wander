@@ -1,15 +1,11 @@
 // Webcam Hand Bench: MediaPipe hands -> HandFrame -> the same features the
 // classifier will use. Runs in a normal browser tab, no headset needed.
-import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
-import wasmLoaderPath from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
-import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
 import { createHandFrame, derivePalm, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { FINGER_NAMES, handFeatures, roughShape } from '../engine/hands/hand-features';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
-import { handednessFromLabel, mediapipeToHandFrame } from './mediapipe-hands';
+import { createHandLandmarker, resultToHands, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
+import { handednessFromLabel } from './mediapipe-hands';
 
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 // MediaPipe's 21-landmark skeleton, for drawing the overlay.
 // prettier-ignore
 const BONES = [
@@ -41,14 +37,7 @@ async function start(): Promise<void> {
   button.disabled = true;
   try {
     status.textContent = 'Loading hand model…';
-    if (!landmarker) {
-      const fileset = { wasmLoaderPath, wasmBinaryPath } as Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>;
-      landmarker = await HandLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numHands: 2,
-      });
-    }
+    landmarker ??= await createHandLandmarker();
     status.textContent = 'Waiting for camera permission…';
     video.srcObject = await navigator.mediaDevices.getUserMedia({
       video: { width: 1280, height: 720, facingMode: 'user' },
@@ -70,7 +59,7 @@ function loop(): void {
     lastVideoTime = video.currentTime;
     const now = performance.now();
     const result = landmarker.detectForVideo(video, now);
-    update(result);
+    resultToHands(result, hands);
     draw(result);
     if (recording) recordFrame(recording, (now - recordStart) / 1000, hands.left, hands.right, null);
     frames++;
@@ -84,16 +73,6 @@ function loop(): void {
     render();
   }
   requestAnimationFrame(loop);
-}
-
-function update(result: HandLandmarkerResult): void {
-  hands.left.tracked = hands.right.tracked = false;
-  hands.left.validJoints = hands.right.validJoints = 0;
-  result.landmarks.forEach((image, i) => {
-    const side = handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left');
-    if (hands[side].tracked) return; // two hands with the same label: keep the first
-    mediapipeToHandFrame(result.worldLandmarks[i], image, hands[side]);
-  });
 }
 
 function draw(result: HandLandmarkerResult): void {

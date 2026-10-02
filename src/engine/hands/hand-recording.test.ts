@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, JOINT_COUNT } from './hand';
-import { createRecording, recordFrame, replayInto } from './hand-recording';
+import { createRecording, parseRecording, recordFrame, replayInto } from './hand-recording';
 
 describe('hand recording', () => {
   it('round-trips positions to the millimetre and keeps tracking state', () => {
@@ -22,5 +22,15 @@ describe('hand recording', () => {
     expect(outL.tracked).toBe(false);
     expect(outL.validJoints).toBe(7);
     expect(json.frames[0].head).toEqual([0, 1600, 0]);
+  });
+
+  it('accepts its own format and rejects anything else', () => {
+    const rec = createRecording('test', 'ua', '2026-10-02T00:00:00Z');
+    expect(() => parseRecording(rec)).toThrow('no frames');
+    recordFrame(rec, 0, createHandFrame('left'), createHandFrame('right'), null);
+    expect(parseRecording(JSON.parse(JSON.stringify(rec))).frames).toHaveLength(1);
+    expect(() => parseRecording({ hello: 1 })).toThrow('Not a hand recording');
+    expect(() => parseRecording(null)).toThrow('Not a hand recording');
+    expect(() => parseRecording({ ...rec, version: 99 })).toThrow('version 99');
   });
 });

@@ -85,6 +85,11 @@ export function clonePose(p: Readonly<HandPose>): HandPose {
   };
 }
 
+/** Copies `src` into `out`. Allocates nothing. */
+export function copyPose(src: Readonly<HandPose>, out: HandPose): HandPose {
+  return lerpPose(src, src, 0, out);
+}
+
 /** Writes the pose between `a` (t = 0) and `b` (t = 1) into `out`. Allocates nothing. */
 export function lerpPose(a: Readonly<HandPose>, b: Readonly<HandPose>, t: number, out: HandPose): HandPose {
   for (let i = 0; i < 4; i++) {
