@@ -36,7 +36,7 @@ The lantern is the game's only light and its pause button. It sits close to the 
 
 Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with recordings):
 
-- **Pinch and release** places or relights the lantern: the thumb and index tips within about 18 mm (0.2 hand lengths) for at least 150 ms, then opened past about 32 mm. The lantern goes where the fingertips last met. A fist doesn't count (its index finger is curled).
+- **Pinch and release** places or relights the lantern: the thumb and index tips within about 18 mm (0.2 hand lengths) for at least 150 ms, then opened past about 32 mm. The lantern goes where the fingertips last met. A fist doesn't count (its index finger is curled), and a pinch that closes into a fist is dropped.
 - **Covering the flame** pauses: a closed hand with the palm within 12 cm of the flame for 0.5 s. It fires once, then waits for the hand to leave.
 - Each gesture has a 1 s cooldown across both hands. A closed hand over the flame is also the fist shape; the game can tell the two apart with `nearLantern`.
 

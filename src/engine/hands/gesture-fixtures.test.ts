@@ -28,9 +28,9 @@ function replay(name: string, lantern: [number, number, number] | null = null) {
 }
 
 describe('gestures on recorded hands', () => {
-  it('the emulator pinch fires one pinch-release when the fingers open, and no cover-flame', () => {
-    // The right hand pinches from about 0.7 s and lets go at about 1.7 s into the clip; the lantern is
-    // placed where a seated player's would be (0.45 m below and 0.2 m in front of the head).
+  it('the emulator pinch fires one pinch-release when the fingers open', () => {
+    // The right hand pinches from about 0.7 s and lets go at about 1.7 s into the clip. (The hand never
+    // closes, so this clip says nothing about cover-flame; that needs a recorded session of shapes.)
     const events = replay('emulator-pinch', [0, 1.15, -0.2]);
     expect(events.map((e) => e.type)).toEqual(['pinch-release']);
     expect(events[0].t).toBeGreaterThan(1.3);

@@ -4,13 +4,18 @@
 // - Pinch: the thumb-index tip gap, in hand lengths, goes below `pinchEnterGap`
 //   and must open past `pinchExitGap` to count as released (hysteresis), with
 //   the index finger not curled past `pinchMaxIndexCurl`, so a fist (whose
-//   thumb rests near the index) isn't a pinch. Released after at least
-//   `pinchMinHoldS` it fires pinch-release at the last firm pinch point.
+//   thumb rests near the index) isn't a pinch; a pinch that closes into a fist
+//   is dropped silently. Released after at least `pinchMinHoldS` (measured
+//   from the first to the last firm frame) it fires pinch-release at the last
+//   firm pinch point.
 // - Cover-flame: the palm within `coverRadiusM` of the lantern with a closed
 //   hand; it stays covered within a slightly larger radius and a slightly
 //   lower curl. After `coverHoldS` it fires once, then waits for the hand to leave.
 // - Each gesture type has a cooldown shared by both hands, so one action is one event.
 // - Missing joints pause a hand; after `freezeS` a pending pinch or cover is dropped silently.
+//   A cover that has fired stays fired through a dropout (a closed hand near the
+//   lantern is easily occluded), until the hand is seen away from it or is gone
+//   for `latchForgetS`.
 // A closed hand over the lantern also commits the 'fist' shape (shape-classifier.ts);
 // the two coexist, and GestureState.nearLantern lets the game tell them apart.
 import { JOINT, type HandFrame, type Handedness, type Vec3 } from './hand';
@@ -36,6 +41,8 @@ export interface GestureConfig {
   cooldownS: number;
   /** A tracking dropout longer than this drops a pending pinch or cover. */
   freezeS: number;
+  /** A dropout longer than this also forgets that a cover has fired. */
+  latchForgetS: number;
 }
 
 export const DEFAULT_GESTURE_CONFIG: Readonly<GestureConfig> = {
@@ -50,6 +57,7 @@ export const DEFAULT_GESTURE_CONFIG: Readonly<GestureConfig> = {
   coverHoldS: 0.5,
   cooldownS: 1,
   freezeS: 0.2,
+  latchForgetS: 2,
 };
 
 const MAX_DT = 0.1;
@@ -59,6 +67,8 @@ interface HandTrack {
   coverS: number;
   /** Fired (or blocked by the cooldown) for this cover: wait for the hand to leave. */
   coverLatched: boolean;
+  /** The latched cover actually fired (not blocked by the cooldown). */
+  coverFired: boolean;
   pausedS: number;
 }
 
@@ -82,8 +92,8 @@ export class GestureDetector {
   private hasLantern = false;
   private readonly own: Record<Handedness, HandFeatures> = { left: createHandFeatures(), right: createHandFeatures() };
   private readonly track: Record<Handedness, HandTrack> = {
-    left: { coverS: 0, coverLatched: false, pausedS: 0 },
-    right: { coverS: 0, coverLatched: false, pausedS: 0 },
+    left: { coverS: 0, coverLatched: false, coverFired: false, pausedS: 0 },
+    right: { coverS: 0, coverLatched: false, coverFired: false, pausedS: 0 },
   };
   private readonly lastFired: Record<GestureType, number> = { 'pinch-release': -Infinity, 'cover-flame': -Infinity };
   private lastT = NaN;
@@ -108,6 +118,8 @@ export class GestureDetector {
    */
   update(hands: Readonly<Record<Handedness, HandFrame>>, t: number, shared?: SharedFeatures): void {
     this.events.clear();
+    // A clock that went backwards (a new hand source) would block both gestures until it caught up.
+    if (t < this.lastT) this.lastFired['pinch-release'] = this.lastFired['cover-flame'] = -Infinity;
     const dt = Number.isNaN(this.lastT) ? 0 : Math.min(Math.max(t - this.lastT, 0), MAX_DT);
     this.lastT = t;
     for (let i = 0; i < HANDS.length; i++) {
@@ -128,7 +140,7 @@ export class GestureDetector {
       s.paused = false;
       const k = this.track[HANDS[i]];
       k.coverS = 0;
-      k.coverLatched = false;
+      k.coverLatched = k.coverFired = false;
       k.pausedS = 0;
     }
     this.lastFired['pinch-release'] = this.lastFired['cover-flame'] = -Infinity;
@@ -146,9 +158,13 @@ export class GestureDetector {
         s.pinching = false;
         s.pinchHeldS = 0;
         k.coverS = 0;
-        k.coverLatched = false;
-        s.coverProgress = 0;
         s.nearLantern = false;
+        s.lanternDistM = Infinity;
+        if (!k.coverLatched) s.coverProgress = 0;
+      }
+      if (k.pausedS > c.latchForgetS) {
+        k.coverLatched = k.coverFired = false;
+        s.coverProgress = 0;
       }
       return;
     }
@@ -164,6 +180,10 @@ export class GestureDetector {
         s.pinchHeldS = 0;
         this.writePinchPoint(hand, s.pinchPoint);
       }
+    } else if (f.curl.index > c.pinchMaxIndexCurl || f.meanCurl >= c.coverEnterCurl) {
+      // The hand closed: a thumb brushing the index on the way into a fist isn't a pinch.
+      s.pinching = false;
+      s.pinchHeldS = 0;
     } else if (gap > c.pinchExitGap) {
       if (s.pinchHeldS >= c.pinchMinHoldS && this.ready('pinch-release', t)) {
         const p = s.pinchPoint;
@@ -179,7 +199,7 @@ export class GestureDetector {
     // Cover-flame.
     if (!this.hasLantern) {
       k.coverS = 0;
-      k.coverLatched = false;
+      k.coverLatched = k.coverFired = false;
       s.coverProgress = 0;
       s.nearLantern = false;
       s.lanternDistM = Infinity;
@@ -195,15 +215,17 @@ export class GestureDetector {
       : dist <= c.coverRadiusM && f.meanCurl >= c.coverEnterCurl;
     if (!inside) {
       k.coverS = 0;
-      k.coverLatched = false;
+      k.coverLatched = k.coverFired = false;
     } else if (!k.coverLatched) {
       k.coverS += dt;
       if (k.coverS >= c.coverHoldS - 1e-6) {
-        if (this.ready('cover-flame', t)) this.fire('cover-flame', h, t, pos[0], pos[1], pos[2], k.coverS);
+        k.coverFired = this.ready('cover-flame', t);
+        if (k.coverFired) this.fire('cover-flame', h, t, pos[0], pos[1], pos[2], k.coverS);
         k.coverLatched = true;
       }
     }
-    s.coverProgress = k.coverLatched ? 1 : Math.min(k.coverS / c.coverHoldS, 1);
+    // Full once it fired; back to 0 if the cooldown blocked it, so the feedback doesn't promise a pause.
+    s.coverProgress = k.coverLatched ? (k.coverFired ? 1 : 0) : Math.min(k.coverS / c.coverHoldS, 1);
   }
 
   private ready(type: GestureType, t: number): boolean {
