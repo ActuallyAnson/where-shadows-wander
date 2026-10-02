@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, type HandFrame } from '../engine/hands/hand';
-import { handFeatures, roughShape } from '../engine/hands/hand-features';
+import { handFeatures } from '../engine/hands/hand-features';
+import { bestShape } from '../engine/hands/shape-ranges';
 import { createRecording, parseRecording, recordFrame } from '../engine/hands/hand-recording';
 import type { HandSource } from './hand-source';
 import { MockMode, mockOptionsFromUrl } from './mock-mode';
 import { ReplaySource } from './replay-source';
-import { SHAPES_SCRIPT, ScriptedSource } from './scripted-source';
+import { SHAPES_SCRIPT } from '../engine/hands/shape-script';
+import { ScriptedSource } from './scripted-source';
 import { BLEND_S, SyntheticSource } from './synthetic-source';
 
 /** A 6 s recording made here from the scripted hands (recordings/ is gitignored, so tests can't rely on it). */
@@ -111,13 +113,13 @@ describe('scripted source', () => {
     const src = new ScriptedSource();
     const l = createHandFrame('left'),
       r = createHandFrame('right');
-    // "right: fist" starts after relaxed 1 s, flat 2 s, relaxed 1 s (see SHAPES_SCRIPT).
+    // "right: fist" starts after the relaxed lead-in, flat and a rest (see SHAPES_SCRIPT).
     const fistAt = SHAPES_SCRIPT.slice(
       0,
       SHAPES_SCRIPT.findIndex((s) => s.shape === 'fist'),
     ).reduce((t, s) => t + s.seconds, 0);
     src.update(fistAt + 1, l, r);
-    expect(roughShape(handFeatures(r)!)).toBe('fist');
+    expect(bestShape(handFeatures(r)!)).toBe('fist');
     expect(l.tracked).toBe(false); // the left hand hasn't appeared yet
   });
 
@@ -139,7 +141,7 @@ describe('synthetic source', () => {
     const mid = handFeatures(r)!.meanCurl;
     src.update(1 + BLEND_S, l, r);
     expect(mid).toBeLessThan(handFeatures(r)!.meanCurl);
-    expect(roughShape(handFeatures(r)!)).toBe('fist');
+    expect(bestShape(handFeatures(r)!)).toBe('fist');
   });
 
   it('hides a hand', () => {

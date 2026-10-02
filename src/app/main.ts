@@ -2,17 +2,27 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { World, createSystem } from '@iwsdk/core';
+import { Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
+import { GestureDetector } from '../engine/hands/gesture-detector';
+import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
+import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
+import { createStagePlane } from '../engine/shadow/pure/stage-plane';
+import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { ShadowDebug } from '../engine/shadow/shadow-debug';
+import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
+import { PromptPanel } from '../engine/xr/prompt-panel';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
+import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { mountLabLink } from './lab-link';
@@ -34,12 +44,55 @@ start().catch((e) => diagnostics.error(`start failed: ${String(e)}`));
 
 async function start(): Promise<void> {
   const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
+  // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
+  if (import.meta.env.DEV) {
+    const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
+    if (emulated) emulated.primaryInputMode = 'hand';
+  }
   diagnostics.mark('worldCreated');
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
   // What the session provides (hands, passthrough, planes, anchors), and the detected planes for StageFrame.
   const capabilities = new CapabilityDetector();
+
+  // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
+  const shapes = new ShapeRecognizer();
+  // Lantern gestures for Teammate B's lantern flow. Mock mode has a stand-in lantern; in XR it waits for B's.
+  const gestures = new GestureDetector();
+  gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
+  let clock = 0;
+
+  // Hand shadows, on a stand-in stage and lantern until StageFrame (A) and the lantern (B) exist:
+  // ?stage=table (the tabletop theatre, default) or ?stage=wall. ?debug=shadow shows the capsules.
+  const params = new URLSearchParams(location.search);
+  const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
+  const stage = createStagePlane();
+  const lantern = new Float64Array(3);
+  const projector = new ShadowProjector();
+  const shadowRenderer = new ShadowRenderer();
+  const stageView = new TestStageView();
+  stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
+  const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
+  world.scene.add(stageView.group, shadowRenderer.mesh);
+  if (shadowDebug) world.scene.add(shadowDebug.group);
+  let rigPlaced = false;
+  let shadowMs = 0;
+  const placeRig = (head: ArrayLike<number>, yaw: number) => {
+    placeTestRig(stageMode, head, yaw, stage, lantern);
+    stageView.place(stage, lantern);
+    // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
+    // lantern: a guessed spot near the chest would read a resting fist as "pause".
+    if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
+    rigPlaced = true;
+  };
+  const headMatrix = new Matrix4();
+  const headPos = new Vector3();
+  const headRot = new Quaternion();
+  const headScale = new Vector3();
+  let resetWatched: XRReferenceSpace | null = null;
+  // In mock mode the player's eyes are the desktop camera; in XR the rig is placed on the first frame.
+  if (mockOptions) placeRig(MOCK_HEAD, 0);
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
@@ -49,7 +102,7 @@ async function start(): Promise<void> {
       return new SyntheticSource();
     });
     mock = new MockMode(source);
-    lab = new HandLab(mock, hands.hands, {
+    lab = new HandLab(mock, hands.hands, shapes, gestures, MOCK_LANTERN, {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
@@ -62,16 +115,24 @@ async function start(): Promise<void> {
   const dots = new JointDots();
   world.scene.add(dots.mesh);
 
-  // addSource keeps only one source, so everything we report goes through reportSource.
-  diagnostics.addSource(() =>
-    reportSource({
+  // addSource keeps only one source, so everything we report goes through it.
+  diagnostics.addSource(() => ({
+    ...reportSource({
       simHz: SIM_HZ,
       simSteps: sim.steps,
       handReadMethod: hands.method,
       mockSource: mock ? mock.source.name : null,
       capabilities,
     }),
-  );
+    shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
+    gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
+    shadow: {
+      stage: stageMode,
+      placed: rigPlaced,
+      msAvg: Math.round(shadowMs * 1000) / 1000,
+      onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
+    },
+  }));
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
@@ -79,14 +140,25 @@ async function start(): Promise<void> {
     if (session && !mock) capabilities.sessionStarted(session);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    if (!mock) {
+      rigPlaced = false; // placed again from the head at the next session
+      stageView.group.visible = shadowRenderer.mesh.visible = false;
+    }
     diagnostics.sessionEnded();
     capabilities.sessionEnded();
     recorder?.finish();
   });
 
-  const recorder = HandRecorder.fromUrl();
+  const recorder = HandRecorder.fromUrl(!mock);
   if (recorder) recorder.onFinished = offerDownload;
   const head: [number, number, number] = [0, 0, 0];
+  const headTurn = { x: 0, y: 0, z: 0, w: 1 };
+  // Guided recording on a headset: prompts on a panel in front of the wearer,
+  // placed on the first XR frame and again when recording starts.
+  const panel = recorder?.script ? new PromptPanel() : null;
+  // The head pose is in reference space, which is the XR origin's space.
+  if (panel) world.player.add(panel.mesh);
+  let panelAtStart = false;
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
@@ -102,10 +174,52 @@ async function start(): Promise<void> {
         capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
       }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
+      // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
+      clock += delta;
+      const handsT = mock ? mock.time : clock;
+      shapes.update(hands.hands, handsT);
+      gestures.update(hands.hands, handsT, shapes);
+      if (!mock && frame && refSpace && refSpace !== resetWatched) {
+        // Recentring moves the player's frame: place the rig again from the new head pose.
+        refSpace.addEventListener('reset', () => (rigPlaced = false));
+        resetWatched = refSpace;
+      }
+      if (!rigPlaced && !mock && frame && refSpace) {
+        const pose = frame.getViewerPose(refSpace);
+        // Skip poses the browser estimates (tracking not ready yet); hands are in scene space, so the head is too.
+        if (pose && !pose.emulatedPosition) {
+          headMatrix.fromArray(pose.transform.matrix).premultiply(this.world.player.matrixWorld);
+          headMatrix.decompose(headPos, headRot, headScale);
+          placeRig([headPos.x, headPos.y, headPos.z], yawOf(headRot.x, headRot.y, headRot.z, headRot.w));
+        }
+      }
+      if (rigPlaced) {
+        const s0 = performance.now();
+        projector.update(hands.hands, stage, lantern);
+        shadowRenderer.update(projector.shadows, stage);
+        shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
+        shadowMs += (performance.now() - s0 - shadowMs) * 0.05;
+      }
       if (recorder) {
-        const viewer = frame && refSpace ? frame.getViewerPose(refSpace)?.transform.position : undefined;
+        const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
+        const viewer = pose?.transform.position;
         if (viewer) [head[0], head[1], head[2]] = [viewer.x, viewer.y, viewer.z];
         recorder.frame(performance.now(), hands.hands.left, hands.hands.right, viewer ? head : null);
+        if (panel && pose && recorder.script) {
+          const o = pose.transform.orientation;
+          headTurn.x = o.x;
+          headTurn.y = o.y;
+          headTurn.z = o.z;
+          headTurn.w = o.w;
+          if (!panel.placed || (recorder.started && !panelAtStart)) {
+            panel.anchor(head, headTurn);
+            panelAtStart = recorder.started;
+          }
+          const prompt = recorder.prompt;
+          if (recorder.finished) panel.show(recorder.script.doneText, 0);
+          else if (prompt) panel.show(prompt.text, prompt.remaining, recorder.script.shapeAt(prompt.index));
+          else panel.show(recorder.script.waitText, 0);
+        }
       }
       sim.advance(delta);
       dots.update(handList);
@@ -117,5 +231,7 @@ async function start(): Promise<void> {
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
   if (import.meta.env.DEV)
-    Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, capabilities } });
+    Object.assign(window, {
+      __wsw: { world, hands, diagnostics, recorder, mock, lab, capabilities, shapes, gestures, projector, stage },
+    });
 }

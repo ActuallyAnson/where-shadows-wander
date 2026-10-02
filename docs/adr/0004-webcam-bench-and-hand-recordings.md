@@ -52,6 +52,22 @@ Mock mode (`?mock=1`, issue #6) added the Hand Lab, which has a webcam source ne
 - **Webcam hands are smoothed for display.** Each camera frame goes through a One Euro filter (`src/engine/hands/one-euro.ts`; it keeps about 28 % of jitter at rest and lags about 1 cm behind a 0.5 m/s move). The hand then glides between camera frames, which adds at most one camera frame of delay. Recordings made from the webcam source therefore hold smoothed hands. Headset hands are never filtered this way.
 - In the Hand Lab, webcam hands are turned 180° about a point 0.5 m in front of the view, so you see them from your own side as a headset would. Turning, unlike mirroring, keeps each hand's true shape.
 
+### 5. Update (3 Oct 2026): shape labels (#7)
+
+Recordings can now say which shape each hand was making, so the classifier can be scored against them (#12).
+
+- **Format version 2** adds `labels: { start, end, hand, shape }[]`, with times in seconds like frame times and `shape` one of the v1 shapes or `none` (relaxed). Version 1 files still load, as recordings with no labels.
+- **Labels come from a guided recording** (`src/engine/hands/shape-script.ts`, `guided-recording.ts`): a script prompts each shape for a fixed time, and each prompt is labelled. On a headset use `?record&script=shapes` (a panel in the scene shows the prompts); at a desk, **Guided recording** in the Hand Lab or on the webcam bench.
+- **A label is what the wearer was asked to do, not what the hand did.** Someone who misses a prompt is still labelled with it, so spot-check recordings by replaying them in the Hand Lab.
+- **Only the settled middle of each prompt is labelled:** 0.5 s is left out at both ends, the time it takes to read a prompt and change shape. Relaxed rests between shapes are labelled `none`, so #12 can count false triggers. A hand that isn't being prompted has no label for that time; leave it out of accuracy counts rather than treating it as `none`.
+- The script (`SHAPES_SCRIPT`) prompts every shape on the right hand, then the left: a 3 s relaxed lead-in, then each shape for 4.5 s with 2 s rests. 84 s in all, so each shape gets a 3.5 s label. (It was 3 s per shape at first, which was too quick to settle into a shape.)
+- If a recording stops early, labels that end after its last frame are left out.
+
+### 6. Update (3 Oct 2026): scoring and regression fixtures (#12)
+
+- `npm run eval` scores the classifier against every labelled recording in `recordings/` (see getting-started, section 9). Scores are kept per source, because webcam and headset noise differ.
+- Recordings stay out of git. Small clips that exposed a bug go into `src/engine/hands/fixtures/` (under 256 KB each, 2 MB in all), listed in `manifest.ts` with the result they must keep giving; `npm test` replays them.
+
 ## What each source is good for
 
 | | Emulator | Webcam | Pico | Quest |

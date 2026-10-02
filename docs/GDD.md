@@ -34,6 +34,12 @@ The player places a small lantern on the near edge of their table, reaches into 
 
 The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it is the first action of every session; blowing it out ends or pauses the session.
 
+Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with recordings):
+
+- **Pinch and release** places or relights the lantern: the thumb and index tips within about 18 mm (0.2 hand lengths) for at least 150 ms, then opened past about 32 mm. The lantern goes where the fingertips last met. A fist doesn't count (its index finger is curled), and a pinch that closes into a fist is dropped.
+- **Covering the flame** pauses: a closed hand with the palm within 12 cm of the flame for 0.5 s. It fires once, then waits for the hand to leave.
+- Each gesture has a 1 s cooldown across both hands. A closed hand over the flame is also the fist shape; the game can tell the two apart with `nearLantern`.
+
 ### Two stage modes
 
 | Mode | When it is used | What it looks like |
@@ -66,7 +72,7 @@ Only a fixed set of one-handed shapes is recognised. Two-handed shapes are left 
 | Cup | Palm up, fingers curled | Catches rain, embers, or fireflies and carries them |
 | Spread | Fingers spread wide | Blocks wind, holds back vines, forms a cage |
 | Rabbit | Index and middle up, others pinched to thumb | Releases the rabbit companion |
-| Fox | Fingers together, thumb up as an ear | Releases the fox companion |
+| Fox | Fingers together, thumb up as an ear (the thumb out to the side like an L, with the hand turned so it points up) | Releases the fox companion |
 
 ### How a shape is used
 
@@ -240,15 +246,26 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger spread | Angle between adjacent finger directions |
 | Palm orientation | Derived palm normal relative to the stage plane |
 
-First implementation (`src/engine/hands/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
+Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): `hand-features.ts` measures per-finger curl (and the mean, smallest and largest of the four fingers), the thumb tip's distance to every fingertip divided by the hand's length, spread between neighbouring fingers and between index and pinky in the palm plane, the palm normal against the stage normal, and the thumb's angle to the palm's forward direction. `shape-ranges.ts` holds each shape's ranges, `shape-classifier.ts` the hold-to-commit state machine, and `shape-recognizer.ts` runs both hands each frame. The Hand Lab and webcam bench cards show the classifier live.
+
+| Shape | Ranges (starting values, tuned with recordings) |
+|----|----|
+| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 35° of the fingers |
+| Fist | every finger curl ≥ 0.65 |
+| Cup | every finger curl 0.2–0.6, palm facing away from the stage (≥ 0.5) |
+| Spread | mean curl ≤ 0.19 and no finger above 0.35, index–pinky spread ≥ 25° |
+| Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4, thumb tip within 0.35 hand lengths of the ring or pinky tip and at least 0.4 from the index tip |
+| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 50° from the fingers |
+
+Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider (1 to 3) widens every range by whole units; hysteresis keeps a committed shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
 
 - Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
-- A shape must match continuously for about 0.4 s to commit (1 s for companions).
+- A shape must match continuously for about 0.4 s to commit (1 s for companions). Each shape emits `candidate` (recognised: the shadow starts sharpening), then `commit` or `cancel`, and later `release`.
 
-- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker.
+- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker. If the hand drifts out of the committed shape's normal range into another shape, the new shape replaces it only when it commits, so there's no gap between roles.
 
-- Low tracking confidence pauses recognition rather than guessing.
+- Low tracking confidence pauses recognition rather than guessing: with any joint missing the hold freezes; after 0.2 s a held shape is cancelled, after 0.5 s a committed one is released.
 
 ### Persistence
 
@@ -275,6 +292,8 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 - **One-handed play:** All v1 shapes are one-handed; the player can switch which hand they use at any time.
 
 - **Shape tolerance slider:** Widens recognition ranges for players with limited finger mobility.
+
+- **Hand calibration:** The player holds each hand flat for 2 seconds and finger curl is measured from their own straight, for fingers that don't fully straighten (`src/engine/hands/hand-calibration.ts`; onboarding can run it).
 
 - **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s.
 

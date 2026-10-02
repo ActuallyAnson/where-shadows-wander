@@ -30,6 +30,12 @@ dist-*/
 recordings/
 *.handrec
 *.handrec.json
+# ...except the small regression fixtures the tests replay (src/engine/hands/fixtures, under 256 KB each)
+!src/engine/hands/fixtures/*.handrec.json
+!src/engine/hands/fixtures/gestures/*.handrec.json
+
+# Classifier evaluation reports (npm run eval)
+eval-reports/
 
 # Editor folders
 .vscode/

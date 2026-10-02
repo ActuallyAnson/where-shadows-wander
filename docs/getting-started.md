@@ -59,12 +59,16 @@ The Hand Lab is mock mode (`?mock=1`): the game runs in a normal browser with ha
 
 1. With `npm run dev` running, open **https://localhost:8081/?mock=1** in a normal Chrome tab, or press **Open Hand Lab** (top left) on the game page. Don't use the window `npm run dev` opens by itself: it drops `?mock=1` when the page reloads, and it doesn't save downloads to your Downloads folder.
 2. Pick a **Source** in the panel on the right:
-   - **Synthetic:** choose **Left** or **Right**, then click a shape (or press 0–6). **Hide** takes a hand away (as if tracking were lost) and **Jitter** adds a few millimetres of tracking noise. Keys: R/L pick a hand, arrows move it (Shift for depth), Q/E roll, Z/X turn, Space pauses.
+   - **Synthetic:** choose **Left** or **Right**, then click a shape (or press 0–6). **Hide** takes a hand away (as if tracking were lost) and **Jitter** adds a few millimetres of tracking noise. Keys: R/L pick a hand, arrows move it (Shift for depth), Q/E roll, Z/X turn, T/Y tilt the fingers up or down, Space pauses. Lantern gestures: P pinches (press again to let go: the log shows a pinch-release where the fingertips met), G moves the hand over the stand-in lantern (then 2 for a fist covers the flame), B brings it back. The **Lantern gestures** box logs each gesture.
    - **Script:** every shape on the right hand, then the left, in a loop.
    - **Replay…:** pick a `.handrec.json`, or drag one onto the page.
    - **Webcam:** your own hands. Allow camera access; the first start downloads the hand model (about 8 MB). The status line shows the tracking rate and MediaPipe's time per frame, which runs in the background and doesn't slow the page.
 3. Drag to look around the hands, scroll to zoom. The cards show each hand's palm direction, thumb–index gap, finger spread and finger curl. The big label is the shape the hand is posed as (Synthetic and Script); the rough guess under it only knows flat, fist and open until the classifier lands.
 4. **● Record**, then **Stop and download**, saves a `.handrec.json` to your Downloads folder.
+5. **Calibration:** with real hands, press **Calibrate right** (or left) and hold that hand flat, fingers straight and together, for 2 seconds. Curl is then measured from your own straight, which removes the webcam's offset (it reads straight fingers as somewhat bent). It's remembered in this browser; **Clear** removes it. The **Shape guide** shows a picture of each shape and how to make it.
+6. **Guided recording** prompts you through every shape, right hand then left (84 s: each shape held 4.5 s with 2 s rests, with a picture of each), and saves a recording with **shape labels**: which shape each hand was asked to make, and when. Those are what the classifier is scored against (#12). Use it with the **Webcam** source. With **Script** it gives a labelled synthetic recording. Press **Stop guided** to end early; you keep the labels for the prompts you finished.
+
+The Hand Lab also shows the hands' **shadows** on a stand-in paper screen (the tabletop theatre) with the lantern on the near table edge. Shadow puppets are made with the hand turned toward the screen: tilt a synthetic hand with T/Y. Add `&stage=wall` for a wall-sized screen further away, and `&debug=shadow` to draw the collision capsules (red), outline (green) and each joint projected separately (blue dots, which sit on the red lines' ends at the normal shadow size). The same options work in XR, where the screen is placed in front of you when the session starts.
 
 You can also choose the source in the address: `?mock=1&src=script`, `?mock=1&src=webcam`, or `?mock=1&src=replay&file=recordings/emulator-demo.handrec.json`. Adding `&record=10` records ten seconds the same way a headset does.
 
@@ -86,13 +90,15 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
-**From the hosted build:** once GitHub Pages is set up (section 10), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
+**From the hosted build:** once GitHub Pages is set up (section 11), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
 
 **To record hand data on a headset,** add `?record=20` to the address, for example `https://192.168.1.95:8081/?record=20&note=fist then flat hand`. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR, press **Download recording**.
 
+**To record labelled hand shapes on a headset,** use `?record&script=shapes`, for example `https://192.168.1.95:8081/?record&script=shapes`. A panel in front of you says "Raise your hands to start", then prompts each shape with a countdown, right hand then left. It takes 84 seconds and the file carries shape labels. Follow the prompts as closely as you can: the labels say what you were asked to do, not what your hand did.
+
 ## 7. View a recording
 
-Open a `.handrec.json` in the Hand Recording Player (ask the project owner for the link; it's a private page they share). It replays the hands in 3D, with the classifier's features plotted over time. Gaps in the traces mean a hand wasn't fully tracked.
+Open a `.handrec.json` in the Hand Recording Player (ask the project owner for the link; it's a private page they share). The player doesn't show shape labels yet, and may not open version 2 files (with labels) until it's updated. It replays the hands in 3D, with the classifier's features plotted over time. Gaps in the traces mean a hand wasn't fully tracked.
 
 To watch one with the game's own code, open the Hand Lab (section 5), press **Replay…** and pick the file, or drag it onto the page. It loops, and the cards show the features frame by frame.
 
@@ -118,7 +124,18 @@ npx iwsdk browser screenshot
 
 The report's `capabilities` section says what the session provides: hand tracking (and each hand's `tracked` and `lostCount`), passthrough, plane and mesh detection (`unsupported`, `none-yet` or `found`, with a count), anchors, and the persistent-anchor API, plus `planeList` with each detected plane's label, centre and normal. In the emulator expect everything available, 17 planes and 9 meshes, and persistent anchors `no` (the emulator's anchors can't request a persistent handle). After `set-connected ... false`, that hand shows `tracked: false` and its `lostCount` goes up. `basis` says how support was decided: `enabledFeatures` when the browser reports the granted features, `api` when only the API's presence was checked.
 
-## 9. Before you commit
+## 9. Score the classifier on recordings
+
+Labelled recordings (section 5's **Guided recording**, or `?record&script=shapes` on a headset) can be scored against the shape classifier:
+
+1. Put the `.handrec.json` files in `recordings/` (any subfolder). They stay on your machine; the folder is gitignored.
+2. Run `npm run eval`. It prints, per source (webcam, Pico, Quest, emulator, synthetic): frame accuracy, hits (prompted shapes that committed), false triggers per minute, flicker and time to commit, then a table per shape, a confusion matrix and the worst labels. A JSON report goes to `eval-reports/`.
+3. To compare with an earlier run: `EVAL_BASELINE=eval-reports/<file>.json npm run eval`. Add `EVAL_CALIBRATE=1` to calibrate each hand from its first flat prompt, as a player would before playing.
+4. When a recording shows a bug, cut the bad moment into a regression fixture: `EVAL_EXTRACT=recordings/<file>:<hand>:<start>-<end>:<name> npm run eval` writes `src/engine/hands/fixtures/<name>.handrec.json`; add it to `src/engine/hands/fixtures/manifest.ts` with the result it should give once fixed. `npm test` then replays it.
+
+Only time inside a label is scored; a label is what the person was asked to do, so replay low-scoring recordings in the Hand Lab to see whether the person or the classifier was wrong.
+
+## 10. Before you commit
 
 ```sh
 npm run format  # format code with Prettier (run this first)
@@ -136,7 +153,7 @@ Commit messages use [Conventional Commits](https://www.conventionalcommits.org/)
 
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open http://localhost:4173/where-shadows-wander/.
 
-## 10. Deploying
+## 11. Deploying
 
 Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is at https://actuallyanson.github.io/where-shadows-wander/ (and the webcam bench at `.../webcam.html`). The published site is public even though the repo is private.
 

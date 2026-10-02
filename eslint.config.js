@@ -8,7 +8,15 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const PURE_FOLDERS = ['src/engine/hands/**', 'src/engine/sim/**', 'src/engine/stage/**', 'src/game/**'];
+// src/engine/shadow/pure holds the shadow projection maths: pure, so it's unit-tested
+// in Node, while the rest of src/engine/shadow draws with three.js.
+const PURE_FOLDERS = [
+  'src/engine/hands/**',
+  'src/engine/sim/**',
+  'src/engine/stage/**',
+  'src/game/**',
+  'src/engine/shadow/pure/**',
+];
 
 export default tseslint.config(
   { ignores: ['dist/**', 'dist-*/**', 'spikes/**', 'recordings/**', 'node_modules/**'] },
@@ -59,7 +67,7 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
   {
-    files: ['scripts/**/*.mjs', '*.config.{js,ts}', 'eslint.config.js'],
+    files: ['scripts/**/*.mjs', '*.config.{js,ts}', 'eslint.config.js', 'eval/**/*.ts'],
     languageOptions: { globals: { ...globals.node } },
   },
   {

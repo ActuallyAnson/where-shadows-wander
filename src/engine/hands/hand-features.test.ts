@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createHandFrame, JOINT, JOINT_COUNT } from './hand';
-import { handFeatures, roughShape } from './hand-features';
+import { createHandFrame, JOINT, JOINT_COUNT, type Vec3 } from './hand';
+import { computeHandFeatures, createHandFeatures, handFeatures } from './hand-features';
+import { bestShape } from './shape-ranges';
+import { clonePose, PRESETS, writeHandPose, type PresetName } from './synthetic-hand';
 
 /** Right hand, palm down, fingers along -Z. `curl` bends each finger joint down by that many degrees. */
 function hand(curlDeg: number, spreadDeg = 0) {
@@ -40,22 +42,77 @@ describe('hand features', () => {
     expect(f.meanCurl).toBeLessThan(0.05);
     expect(f.spreadDeg).toBeLessThan(2);
     expect(f.pinchGapMm).toBeGreaterThan(40);
-    expect(roughShape(f)).toBe('flat (fingers together)');
+    expect(bestShape(f)).toBe('flat');
   });
 
   it('reads curled fingers as a fist', () => {
     const f = handFeatures(hand(70))!;
     expect(f.meanCurl).toBeGreaterThan(0.9);
-    expect(roughShape(f)).toBe('fist');
+    expect(bestShape(f)).toBe('fist');
   });
 
   it('reads spread fingers as open', () => {
     const f = handFeatures(hand(0, 40))!;
     expect(f.spreadDeg).toBeGreaterThan(30);
-    expect(roughShape(f)).toBe('open (fingers spread)');
+    expect(bestShape(f)).toBe('spread');
   });
 
   it('returns null for an untracked hand', () => {
     expect(handFeatures(createHandFrame('left'))).toBeNull();
+  });
+});
+
+describe('hand features (classifier inputs)', () => {
+  const W: Vec3 = [0, 1, -0.4];
+  const pose = (p: PresetName, scale = 1) => writeHandPose(PRESETS[p], W, createHandFrame('right'), scale);
+
+  it('computeHandFeatures writes into and returns the struct it was given', () => {
+    const out = createHandFeatures();
+    expect(computeHandFeatures(pose('flat'), out)).toBe(out);
+    expect(computeHandFeatures(pose('fist'), out)).toBe(out);
+    expect(out.meanCurl).toBeGreaterThan(0.8);
+  });
+
+  it('returns null with any joint missing, even when the positions are set', () => {
+    const h = pose('flat');
+    h.validJoints = 24;
+    expect(computeHandFeatures(h, createHandFeatures())).toBeNull();
+  });
+
+  it('tip gaps are independent of hand size', () => {
+    const small = handFeatures(pose('rabbit', 0.8))!,
+      big = handFeatures(pose('rabbit', 1.2))!;
+    for (let i = 0; i < 4; i++) expect(small.tipGap[i]).toBeCloseTo(big.tipGap[i], 3);
+    expect(big.handSizeM / small.handSizeM).toBeCloseTo(1.5, 3);
+  });
+
+  it('palmStage follows the stage normal', () => {
+    expect(handFeatures(pose('flat'))!.palmStage).toBeCloseTo(-1, 3);
+    expect(handFeatures(pose('flat'), [0, -1, 0])!.palmStage).toBeCloseTo(1, 3);
+    expect(handFeatures(pose('cup'))!.palmUp).toBeGreaterThan(0.9);
+  });
+
+  it('pair spreads add up to about the index-pinky spread for the spread preset', () => {
+    const f = handFeatures(pose('spread'))!;
+    const total = f.pairSpreadDeg[0] + f.pairSpreadDeg[1] + f.pairSpreadDeg[2];
+    expect(total).toBeCloseTo(f.spreadDeg, 0);
+    expect(f.spreadDeg).toBeGreaterThan(30);
+  });
+
+  it("curling fingers doesn't read as spreading them", () => {
+    expect(handFeatures(pose('fist'))!.spreadDeg).toBeLessThan(10);
+  });
+
+  it('thumb angle separates flat from fox, with the thumb out to the side or lifted', () => {
+    expect(handFeatures(pose('flat'))!.thumbFwdDeg).toBeLessThan(30);
+    expect(handFeatures(pose('fox'))!.thumbFwdDeg).toBeGreaterThan(55);
+    expect(Math.abs(handFeatures(pose('fox'))!.thumbElev)).toBeLessThan(0.3); // out to the side, in the palm plane
+    const lifted = clonePose(PRESETS.fox);
+    lifted.thumb.abductDeg = 10;
+    lifted.thumb.liftDeg = 75;
+    const f = handFeatures(writeHandPose(lifted, W, createHandFrame('right')))!;
+    expect(f.thumbFwdDeg).toBeGreaterThan(55);
+    expect(f.thumbElev).toBeGreaterThan(0.7);
+    expect(handFeatures(pose('relaxed'))!.thumbFwdDeg).toBeLessThan(45);
   });
 });

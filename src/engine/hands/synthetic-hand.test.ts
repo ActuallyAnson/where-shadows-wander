@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, derivePalm, JOINT, JOINT_PARENT, type Handedness, type Vec3 } from './hand';
-import { handFeatures, roughShape } from './hand-features';
+import { handFeatures } from './hand-features';
+import { bestShape } from './shape-ranges';
 import {
   clonePose,
   jitterHand,
@@ -32,13 +33,13 @@ describe('synthetic hand presets', () => {
     expect(f.spreadDeg).toBeLessThan(10);
     expect(f.pinchGapMm).toBeGreaterThan(30);
     expect(palm.normal[1]).toBeLessThan(-0.9);
-    expect(roughShape(f)).toBe('flat (fingers together)');
+    expect(bestShape(f)).toBe('flat');
   });
 
   it.each(['left', 'right'] as const)('fist (%s): all fingers curled', (side) => {
     const { f } = make('fist', side);
     expect(f.meanCurl).toBeGreaterThan(0.8);
-    expect(roughShape(f)).toBe('fist');
+    expect(bestShape(f)).toBe('fist');
   });
 
   it.each(['left', 'right'] as const)('cup (%s): half curled, palm up', (side) => {
@@ -52,7 +53,7 @@ describe('synthetic hand presets', () => {
     const { f } = make('spread', side);
     expect(f.meanCurl).toBeLessThan(0.15);
     expect(f.spreadDeg).toBeGreaterThan(30);
-    expect(roughShape(f)).toBe('open (fingers spread)');
+    expect(bestShape(f)).toBe('spread');
   });
 
   it.each(['left', 'right'] as const)('rabbit (%s): index and middle up, ring pinched to the thumb', (side) => {

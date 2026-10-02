@@ -17,7 +17,7 @@ Goal: the shell runs on the Pico with hands, passthrough and plane detection, an
 | Anson | ESLint, Prettier, required CI | #4 | ✅ |
 | Anson | XR capability layer | #5 | ⏳ |
 | Anson | Mock input mode (`?mock=1`) | #6 | ✅ |
-| Anson | Shape labels in hand recordings | #7 | |
+| Anson | Shape labels in hand recordings | #7 | ✅ |
 | B | First Pico session and its report | #8 | |
 | B | Take over CI and the Pages deploy | | |
 | A | Loop scheduler (from `src/engine/sim/fixed-step.ts`): interpolation, pause/resume, determinism | | |
@@ -30,8 +30,8 @@ Goal: hand shadows on the stage, and a 2D world in stage space, in both stage mo
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Projected-shadow renderer and collision capsules | #9 | |
-| Anson | Lantern gestures (pinch to place, hand over the flame to pause) | #10 | |
+| Anson | Projected-shadow renderer and collision capsules | #9 | ⏳ |
+| Anson | Lantern gestures (pinch to place, hand over the flame to pause) | #10 | ⏳ |
 | A | StageFrame: choosing a table or wall, snapping, placement fallback | | |
 | A | Entity system and object pools | | |
 | A | 2D collision solver: first version against the shadow capsules | | |
@@ -45,8 +45,8 @@ Goal: the classifier recognises the verb shapes reliably with hold-to-commit and
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Pose classifier for the v1 shapes | #11 | |
-| Anson | Classifier evaluation pipeline | #12 | |
+| Anson | Pose classifier for the v1 shapes | #11 | ⏳ |
+| Anson | Classifier evaluation pipeline | #12 | ⏳ |
 | A | Traveller state machine | | |
 | A | Shape abilities: bridge, rock, cup, spread | | |
 | B | Procedural animation runtime | | |

@@ -66,13 +66,17 @@ const pose = (fingers: HandPose['fingers'], t: ThumbPose, rollDeg = 0): HandPose
  * hands; the classifier's ranges come from recordings.
  */
 export const PRESETS: Readonly<Record<PresetName, Readonly<HandPose>>> = {
-  relaxed: pose([f(0.2, -4), f(0.22, 0), f(0.25, 3), f(0.28, 6)], thumb(0.2, 30)),
+  // A resting hand is gently curved (mean curl about 0.34), clearly apart from flat (<= 0.19) even
+  // with flat's hysteresis (<= 0.29); a straighter "relaxed" would keep a flat shape committed.
+  relaxed: pose([f(0.3, -4), f(0.32, 0), f(0.35, 3), f(0.38, 6)], thumb(0.2, 30)),
   flat: pose([f(0.02, -2), f(0.02, 0), f(0.02, 2), f(0.02, 4)], thumb(0.05, 12)),
   fist: pose([f(0.95, 0), f(0.95, 0), f(0.95, 0), f(0.95, 0)], thumb(0.8, 20, -10)),
   cup: pose([f(0.4, -2), f(0.4, 0), f(0.4, 2), f(0.4, 4)], thumb(0.3, 25, 10), 180),
   spread: pose([f(0.03, -15), f(0.03, -3), f(0.03, 9), f(0.03, 22)], thumb(0.05, 60)),
   rabbit: pose([f(0.03, -8), f(0.03, 6), f(0.6, 2), f(0.6, -4)], thumb(0, 30, 0, 1, 'ring')),
-  fox: pose([f(0.03, -2), f(0.03, 0), f(0.03, 2), f(0.03, 4)], thumb(0, 10, 75)),
+  // Fingers together with the thumb out to the side (an L), hand turned pinky-down so the thumb points up.
+  // (A thumb can't lift far out of the palm toward the back of the hand.)
+  fox: pose([f(0.03, -2), f(0.03, 0), f(0.03, 2), f(0.03, 4)], thumb(0, 70), -90),
 };
 
 export function clonePose(p: Readonly<HandPose>): HandPose {

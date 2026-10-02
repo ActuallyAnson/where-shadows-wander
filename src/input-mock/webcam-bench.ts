@@ -1,8 +1,12 @@
 // Webcam Hand Bench: MediaPipe hands -> HandFrame -> the same features the
 // classifier will use. Runs in a normal browser tab, no headset needed.
 import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
+import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
+import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { downloadRecording, handCardHtml } from './hand-card';
+import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { HandAssigner } from './hand-assigner';
 import { createHandLandmarker, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
 import { handednessFromLabel, resultToHands } from './mediapipe-hands';
@@ -24,13 +28,20 @@ const hands: Record<Handedness, HandFrame> = { left: createHandFrame('left'), ri
 let landmarker: HandLandmarker | null = null;
 let recording: HandRecording | null = null;
 let recordStart = 0;
+let guided: GuidedRecording | null = null;
+let guidedStart = 0;
+const prompt = $<HTMLDivElement>('prompt');
+let shownStep = -2;
+let shownSecond = -1;
 const assigner = new HandAssigner();
+const shapes = new ShapeRecognizer();
 let frames = 0;
 let fpsAt = performance.now();
 let fps = 0;
 
 $('start').addEventListener('click', start);
 $('rec').addEventListener('click', toggleRecording);
+$('guide').addEventListener('click', toggleGuided);
 render();
 
 async function start(): Promise<void> {
@@ -47,6 +58,7 @@ async function start(): Promise<void> {
     await video.play();
     $('empty').hidden = true;
     $<HTMLButtonElement>('rec').disabled = false;
+    $<HTMLButtonElement>('guide').disabled = false;
     button.textContent = 'Camera on';
     video.requestVideoFrameCallback(loop);
   } catch (e) {
@@ -61,8 +73,13 @@ function loop(): void {
     const now = performance.now();
     const result = landmarker.detectForVideo(video, now);
     resultToHands(result, hands, assigner, now);
+    shapes.update(hands, now / 1000);
     draw(result);
     if (recording) recordFrame(recording, (now - recordStart) / 1000, hands.left, hands.right, null);
+    if (guided) {
+      if (!guided.frame((now - guidedStart) / 1000, hands.left, hands.right, null)) finishGuided();
+      else showPrompt();
+    }
     frames++;
     if (now - fpsAt > 1000) {
       fps = (frames * 1000) / (now - fpsAt);
@@ -102,12 +119,59 @@ function draw(result: HandLandmarkerResult): void {
 function render(): void {
   // On the bench the webcam faces you, so +Z points toward the camera.
   for (const side of ['right', 'left'] as const)
-    $(`hand-${side}`).innerHTML = handCardHtml(hands[side], ['toward the camera', 'toward you']);
+    $(`hand-${side}`).innerHTML = handCardHtml(
+      hands[side],
+      ['toward the camera', 'toward you'],
+      null,
+      shapes[side].state,
+      shapes[side].margins,
+    );
+}
+
+/** Guided recording: prompts every shape on each hand and saves a labelled recording (src/engine/hands/shape-script.ts). */
+function toggleGuided(): void {
+  if (guided) return finishGuided();
+  if (recording) return;
+  guided = new GuidedRecording(
+    new ShapeScript(SHAPES_SCRIPT),
+    'Webcam (MediaPipe) via webcam.html, guided',
+    navigator.userAgent,
+    new Date().toISOString(),
+  );
+  guidedStart = performance.now();
+  $('guide').textContent = 'Stop guided';
+  $<HTMLButtonElement>('rec').disabled = true;
+  prompt.hidden = false;
+}
+
+function finishGuided(): void {
+  if (!guided) return;
+  const rec = guided.finish();
+  guided = null;
+  if (rec.frames.length) downloadRecording(rec, 'wsw-webcam-guided');
+  $('guide').textContent = 'Guided recording';
+  $<HTMLButtonElement>('rec').disabled = false;
+  prompt.hidden = true;
+  shownStep = -2;
+}
+
+/** Updates the prompt overlay only when the step or the whole second changes. */
+function showPrompt(): void {
+  const p = guided!.prompt;
+  const second = Math.ceil(p.remaining);
+  if (p.index === shownStep && second === shownSecond) return;
+  shownStep = p.index;
+  shownSecond = second;
+  const [title, detail] = p.text.split('\n');
+  const shape = guided!.script.shapeAt(p.index);
+  prompt.innerHTML = `${shape ? `<img src="${sampleImage(shape, '#f0a24a', guided!.script.steps[p.index].hand)}" alt="">` : ''}<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}<em>${Math.ceil(p.remaining) || ''}</em>`;
 }
 
 function toggleRecording(): void {
   const button = $<HTMLButtonElement>('rec');
+  if (guided) return;
   if (!recording) {
+    $<HTMLButtonElement>('guide').disabled = true;
     recording = createRecording('Webcam (MediaPipe) via webcam.html', navigator.userAgent, new Date().toISOString());
     recordStart = performance.now();
     button.textContent = 'Stop and download';
@@ -117,4 +181,5 @@ function toggleRecording(): void {
   recording = null;
   button.textContent = 'Record';
   downloadRecording(rec, 'wsw-webcam');
+  $<HTMLButtonElement>('guide').disabled = false;
 }

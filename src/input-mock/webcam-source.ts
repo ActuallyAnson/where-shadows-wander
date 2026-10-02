@@ -22,6 +22,8 @@ import { clearHand, type HandSource } from './hand-source';
 const CAMERA = [0, 1, 0.5];
 /** mediapipeToHandFrame places hands this far in front of the webcam; we turn them about that point. */
 const HAND_DEPTH = 0.5;
+/** Lowers webcam hands to where mock hands rest (MOCK_WRIST), over the table, in front of the paper stage. */
+const HAND_DROP = 0.2;
 
 export class WebcamSource implements HandSource {
   readonly name = 'webcam';
@@ -30,6 +32,8 @@ export class WebcamSource implements HandSource {
     right: createHandFrame('right'),
   };
   private readonly assigner = new HandAssigner();
+  /** Treat a single hand in view as this side (MediaPipe's guess for a lone hand is unreliable); null = auto. */
+  lockSide: Handedness | null = null;
   private readonly smooth = { left: new Smoothed(), right: new Smoothed() };
   private stopped = false;
   /** A frame is with the worker; newer camera frames are skipped until it answers. */
@@ -106,7 +110,7 @@ export class WebcamSource implements HandSource {
     this.detectMs += (ms - this.detectMs) * 0.1;
     if (this.lastResultAt > 0) this.frameMs += (Math.min(now - this.lastResultAt, 200) - this.frameMs) * 0.1;
     this.lastResultAt = now;
-    resultToHands(result, this.seen, this.assigner, now);
+    resultToHands(result, this.seen, this.assigner, now, this.lockSide);
     this.smooth.left.camera(this.seen.left, now, this.frameMs);
     this.smooth.right.camera(this.seen.right, now, this.frameMs);
   }
@@ -168,7 +172,7 @@ function copyPlaced(s: Float32Array, src: HandFrame, out: HandFrame): void {
   // 180° about the vertical through the hand-depth point: x -> -x, z -> -2·depth - z.
   for (let j = 0; j < s.length; j += 3) {
     p[j] = CAMERA[0] - s[j];
-    p[j + 1] = CAMERA[1] + s[j + 1];
+    p[j + 1] = CAMERA[1] - HAND_DROP + s[j + 1];
     p[j + 2] = CAMERA[2] - 2 * HAND_DEPTH - s[j + 2];
   }
   out.radii.set(src.radii);

@@ -106,12 +106,16 @@ const scratch = [createHandFrame('left'), createHandFrame('right')];
 /**
  * Writes a landmarker result into both hands; hands it didn't see are left untracked.
  * With an assigner, each hand keeps its side when MediaPipe's label flips for a frame.
+ * With `lockSide`, a single hand is always that side: MediaPipe often guesses a
+ * lone hand's side wrong (worst when the back of the hand faces the camera),
+ * which also flips its palm direction.
  */
 export function resultToHands(
   result: LandmarkerResult,
   hands: Record<Handedness, HandFrame>,
   assigner?: HandAssigner,
   nowMs = 0,
+  lockSide: Handedness | null = null,
 ): void {
   hands.left.tracked = hands.right.tracked = false;
   hands.left.validJoints = hands.right.validJoints = 0;
@@ -123,11 +127,14 @@ export function resultToHands(
     const p = mediapipeToHandFrame(result.worldLandmarks[i], result.landmarks[i], scratch[i]).positions;
     wrists.push([p[0], p[1], p[2]]);
   }
-  const sides: Handedness[] = assigner
-    ? assigner.assign(labels, wrists, nowMs)
-    : labels[0] === labels[1]
-      ? [labels[0], labels[0] === 'left' ? 'right' : 'left']
-      : labels;
+  const sides: Handedness[] =
+    lockSide && n === 1
+      ? [lockSide]
+      : assigner
+        ? assigner.assign(labels, wrists, nowMs)
+        : labels[0] === labels[1]
+          ? [labels[0], labels[0] === 'left' ? 'right' : 'left']
+          : labels;
   for (let i = 0; i < n; i++) copyHand(scratch[i], hands[sides[i]]);
 }
 
