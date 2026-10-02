@@ -26,7 +26,7 @@ Keep a known, tested fallback: **plain three.js (`super-three@0.181.0`) + `@iwsd
 
 ### The entry file (spike, 54 lines, ran in the emulator)
 
-From `spikes/iwsdk/fallback/main.ts` on branch `spike/iwsdk`. It reused every spike module unchanged by aliasing `@iwsdk/core` to `three`. For this repo, swap `SpikeGame` for our `XRHandReader`, `FixedStepLoop`, `JointDots` and `Diagnostics`, the same objects `src/main.ts` wires into its driver system.
+From `spikes/iwsdk/fallback/main.ts` on branch `spike/iwsdk`. It reused every spike module unchanged by aliasing `@iwsdk/core` to `three`. For this repo, swap `SpikeGame` for our `XRHandReader`, `FixedStepLoop`, `JointDots` and `Diagnostics`, the same objects `src/app/main.ts` wires into its driver system.
 
 ```ts
 // Fallback architecture: plain three.js + @iwsdk/xr-input, no @iwsdk/core / ECS.
@@ -127,4 +127,4 @@ Before switching, get a forum answer on eligibility.
 ## Consequences
 
 - `scripts/check-boundaries.mjs` is what keeps this fallback cheap. Don't weaken it.
-- Code in `src/platform` and `src/view` may use `@iwsdk/core`, but should stick to its three.js re-exports and raw WebXR wherever possible, so that aliasing `@iwsdk/core` to `three` still compiles. Today only `src/main.ts`, `src/platform/iwsdk-input-visuals.ts` and the IWSDK manifests (`src/assets.ts`, `src/components.ts`) use IWSDK-specific APIs; the fallback drops the manifests.
+- Code in `src/app`, `src/engine/xr` and other engine-facing folders may use `@iwsdk/core`, but should stick to its three.js re-exports and raw WebXR wherever possible, so that aliasing `@iwsdk/core` to `three` still compiles. Today only `src/app/main.ts`, `src/engine/xr/iwsdk-input-visuals.ts` and the IWSDK manifests (`src/assets.ts`, `src/components.ts`) use IWSDK-specific APIs; the fallback drops the manifests.

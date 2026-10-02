@@ -4,7 +4,7 @@
 //
 // Caveats compared with a headset: depth comes from one camera (approximate),
 // the viewpoint is the webcam's (facing the player), and the noise differs.
-import { JOINT_COUNT, type HandFrame, type Handedness } from '../hands/hand';
+import { JOINT_COUNT, type HandFrame, type Handedness } from '../engine/hands/hand';
 
 /** A MediaPipe landmark: image coords are 0..1 (x right, y down); world coords are metres. */
 export interface Landmark {

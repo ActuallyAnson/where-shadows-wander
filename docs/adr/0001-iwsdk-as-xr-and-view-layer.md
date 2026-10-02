@@ -23,13 +23,13 @@ IWSDK is young: 1.0.0 shipped on 24 Sep 2026, npm's `latest` tag still points at
 
 ### What IWSDK does not do
 
-- **Gameplay and simulation never import IWSDK or three.js.** `src/hands`, `src/sim` and `src/game` are plain TypeScript. `npm run check:boundaries` (`scripts/check-boundaries.mjs`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, or our `platform`/`view` folders.
+- **Gameplay and simulation never import IWSDK or three.js.** `src/engine/hands`, `src/engine/sim`, `src/engine/stage` and `src/game` are plain TypeScript. `npm run check:boundaries` (`scripts/check-boundaries.mjs`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, or our `platform`/`view` folders.
 - **No game state in the ECS.** `src/components.ts` and the scene JSON stay empty. The view layer uses plain three.js objects (`InstancedMesh`, custom `ShaderMaterial`) added with `world.scene.add`. Use an IWSDK ECS feature only when it clearly saves work. The trade-off is that IWSDK's editor and `ecs` CLI don't see our objects.
 - **Hand data comes from raw WebXR** (`frame.fillPoses`), not IWSDK's input, grab or gesture systems.
 
 ### Hands: 25 joints, derived palm
 
-WebXR Hand Input exposes **25 joints** per hand. OpenXR's 26th joint (`palm`) is not exposed in any browser. The hand data format (`src/hands/hand.ts`) and the classifier use the 25 joints, and `derivePalm()` computes the palm from joint positions:
+WebXR Hand Input exposes **25 joints** per hand. OpenXR's 26th joint (`palm`) is not exposed in any browser. The hand data format (`src/engine/hands/hand.ts`) and the classifier use the 25 joints, and `derivePalm()` computes the palm from joint positions:
 
 - position: midpoint of the middle-finger metacarpal and proximal joints
 - forward: wrist to the middle-finger knuckle
@@ -38,7 +38,7 @@ WebXR Hand Input exposes **25 joints** per hand. OpenXR's 26th joint (`palm`) is
 
 ### One driver system, our own fixed step
 
-IWSDK keeps `renderer.setAnimationLoop`. We register exactly one system (`FrameDriverSystem` in `src/main.ts`) at **priority 10**. That is after IWSDK's input (-4) and scene understanding (-1) systems, and before render. It reads the frame and advances `FixedStepLoop` (`src/sim/fixed-step.ts`), which steps the sim at a fixed rate with an accumulator and returns an interpolation factor for rendering.
+IWSDK keeps `renderer.setAnimationLoop`. We register exactly one system (`FrameDriverSystem` in `src/app/main.ts`) at **priority 10**. That is after IWSDK's input (-4) and scene understanding (-1) systems, and before render. It reads the frame and advances `FixedStepLoop` (`src/engine/sim/fixed-step.ts`), which steps the sim at a fixed rate with an accumulator and returns an interpolation factor for rendering.
 
 The spike also tried taking over `setAnimationLoop` and calling `world.update` ourselves. That works, but it copies IWSDK's private loop body, so it would break across versions. Rejected.
 
@@ -52,7 +52,7 @@ The spike also tried taking over `setAnimationLoop` and calling `world.update` o
 
 ### Build: drop the unused icon set
 
-`@drawcall/uikitml` imports all of `@pmndrs/uikit-lucide` (4.2 MB raw) at module top level. It can't be tree-shaken, even with `spatialUI: false`. `vite.config.ts` aliases `@pmndrs/uikit-lucide` to `src/stubs/lucide-subset.ts`, which re-exports only the two icons `@pmndrs/uikit-horizon` uses.
+`@drawcall/uikitml` imports all of `@pmndrs/uikit-lucide` (4.2 MB raw) at module top level. It can't be tree-shaken, even with `spatialUI: false`. `vite.config.ts` aliases `@pmndrs/uikit-lucide` to `src/app/stubs/lucide-subset.ts`, which re-exports only the two icons `@pmndrs/uikit-horizon` uses.
 
 | | main chunk gzip | cold-load transfer |
 |---|---|---|
@@ -63,7 +63,7 @@ If we ever turn on spatial UI with lucide icons, remove the alias. The upstream 
 
 ### Hide IWSDK's input visuals
 
-In passthrough the player sees their real hands and never points at anything, so IWSDK's input visuals must not draw. Both fixes are in `src/platform/iwsdk-input-visuals.ts`:
+In passthrough the player sees their real hands and never points at anything, so IWSDK's input visuals must not draw. Both fixes are in `src/engine/xr/iwsdk-input-visuals.ts`:
 
 - **Hand models:** `visualAdapters.hand[*].toggleVisual(false)` and `visual.toggle(false)` did not hide them in the spike. We set `visible = false` on the hand `SkinnedMesh`es every frame, because the visuals are rebuilt when a hand reconnects. Re-check IWSDK's own toggle when upgrading.
 - **Far-ray pointers:** IWSDK draws one ray per hand. `multiPointers[hand].toggleSubPointer('ray', false)`, called once after `World.create`, hides them and turns off ray interaction, which the game doesn't use.
@@ -74,7 +74,7 @@ In the emulator on 1.0.0, with both hands tracked, every IWSDK hand and ray mesh
 
 - The project model files (`iwsdk.config.json`, `src/assets.ts`, `src/components.ts`, `public/scenes/main.iwsdk.scene.json`) exist because the IWSDK Vite plugin needs them. Keep them minimal.
 - IWSDK's AI-agent adapter files (`AGENTS.md`, `.claude/`, `.cursor/`, `.codex/`, `opencode.json`, `.github/instructions/`) are not part of this repo. The CLI's generated MCP configs are gitignored.
-- No top-level `await` in `src/main.ts`. IWSDK lazily imports a chunk that imports back from the entry chunk, so a top-level `await World.create(...)` deadlocks in production builds; dev mode doesn't show it.
+- No top-level `await` in `src/app/main.ts`. IWSDK lazily imports a chunk that imports back from the entry chunk, so a top-level `await World.create(...)` deadlocks in production builds; dev mode doesn't show it.
 - Deploy with the GitHub Actions Pages flow. The build emits `assets/_virtual_iwsdk-*.js`, and classic Jekyll Pages ignores files starting with `_`. `public/.nojekyll` covers the classic flow too.
 
 ## Consequences

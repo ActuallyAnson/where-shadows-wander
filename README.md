@@ -35,15 +35,20 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 ### Code layout
 
-| Folder | What | May import IWSDK / three.js |
-|---|---|---|
-| `src/hands` | Data shared by platform and gameplay: hand (25 joints + derived palm), shape features, recording format | No |
-| `src/sim` | Fixed-timestep loop and, later, the 2D simulation | No |
-| `src/game` | Gameplay (from week 2) | No |
-| `src/platform` | Raw WebXR reads, IWSDK workarounds, diagnostics, hand recorder, webcam (MediaPipe) conversion | Yes |
-| `src/view` | Plain three.js objects | Yes |
-| `src/main.ts` | `World.create` and the single driver system | Yes |
-| `src/webcam` | Webcam hand bench page (`webcam.html`), dev tool | No IWSDK |
+| Folder | Owner | What | Pure (no IWSDK / three.js) |
+|---|---|---|---|
+| `src/app` | Anson | Entry point (`World.create`, the single driver system), IWSDK manifests, no-AR notice | No |
+| `src/engine/xr` | Anson | Raw WebXR hand reading, IWSDK workarounds, hand recorder, joint dots | No |
+| `src/engine/hands` | Anson | Hand data (25 joints, derived palm), shape features, recording format; later the classifier | **Yes** |
+| `src/engine/shadow` | Anson | Projected-shadow renderer (week 2) | No |
+| `src/input-mock` | Anson | Webcam hand bench (`webcam.html`), MediaPipe conversion; later `?mock=1` | No |
+| `src/engine/sim` | A | Fixed-timestep loop; later the 2D solver and entities | **Yes** |
+| `src/engine/stage` | A | StageFrame maths (3D ↔ 2D stage space) | **Yes** |
+| `src/game` | A | Gameplay: traveller, shape abilities, puzzles, companions | **Yes** |
+| `src/engine/render`, `src/engine/anim`, `src/engine/services`, `src/ui` | B | Stage renderer, animation, saves, assets, audio, UI | Adapters no; core logic yes |
+| `src/debug` | B | Diagnostics report, anchor probe, Copy report panel | No |
+
+Folders without code yet are created by their owner when needed.
 
 `npm run check:boundaries` enforces the "No" rows.
 

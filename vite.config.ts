@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => ({
       // See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
       {
         find: /^@pmndrs\/uikit-lucide$/,
-        replacement: fileURLToPath(new URL('./src/stubs/lucide-subset.ts', import.meta.url)),
+        replacement: fileURLToPath(new URL('./src/app/stubs/lucide-subset.ts', import.meta.url)),
       },
     ],
     // One three.js (super-three@0.181) and one uikit graph, never two.
