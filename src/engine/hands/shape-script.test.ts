@@ -48,11 +48,11 @@ describe('shape script', () => {
 
   it('prompts every shape on each hand with rest between, in about a minute', () => {
     const s = new ShapeScript(SHAPES_SCRIPT);
-    expect(s.duration).toBe(66);
+    expect(s.duration).toBe(84);
     for (const hand of ['left', 'right'] as const) {
       const shapes = s.labels().filter((l) => l.hand === hand && l.shape !== 'none');
       expect(shapes.map((l) => l.shape)).toEqual([...SHAPES]);
-      shapes.forEach((l) => expect(l.end - l.start).toBeCloseTo(2));
+      shapes.forEach((l) => expect(l.end - l.start).toBeCloseTo(3.5));
       expect(s.labels().filter((l) => l.hand === hand && l.shape === 'none').length).toBe(SHAPES.length + 1);
     }
   });

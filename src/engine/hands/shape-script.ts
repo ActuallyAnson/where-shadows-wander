@@ -21,15 +21,16 @@ export interface ScriptStep {
  */
 export const SETTLE_S = 0.5;
 
-const HOLD_S = 3;
+const HOLD_S = 4.5;
 const REST_S = 2;
 const LEAD_IN_S = 3;
 
 /**
  * Every v1 shape on the right hand, then on the left: a relaxed lead-in, then
- * each shape held 3 s with 2 s relaxed between. 66 s in all (a guided
+ * each shape held 4.5 s with 2 s relaxed between. 84 s in all (a guided
  * recording lasts as long as its script). With the settle margin, each shape
- * gets a 2 s label and each rest a 1 s `none` label.
+ * gets a 3.5 s label and each rest a 1 s `none` label. (3 s holds were too
+ * quick to settle into a shape and hold it.)
  */
 export const SHAPES_SCRIPT: readonly ScriptStep[] = (['right', 'left'] as const).flatMap((hand) => [
   { hand, shape: 'relaxed' as const, seconds: LEAD_IN_S },
@@ -39,8 +40,8 @@ export const SHAPES_SCRIPT: readonly ScriptStep[] = (['right', 'left'] as const)
   ]),
 ]);
 
-/** How to make each shape (GDD, "Shape vocabulary"), shown under the prompt. */
-const HOW: Readonly<Record<PresetName, string>> = {
+/** How to make each shape (GDD, "Shape vocabulary"), shown under the prompt and in the Hand Lab's guide. */
+export const SHAPE_HOW: Readonly<Record<PresetName, string>> = {
   relaxed: 'Let the hand rest',
   flat: 'Palm down, fingers together',
   fist: 'Closed hand',
@@ -110,6 +111,11 @@ export class ShapeScript {
     return i;
   }
 
+  /** The shape the prompt at step `index` asks for (null before, after, or for a lowered hand), for its example picture. */
+  shapeAt(index: number): PresetName | null {
+    return index >= 0 && index < this.steps.length ? this.steps[index].shape : null;
+  }
+
   /** Writes the prompt for time `t` into `out`. Allocates nothing. */
   promptAt(t: number, out: Prompt): Prompt {
     const i = this.stepAt(t);
@@ -146,5 +152,5 @@ function promptText(s: ScriptStep): string {
   const hand = s.hand === 'right' ? 'Right hand' : 'Left hand';
   if (s.shape === null) return `Lower your ${s.hand} hand`;
   if (s.shape === 'relaxed') return `${hand}: relax`;
-  return `${hand}: ${s.shape.toUpperCase()}\n${HOW[s.shape]}`;
+  return `${hand}: ${s.shape.toUpperCase()}\n${SHAPE_HOW[s.shape]}`;
 }

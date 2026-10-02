@@ -293,6 +293,8 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 
 - **Shape tolerance slider:** Widens recognition ranges for players with limited finger mobility.
 
+- **Hand calibration:** The player holds each hand flat for 2 seconds and finger curl is measured from their own straight, for fingers that don't fully straighten (`src/engine/hands/hand-calibration.ts`; onboarding can run it).
+
 - **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s.
 
 - **Shadow size slider:** Makes shadows larger for low-vision players.

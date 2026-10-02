@@ -3,14 +3,14 @@ import { evaluateRecording, formatReport, percentile, sourceOf, summarise } from
 import { createHandFrame } from './hand';
 import { createRecording, recordFrame, type HandRecording, type ShapeLabel } from './hand-recording';
 import { SETTLE_S } from './shape-script';
-import { PRESETS, writeHandPose, type PresetName } from './synthetic-hand';
+import { clonePose, PRESETS, writeHandPose, type HandPose, type PresetName } from './synthetic-hand';
 
 const FPS = 50;
 
 /** A recording of the right hand following `pose(t)` (null = not tracked), with labels. */
 function recording(
   seconds: number,
-  pose: (t: number) => PresetName | null,
+  pose: (t: number) => PresetName | HandPose | null,
   labels: ShapeLabel[],
   note = 'Hand Lab guided, script',
 ) {
@@ -20,7 +20,7 @@ function recording(
   for (let i = 0; i <= seconds * FPS; i++) {
     const t = i / FPS;
     const p = pose(t);
-    if (p) writeHandPose(PRESETS[p], [0.1, 1, -0.4], r);
+    if (p) writeHandPose(typeof p === 'string' ? PRESETS[p] : p, [0.1, 1, -0.4], r);
     else r.tracked = false;
     r.validJoints = p ? 25 : 0;
     recordFrame(rec, t, l, r, null);
@@ -126,5 +126,24 @@ describe('classifier evaluation', () => {
     const text = formatReport(summarise([evaluateRecording(recording(4, () => 'fist', [label(1, 3, 'fist')]))]));
     expect(text).toContain('synthetic');
     expect(text).toContain('confusion');
+  });
+
+  it('calibrates each hand from its first flat prompt when asked', () => {
+    // A tracker that reads every finger 0.3 more bent: flat isn't recognised raw, but is once calibrated.
+    const bent = (p: PresetName) => {
+      const pose = clonePose(PRESETS[p]);
+      for (const f of pose.fingers) f.curl = Math.min(f.curl + 0.3, 1);
+      return pose;
+    };
+    const rec = recording(8, (t) => (t < 3 ? bent('flat') : t < 4 ? bent('relaxed') : bent('flat')), [
+      label(0.5, 2.5, 'flat'),
+      label(4.5, 7.5, 'flat'),
+    ]);
+    const raw = evaluateRecording(rec);
+    const calibrated = evaluateRecording(rec, {}, { calibrate: true });
+    expect(raw.labels[1].hit).toBe(false);
+    expect(calibrated.labels[1].hit).toBe(true);
+    expect(calibrated.calibration!.right![1]).toBeGreaterThan(0.25);
+    expect(calibrated.calibration!.left).toBeNull();
   });
 });

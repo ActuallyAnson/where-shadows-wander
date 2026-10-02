@@ -2,6 +2,7 @@
 // hold-to-commit state machine, with this frame's events in one queue.
 // Plain TypeScript: no IWSDK, no three.js. Allocates nothing per update.
 import type { HandFrame, Handedness, Vec3 } from './hand';
+import { CalibrationRun, createCurlBias, type CurlBias } from './hand-calibration';
 import { computeHandFeatures, createHandFeatures, WORLD_UP, type HandFeatures } from './hand-features';
 import { ShapeClassifier, type ClassifierConfig } from './shape-classifier';
 import { ShapeEventQueue } from './shape-events';
@@ -22,6 +23,11 @@ export class ShapeRecognizer {
   readonly commits = Object.fromEntries(SHAPES.map((s) => [s, 0])) as Record<Shape, number>;
   /** The stage's normal; up for the tabletop theatre. StageFrame sets it for the wall stage. */
   readonly stageNormal: Vec3 = [...WORLD_UP];
+  /** Each hand's baseline finger curl (hand-calibration.ts); zeros until calibrated. */
+  readonly calibration: Record<Handedness, CurlBias> = { left: createCurlBias(), right: createCurlBias() };
+  /** A calibration in progress, if any; read its state and progress for the UI. */
+  calibrating: CalibrationRun | null = null;
+  private readonly raw = createHandFeatures();
   private lastT = NaN;
 
   constructor(config: Partial<ClassifierConfig> = {}) {
@@ -40,6 +46,18 @@ export class ShapeRecognizer {
       const e = this.events.at(i);
       if (e.type === 'commit') this.commits[e.shape]++;
     }
+  }
+
+  /** Starts calibrating `hand`: hold it flat for CALIBRATION_HOLD_S. The result is applied when done. */
+  startCalibration(hand: Handedness): CalibrationRun {
+    this.calibrating = new CalibrationRun(hand);
+    return this.calibrating;
+  }
+
+  /** Sets (or with null, clears) a hand's calibration, e.g. one saved earlier. */
+  setCalibration(hand: Handedness, bias: ArrayLike<number> | null): void {
+    const c = this.calibration[hand];
+    for (let i = 0; i < c.length; i++) c[i] = bias ? bias[i] : 0;
   }
 
   setStageNormal(n: Readonly<Vec3>): void {
@@ -71,7 +89,12 @@ export class ShapeRecognizer {
   }
 
   private step(c: ShapeClassifier, hand: HandFrame, dt: number, t: number): void {
-    const f = computeHandFeatures(hand, this.features[c.hand], this.stageNormal);
+    const run = this.calibrating;
+    if (run && run.hand === c.hand && run.state === 'collecting') {
+      if (run.add(computeHandFeatures(hand, this.raw, this.stageNormal), dt) === 'done')
+        this.setCalibration(c.hand, run.bias);
+    }
+    const f = computeHandFeatures(hand, this.features[c.hand], this.stageNormal, this.calibration[c.hand]);
     this.valid[c.hand] = f !== null;
     c.update(f, hand.validJoints, dt, t, this.events);
   }

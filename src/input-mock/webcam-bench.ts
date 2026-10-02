@@ -6,6 +6,7 @@ import { createRecording, recordFrame, type HandRecording } from '../engine/hand
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { downloadRecording, handCardHtml } from './hand-card';
+import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { HandAssigner } from './hand-assigner';
 import { createHandLandmarker, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
 import { handednessFromLabel, resultToHands } from './mediapipe-hands';
@@ -162,7 +163,8 @@ function showPrompt(): void {
   shownStep = p.index;
   shownSecond = second;
   const [title, detail] = p.text.split('\n');
-  prompt.innerHTML = `<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}<em>${Math.ceil(p.remaining) || ''}</em>`;
+  const shape = guided!.script.shapeAt(p.index);
+  prompt.innerHTML = `${shape ? `<img src="${sampleImage(shape, '#f0a24a', guided!.script.steps[p.index].hand)}" alt="">` : ''}<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}<em>${Math.ceil(p.remaining) || ''}</em>`;
 }
 
 function toggleRecording(): void {
