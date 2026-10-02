@@ -16,11 +16,11 @@ export interface HandSource {
 /**
  * Where mock hands rest, in scene space. The desktop camera sits at (0, 1, 0.5)
  * (iwsdk.config.json), so this is about 0.45 m in front of it and a little below
- * eye height, like hands over a table.
+ * eye height.
  */
 export const MOCK_WRIST: Readonly<Record<Handedness, Readonly<Vec3>>> = {
-  left: [-0.12, 0.88, 0.05],
-  right: [0.12, 0.88, 0.05],
+  left: [-0.08, 0.95, 0.05],
+  right: [0.08, 0.95, 0.05],
 };
 
 export function clearHand(hand: HandFrame): void {

@@ -21,7 +21,7 @@ export function mountMockControls(mode: MockMode): void {
 
   const panel = document.createElement('div');
   panel.style.cssText =
-    'position:fixed;left:12px;bottom:12px;z-index:10;max-width:34rem;padding:10px 12px;border-radius:8px;' +
+    'position:fixed;left:12px;top:12px;z-index:10;max-width:19rem;padding:10px 12px;border-radius:8px;' +
     'background:rgba(20,22,28,.85);color:#ece6d8;font:13px/1.45 system-ui,sans-serif;pointer-events:none';
   document.body.append(panel);
 
