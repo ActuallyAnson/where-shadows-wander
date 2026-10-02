@@ -24,7 +24,7 @@ export const SAMPLE_VIEWS: Readonly<Record<PresetName, SampleView>> = {
   cup: { yawDeg: 25, pitchDeg: 25 },
   spread: { yawDeg: 15, pitchDeg: 65 },
   // Ears up: the hand tilted fingers-up, seen from the side, so the pinched thumb shows below them.
-  rabbit: { yawDeg: 90, pitchDeg: 0, fingersUpDeg: 70 },
+  rabbit: { yawDeg: 55, pitchDeg: 0, fingersUpDeg: 70 },
   // From the side, the fingers point one way and the thumb straight up: an L.
   fox: { yawDeg: 90, pitchDeg: 0 },
 };
