@@ -202,7 +202,7 @@ export class HandLab {
       <section id="lab-controls"></section>
       <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
-          `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
+          `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s, '#f0a24a', 'right', 168)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
       ).join('')}</div></details>
       <section class="hand" id="lab-gestures"></section>
       <section class="hand" id="lab-hand-right"></section>
@@ -423,9 +423,9 @@ const CSS = `
 .lab .prompt img { float: left; width: 72px; height: 72px; margin-right: 10px; }
 .lab .guide { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .lab .guide summary { cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.lab .guide .shapes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
-.lab .guide figure { margin: 0; display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; }
-.lab .guide img { width: 56px; height: 56px; }
+.lab .guide .shapes { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 8px; }
+.lab .guide figure { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 10px; align-items: center; }
+.lab .guide img { width: 84px; height: 84px; }
 .lab .guide figcaption { font-size: 11px; color: var(--muted); }
 .lab .guide figcaption b { display: block; color: var(--ink); font-size: 12.5px; text-transform: capitalize; }
 .lab .prompt span { color: var(--muted); }

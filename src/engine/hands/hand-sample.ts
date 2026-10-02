@@ -3,12 +3,14 @@
 // that shows the shape clearly, flattened to 2D. Plain TypeScript; drawing is
 // done by the caller (src/engine/xr/hand-sample-draw.ts).
 import { createHandFrame, JOINT_COUNT, type Handedness } from './hand';
-import { PRESETS, writeHandPose, type PresetName } from './synthetic-hand';
+import { clonePose, PRESETS, writeHandPose, type PresetName } from './synthetic-hand';
 
 export interface SampleView {
   /** Turn the hand about the vertical, then tilt it toward the viewer, degrees. */
   yawDeg: number;
   pitchDeg: number;
+  /** Tilt the hand's fingers up first (as for a shadow puppet), degrees. */
+  fingersUpDeg?: number;
 }
 
 /**
@@ -21,8 +23,10 @@ export const SAMPLE_VIEWS: Readonly<Record<PresetName, SampleView>> = {
   fist: { yawDeg: 35, pitchDeg: 35 },
   cup: { yawDeg: 25, pitchDeg: 25 },
   spread: { yawDeg: 15, pitchDeg: 65 },
-  rabbit: { yawDeg: 60, pitchDeg: 20 },
-  fox: { yawDeg: 80, pitchDeg: 10 },
+  // Ears up: the hand tilted fingers-up, seen from the side, so the pinched thumb shows below them.
+  rabbit: { yawDeg: 90, pitchDeg: 0, fingersUpDeg: 70 },
+  // From the side, the fingers point one way and the thumb straight up: an L.
+  fox: { yawDeg: 90, pitchDeg: 0 },
 };
 
 /**
@@ -31,8 +35,10 @@ export const SAMPLE_VIEWS: Readonly<Record<PresetName, SampleView>> = {
  * pictures drawn once, not per frame.
  */
 export function sampleHand(preset: PresetName, side: Handedness = 'right'): Float32Array {
-  const hand = writeHandPose(PRESETS[preset], [0, 0, 0], createHandFrame(side));
-  const { yawDeg, pitchDeg } = SAMPLE_VIEWS[preset];
+  const { yawDeg, pitchDeg, fingersUpDeg = 0 } = SAMPLE_VIEWS[preset];
+  const pose = clonePose(PRESETS[preset]);
+  pose.pitchDeg += fingersUpDeg;
+  const hand = writeHandPose(pose, [0, 0, 0], createHandFrame(side));
   const yaw = ((side === 'left' ? -yawDeg : yawDeg) * Math.PI) / 180,
     pitch = (pitchDeg * Math.PI) / 180;
   const out = new Float32Array(JOINT_COUNT * 2);
