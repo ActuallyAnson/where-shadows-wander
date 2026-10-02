@@ -213,6 +213,8 @@ export class HandLab {
       landmarks.</p>
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
+    const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
+    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
 
     const file = this.root.querySelector<HTMLInputElement>('#lab-file')!;
     file.addEventListener('change', () => {
