@@ -3,6 +3,7 @@
 import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { downloadRecording, handCardHtml } from './hand-card';
 import { HandAssigner } from './hand-assigner';
@@ -32,6 +33,7 @@ const prompt = $<HTMLDivElement>('prompt');
 let shownStep = -2;
 let shownSecond = -1;
 const assigner = new HandAssigner();
+const shapes = new ShapeRecognizer();
 let frames = 0;
 let fpsAt = performance.now();
 let fps = 0;
@@ -70,6 +72,7 @@ function loop(): void {
     const now = performance.now();
     const result = landmarker.detectForVideo(video, now);
     resultToHands(result, hands, assigner, now);
+    shapes.update(hands, now / 1000);
     draw(result);
     if (recording) recordFrame(recording, (now - recordStart) / 1000, hands.left, hands.right, null);
     if (guided) {
@@ -115,7 +118,13 @@ function draw(result: HandLandmarkerResult): void {
 function render(): void {
   // On the bench the webcam faces you, so +Z points toward the camera.
   for (const side of ['right', 'left'] as const)
-    $(`hand-${side}`).innerHTML = handCardHtml(hands[side], ['toward the camera', 'toward you']);
+    $(`hand-${side}`).innerHTML = handCardHtml(
+      hands[side],
+      ['toward the camera', 'toward you'],
+      null,
+      shapes[side].state,
+      shapes[side].margins,
+    );
 }
 
 /** Guided recording: prompts every shape on each hand and saves a labelled recording (src/engine/hands/shape-script.ts). */

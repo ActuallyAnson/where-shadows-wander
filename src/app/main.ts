@@ -6,6 +6,7 @@ import { World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
+import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
@@ -37,6 +38,9 @@ async function start(): Promise<void> {
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
+  // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
+  const shapes = new ShapeRecognizer();
+  let clock = 0;
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
@@ -46,7 +50,7 @@ async function start(): Promise<void> {
       return new SyntheticSource();
     });
     mock = new MockMode(source);
-    lab = new HandLab(mock, hands.hands, {
+    lab = new HandLab(mock, hands.hands, shapes, {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
@@ -63,6 +67,7 @@ async function start(): Promise<void> {
     sim: { hz: SIM_HZ, steps: sim.steps },
     handReadMethod: { ...hands.method },
     mock: mock ? { source: mock.source.name } : null,
+    shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
   }));
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
@@ -95,6 +100,9 @@ async function start(): Promise<void> {
       if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
       else if (frame && refSpace) hands.update(frame, refSpace, this.world.player.matrixWorld);
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
+      // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
+      clock += delta;
+      shapes.update(hands.hands, mock ? mock.time : clock);
       if (recorder) {
         const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
         const viewer = pose?.transform.position;
@@ -125,5 +133,5 @@ async function start(): Promise<void> {
   world.registerSystem(FrameDriverSystem, { priority: 10 });
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
-  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab } });
+  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes } });
 }

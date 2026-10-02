@@ -175,6 +175,62 @@
         font: 12.5px var(--mono);
         font-variant-numeric: tabular-nums;
       }
+      .hold {
+        position: relative;
+        height: 18px;
+        border-radius: 4px;
+        background: var(--stage);
+        overflow: hidden;
+        font-size: 11px;
+      }
+      .hold span {
+        position: relative;
+        z-index: 1;
+        padding-left: 6px;
+        line-height: 18px;
+      }
+      .hold i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        opacity: 0.55;
+      }
+      .margins {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4px;
+      }
+      .margins .m {
+        display: grid;
+        gap: 2px;
+        justify-items: center;
+        font: 9.5px var(--mono);
+        color: var(--muted);
+      }
+      .margins .m.on {
+        color: var(--ink);
+      }
+      .margins .b {
+        width: 100%;
+        height: 26px;
+        border-radius: 3px;
+        background: var(--stage);
+        position: relative;
+        overflow: hidden;
+      }
+      .margins .b i {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--muted);
+        opacity: 0.5;
+      }
+      .margins .m.on .b i {
+        background: var(--right);
+        opacity: 1;
+      }
       .guess {
         color: var(--muted);
         font-size: 12px;

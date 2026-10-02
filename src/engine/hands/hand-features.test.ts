@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, JOINT, JOINT_COUNT, type Vec3 } from './hand';
-import { computeHandFeatures, createHandFeatures, handFeatures, roughShape } from './hand-features';
+import { computeHandFeatures, createHandFeatures, handFeatures } from './hand-features';
+import { bestShape } from './shape-ranges';
 import { clonePose, PRESETS, writeHandPose, type PresetName } from './synthetic-hand';
 
 /** Right hand, palm down, fingers along -Z. `curl` bends each finger joint down by that many degrees. */
@@ -41,19 +42,19 @@ describe('hand features', () => {
     expect(f.meanCurl).toBeLessThan(0.05);
     expect(f.spreadDeg).toBeLessThan(2);
     expect(f.pinchGapMm).toBeGreaterThan(40);
-    expect(roughShape(f)).toBe('flat (fingers together)');
+    expect(bestShape(f)).toBe('flat');
   });
 
   it('reads curled fingers as a fist', () => {
     const f = handFeatures(hand(70))!;
     expect(f.meanCurl).toBeGreaterThan(0.9);
-    expect(roughShape(f)).toBe('fist');
+    expect(bestShape(f)).toBe('fist');
   });
 
   it('reads spread fingers as open', () => {
     const f = handFeatures(hand(0, 40))!;
     expect(f.spreadDeg).toBeGreaterThan(30);
-    expect(roughShape(f)).toBe('open (fingers spread)');
+    expect(bestShape(f)).toBe('spread');
   });
 
   it('returns null for an untracked hand', () => {

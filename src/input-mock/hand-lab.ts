@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import type { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
@@ -45,6 +46,7 @@ export class HandLab {
   constructor(
     private readonly mode: MockMode,
     private readonly hands: Record<Handedness, HandFrame>,
+    private readonly shapes: ShapeRecognizer,
     private readonly view: LabView,
   ) {
     view.scene.add(this.bones.mesh);
@@ -262,6 +264,8 @@ export class HandLab {
           this.hands[side],
           ['toward you', 'away from you'],
           this.mode.source.shapeOf?.(side) ?? null,
+          this.shapes[side].state,
+          this.shapes[side].margins,
         );
     }
     const prompt = this.root.querySelector('#lab-prompt');
@@ -353,6 +357,16 @@ const CSS = `
 .lab .shape { font-size: 16px; font-weight: 600; }
 .lab .shape.none { color: var(--muted); font-weight: 400; }
 .lab .guess { color: var(--muted); font-size: 12px; margin-top: -4px; }
+.lab .hold { position: relative; height: 18px; border-radius: 4px; background: var(--stage); overflow: hidden; font-size: 11px; }
+.lab .hold span { position: relative; z-index: 1; padding-left: 6px; line-height: 18px; }
+.lab .hold i { position: absolute; left: 0; top: 0; bottom: 0; opacity: .55; }
+.lab .margins { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.lab .margins .m { display: grid; gap: 2px; justify-items: center; font: 9.5px ui-monospace, monospace; color: var(--muted); }
+.lab .margins .m.on { color: var(--ink); }
+.lab .margins .b { width: 100%; height: 26px; border-radius: 3px; background: var(--stage); position: relative; overflow: hidden;
+  background-image: linear-gradient(to top, transparent calc(50% - 0.5px), var(--muted) 50%, transparent calc(50% + 0.5px)); }
+.lab .margins .b i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--muted); opacity: .5; }
+.lab .margins .m.on .b i { background: var(--accent); opacity: 1; }
 .lab dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
 .lab dt { color: var(--muted); }
 .lab dd { margin: 0; text-align: right; font: 12px ui-monospace, monospace; font-variant-numeric: tabular-nums; }

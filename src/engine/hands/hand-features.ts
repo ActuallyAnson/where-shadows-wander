@@ -160,20 +160,6 @@ export function handFeatures(hand: HandFrame, stageNormal: Readonly<Vec3> = WORL
   return computeHandFeatures(hand, createHandFeatures(), stageNormal);
 }
 
-export type RoughShape = 'pinch' | 'fist' | 'flat (fingers together)' | 'open (fingers spread)' | 'in between';
-
-/**
- * A rough label for the webcam test page only. The real classifier (week 3)
- * adds palm orientation, hold time and hysteresis.
- */
-export function roughShape(f: HandFeatures): RoughShape {
-  if (f.pinchGapMm < 25 && f.curl.index < 0.6) return 'pinch';
-  if (f.meanCurl > 0.6) return 'fist';
-  if (f.meanCurl < 0.25 && f.spreadDeg < 15) return 'flat (fingers together)';
-  if (f.meanCurl < 0.25) return 'open (fingers spread)';
-  return 'in between';
-}
-
 /** Writes the vector from joint `from` to joint `to` into `out`. */
 function direction(p: Float32Array, from: number, to: number, out: Float64Array): void {
   for (let k = 0; k < 3; k++) out[k] = p[to * 3 + k] - p[from * 3 + k];
