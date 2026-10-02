@@ -211,7 +211,8 @@ export class HandLab {
     const time = this.root.querySelector('#lab-time');
     if (time) {
       const rec = this.recording ? ` · recording ${(this.mode.time - this.recordStart).toFixed(1)} s` : '';
-      time.textContent = `${this.mode.source.name} · ${this.mode.time.toFixed(1)} s${rec}`;
+      const status = this.mode.source.status?.() ?? this.mode.source.name;
+      time.textContent = `${status} · ${this.mode.time.toFixed(1)} s${rec}`;
     }
   }
 

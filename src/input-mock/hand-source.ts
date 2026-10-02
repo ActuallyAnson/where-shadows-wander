@@ -13,6 +13,8 @@ export interface HandSource {
   update(t: number, left: HandFrame, right: HandFrame): void;
   /** The shape a hand is posed as, for sources that know it (synthetic, script); null when hidden. */
   shapeOf?(hand: Handedness): PresetName | null;
+  /** A short live status line for the Hand Lab, e.g. the camera rate. */
+  status?(): string;
   dispose?(): void;
 }
 
