@@ -17,6 +17,7 @@ export interface Landmark {
 // metacarpal joints, which MediaPipe doesn't have (they sit near the wrist).
 // MediaPipe: 0 wrist; thumb 1 CMC, 2 MCP, 3 IP, 4 tip; fingers MCP, PIP, DIP, tip
 // (index 5-8, middle 9-12, ring 13-16, pinky 17-20).
+// prettier-ignore
 const FROM_MEDIAPIPE = [
   0,
   1, 2, 3, 4,

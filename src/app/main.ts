@@ -1,7 +1,7 @@
 // Composition root. IWSDK owns the XR session, renderer and display loop; one
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
-// this is enforced by scripts/check-boundaries.mjs. See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
+// this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 import { World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';

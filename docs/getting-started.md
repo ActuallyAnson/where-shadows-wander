@@ -107,12 +107,14 @@ npx iwsdk browser screenshot
 ## 9. Before you commit
 
 ```sh
-npm run check   # typecheck, import boundaries, single three.js, unit tests
+npm run format  # format code with Prettier (run this first)
+npm run check   # typecheck, lint, format check, single three.js, unit tests
 npm run build   # production build into dist/
 ```
 
 `npm run check` fails if:
-- code in `src/engine/hands`, `src/engine/sim`, `src/engine/stage` or `src/game` imports IWSDK, three.js or an engine-facing folder (gameplay stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
+- ESLint finds a problem, including code in `src/engine/hands`, `src/engine/sim`, `src/engine/stage` or `src/game` importing IWSDK, three.js or an engine-facing folder, or using browser globals (pure code stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
+- a file isn't formatted with Prettier (`npm run format` fixes it);
 - a second copy of three.js gets installed;
 - a test fails.
 

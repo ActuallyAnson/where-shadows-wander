@@ -1,0 +1,7 @@
+dist/
+dist-*/
+spikes/
+recordings/
+package-lock.json
+# Prose and the pandoc-converted GDD are formatted by hand.
+*.md

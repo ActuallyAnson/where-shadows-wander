@@ -10,6 +10,7 @@ import { handednessFromLabel, mediapipeToHandFrame } from './mediapipe-hands';
 
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 // MediaPipe's 21-landmark skeleton, for drawing the overlay.
+// prettier-ignore
 const BONES = [
   [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
   [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20],
@@ -124,7 +125,7 @@ function card(side: Handedness): string {
   const f = handFeatures(hands[side]);
   const palm = derivePalm(hands[side]);
   if (!f || !palm) return `${title}<div class="shape none">Not seen</div>`;
-  const [nx, ny, nz] = palm.normal;
+  const [, ny, nz] = palm.normal;
   // Scene: +Z points from the hand toward the camera, +Y up. You sit behind the hand, so -Z is toward you.
   const facing = ny > 0.6 ? 'up' : ny < -0.6 ? 'down' : nz > 0.6 ? 'toward the camera' : nz < -0.6 ? 'toward you' : 'sideways';
   return `${title}

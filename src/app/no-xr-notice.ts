@@ -4,7 +4,7 @@
 // The emulator in `npm run dev` reports AR support, so it never shows there.
 
 export async function showNoXrNoticeIfNeeded(): Promise<void> {
-  let supported = false;
+  let supported: boolean;
   try {
     supported = (await navigator.xr?.isSessionSupported('immersive-ar')) ?? false;
   } catch {
