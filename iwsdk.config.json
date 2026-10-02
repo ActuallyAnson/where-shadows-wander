@@ -3,10 +3,10 @@
   "version": "iwsdk.project.v1",
   "scene": "./public/scenes/main.iwsdk.scene.json",
   "assets": {
-    "module": "./src/assets"
+    "module": "./src/app/assets"
   },
   "components": {
-    "module": "./src/components"
+    "module": "./src/app/components"
   },
   "world": {
     "xr": {

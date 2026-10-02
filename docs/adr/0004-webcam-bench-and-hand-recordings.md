@@ -13,15 +13,15 @@ The pose classifier (GDD, week 3) needs real hands making real shapes: flat hand
 
 ### 1. Every hand source produces the same `HandFrame`
 
-The classifier only reads `HandFrame` (`src/hands/hand.ts`: 25 WebXR joints in metres, scene space). Each source converts into it:
+The classifier only reads `HandFrame` (`src/engine/hands/hand.ts`: 25 WebXR joints in metres, scene space). Each source converts into it:
 
 | Source | Code | Where it runs |
 |---|---|---|
-| Headset (Pico, Quest), emulator | `src/platform/xr-hands.ts` (raw WebXR) | The game, `index.html` |
-| Webcam | `src/platform/mediapipe-hands.ts` (MediaPipe) | The webcam bench, `webcam.html` |
-| Recording | `replayInto()` in `src/hands/hand-recording.ts` | Unit tests, and later the classifier tuning tools |
+| Headset (Pico, Quest), emulator | `src/engine/xr/xr-hands.ts` (raw WebXR) | The game, `index.html` |
+| Webcam | `src/input-mock/mediapipe-hands.ts` (MediaPipe) | The webcam bench, `webcam.html` |
+| Recording | `replayInto()` in `src/engine/hands/hand-recording.ts` | Unit tests, and later the classifier tuning tools |
 
-Shape features live in `src/hands/hand-features.ts` (finger curl, thumb–index gap, finger spread) and `derivePalm()` in `hand.ts`. They are pure TypeScript, so the game, the bench and tests all compute exactly the same numbers.
+Shape features live in `src/engine/hands/hand-features.ts` (finger curl, thumb–index gap, finger spread) and `derivePalm()` in `hand.ts`. They are pure TypeScript, so the game, the bench and tests all compute exactly the same numbers.
 
 ### 2. Webcam hand bench (`webcam.html`)
 
@@ -32,11 +32,11 @@ Shape features live in `src/hands/hand-features.ts` (finger curl, thumb–index 
 
 **Converting 21 landmarks to 25 joints.** MediaPipe has the wrist, the four thumb points, and the knuckle, middle joint, end joint and tip of each finger. Those map directly to WebXR joints. WebXR's four finger *metacarpal* joints (near the wrist) don't exist in MediaPipe, so they are placed 15 % of the way from the wrist to each knuckle. MediaPipe's world axes (x right, y down, z away from the camera) become scene axes by flipping y and z. That is a rotation, not a mirror, so left and right hands keep their true shape, which `derivePalm()` depends on.
 
-**Handedness: MediaPipe's label is used as is.** MediaPipe's docs say the label assumes a mirrored (selfie) image, which suggested swapping it for raw camera frames. On a real photo of a person holding up both hands, swapping gave the wrong hand names *and* flipped both palm normals away from the visible palms. Without the swap, both names and both palm directions are right. Only the on-screen preview is mirrored, with CSS; the frames given to MediaPipe are not. If a MediaPipe upgrade changes this, `src/platform/mediapipe-hands.test.ts` and a photo check will show it.
+**Handedness: MediaPipe's label is used as is.** MediaPipe's docs say the label assumes a mirrored (selfie) image, which suggested swapping it for raw camera frames. On a real photo of a person holding up both hands, swapping gave the wrong hand names *and* flipped both palm normals away from the visible palms. Without the swap, both names and both palm directions are right. Only the on-screen preview is mirrored, with CSS; the frames given to MediaPipe are not. If a MediaPipe upgrade changes this, `src/input-mock/mediapipe-hands.test.ts` and a photo check will show it.
 
 ### 3. Hand recordings (`.handrec.json`)
 
-- Format in `src/hands/hand-recording.ts`: joint positions in whole millimetres per frame (null when a hand isn't fully tracked), joints tracked per hand, headset position, a timestamp, the browser's user agent and a free-text note. About 45 KB per second for two hands.
+- Format in `src/engine/hands/hand-recording.ts`: joint positions in whole millimetres per frame (null when a hand isn't fully tracked), joints tracked per hand, headset position, a timestamp, the browser's user agent and a free-text note. About 45 KB per second for two hands.
 - **On a headset:** add `?record=<seconds>` (and optionally `&note=...`) to the game URL. Recording starts when the first hand is tracked. After leaving XR, the page offers **Download recording**.
 - **On the webcam bench:** **Record**, then **Stop and download**.
 - **Viewing:** the Hand Recording Player page opens any `.handrec.json` and replays it in 3D with feature traces over time.

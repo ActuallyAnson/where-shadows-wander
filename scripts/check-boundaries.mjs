@@ -1,14 +1,15 @@
-// Fails if gameplay/sim code imports IWSDK, three.js, or the platform/view layers.
+// Fails if pure code (hand maths, sim, stage maths, gameplay) imports IWSDK,
+// three.js, or an engine-facing folder.
 // Keeps the plain three.js fallback (docs/adr/0002-plain-threejs-fallback.md) cheap.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const PURE_DIRS = ['src/hands', 'src/sim', 'src/game'];
+const PURE_DIRS = ['src/engine/hands', 'src/engine/sim', 'src/engine/stage', 'src/game'];
 const FORBIDDEN = [
   { re: /^@iwsdk\//, why: 'IWSDK' },
   { re: /^(three|super-three)(\/|$)/, why: 'three.js' },
   { re: /^iwer(\/|$)/, why: 'the emulator' },
-  { re: /(^|\/)(platform|view)(\/|$)/, why: 'the platform/view layer' },
+  { re: /(^|\/)(app|debug|input-mock|ui|xr|shadow|render|anim|services)(\/|$)/, why: 'an engine-facing folder' },
 ];
 const IMPORT = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s+['"]([^'"]+)['"]/g;
 
@@ -38,7 +39,7 @@ for (const dir of PURE_DIRS) {
   }
 }
 if (problems.length) {
-  console.error(`Gameplay/sim must not import IWSDK, three.js or platform code:\n  ${problems.join('\n  ')}`);
+  console.error(`Pure code must not import IWSDK, three.js or engine-facing folders:\n  ${problems.join('\n  ')}`);
   process.exit(1);
 }
 console.log(`boundaries ok (${PURE_DIRS.join(', ')})`);

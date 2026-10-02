@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createHandFrame, derivePalm, JOINT } from '../hands/hand';
+import { createHandFrame, derivePalm, JOINT } from '../engine/hands/hand';
 import { handednessFromLabel, mediapipeToHandFrame, type Landmark } from './mediapipe-hands';
 
 /**

@@ -1,16 +1,17 @@
 // Composition root. IWSDK owns the XR session, renderer and display loop; one
-// driver system hands each frame to our code. Gameplay and sim (src/sim,
-// src/hands, later src/game) never import IWSDK or three.js; this is
-// enforced by scripts/check-boundaries.mjs. See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
+// driver system hands each frame to our code. Pure code (src/engine/hands,
+// src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
+// this is enforced by scripts/check-boundaries.mjs. See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 import { World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
-import { FixedStepLoop } from './sim/fixed-step';
-import { Diagnostics, mountReportPanel } from './platform/diagnostics';
-import { disableIwsdkRays, hideIwsdkHandMeshes } from './platform/iwsdk-input-visuals';
-import { HandRecorder, offerDownload } from './platform/hand-recorder';
-import { showNoXrNoticeIfNeeded } from './platform/no-xr-notice';
-import { XRHandReader } from './platform/xr-hands';
-import { JointDots } from './view/joint-dots';
+import { Diagnostics } from '../debug/diagnostics';
+import { mountReportPanel } from '../debug/report-panel';
+import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
+import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
+import { JointDots } from '../engine/xr/joint-dots';
+import { XRHandReader } from '../engine/xr/xr-hands';
+import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 
 const SIM_HZ = 60;
 
