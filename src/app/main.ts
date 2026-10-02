@@ -6,6 +6,7 @@ import { World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
+import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
@@ -14,6 +15,7 @@ import { JointDots } from '../engine/xr/joint-dots';
 import { PromptPanel } from '../engine/xr/prompt-panel';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
+import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { mountLabLink } from './lab-link';
@@ -40,6 +42,9 @@ async function start(): Promise<void> {
   const hands = new XRHandReader();
   // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
   const shapes = new ShapeRecognizer();
+  // Lantern gestures for Teammate B's lantern flow. Mock mode has a stand-in lantern; in XR it waits for B's.
+  const gestures = new GestureDetector();
+  gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
   let clock = 0;
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
@@ -50,7 +55,7 @@ async function start(): Promise<void> {
       return new SyntheticSource();
     });
     mock = new MockMode(source);
-    lab = new HandLab(mock, hands.hands, shapes, {
+    lab = new HandLab(mock, hands.hands, shapes, gestures, MOCK_LANTERN, {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
@@ -68,6 +73,7 @@ async function start(): Promise<void> {
     handReadMethod: { ...hands.method },
     mock: mock ? { source: mock.source.name } : null,
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
+    gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
   }));
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
@@ -102,7 +108,9 @@ async function start(): Promise<void> {
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
       clock += delta;
-      shapes.update(hands.hands, mock ? mock.time : clock);
+      const handsT = mock ? mock.time : clock;
+      shapes.update(hands.hands, handsT);
+      gestures.update(hands.hands, handsT, shapes);
       if (recorder) {
         const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
         const viewer = pose?.transform.position;
@@ -133,5 +141,6 @@ async function start(): Promise<void> {
   world.registerSystem(FrameDriverSystem, { priority: 10 });
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
-  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes } });
+  if (import.meta.env.DEV)
+    Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes, gestures } });
 }

@@ -28,6 +28,9 @@ interface HandState {
   /** Added to the preset's wrist orientation, degrees. */
   rollDeg: number;
   yawDeg: number;
+  /** Thumb pulled onto the index tip (0..1), blending toward `pinchOn`. */
+  pinch: number;
+  pinchOn: boolean;
 }
 
 export class SyntheticSource implements HandSource {
@@ -67,7 +70,36 @@ export class SyntheticSource implements HandSource {
     this.hands[hand].yawDeg += yawDeg;
   }
 
+  /** Pinches the thumb onto the index tip (on) or lets go, on top of the current shape. */
+  setPinch(hand: Handedness, on: boolean): void {
+    this.hands[hand].pinchOn = on;
+  }
+
+  pinching(hand: Handedness): boolean {
+    return this.hands[hand].pinchOn;
+  }
+
+  /** Moves a hand so its palm is just above `point` (e.g. over the lantern), palm down. */
+  placeOver(hand: Handedness, point: Readonly<Vec3>): void {
+    const w = this.hands[hand].wrist;
+    // The palm centre sits about 6 cm along the fingers from the wrist; keep it 4 cm above the point.
+    w[0] = point[0];
+    w[1] = point[1] + 0.04;
+    w[2] = point[2] + 0.06;
+  }
+
+  /** Puts a hand back where it rests. */
+  home(hand: Handedness): void {
+    const w = this.hands[hand].wrist;
+    w[0] = MOCK_WRIST[hand][0];
+    w[1] = MOCK_WRIST[hand][1];
+    w[2] = MOCK_WRIST[hand][2];
+  }
+
   update(t: number, left: HandFrame, right: HandFrame): void {
+    const step = Math.max(t - this.t, 0) / BLEND_S;
+    blendPinch(this.hands.left, step);
+    blendPinch(this.hands.right, step);
     this.t = t;
     this.write(this.hands.left, left);
     this.write(this.hands.right, right);
@@ -80,9 +112,17 @@ export class SyntheticSource implements HandSource {
     copyPose(h.current, h.shown);
     h.shown.rollDeg += h.rollDeg;
     h.shown.yawDeg += h.yawDeg;
+    if (h.pinch > 0) {
+      h.shown.thumb.pinch = Math.max(h.shown.thumb.pinch, h.pinch);
+      h.shown.thumb.pinchTo = 'index';
+    }
     writeHandPose(h.shown, h.wrist, out);
     if (this.jitter > 0) jitterHand(out, this.jitter, this.random);
   }
+}
+
+function blendPinch(h: HandState, step: number): void {
+  h.pinch = h.pinchOn ? Math.min(h.pinch + step, 1) : Math.max(h.pinch - step, 0);
 }
 
 function state(target: PresetName, wrist: Readonly<Vec3>): HandState {
@@ -95,5 +135,7 @@ function state(target: PresetName, wrist: Readonly<Vec3>): HandState {
     wrist: [...wrist],
     rollDeg: 0,
     yawDeg: 0,
+    pinch: 0,
+    pinchOn: false,
   };
 }

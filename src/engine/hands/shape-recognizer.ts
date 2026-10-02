@@ -16,6 +16,8 @@ export class ShapeRecognizer {
   readonly events = new ShapeEventQueue(16);
   /** The latest features per hand (stale while that hand is paused). */
   readonly features: Record<Handedness, HandFeatures> = { left: createHandFeatures(), right: createHandFeatures() };
+  /** Whether each hand's features are from this frame (false while it's paused, when they're stale). */
+  readonly valid: Record<Handedness, boolean> = { left: false, right: false };
   /** Commits per shape since start, for diagnostics. */
   readonly commits = Object.fromEntries(SHAPES.map((s) => [s, 0])) as Record<Shape, number>;
   /** The stage's normal; up for the tabletop theatre. StageFrame sets it for the wall stage. */
@@ -70,6 +72,7 @@ export class ShapeRecognizer {
 
   private step(c: ShapeClassifier, hand: HandFrame, dt: number, t: number): void {
     const f = computeHandFeatures(hand, this.features[c.hand], this.stageNormal);
+    this.valid[c.hand] = f !== null;
     c.update(f, hand.validJoints, dt, t, this.events);
   }
 }
