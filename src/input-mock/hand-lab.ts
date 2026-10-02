@@ -171,9 +171,10 @@ export class HandLab {
       <section id="lab-controls"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
-      <p class="foot">The big label is the shape the hand is posed as. The rough guess only knows flat, fist and
-      open; the real classifier (week 3) will recognise all six. <a href="./webcam.html">Webcam bench</a> shows
-      the camera image with landmarks.</p>
+      <p class="foot">The big label is what the classifier has committed; "holding" shows a shape on its way
+      there (0.4 s for verbs, 1 s for rabbit and fox). The bars show how far inside each shape's ranges the hand
+      is: above the line matches. <a href="./webcam.html">Webcam bench</a> shows the camera image with
+      landmarks.</p>
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
 
