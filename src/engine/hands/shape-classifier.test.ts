@@ -170,6 +170,24 @@ describe('shape classifier', () => {
     expect(events.slice(0, 3)).toEqual(['candidate fox', 'cancel fox', 'candidate fox']);
   });
 
+  it("drops a hold that's outside its ranges while another shape matches", () => {
+    // At tolerance 2 flat allows a thumb up to 43° and fox from 42°. Flat starts its hold; then
+    // the thumb sits at 43.2°: flat is 0.025 units out (inside the slack) and fox 0.15 in, not
+    // enough of a lead to switch. The flat hold must drop rather than commit flat.
+    const c = new ShapeClassifier('right', { tolerance: 2 });
+    const q = new ShapeEventQueue();
+    const f = handFeatures(writeHandPose(PRESETS.flat, W, createHandFrame('right')))!;
+    const events: string[] = [];
+    for (let i = 0; i < FPS; i++) {
+      f.thumbFwdDeg = i === 0 ? 10 : 43.2;
+      q.clear();
+      c.update(f, 25, 1 / FPS, i / FPS, q);
+      for (let k = 0; k < q.count; k++) events.push(`${q.at(k).type} ${q.at(k).shape}`);
+    }
+    expect(events.slice(0, 3)).toEqual(['candidate flat', 'cancel flat', 'candidate fox']);
+    expect(events).not.toContain('commit flat');
+  });
+
   it('commits on time at 60 fps despite float rounding', () => {
     const r = new ShapeRecognizer();
     const hands = { left: createHandFrame('left'), right: createHandFrame('right') };

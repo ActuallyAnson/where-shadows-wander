@@ -41,7 +41,7 @@ describe('classifier evaluation', () => {
     // Fist from 1 s; labelled fist 1.5-3.5 s (prompt at 1 s).
     const e = evaluateRecording(recording(4, (t) => (t < 1 ? 'relaxed' : 'fist'), [label(1.5, 3.5, 'fist')]));
     const r = e.labels[0];
-    expect(r.frames).toBe(2 * FPS + 1);
+    expect(r.frames).toBe(2 * FPS); // [start, end)
     expect(r.correct).toBe(r.frames);
     expect(r.hit).toBe(true);
     expect(r.timeToCommit!).toBeCloseTo(0.4, 1); // from the prompt at start - SETTLE_S
@@ -63,9 +63,18 @@ describe('classifier evaluation', () => {
     expect(wrong.labels[0].timeToCommit).toBeNull();
   });
 
-  it('counts a shape already committed at the prompt as a hit', () => {
+  it('counts a shape already committed at the prompt as a hit, without a time to commit', () => {
     const e = evaluateRecording(recording(4, () => 'fist', [label(2, 3.5, 'fist')]));
-    expect(e.labels[0]).toMatchObject({ hit: true, timeToCommit: 0 });
+    expect(e.labels[0]).toMatchObject({ hit: true, timeToCommit: null, flicker: 0 });
+    expect(summarise([e]).overall!.timeToCommit.verbs.median).toBeNull();
+  });
+
+  it('counts a re-commit after the prompt as flicker, including when the shape was committed at the prompt', () => {
+    // Fist commits at 0.4 s, lets go during 1.2-1.4 s and commits again at about 1.8 s; the label is 0.9-2.9 (prompt 0.4).
+    const e = evaluateRecording(
+      recording(3, (t) => (t > 1.2 && t < 1.4 ? 'relaxed' : 'fist'), [label(0.9, 2.9, 'fist')]),
+    );
+    expect(e.labels[0].flicker).toBe(1);
   });
 
   it('puts paused frames in their own column', () => {
@@ -97,10 +106,14 @@ describe('classifier evaluation', () => {
     expect(sourceOf(rec('Hand Lab guided, script', 'Mac'))).toBe('synthetic');
     expect(sourceOf(rec('Hand Lab, replay: a.json', 'Mac'))).toBe('replay');
     expect(sourceOf(rec('guided: shapes', 'Mozilla/5.0 (Linux; Android 12; PICO 4) PicoBrowser'))).toBe('pico');
-    expect(sourceOf(rec('guided: shapes', 'Mozilla/5.0 (Linux; Android 14; Quest 3) OculusBrowser/38'))).toBe('quest');
-    expect(sourceOf(rec('guided: shapes', 'Mozilla/5.0 (X11; Linux x86_64; Quest 3) OculusBrowser/33'))).toBe(
-      'emulator',
-    );
+    const quest =
+      'Mozilla/5.0 (X11; Linux x86_64; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/38.2.0.6.81';
+    expect(sourceOf(rec('guided: shapes', quest))).toBe('quest');
+    const iwer =
+      'Mozilla/5.0 (X11; Linux x86_64; Quest 3) AppleWebKit/537.36 (KHTML, like Gecko) OculusBrowser/33.0.0.x.x.x';
+    expect(sourceOf(rec('guided: shapes', iwer))).toBe('emulator');
+    expect(sourceOf(rec('Hand Lab guided, replay: webcam-run.handrec.json', 'Mac'))).toBe('replay');
+    expect(sourceOf(rec('compare with webcam', iwer))).toBe('emulator');
   });
 
   it('uses nearest-rank percentiles', () => {

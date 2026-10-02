@@ -11,10 +11,13 @@
 //   inside a 2 s label.)
 // - Label hit: a commit of the label's shape between the prompt (label start
 //   - SETTLE_S) and the label's end, or the shape already committed at the
-//   prompt. Time to commit is measured from the prompt.
+//   prompt. Time to commit is measured from the prompt (left out of the time
+//   statistics when the shape was already committed).
 // - False trigger: a commit inside a label for that hand whose shape differs
 //   from the commit, including any commit during a `none` label.
-// - Flicker: commits of the label's shape after the first, inside one label.
+// - Flicker: commits of the label's shape after the first, from the prompt to
+//   the label's end (a shape committed at the prompt counts as the first).
+// Labels are half-open, [start, end), so touching labels don't share a frame.
 import { createHandFrame, type Handedness } from './hand';
 import { replayInto, type HandRecording, type LabelShape, type ShapeLabel } from './hand-recording';
 import type { ClassifierConfig } from './shape-classifier';
@@ -37,7 +40,7 @@ export interface LabelResult {
   paused: number;
   /** For shape labels: committed in time? null for `none` labels. */
   hit: boolean | null;
-  /** Seconds from the prompt to the commit, for hits. */
+  /** Seconds from the prompt to the commit, for hits; null if missed or already committed at the prompt. */
   timeToCommit: number | null;
   flicker: number;
 }
@@ -64,16 +67,19 @@ export interface RecordingEval {
 /** Where a recording came from, by its note, then its browser's user agent. */
 export function sourceOf(rec: HandRecording): EvalSource | 'replay' {
   const note = rec.note.toLowerCase();
-  if (note.includes('hand lab')) {
-    if (note.includes('webcam')) return 'webcam';
-    if (note.includes('replay')) return 'replay';
+  // Notes the Hand Lab writes: "Hand Lab[ guided], <source name>" (a replay's name starts with "replay").
+  const lab = /^hand lab( guided)?, (.*)$/.exec(note.split(' [trimmed')[0]);
+  if (lab) {
+    if (lab[2].startsWith('replay')) return 'replay';
+    if (lab[2] === 'webcam') return 'webcam';
     return 'synthetic';
   }
-  if (note.includes('webcam')) return 'webcam';
+  if (note.includes('via webcam.html')) return 'webcam';
   const ua = rec.userAgent;
   if (/pico/i.test(ua)) return 'pico';
-  // The emulator reports a Quest user agent, but from a desktop OS rather than Android.
-  if (/quest|oculusbrowser/i.test(ua)) return /android/i.test(ua) ? 'quest' : 'emulator';
+  // The emulator (IWER) copies Quest Browser's user agent but with a placeholder version, "OculusBrowser/33.0.0.x.x.x".
+  if (/oculusbrowser\/[\d.]*\.x/i.test(ua)) return 'emulator';
+  if (/quest|oculusbrowser/i.test(ua)) return 'quest';
   return 'emulator';
 }
 
@@ -130,7 +136,7 @@ export function evaluateRecording(rec: HandRecording, config: Partial<Classifier
       if (e.type === 'commit') commits.push({ t: e.t, hand: e.hand, shape: e.shape });
     }
     for (const r of results) {
-      if (frame.t < r.label.start || frame.t > r.label.end) continue;
+      if (frame.t < r.label.start || frame.t >= r.label.end) continue;
       const said = recognised(recognizer[r.label.hand].state);
       r.frames++;
       if (said === 'paused') r.paused++;
@@ -144,18 +150,17 @@ export function evaluateRecording(rec: HandRecording, config: Partial<Classifier
     const prompt = start - SETTLE_S;
     const mine = commits.filter((c) => c.hand === hand);
     if (shape !== 'none') {
-      const first = mine.find((c) => c.shape === shape && c.t >= prompt && c.t <= end);
-      if (committedAtPrompt.get(r)) {
+      const already = committedAtPrompt.get(r) ?? false;
+      const inWindow = mine.filter((c) => c.shape === shape && c.t >= prompt && c.t < end);
+      if (already) r.hit = true;
+      else if (inWindow.length) {
         r.hit = true;
-        r.timeToCommit = 0;
-      } else if (first) {
-        r.hit = true;
-        r.timeToCommit = first.t - prompt;
+        r.timeToCommit = inWindow[0].t - prompt;
       }
-      r.flicker = Math.max(0, mine.filter((c) => c.shape === shape && c.t >= start && c.t <= end).length - 1);
+      r.flicker = Math.max(0, inWindow.length + (already ? 1 : 0) - 1);
     }
     for (const c of mine)
-      if (c.t >= start && c.t <= end && c.shape !== shape) result.falseCommits.push({ ...c, label: shape });
+      if (c.t >= start && c.t < end && c.shape !== shape) result.falseCommits.push({ ...c, label: shape });
   }
   result.labels = results;
   return result;
@@ -218,8 +223,9 @@ function summariseGroup(evals: readonly RecordingEval[]): SourceSummary {
   const correct = sum(all.map((r) => r.correct));
   const shapeLabels = all.filter((r) => r.label.shape !== 'none');
   const hits = shapeLabels.filter((r) => r.hit);
+  const timed = hits.filter((r) => r.timeToCommit !== null);
   const ttc = (pick: (s: Shape) => boolean) =>
-    stats(hits.filter((r) => pick(r.label.shape as Shape)).map((r) => r.timeToCommit!));
+    stats(timed.filter((r) => pick(r.label.shape as Shape)).map((r) => r.timeToCommit!));
   const falseCommits = sum(evals.map((e) => e.falseCommits.length));
   const labelledMinutes = sum(evals.map((e) => e.labelledMinutes));
   const noneMinutes = sum(evals.map((e) => e.noneMinutes));
@@ -237,7 +243,7 @@ function summariseGroup(evals: readonly RecordingEval[]): SourceSummary {
           accuracy: ratio(sum(mine.map((r) => r.correct)), f - p),
           labels: mine.length,
           hits: h.length,
-          timeToCommit: stats(h.map((r) => r.timeToCommit!)),
+          timeToCommit: stats(h.filter((r) => r.timeToCommit !== null).map((r) => r.timeToCommit!)),
         },
       ];
     }),
@@ -288,7 +294,9 @@ function ratio(a: number, b: number): number {
 export function formatReport(summary: EvalSummary): string {
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   const sec = (x: number | null) => (x === null ? '-' : `${x.toFixed(2)}s`);
-  const rows = Object.entries(summary.bySource).map(([source, s]) => [
+  const groups = Object.entries(summary.bySource);
+  if (summary.overall && groups.length > 1) groups.push(['all', summary.overall]);
+  const rows = groups.map(([source, s]) => [
     source,
     String(s.recordings),
     String(s.frames),

@@ -119,7 +119,10 @@ export class ShapeClassifier {
 
     if (this.candidate >= 0) {
       const y = this.candidate;
-      if (this.margins[y] < -c.holdSlack) {
+      // Outside its ranges, the hold survives only as noise: not past the slack, and not while
+      // another shape matches (the hand has moved on).
+      const otherMatches = winner >= 0 && winner !== y;
+      if (this.margins[y] < -c.holdSlack || (this.margins[y] < 0 && otherMatches)) {
         events.push('cancel', this.hand, SHAPES[y], t, this.margins[y], this.heldS);
         this.candidate = -1;
         this.heldS = 0;
