@@ -346,6 +346,7 @@ const CSS = `
 .lab .msg { margin: 0; color: var(--accent); }
 .lab .prompt { position: relative; overflow: hidden; display: grid; gap: 2px; padding: 12px 14px 16px; border-radius: 10px;
   background: var(--panel); border: 1px solid var(--accent); }
+.lab .prompt[hidden] { display: none; }
 .lab .prompt b { font-size: 20px; }
 .lab .prompt span { color: var(--muted); }
 .lab .prompt em { position: absolute; right: 14px; top: 10px; font: 600 22px ui-monospace, monospace; color: var(--accent); font-style: normal; }
