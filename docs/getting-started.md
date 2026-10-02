@@ -87,7 +87,7 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
-**From the hosted build:** once GitHub Pages is set up (section 10), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
+**From the hosted build:** once GitHub Pages is set up (section 11), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
 
 **To record hand data on a headset,** add `?record=20` to the address, for example `https://192.168.1.95:8081/?record=20&note=fist then flat hand`. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR, press **Download recording**.
 
@@ -119,7 +119,18 @@ npx iwsdk browser screenshot
 
 `npx iwsdk xr --help` lists every command.
 
-## 9. Before you commit
+## 9. Score the classifier on recordings
+
+Labelled recordings (section 5's **Guided recording**, or `?record&script=shapes` on a headset) can be scored against the shape classifier:
+
+1. Put the `.handrec.json` files in `recordings/` (any subfolder). They stay on your machine; the folder is gitignored.
+2. Run `npm run eval`. It prints, per source (webcam, Pico, Quest, emulator, synthetic): frame accuracy, hits (prompted shapes that committed), false triggers per minute, flicker and time to commit, then a table per shape, a confusion matrix and the worst labels. A JSON report goes to `eval-reports/`.
+3. To compare with an earlier run: `EVAL_BASELINE=eval-reports/<file>.json npm run eval`.
+4. When a recording shows a bug, cut the bad moment into a regression fixture: `EVAL_EXTRACT=recordings/<file>:<hand>:<start>-<end>:<name> npm run eval` writes `src/engine/hands/fixtures/<name>.handrec.json`; add it to `src/engine/hands/fixtures/manifest.ts` with the result it should give once fixed. `npm test` then replays it.
+
+Only time inside a label is scored; a label is what the person was asked to do, so replay low-scoring recordings in the Hand Lab to see whether the person or the classifier was wrong.
+
+## 10. Before you commit
 
 ```sh
 npm run format  # format code with Prettier (run this first)
@@ -137,7 +148,7 @@ Commit messages use [Conventional Commits](https://www.conventionalcommits.org/)
 
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open http://localhost:4173/where-shadows-wander/.
 
-## 10. Deploying
+## 11. Deploying
 
 Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is at https://actuallyanson.github.io/where-shadows-wander/ (and the webcam bench at `.../webcam.html`). The published site is public even though the repo is private.
 

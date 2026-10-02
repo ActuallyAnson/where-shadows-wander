@@ -63,6 +63,11 @@ Recordings can now say which shape each hand was making, so the classifier can b
 - The script (`SHAPES_SCRIPT`) prompts every shape on the right hand, then the left: a 3 s relaxed lead-in, then each shape for 3 s with 2 s rests. 66 s in all, so each shape gets a 2 s label.
 - If a recording stops early, labels that end after its last frame are left out.
 
+### 6. Update (3 Oct 2026): scoring and regression fixtures (#12)
+
+- `npm run eval` scores the classifier against every labelled recording in `recordings/` (see getting-started, section 9). Scores are kept per source, because webcam and headset noise differ.
+- Recordings stay out of git. Small clips that exposed a bug go into `src/engine/hands/fixtures/` (under 256 KB each, 2 MB in all), listed in `manifest.ts` with the result they must keep giving; `npm test` replays them.
+
 ## What each source is good for
 
 | | Emulator | Webcam | Pico | Quest |
