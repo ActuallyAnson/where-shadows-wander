@@ -69,7 +69,8 @@ function at(p: Float32Array, j: number): V {
 }
 
 function dir(p: Float32Array, a: number, b: number): V {
-  const A = at(p, a), B = at(p, b);
+  const A = at(p, a),
+    B = at(p, b);
   return [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
 }
 
@@ -79,7 +80,8 @@ function dist(p: Float32Array, a: number, b: number): number {
 }
 
 function angle(a: V, b: V): number {
-  const la = Math.hypot(...a), lb = Math.hypot(...b);
+  const la = Math.hypot(...a),
+    lb = Math.hypot(...b);
   if (la < 1e-9 || lb < 1e-9) return 0;
   const c = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb);
   return Math.acos(Math.max(-1, Math.min(1, c)));
@@ -92,6 +94,7 @@ function angleDeg(a: V, b: V): number {
 /** Sum of the angles between consecutive bones along a joint chain. */
 function bend(p: Float32Array, chain: number[]): number {
   let total = 0;
-  for (let i = 1; i < chain.length - 1; i++) total += angle(dir(p, chain[i - 1], chain[i]), dir(p, chain[i], chain[i + 1]));
+  for (let i = 1; i < chain.length - 1; i++)
+    total += angle(dir(p, chain[i - 1], chain[i]), dir(p, chain[i], chain[i + 1]));
   return total;
 }

@@ -50,7 +50,7 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 Folders without code yet are created by their owner when needed.
 
-`npm run check:boundaries` enforces the "No" rows.
+ESLint (`npm run lint`, part of `npm run check`) enforces the "Pure" rows: no IWSDK, three.js, engine-facing folders or browser globals. The rules are in `eslint.config.js`.
 
 ## Testing on a headset
 

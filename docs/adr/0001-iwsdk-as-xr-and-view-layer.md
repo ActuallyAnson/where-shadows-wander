@@ -23,7 +23,7 @@ IWSDK is young: 1.0.0 shipped on 24 Sep 2026, npm's `latest` tag still points at
 
 ### What IWSDK does not do
 
-- **Gameplay and simulation never import IWSDK or three.js.** `src/engine/hands`, `src/engine/sim`, `src/engine/stage` and `src/game` are plain TypeScript. `npm run check:boundaries` (`scripts/check-boundaries.mjs`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, or our `platform`/`view` folders.
+- **Gameplay and simulation never import IWSDK or three.js.** `src/engine/hands`, `src/engine/sim`, `src/engine/stage` and `src/game` are plain TypeScript. ESLint (`npm run lint`, rules in `eslint.config.js`) fails the build if they import `@iwsdk/*`, `three`, `iwer`, MediaPipe or an engine-facing folder, or use browser globals.
 - **No game state in the ECS.** `src/components.ts` and the scene JSON stay empty. The view layer uses plain three.js objects (`InstancedMesh`, custom `ShaderMaterial`) added with `world.scene.add`. Use an IWSDK ECS feature only when it clearly saves work. The trade-off is that IWSDK's editor and `ecs` CLI don't see our objects.
 - **Hand data comes from raw WebXR** (`frame.fillPoses`), not IWSDK's input, grab or gesture systems.
 

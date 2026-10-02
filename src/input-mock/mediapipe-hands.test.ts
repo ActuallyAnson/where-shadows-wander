@@ -9,7 +9,12 @@ import { handednessFromLabel, mediapipeToHandFrame, type Landmark } from './medi
  */
 function rightHandPalmToCamera(): Landmark[] {
   const lm: Landmark[] = [{ x: 0, y: 0.05, z: 0 }]; // wrist below the centre
-  lm.push({ x: 0.03, y: 0.03, z: 0 }, { x: 0.05, y: 0.01, z: 0 }, { x: 0.06, y: -0.01, z: 0 }, { x: 0.07, y: -0.03, z: 0 });
+  lm.push(
+    { x: 0.03, y: 0.03, z: 0 },
+    { x: 0.05, y: 0.01, z: 0 },
+    { x: 0.06, y: -0.01, z: 0 },
+    { x: 0.07, y: -0.03, z: 0 },
+  );
   [0.025, 0.008, -0.008, -0.025].forEach((x) => {
     for (const y of [-0.02, -0.05, -0.07, -0.09]) lm.push({ x, y, z: 0 });
   });
@@ -37,8 +42,15 @@ describe('MediaPipe to HandFrame', () => {
     const image = world.map(() => ({ x: 0.5, y: 0.5, z: 0 }));
     const h = mediapipeToHandFrame(world, image, createHandFrame('right'), 0.5);
     expect(h.positions[JOINT.wrist * 3 + 2]).toBeCloseTo(-0.5, 6);
-    const meta = JOINT['index-finger-metacarpal'] * 3, wrist = JOINT.wrist * 3, knuckle = JOINT['index-finger-phalanx-proximal'] * 3;
-    const d = (a: number, b: number) => Math.hypot(h.positions[a] - h.positions[b], h.positions[a + 1] - h.positions[b + 1], h.positions[a + 2] - h.positions[b + 2]);
+    const meta = JOINT['index-finger-metacarpal'] * 3,
+      wrist = JOINT.wrist * 3,
+      knuckle = JOINT['index-finger-phalanx-proximal'] * 3;
+    const d = (a: number, b: number) =>
+      Math.hypot(
+        h.positions[a] - h.positions[b],
+        h.positions[a + 1] - h.positions[b + 1],
+        h.positions[a + 2] - h.positions[b + 2],
+      );
     expect(d(meta, wrist) / d(knuckle, wrist)).toBeCloseTo(0.15, 3);
   });
 });

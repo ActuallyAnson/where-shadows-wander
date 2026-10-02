@@ -126,5 +126,5 @@ Before switching, get a forum answer on eligibility.
 
 ## Consequences
 
-- `scripts/check-boundaries.mjs` is what keeps this fallback cheap. Don't weaken it.
+- The pure-code lint rules in `eslint.config.js` are what keep this fallback cheap. Don't weaken them.
 - Code in `src/app`, `src/engine/xr` and other engine-facing folders may use `@iwsdk/core`, but should stick to its three.js re-exports and raw WebXR wherever possible, so that aliasing `@iwsdk/core` to `three` still compiles. Today only `src/app/main.ts`, `src/engine/xr/iwsdk-input-visuals.ts` and the IWSDK manifests (`src/assets.ts`, `src/components.ts`) use IWSDK-specific APIs; the fallback drops the manifests.

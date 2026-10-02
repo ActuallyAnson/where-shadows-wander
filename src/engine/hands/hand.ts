@@ -6,6 +6,7 @@
 
 export type Handedness = 'left' | 'right';
 
+// prettier-ignore
 export const JOINT_NAMES = [
   'wrist',
   'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
@@ -23,6 +24,7 @@ export const JOINT_COUNT = 25;
 export const JOINT = Object.fromEntries(JOINT_NAMES.map((n, i) => [n, i])) as Record<JointName, number>;
 
 /** Parent joint index for each joint (-1 for the wrist). */
+// prettier-ignore
 export const JOINT_PARENT: readonly number[] = [
   -1,
   0, 1, 2, 3,

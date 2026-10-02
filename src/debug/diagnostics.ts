@@ -102,7 +102,12 @@ export class Diagnostics {
    * Call once per display frame from the driver system.
    * @param cpuMs time spent in our own frame code
    */
-  frame(frame: XRFrame | null, refSpace: XRReferenceSpace | null, hands: Record<Handedness, HandFrame>, cpuMs: number): void {
+  frame(
+    frame: XRFrame | null,
+    refSpace: XRReferenceSpace | null,
+    hands: Record<Handedness, HandFrame>,
+    cpuMs: number,
+  ): void {
     const now = performance.now();
     if (!frame || !refSpace) return;
     if (this.xrFrames === 0) {
@@ -211,10 +216,15 @@ export class Diagnostics {
       // Plane space +Y is the plane normal; its sign is not guaranteed to face the room.
       const n = [m[4], m[5], m[6]];
       const c = [m[12], m[13], m[14]];
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        maxX = -Infinity,
+        minZ = Infinity,
+        maxZ = -Infinity;
       for (const p of plane.polygon) {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z);
+        maxZ = Math.max(maxZ, p.z);
       }
       const toViewer = viewer ? [viewer.x - c[0], viewer.y - c[1], viewer.z - c[2]] : null;
       list.push({
@@ -230,17 +240,25 @@ export class Diagnostics {
     // Values are in the XR reference space, not scene space.
     this.report.planes = { count: planes.size, list };
   }
-
 }
 
 /** Eye buffer size: XRProjectionLayer has textureWidth, XRWebGLLayer has framebufferWidth. */
 function layerSize(layer: Record<string, number> | null): [number, number] | null {
   if (!layer) return null;
-  return layer.textureWidth ? [layer.textureWidth, layer.textureHeight] : [layer.framebufferWidth, layer.framebufferHeight];
+  return layer.textureWidth
+    ? [layer.textureWidth, layer.textureHeight]
+    : [layer.framebufferWidth, layer.framebufferHeight];
 }
 
 function newHandStats(): HandStats {
-  return { framesTracked: 0, framesPartial: 0, framesMissing: 0, lostEvents: 0, minValidJointsWhilePresent: null, wasTracked: false };
+  return {
+    framesTracked: 0,
+    framesPartial: 0,
+    framesMissing: 0,
+    lostEvents: 0,
+    minValidJointsWhilePresent: null,
+    wasTracked: false,
+  };
 }
 
 function trackHand(s: HandStats, hand: HandFrame): void {

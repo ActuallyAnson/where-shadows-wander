@@ -19,7 +19,8 @@ export function mountReportPanel(diagnostics: Diagnostics): void {
   status.style.cssText = 'font-size:12px;color:#555';
   const text = document.createElement('textarea');
   text.readOnly = true;
-  text.style.cssText = 'display:none;width:100%;height:220px;margin-top:8px;font:11px ui-monospace,monospace;box-sizing:border-box';
+  text.style.cssText =
+    'display:none;width:100%;height:220px;margin-top:8px;font:11px ui-monospace,monospace;box-sizing:border-box';
   row.append(copy, toggle, status);
   panel.append(row, text);
   document.body.append(panel);
@@ -59,6 +60,7 @@ export function mountReportPanel(diagnostics: Diagnostics): void {
 function button(label: string): HTMLButtonElement {
   const b = document.createElement('button');
   b.textContent = label;
-  b.style.cssText = 'font:inherit;padding:8px 14px;border-radius:6px;border:1px solid #8a7a45;background:#fff;cursor:pointer';
+  b.style.cssText =
+    'font:inherit;padding:8px 14px;border-radius:6px;border:1px solid #8a7a45;background:#fff;cursor:pointer';
   return b;
 }
