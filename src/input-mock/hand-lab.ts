@@ -119,14 +119,17 @@ export class HandLab {
 
   private mount(): void {
     document.head.append(Object.assign(document.createElement('style'), { textContent: CSS }));
+    // The canvas is transparent (for passthrough); give the lab a dark backdrop so bones show up.
+    document.body.style.background = '#101217';
     this.root.className = 'lab';
     this.root.innerHTML = `
       <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.</p></header>
       <section id="lab-controls"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
-      <p class="foot">The shape label is a rough guide; the real classifier adds palm direction, hold time and
-      hysteresis. <a href="./webcam.html">Webcam bench</a> shows the camera image with landmarks.</p>
+      <p class="foot">The big label is the shape the hand is posed as. The rough guess only knows flat, fist and
+      open; the real classifier (week 3) will recognise all six. <a href="./webcam.html">Webcam bench</a> shows
+      the camera image with landmarks.</p>
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
 
@@ -197,7 +200,12 @@ export class HandLab {
     // The default view is from the player's eyes, looking down -Z.
     for (const side of ['right', 'left'] as const) {
       const el = this.root.querySelector(`#lab-hand-${side}`);
-      if (el) el.innerHTML = handCardHtml(this.hands[side], ['toward you', 'away from you']);
+      if (el)
+        el.innerHTML = handCardHtml(
+          this.hands[side],
+          ['toward you', 'away from you'],
+          this.mode.source.shapeOf?.(side) ?? null,
+        );
     }
     const time = this.root.querySelector('#lab-time');
     if (time) {
@@ -270,6 +278,7 @@ const CSS = `
 .lab .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .lab .shape { font-size: 16px; font-weight: 600; }
 .lab .shape.none { color: var(--muted); font-weight: 400; }
+.lab .guess { color: var(--muted); font-size: 12px; margin-top: -4px; }
 .lab dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
 .lab dt { color: var(--muted); }
 .lab dd { margin: 0; text-align: right; font: 12px ui-monospace, monospace; font-variant-numeric: tabular-nums; }

@@ -29,6 +29,7 @@ export class ScriptedSource implements HandSource {
   readonly duration: number;
   private readonly starts: number[];
   private readonly pose = clonePose(PRESETS.relaxed);
+  private readonly shown: Record<Handedness, PresetName | null> = { left: null, right: null };
 
   /** Hands not mentioned in the script yet start `initial`. When `loop` is off, the last step holds. */
   constructor(
@@ -48,6 +49,10 @@ export class ScriptedSource implements HandSource {
     this.write('right', local, right);
   }
 
+  shapeOf(hand: Handedness): PresetName | null {
+    return this.shown[hand];
+  }
+
   private write(hand: Handedness, t: number, out: HandFrame): void {
     // The latest step for this hand that has started, and the one before it.
     let cur = -1,
@@ -59,6 +64,7 @@ export class ScriptedSource implements HandSource {
     }
     const to = cur < 0 ? this.initial[hand] : this.steps[cur].shape;
     const from = prev < 0 ? this.initial[hand] : this.steps[prev].shape;
+    this.shown[hand] = to;
     if (to === null) return clearHand(out);
     const k = cur < 0 || from === null ? 1 : Math.min((t - this.starts[cur]) / BLEND_S, 1);
     lerpPose(PRESETS[from ?? to], PRESETS[to], k * k * (3 - 2 * k), this.pose);

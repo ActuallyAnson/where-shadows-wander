@@ -2,6 +2,7 @@
 // place of the headset. Every source writes the same HandFrame format as
 // XRHandReader, so the rest of the game can't tell the difference.
 import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
+import type { PresetName } from '../engine/hands/synthetic-hand';
 
 export interface HandSource {
   readonly name: string;
@@ -10,6 +11,8 @@ export interface HandSource {
    * while paused). Hands that the source doesn't show are left untracked.
    */
   update(t: number, left: HandFrame, right: HandFrame): void;
+  /** The shape a hand is posed as, for sources that know it (synthetic, script); null when hidden. */
+  shapeOf?(hand: Handedness): PresetName | null;
   dispose?(): void;
 }
 
