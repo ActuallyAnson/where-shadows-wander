@@ -28,6 +28,13 @@ export const MOCK_WRIST: Readonly<Record<Handedness, Readonly<Vec3>>> = {
   right: [0.08, 0.95, 0.05],
 };
 
+/**
+ * A stand-in lantern for mock mode, until Teammate B's lantern exists: on the
+ * near edge of the table, below and in front of the desktop camera, with the
+ * mock hands between it and the stage (GDD "The lantern").
+ */
+export const MOCK_LANTERN: Readonly<Vec3> = [0, 0.78, 0.3];
+
 export function clearHand(hand: HandFrame): void {
   hand.tracked = false;
   hand.validJoints = 0;

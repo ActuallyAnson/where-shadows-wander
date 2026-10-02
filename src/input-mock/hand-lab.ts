@@ -3,14 +3,16 @@
 // classifier's features, record, and look around the hands in 3D.
 import type { PerspectiveCamera, Scene } from '@iwsdk/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { HandFrame, Handedness } from '../engine/hands/hand';
+import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import type { GestureDetector } from '../engine/hands/gesture-detector';
 import type { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
+import { LanternMarker } from './lantern-marker';
 import { downloadRecording, handCardHtml } from './hand-card';
 import { MOCK_WRIST, type HandSource } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
@@ -32,6 +34,9 @@ export interface LabView {
 
 export class HandLab {
   private readonly bones = new HandBones();
+  private readonly marker: LanternMarker;
+  /** The latest gesture events, newest first (copied: the detector reuses its event objects). */
+  private readonly gestureLog: string[] = [];
   private readonly orbit: OrbitControls;
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
@@ -47,9 +52,13 @@ export class HandLab {
     private readonly mode: MockMode,
     private readonly hands: Record<Handedness, HandFrame>,
     private readonly shapes: ShapeRecognizer,
+    private readonly gestures: GestureDetector,
+    private readonly lantern: Readonly<Vec3>,
     private readonly view: LabView,
   ) {
     view.scene.add(this.bones.mesh);
+    this.marker = new LanternMarker(lantern, gestures.config.coverRadiusM);
+    view.scene.add(this.marker.group);
     this.orbit = new OrbitControls(view.camera, view.canvas);
     const [lx, ly, lz] = MOCK_WRIST.left;
     const [rx] = MOCK_WRIST.right;
@@ -68,6 +77,14 @@ export class HandLab {
   /** Call once per frame, after the hands are filled. */
   frame(): void {
     this.bones.update([this.hands.left, this.hands.right]);
+    const g = this.gestures;
+    this.marker.setProgress(Math.max(g.state.left.coverProgress, g.state.right.coverProgress));
+    for (let i = 0; i < g.events.count; i++) {
+      const e = g.events.at(i);
+      const at = e.position.map((v) => v.toFixed(2)).join(', ');
+      this.gestureLog.unshift(`${e.t.toFixed(1)} s · ${e.hand} · ${e.type} at (${at})`);
+      this.gestureLog.length = Math.min(this.gestureLog.length, 8);
+    }
     if (this.recording)
       recordFrame(this.recording, this.mode.time - this.recordStart, this.hands.left, this.hands.right, null);
     if (this.guided && !this.guided.frame(this.mode.time - this.guidedStart, this.hands.left, this.hands.right, null))
@@ -86,6 +103,7 @@ export class HandLab {
   private setSource(source: HandSource): void {
     this.mode.setSource(source);
     this.shapes.reset();
+    this.gestures.reset();
   }
 
   private get synthetic(): SyntheticSource | null {
@@ -175,6 +193,7 @@ export class HandLab {
       <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
         <a href="./">Back to the game</a></p></header>
       <section id="lab-controls"></section>
+      <section class="hand" id="lab-gestures"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
       <p class="foot">The big label is what the classifier has committed; "holding" shows a shape on its way
@@ -275,6 +294,21 @@ export class HandLab {
           this.shapes[side].margins,
         );
     }
+    const gestures = this.root.querySelector('#lab-gestures');
+    if (gestures) {
+      const s = this.gestures.state[this.selected];
+      const live = s.pinching
+        ? `pinching ${s.pinchHeldS.toFixed(1)} s`
+        : s.nearLantern
+          ? `over the lantern ${(s.coverProgress * 100).toFixed(0)}%`
+          : `lantern ${Number.isFinite(s.lanternDistM) ? `${(s.lanternDistM * 100).toFixed(0)} cm` : 'off'}`;
+      gestures.innerHTML =
+        `<h2>Lantern gestures <span>${this.selected} hand: ${live}</span></h2>` +
+        `<p class="keys">P pinch (let go to place) · G hand to the lantern, then 2 for a fist (cover the flame) · B hand back</p>` +
+        (this.gestureLog.length
+          ? `<ol class="log">${this.gestureLog.map((l) => `<li>${l}</li>`).join('')}</ol>`
+          : '<p class="keys">No gestures yet.</p>');
+    }
     const prompt = this.root.querySelector('#lab-prompt');
     if (prompt && this.guided) {
       const p = this.guided.prompt;
@@ -309,6 +343,9 @@ export class HandLab {
     else if (k === 'r') this.selected = 'right';
     else if (k === 'l') this.selected = 'left';
     else if (k === 'j') s.jitter = s.jitter > 0 ? 0 : JITTER_M;
+    else if (k === 'p') s.setPinch(sel, !s.pinching(sel));
+    else if (k === 'g') s.placeOver(sel, this.lantern);
+    else if (k === 'b') s.home(sel);
     else if (k === 'q') s.turn(sel, -TURN_DEG, 0);
     else if (k === 'e') s.turn(sel, TURN_DEG, 0);
     else if (k === 'z') s.turn(sel, 0, TURN_DEG);
@@ -351,6 +388,7 @@ const CSS = `
 .lab button:disabled { opacity: .5; cursor: default; }
 .lab kbd { font: 10px ui-monospace, monospace; opacity: .6; margin-right: 4px; }
 .lab .msg { margin: 0; color: var(--accent); }
+.lab .log { margin: 0; padding-left: 18px; font: 11.5px ui-monospace, monospace; color: var(--ink); display: grid; gap: 2px; }
 .lab .prompt { position: relative; overflow: hidden; display: grid; gap: 2px; padding: 12px 14px 16px; border-radius: 10px;
   background: var(--panel); border: 1px solid var(--accent); }
 .lab .prompt[hidden] { display: none; }
