@@ -10,6 +10,7 @@ import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
+import { PromptPanel } from '../engine/xr/prompt-panel';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
@@ -72,9 +73,15 @@ async function start(): Promise<void> {
     recorder?.finish();
   });
 
-  const recorder = HandRecorder.fromUrl();
+  const recorder = HandRecorder.fromUrl(!mock);
   if (recorder) recorder.onFinished = offerDownload;
   const head: [number, number, number] = [0, 0, 0];
+  const headTurn = { x: 0, y: 0, z: 0, w: 1 };
+  // Guided recording on a headset: prompts on a panel in front of the wearer,
+  // placed on the first XR frame and again when recording starts.
+  const panel = recorder?.script ? new PromptPanel() : null;
+  if (panel) world.scene.add(panel.mesh);
+  let panelAtStart = false;
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
@@ -88,9 +95,25 @@ async function start(): Promise<void> {
       else if (frame && refSpace) hands.update(frame, refSpace, this.world.player.matrixWorld);
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       if (recorder) {
-        const viewer = frame && refSpace ? frame.getViewerPose(refSpace)?.transform.position : undefined;
+        const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
+        const viewer = pose?.transform.position;
         if (viewer) [head[0], head[1], head[2]] = [viewer.x, viewer.y, viewer.z];
         recorder.frame(performance.now(), hands.hands.left, hands.hands.right, viewer ? head : null);
+        if (panel && pose && recorder.script) {
+          const o = pose.transform.orientation;
+          headTurn.x = o.x;
+          headTurn.y = o.y;
+          headTurn.z = o.z;
+          headTurn.w = o.w;
+          if (!panel.placed || (recorder.started && !panelAtStart)) {
+            panel.anchor(head, headTurn);
+            panelAtStart = recorder.started;
+          }
+          const prompt = recorder.prompt;
+          if (recorder.finished) panel.show(recorder.script.doneText, 0);
+          else if (prompt) panel.show(prompt.text, prompt.remaining);
+          else panel.show(recorder.script.waitText, 0);
+        }
       }
       sim.advance(delta);
       dots.update(handList);
