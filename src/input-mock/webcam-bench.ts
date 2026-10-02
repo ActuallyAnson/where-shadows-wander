@@ -29,7 +29,8 @@ let recordStart = 0;
 let guided: GuidedRecording | null = null;
 let guidedStart = 0;
 const prompt = $<HTMLDivElement>('prompt');
-let shownPrompt = '';
+let shownStep = -2;
+let shownSecond = -1;
 const assigner = new HandAssigner();
 let frames = 0;
 let fpsAt = performance.now();
@@ -141,15 +142,16 @@ function finishGuided(): void {
   $('guide').textContent = 'Guided recording';
   $<HTMLButtonElement>('rec').disabled = false;
   prompt.hidden = true;
-  shownPrompt = '';
+  shownStep = -2;
 }
 
 /** Updates the prompt overlay only when the step or the whole second changes. */
 function showPrompt(): void {
   const p = guided!.prompt;
-  const key = `${p.index}:${Math.ceil(p.remaining)}`;
-  if (key === shownPrompt) return;
-  shownPrompt = key;
+  const second = Math.ceil(p.remaining);
+  if (p.index === shownStep && second === shownSecond) return;
+  shownStep = p.index;
+  shownSecond = second;
   const [title, detail] = p.text.split('\n');
   prompt.innerHTML = `<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}<em>${Math.ceil(p.remaining) || ''}</em>`;
 }

@@ -78,7 +78,8 @@ export class HandRecorder {
   static fromUrl(allowScript = true): HandRecorder | null {
     const params = new URLSearchParams(location.search);
     if (!params.has('record')) return null;
-    const s = Number(params.get('record') || 10);
+    const n = Number(params.get('record') || 10);
+    const s = Number.isFinite(n) ? n : 10;
     const name = params.get('script');
     let script: ShapeScript | null = null;
     if (name && !allowScript)

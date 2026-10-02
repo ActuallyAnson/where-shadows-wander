@@ -78,6 +78,7 @@ describe('hand recording', () => {
       { start: 0, end: 1, hand: 'both', shape: 'fist' },
       { start: 0, end: 1, hand: 'left', shape: 'pinch' },
       { start: NaN, end: 1, hand: 'left', shape: 'fist' },
+      { start: -1, end: 1, hand: 'left', shape: 'fist' },
     ];
     for (const label of bad) {
       const rec = { ...recordingWithFrames(1), labels: [label as ShapeLabel] };

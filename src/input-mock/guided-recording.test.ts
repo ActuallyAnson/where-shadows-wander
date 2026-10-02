@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { createHandFrame, type Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { parseRecording } from '../engine/hands/hand-recording';
-import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
+import { SETTLE_S, SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { ScriptedSource } from './scripted-source';
+import { BLEND_S } from './synthetic-source';
 
 function guidedRun(fps: number) {
   const source = new ScriptedSource(SHAPES_SCRIPT, false);
@@ -37,6 +38,9 @@ describe.each([72, 30])('a guided run of the shapes script at %d fps', (fps) => 
   });
 
   it('labels match the shape the hand was posed as on every frame inside them', () => {
+    // shapeOf() is the target pose; it equals the drawn pose only once the blend has
+    // finished, which the settle margin guarantees.
+    expect(BLEND_S).toBeLessThan(SETTLE_S);
     for (const label of rec.labels) {
       const inside = rec.frames.filter((f) => f.t >= label.start && f.t <= label.end);
       expect(inside.length).toBeGreaterThan(fps * 0.9);

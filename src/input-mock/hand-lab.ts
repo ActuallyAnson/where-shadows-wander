@@ -117,6 +117,7 @@ export class HandLab {
    */
   private startGuided(): void {
     if (this.recording || this.guided) return;
+    this.message = '';
     this.mode.paused = false;
     if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
     this.guidedStart = this.mode.time;
@@ -135,6 +136,9 @@ export class HandLab {
     const rec = this.guided.finish();
     this.guided = null;
     if (rec.frames.length) downloadRecording(rec, 'wsw-lab-guided');
+    else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
+    // The run used a one-shot script; go back to the looping one the Script button promises.
+    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource());
     this.renderControls();
     this.renderLive();
   }
@@ -201,7 +205,12 @@ export class HandLab {
     window.addEventListener('drop', (e) => {
       e.preventDefault();
       const dropped = e.dataTransfer?.files[0];
-      if (dropped && !this.guided) void this.switchSource('replay', dropped);
+      if (!dropped) return;
+      if (this.guided) {
+        this.message = 'Stop the guided recording before replaying a file.';
+        return this.renderControls();
+      }
+      void this.switchSource('replay', dropped);
     });
     this.renderControls();
     this.renderLive();
@@ -240,6 +249,8 @@ export class HandLab {
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (66 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>
       <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
+    // Fill the new prompt element now rather than leaving it blank until the next live update.
+    if (this.guided) this.renderLive();
   }
 
   private renderLive(): void {

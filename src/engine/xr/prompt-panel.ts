@@ -52,8 +52,8 @@ export class PromptPanel {
 
   /**
    * Places the panel in front of the head, level with the floor, facing it.
-   * `head` is the viewer position; it's in scene space while the XR origin is
-   * at identity, as in this seated game.
+   * `head` and `orientation` are the viewer pose in XR reference space, so add
+   * `mesh` to the XR origin (world.player), not the scene.
    */
   anchor(head: readonly number[], orientation: Orientation): void {
     this.q.set(orientation.x, orientation.y, orientation.z, orientation.w);
@@ -78,7 +78,9 @@ export class PromptPanel {
     g.clearRect(0, 0, w, h);
     g.fillStyle = 'rgba(20, 22, 28, 0.88)';
     g.beginPath();
-    g.roundRect(0, 0, w, h, 28);
+    // roundRect is Chrome 99+; a plain rectangle keeps older headset browsers working.
+    if (typeof g.roundRect === 'function') g.roundRect(0, 0, w, h, 28);
+    else g.rect(0, 0, w, h);
     g.fill();
     const [title, detail] = text.split('\n');
     g.fillStyle = '#ece6d8';

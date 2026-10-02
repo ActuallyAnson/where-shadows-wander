@@ -46,9 +46,9 @@ describe('shape script', () => {
     expect(labels.map((l) => `${l.hand} ${l.shape}`)).toEqual(['right none', 'right fist', 'left cup']);
   });
 
-  it('prompts every shape on each hand with rest between, and fits in a 120 s recording', () => {
+  it('prompts every shape on each hand with rest between, in about a minute', () => {
     const s = new ShapeScript(SHAPES_SCRIPT);
-    expect(s.duration).toBeLessThanOrEqual(120);
+    expect(s.duration).toBe(66);
     for (const hand of ['left', 'right'] as const) {
       const shapes = s.labels().filter((l) => l.hand === hand && l.shape !== 'none');
       expect(shapes.map((l) => l.shape)).toEqual([...SHAPES]);
@@ -61,7 +61,7 @@ describe('shape script', () => {
     const s = new ShapeScript(STEPS);
     const p = createPrompt();
     expect(s.promptAt(-1, p)).toBe(p);
-    expect(p.text).toBe('Raise your right hand to start');
+    expect(p.text).toBe(s.waitText);
     s.promptAt(3, p);
     expect(p.index).toBe(1);
     expect(p.text).toBe(s.texts[1]);

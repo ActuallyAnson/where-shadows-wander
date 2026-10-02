@@ -105,6 +105,7 @@ export function parseRecording(json: unknown): HandRecording {
   r.labels.forEach((l, i) => {
     const ok =
       Number.isFinite(l?.start) &&
+      l.start >= 0 &&
       Number.isFinite(l?.end) &&
       l.start < l.end &&
       (l.hand === 'left' || l.hand === 'right') &&

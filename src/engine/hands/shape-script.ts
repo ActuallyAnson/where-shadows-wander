@@ -27,9 +27,9 @@ const LEAD_IN_S = 3;
 
 /**
  * Every v1 shape on the right hand, then on the left: a relaxed lead-in, then
- * each shape held 3 s with 2 s relaxed between. 66 s in all, under the
- * recorder's 120 s cap. With the settle margin, each shape gets a 2 s label
- * and each rest a 1 s `none` label.
+ * each shape held 3 s with 2 s relaxed between. 66 s in all (a guided
+ * recording lasts as long as its script). With the settle margin, each shape
+ * gets a 2 s label and each rest a 1 s `none` label.
  */
 export const SHAPES_SCRIPT: readonly ScriptStep[] = (['right', 'left'] as const).flatMap((hand) => [
   { hand, shape: 'relaxed' as const, seconds: LEAD_IN_S },
@@ -86,7 +86,7 @@ export class ShapeScript {
       return prev;
     });
     this.texts = steps.map(promptText);
-    this.waitText = `Raise your ${steps[0].hand} hand to start`;
+    this.waitText = 'Raise your hands to start';
   }
 
   /** The step running at `t`: -1 before the start, `steps.length` at or after the end. */

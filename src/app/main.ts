@@ -80,7 +80,8 @@ async function start(): Promise<void> {
   // Guided recording on a headset: prompts on a panel in front of the wearer,
   // placed on the first XR frame and again when recording starts.
   const panel = recorder?.script ? new PromptPanel() : null;
-  if (panel) world.scene.add(panel.mesh);
+  // The head pose is in reference space, which is the XR origin's space.
+  if (panel) world.player.add(panel.mesh);
   let panelAtStart = false;
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
