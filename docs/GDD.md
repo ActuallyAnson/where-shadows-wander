@@ -240,15 +240,26 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger spread | Angle between adjacent finger directions |
 | Palm orientation | Derived palm normal relative to the stage plane |
 
-First implementation (`src/engine/hands/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
+Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): `hand-features.ts` measures per-finger curl (and the mean, smallest and largest of the four fingers), the thumb tip's distance to every fingertip divided by the hand's length, spread between neighbouring fingers and between index and pinky in the palm plane, the palm normal against the stage normal, and the thumb's angle to the palm's forward direction. `shape-ranges.ts` holds each shape's ranges, `shape-classifier.ts` the hold-to-commit state machine, and `shape-recognizer.ts` runs both hands each frame. The Hand Lab and webcam bench cards show the classifier live.
+
+| Shape | Ranges (starting values, tuned with recordings) |
+|----|----|
+| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 35° of the fingers |
+| Fist | every finger curl ≥ 0.65 |
+| Cup | every finger curl 0.2–0.6, palm facing away from the stage (≥ 0.5) |
+| Spread | mean curl ≤ 0.19 and no finger above 0.35, index–pinky spread ≥ 25° |
+| Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4, thumb tip within 0.35 hand lengths of the ring or pinky tip and at least 0.4 from the index tip |
+| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 50° from the fingers |
+
+Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider (1 to 3) widens every range by whole units; hysteresis keeps a committed shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
 
 - Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
-- A shape must match continuously for about 0.4 s to commit (1 s for companions).
+- A shape must match continuously for about 0.4 s to commit (1 s for companions). Each shape emits `candidate` (recognised: the shadow starts sharpening), then `commit` or `cancel`, and later `release`.
 
-- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker.
+- Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker. If the hand drifts out of the committed shape's normal range into another shape, the new shape replaces it only when it commits, so there's no gap between roles.
 
-- Low tracking confidence pauses recognition rather than guessing.
+- Low tracking confidence pauses recognition rather than guessing: with any joint missing the hold freezes; after 0.2 s a held shape is cancelled, after 0.5 s a committed one is released.
 
 ### Persistence
 

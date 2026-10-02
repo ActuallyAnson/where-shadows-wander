@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, type HandFrame } from '../engine/hands/hand';
-import { handFeatures, roughShape } from '../engine/hands/hand-features';
+import { handFeatures } from '../engine/hands/hand-features';
+import { bestShape } from '../engine/hands/shape-ranges';
 import { createRecording, parseRecording, recordFrame } from '../engine/hands/hand-recording';
 import type { HandSource } from './hand-source';
 import { MockMode, mockOptionsFromUrl } from './mock-mode';
@@ -118,7 +119,7 @@ describe('scripted source', () => {
       SHAPES_SCRIPT.findIndex((s) => s.shape === 'fist'),
     ).reduce((t, s) => t + s.seconds, 0);
     src.update(fistAt + 1, l, r);
-    expect(roughShape(handFeatures(r)!)).toBe('fist');
+    expect(bestShape(handFeatures(r)!)).toBe('fist');
     expect(l.tracked).toBe(false); // the left hand hasn't appeared yet
   });
 
@@ -140,7 +141,7 @@ describe('synthetic source', () => {
     const mid = handFeatures(r)!.meanCurl;
     src.update(1 + BLEND_S, l, r);
     expect(mid).toBeLessThan(handFeatures(r)!.meanCurl);
-    expect(roughShape(handFeatures(r)!)).toBe('fist');
+    expect(bestShape(handFeatures(r)!)).toBe('fist');
   });
 
   it('hides a hand', () => {

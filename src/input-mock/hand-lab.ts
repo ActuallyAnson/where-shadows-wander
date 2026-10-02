@@ -6,12 +6,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import type { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
 import { downloadRecording, handCardHtml } from './hand-card';
-import { MOCK_WRIST } from './hand-source';
+import { MOCK_WRIST, type HandSource } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
 import { ScriptedSource } from './scripted-source';
@@ -45,6 +46,7 @@ export class HandLab {
   constructor(
     private readonly mode: MockMode,
     private readonly hands: Record<Handedness, HandFrame>,
+    private readonly shapes: ShapeRecognizer,
     private readonly view: LabView,
   ) {
     view.scene.add(this.bones.mesh);
@@ -80,6 +82,12 @@ export class HandLab {
     this.view.camera.setViewOffset(w, h, narrow ? 0 : PANEL_W / 2, narrow ? h * 0.22 : 0, w, h);
   }
 
+  /** Changes the hand source; the classifier starts fresh, since mock time restarts at 0. */
+  private setSource(source: HandSource): void {
+    this.mode.setSource(source);
+    this.shapes.reset();
+  }
+
   private get synthetic(): SyntheticSource | null {
     return this.mode.source instanceof SyntheticSource ? this.mode.source : null;
   }
@@ -100,7 +108,7 @@ export class HandLab {
     this.renderControls();
     try {
       const source = file ? await replayFromFile(file) : await createMockSource({ source: kind, file: '' });
-      this.mode.setSource(source);
+      this.setSource(source);
       this.onSourceChanged();
       this.message = '';
     } catch (e) {
@@ -119,7 +127,7 @@ export class HandLab {
     if (this.recording || this.guided) return;
     this.message = '';
     this.mode.paused = false;
-    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
+    if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
     this.guidedStart = this.mode.time;
     this.guided = new GuidedRecording(
       new ShapeScript(SHAPES_SCRIPT),
@@ -138,7 +146,7 @@ export class HandLab {
     if (rec.frames.length) downloadRecording(rec, 'wsw-lab-guided');
     else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
     // The run used a one-shot script; go back to the looping one the Script button promises.
-    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource());
+    if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource());
     this.renderControls();
     this.renderLive();
   }
@@ -169,9 +177,10 @@ export class HandLab {
       <section id="lab-controls"></section>
       <section class="hand" id="lab-hand-right"></section>
       <section class="hand" id="lab-hand-left"></section>
-      <p class="foot">The big label is the shape the hand is posed as. The rough guess only knows flat, fist and
-      open; the real classifier (week 3) will recognise all six. <a href="./webcam.html">Webcam bench</a> shows
-      the camera image with landmarks.</p>
+      <p class="foot">The big label is what the classifier has committed; "holding" shows a shape on its way
+      there (0.4 s for verbs, 1 s for rabbit and fox). The bars show how far inside each shape's ranges the hand
+      is: above the line matches. <a href="./webcam.html">Webcam bench</a> shows the camera image with
+      landmarks.</p>
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
 
@@ -262,6 +271,8 @@ export class HandLab {
           this.hands[side],
           ['toward you', 'away from you'],
           this.mode.source.shapeOf?.(side) ?? null,
+          this.shapes[side].state,
+          this.shapes[side].margins,
         );
     }
     const prompt = this.root.querySelector('#lab-prompt');
@@ -354,6 +365,16 @@ const CSS = `
 .lab .shape { font-size: 16px; font-weight: 600; }
 .lab .shape.none { color: var(--muted); font-weight: 400; }
 .lab .guess { color: var(--muted); font-size: 12px; margin-top: -4px; }
+.lab .hold { position: relative; height: 18px; border-radius: 4px; background: var(--stage); overflow: hidden; font-size: 11px; }
+.lab .hold span { position: relative; z-index: 1; padding-left: 6px; line-height: 18px; }
+.lab .hold i { position: absolute; left: 0; top: 0; bottom: 0; opacity: .55; }
+.lab .margins { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.lab .margins .m { display: grid; gap: 2px; justify-items: center; font: 9.5px ui-monospace, monospace; color: var(--muted); }
+.lab .margins .m.on { color: var(--ink); }
+.lab .margins .b { width: 100%; height: 26px; border-radius: 3px; background: var(--stage); position: relative; overflow: hidden;
+  background-image: linear-gradient(to top, transparent calc(50% - 0.5px), var(--muted) 50%, transparent calc(50% + 0.5px)); }
+.lab .margins .b i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--muted); opacity: .5; }
+.lab .margins .m.on .b i { background: var(--accent); opacity: 1; }
 .lab dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
 .lab dt { color: var(--muted); }
 .lab dd { margin: 0; text-align: right; font: 12px ui-monospace, monospace; font-variant-numeric: tabular-nums; }
