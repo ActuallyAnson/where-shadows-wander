@@ -15,6 +15,7 @@ import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
@@ -25,6 +26,7 @@ import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { mountLabLink } from './lab-link';
+import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 
 const SIM_HZ = 60;
@@ -51,6 +53,9 @@ async function start(): Promise<void> {
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
+  // What the session provides (hands, passthrough, planes, anchors), and the detected planes for StageFrame.
+  const capabilities = new CapabilityDetector();
+
   // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
   const shapes = new ShapeRecognizer();
   // Lantern gestures for Teammate B's lantern flow. Mock mode has a stand-in lantern; in XR it waits for B's.
@@ -110,10 +115,15 @@ async function start(): Promise<void> {
   const dots = new JointDots();
   world.scene.add(dots.mesh);
 
+  // addSource keeps only one source, so everything we report goes through it.
   diagnostics.addSource(() => ({
-    sim: { hz: SIM_HZ, steps: sim.steps },
-    handReadMethod: { ...hands.method },
-    mock: mock ? { source: mock.source.name } : null,
+    ...reportSource({
+      simHz: SIM_HZ,
+      simSteps: sim.steps,
+      handReadMethod: hands.method,
+      mockSource: mock ? mock.source.name : null,
+      capabilities,
+    }),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     shadow: {
@@ -126,6 +136,8 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
+    // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
+    if (session && !mock) capabilities.sessionStarted(session);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     if (!mock) {
@@ -133,6 +145,7 @@ async function start(): Promise<void> {
       stageView.group.visible = shadowRenderer.mesh.visible = false;
     }
     diagnostics.sessionEnded();
+    capabilities.sessionEnded();
     recorder?.finish();
   });
 
@@ -156,7 +169,10 @@ async function start(): Promise<void> {
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
       if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
-      else if (frame && refSpace) hands.update(frame, refSpace, this.world.player.matrixWorld);
+      else if (frame && refSpace) {
+        hands.update(frame, refSpace, this.world.player.matrixWorld);
+        capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
+      }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
       clock += delta;
@@ -216,6 +232,6 @@ async function start(): Promise<void> {
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
   if (import.meta.env.DEV)
     Object.assign(window, {
-      __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes, gestures, projector, stage },
+      __wsw: { world, hands, diagnostics, recorder, mock, lab, capabilities, shapes, gestures, projector, stage },
     });
 }

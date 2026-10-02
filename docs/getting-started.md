@@ -122,6 +122,8 @@ npx iwsdk browser screenshot
 
 `npx iwsdk xr --help` lists every command.
 
+The report's `capabilities` section says what the session provides: hand tracking (and each hand's `tracked` and `lostCount`), passthrough, plane and mesh detection (`unsupported`, `none-yet` or `found`, with a count), anchors, and the persistent-anchor API, plus `planeList` with each detected plane's label, centre and normal. In the emulator expect everything available, 17 planes and 9 meshes, and persistent anchors `no` (the emulator's anchors can't request a persistent handle). After `set-connected ... false`, that hand shows `tracked: false` and its `lostCount` goes up. `basis` says how support was decided: `enabledFeatures` when the browser reports the granted features, `api` when only the API's presence was checked.
+
 ## 9. Score the classifier on recordings
 
 Labelled recordings (section 5's **Guided recording**, or `?record&script=shapes` on a headset) can be scored against the shape classifier:
