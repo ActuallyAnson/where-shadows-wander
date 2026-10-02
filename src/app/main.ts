@@ -42,6 +42,11 @@ start().catch((e) => diagnostics.error(`start failed: ${String(e)}`));
 
 async function start(): Promise<void> {
   const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
+  // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
+  if (import.meta.env.DEV) {
+    const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
+    if (emulated) emulated.primaryInputMode = 'hand';
+  }
   diagnostics.mark('worldCreated');
   disableIwsdkRays(world);
 
