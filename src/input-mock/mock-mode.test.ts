@@ -5,7 +5,8 @@ import { createRecording, parseRecording, recordFrame } from '../engine/hands/ha
 import type { HandSource } from './hand-source';
 import { MockMode, mockOptionsFromUrl } from './mock-mode';
 import { ReplaySource } from './replay-source';
-import { SHAPES_SCRIPT, ScriptedSource } from './scripted-source';
+import { SHAPES_SCRIPT } from '../engine/hands/shape-script';
+import { ScriptedSource } from './scripted-source';
 import { BLEND_S, SyntheticSource } from './synthetic-source';
 
 /** A 6 s recording made here from the scripted hands (recordings/ is gitignored, so tests can't rely on it). */
@@ -111,7 +112,7 @@ describe('scripted source', () => {
     const src = new ScriptedSource();
     const l = createHandFrame('left'),
       r = createHandFrame('right');
-    // "right: fist" starts after relaxed 1 s, flat 2 s, relaxed 1 s (see SHAPES_SCRIPT).
+    // "right: fist" starts after the relaxed lead-in, flat and a rest (see SHAPES_SCRIPT).
     const fistAt = SHAPES_SCRIPT.slice(
       0,
       SHAPES_SCRIPT.findIndex((s) => s.shape === 'fist'),
