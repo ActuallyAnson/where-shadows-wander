@@ -62,9 +62,10 @@ export class HandLab {
     this.orbit = new OrbitControls(view.camera, view.canvas);
     const [lx, ly, lz] = MOCK_WRIST.left;
     const [rx] = MOCK_WRIST.right;
-    this.orbit.target.set((lx + rx) / 2, ly, lz - 0.08);
-    // Closer than the player's eyes and a little to the side, so finger curl is easy to see.
-    view.camera.position.set(0.16, ly + 0.17, lz + 0.22);
+    // Between the hands and the lantern, which sits nearer the player on the table edge.
+    this.orbit.target.set((lx + rx) / 2, (ly + lantern[1]) / 2, (lz + lantern[2]) / 2);
+    // Above and to the side of the player, so curled fingers and the lantern are both in view.
+    view.camera.position.set(0.3, ly + 0.3, lantern[2] + 0.35);
     this.orbit.update();
     this.fitView();
     window.addEventListener('resize', () => this.fitView());
