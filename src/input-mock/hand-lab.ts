@@ -290,7 +290,7 @@ export class HandLab {
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
-        ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (66 s) and saves a labelled recording')}
+        ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>
       <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
     // Fill the new prompt element now rather than leaving it blank until the next live update.

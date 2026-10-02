@@ -21,15 +21,16 @@ export interface ScriptStep {
  */
 export const SETTLE_S = 0.5;
 
-const HOLD_S = 3;
+const HOLD_S = 4.5;
 const REST_S = 2;
 const LEAD_IN_S = 3;
 
 /**
  * Every v1 shape on the right hand, then on the left: a relaxed lead-in, then
- * each shape held 3 s with 2 s relaxed between. 66 s in all (a guided
+ * each shape held 4.5 s with 2 s relaxed between. 84 s in all (a guided
  * recording lasts as long as its script). With the settle margin, each shape
- * gets a 2 s label and each rest a 1 s `none` label.
+ * gets a 3.5 s label and each rest a 1 s `none` label. (3 s holds were too
+ * quick to settle into a shape and hold it.)
  */
 export const SHAPES_SCRIPT: readonly ScriptStep[] = (['right', 'left'] as const).flatMap((hand) => [
   { hand, shape: 'relaxed' as const, seconds: LEAD_IN_S },

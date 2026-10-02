@@ -60,7 +60,7 @@ Recordings can now say which shape each hand was making, so the classifier can b
 - **Labels come from a guided recording** (`src/engine/hands/shape-script.ts`, `guided-recording.ts`): a script prompts each shape for a fixed time, and each prompt is labelled. On a headset use `?record&script=shapes` (a panel in the scene shows the prompts); at a desk, **Guided recording** in the Hand Lab or on the webcam bench.
 - **A label is what the wearer was asked to do, not what the hand did.** Someone who misses a prompt is still labelled with it, so spot-check recordings by replaying them in the Hand Lab.
 - **Only the settled middle of each prompt is labelled:** 0.5 s is left out at both ends, the time it takes to read a prompt and change shape. Relaxed rests between shapes are labelled `none`, so #12 can count false triggers. A hand that isn't being prompted has no label for that time; leave it out of accuracy counts rather than treating it as `none`.
-- The script (`SHAPES_SCRIPT`) prompts every shape on the right hand, then the left: a 3 s relaxed lead-in, then each shape for 3 s with 2 s rests. 66 s in all, so each shape gets a 2 s label.
+- The script (`SHAPES_SCRIPT`) prompts every shape on the right hand, then the left: a 3 s relaxed lead-in, then each shape for 4.5 s with 2 s rests. 84 s in all, so each shape gets a 3.5 s label. (It was 3 s per shape at first, which was too quick to settle into a shape.)
 - If a recording stops early, labels that end after its last frame are left out.
 
 ### 6. Update (3 Oct 2026): scoring and regression fixtures (#12)
