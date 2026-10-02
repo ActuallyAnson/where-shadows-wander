@@ -1,8 +1,8 @@
 // Webcam Hand Bench: MediaPipe hands -> HandFrame -> the same features the
 // classifier will use. Runs in a normal browser tab, no headset needed.
-import { createHandFrame, derivePalm, type HandFrame, type Handedness } from '../engine/hands/hand';
-import { FINGER_NAMES, handFeatures, roughShape } from '../engine/hands/hand-features';
+import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import { downloadRecording, handCardHtml } from './hand-card';
 import { createHandLandmarker, resultToHands, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
 import { handednessFromLabel } from './mediapipe-hands';
 
@@ -99,31 +99,9 @@ function draw(result: HandLandmarkerResult): void {
 }
 
 function render(): void {
-  for (const side of ['right', 'left'] as const) $(`hand-${side}`).innerHTML = card(side);
-}
-
-function card(side: Handedness): string {
-  const color = side === 'right' ? 'var(--right)' : 'var(--left)';
-  const title = `<h2><i class="dot" style="background:${color}"></i>${side} hand</h2>`;
-  const f = handFeatures(hands[side]);
-  const palm = derivePalm(hands[side]);
-  if (!f || !palm) return `${title}<div class="shape none">Not seen</div>`;
-  const [, ny, nz] = palm.normal;
-  // Scene: +Z points from the hand toward the camera, +Y up. You sit behind the hand, so -Z is toward you.
-  const facing =
-    ny > 0.6 ? 'up' : ny < -0.6 ? 'down' : nz > 0.6 ? 'toward the camera' : nz < -0.6 ? 'toward you' : 'sideways';
-  return `${title}
-    <div class="shape">${roughShape(f)}</div>
-    <dl>
-      <dt>Palm faces</dt><dd>${facing}</dd>
-      <dt>Palm normal</dt><dd>${palm.normal.map((v) => v.toFixed(2)).join(' ')}</dd>
-      <dt>Thumb–index gap</dt><dd>${f.pinchGapMm.toFixed(0)} mm</dd>
-      <dt>Finger spread</dt><dd>${f.spreadDeg.toFixed(0)}°</dd>
-      <dt>Mean curl</dt><dd>${f.meanCurl.toFixed(2)}</dd>
-    </dl>
-    <div class="curls" style="color:${color}">${FINGER_NAMES.map(
-      (n) => `<div class="curl"><div class="b"><i style="height:${(f.curl[n] * 100).toFixed(0)}%"></i></div>${n}</div>`,
-    ).join('')}</div>`;
+  // On the bench the webcam faces you, so +Z points toward the camera.
+  for (const side of ['right', 'left'] as const)
+    $(`hand-${side}`).innerHTML = handCardHtml(hands[side], ['toward the camera', 'toward you']);
 }
 
 function toggleRecording(): void {
@@ -137,11 +115,5 @@ function toggleRecording(): void {
   const rec = recording;
   recording = null;
   button.textContent = 'Record';
-  const url = URL.createObjectURL(new Blob([JSON.stringify(rec)], { type: 'application/json' }));
-  const a = Object.assign(document.createElement('a'), {
-    href: url,
-    download: `wsw-webcam-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`,
-  });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadRecording(rec, 'wsw-webcam');
 }

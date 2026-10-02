@@ -11,7 +11,7 @@ import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
 import { XRHandReader } from '../engine/xr/xr-hands';
-import { mountMockControls } from '../input-mock/mock-controls';
+import { HandLab } from '../input-mock/hand-lab';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
@@ -36,13 +36,18 @@ async function start(): Promise<void> {
   const hands = new XRHandReader();
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
+  let lab: HandLab | null = null;
   if (mockOptions) {
     const source = await createMockSource(mockOptions).catch((e) => {
       diagnostics.error(`mock source "${mockOptions.source}" failed, using synthetic hands: ${String(e)}`);
       return new SyntheticSource();
     });
     mock = new MockMode(source);
-    mountMockControls(mock);
+    lab = new HandLab(mock, hands.hands, {
+      scene: world.scene,
+      camera: world.camera,
+      canvas: world.renderer.domElement,
+    });
   }
   const handList = [hands.hands.left, hands.hands.right];
   const sim = new FixedStepLoop(SIM_HZ, () => {
@@ -87,11 +92,12 @@ async function start(): Promise<void> {
       }
       sim.advance(delta);
       dots.update(handList);
+      lab?.frame();
       diagnostics.frame(frame, refSpace, hands.hands, performance.now() - t0);
     }
   }
   world.registerSystem(FrameDriverSystem, { priority: 10 });
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
-  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock } });
+  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab } });
 }

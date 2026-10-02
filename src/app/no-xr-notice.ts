@@ -24,8 +24,8 @@ export async function showNoXrNoticeIfNeeded(): Promise<void> {
       so open this page in the browser on a <b>Meta Quest</b> or <b>Pico</b> headset.</p>
       <p style="margin:0;color:#a8a294;font-size:14px">In development: the headset build has hand tracking and room
       detection, but no gameplay yet.</p>
-      <p style="margin:0;font-size:14px">No headset? Try your hands on the
-      <a href="./webcam.html" style="color:#f0a24a">webcam hand bench</a>.</p>
+      <p style="margin:0;font-size:14px">No headset? Open the
+      <a href="./?mock=1" style="color:#f0a24a">Hand Lab</a> to try the hand shapes with mock or webcam hands.</p>
     </div>`;
   document.body.append(box);
 }

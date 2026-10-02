@@ -4,7 +4,8 @@
 //   ?mock=1&src=script              every v1 shape on each hand, in a loop
 //   ?mock=1&src=replay&file=<url>   a .handrec.json (default: the emulator demo)
 //   ?mock=1&src=webcam              live hands from the webcam (MediaPipe)
-// Dropping a .handrec.json onto the page switches to replaying it.
+// The Hand Lab panel (hand-lab.ts) switches sources at runtime, and dropping a
+// .handrec.json onto the page replays it.
 import type { HandFrame } from '../engine/hands/hand';
 import type { HandSource } from './hand-source';
 import { loadReplay } from './replay-source';

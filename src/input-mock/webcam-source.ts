@@ -1,14 +1,18 @@
 // Live webcam hands in mock mode (?mock=1&src=webcam), through MediaPipe.
 // Loaded with a dynamic import, so the game only downloads MediaPipe when asked.
-// The webcam is treated as the desktop camera: hands appear where the webcam
-// sees them, about 0.5 m in front of the view. See ADR 0004 for how webcam
-// hands differ from a headset's.
+// Hands appear about 0.5 m in front of the desktop view, turned 180° so you
+// see them from your own side, as a headset would: your right hand on the
+// right, the back of your hand toward you when your palm faces the webcam.
+// Turning (not mirroring) keeps left and right hands their true shape. See
+// ADR 0004 for how webcam hands differ from a headset's.
 import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { createHandLandmarker, resultToHands, type HandLandmarker } from './hand-landmarker';
 import { clearHand, type HandSource } from './hand-source';
 
-/** The desktop camera's position (iwsdk.config.json); the webcam stands in for it. */
+/** The desktop camera's position (iwsdk.config.json). */
 const CAMERA = [0, 1, 0.5];
+/** mediapipeToHandFrame places hands this far in front of the webcam; we turn them about that point. */
+const HAND_DEPTH = 0.5;
 
 export class WebcamSource implements HandSource {
   readonly name = 'webcam';
@@ -29,7 +33,7 @@ export class WebcamSource implements HandSource {
     video.muted = video.playsInline = true;
     // Small mirrored preview in the corner, so you can see what the camera sees.
     video.style.cssText =
-      'position:fixed;right:12px;top:12px;width:200px;z-index:10;transform:scaleX(-1);' +
+      'position:fixed;left:12px;top:12px;width:200px;z-index:10;transform:scaleX(-1);' +
       'border-radius:8px;opacity:.85;pointer-events:none';
     video.srcObject = await navigator.mediaDevices.getUserMedia({
       video: { width: 1280, height: 720, facingMode: 'user' },
@@ -58,7 +62,14 @@ export class WebcamSource implements HandSource {
 
 function copyPlaced(src: HandFrame, out: HandFrame): void {
   if (!src.tracked) return clearHand(out);
-  for (let i = 0; i < src.positions.length; i++) out.positions[i] = src.positions[i] + CAMERA[i % 3];
+  const s = src.positions,
+    p = out.positions;
+  // 180° about the vertical through the hand-depth point: x -> -x, z -> -2·depth - z.
+  for (let j = 0; j < s.length; j += 3) {
+    p[j] = CAMERA[0] - s[j];
+    p[j + 1] = CAMERA[1] + s[j + 1];
+    p[j + 2] = CAMERA[2] - 2 * HAND_DEPTH - s[j + 2];
+  }
   out.radii.set(src.radii);
   out.tracked = true;
   out.validJoints = src.validJoints;
