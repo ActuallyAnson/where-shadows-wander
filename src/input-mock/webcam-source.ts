@@ -73,7 +73,9 @@ export class WebcamSource implements HandSource {
       'position:fixed;left:12px;top:12px;width:200px;z-index:10;transform:scaleX(-1);' +
       'border-radius:8px;opacity:.85;pointer-events:none';
     video.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: { width: 1280, height: 720, facingMode: 'user' },
+      // MediaPipe shrinks every image to about 256 px, so a small camera frame
+      // loses nothing and is much cheaper to hand over (720p measured 28-38 ms per frame).
+      video: { width: 640, height: 360, facingMode: 'user' },
       audio: false,
     });
     document.body.append(video);
