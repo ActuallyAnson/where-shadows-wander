@@ -58,6 +58,7 @@ These come from the architecture and the frame budget. The reasons are in [docs/
 Say in the PR which of these you checked:
 
 - **Unit tests:** `npm test`.
+- **Classifier changes:** `npm run eval` on your labelled recordings, before and after (`EVAL_BASELINE`), and say what changed.
 - **Emulator:** `npm run dev`, then Enter XR with hands. The scripted commands are in getting-started, section 8.
 - **Hand Lab (`?mock=1`):** for anything about hand shapes or hand data, with synthetic, scripted, replayed or webcam hands.
 - **Pico:** for anything about real tracking, rooms, performance or feel.

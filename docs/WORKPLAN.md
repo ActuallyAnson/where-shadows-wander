@@ -46,7 +46,7 @@ Goal: the classifier recognises the verb shapes reliably with hold-to-commit and
 | Owner | Task | Issue | Status |
 |---|---|---|---|
 | Anson | Pose classifier for the v1 shapes | #11 | ⏳ |
-| Anson | Classifier evaluation pipeline | #12 | |
+| Anson | Classifier evaluation pipeline | #12 | ⏳ |
 | A | Traveller state machine | | |
 | A | Shape abilities: bridge, rock, cup, spread | | |
 | B | Procedural animation runtime | | |
