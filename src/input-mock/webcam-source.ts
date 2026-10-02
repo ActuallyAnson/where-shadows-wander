@@ -6,14 +6,16 @@
 // Turning (not mirroring) keeps left and right hands their true shape. See
 // ADR 0004 for how webcam hands differ from a headset's.
 //
-// The camera gives about 24-30 new hands a second and each is a little noisy,
+// MediaPipe runs in a worker (hand-landmarker.worker.ts), so it never stalls drawing.
+// The camera gives about 15-30 new hands a second and each is a little noisy,
 // so every camera frame goes through a One Euro filter, and the display glides
 // from the last filtered hand to the new one over one camera interval instead
 // of jumping. That costs at most one camera frame of delay (about 40 ms).
 import { createHandFrame, JOINT_COUNT, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { OneEuroFilter } from '../engine/hands/one-euro';
 import { HandAssigner } from './hand-assigner';
-import { createHandLandmarker, resultToHands, type HandLandmarker } from './hand-landmarker';
+import type { WorkerReply, WorkerRequest } from './hand-landmarker.worker';
+import { resultToHands, type LandmarkerResult } from './mediapipe-hands';
 import { clearHand, type HandSource } from './hand-source';
 
 /** The desktop camera's position (iwsdk.config.json). */
@@ -30,57 +32,83 @@ export class WebcamSource implements HandSource {
   private readonly assigner = new HandAssigner();
   private readonly smooth = { left: new Smoothed(), right: new Smoothed() };
   private stopped = false;
-  private lastCameraAt = 0;
-  /** Smoothed time between camera frames, ms. */
-  private cameraMs = 40;
-  /** Smoothed MediaPipe time per camera frame, ms. */
+  /** A frame is with the worker; newer camera frames are skipped until it answers. */
+  private busy = false;
+  private lastResultAt = 0;
+  /** Smoothed time between tracked frames, ms. */
+  private frameMs = 40;
+  /** Smoothed MediaPipe time per frame in the worker, ms (doesn't block the page). */
   private detectMs = 0;
 
   private constructor(
-    private readonly landmarker: HandLandmarker,
+    private readonly worker: Worker,
     private readonly video: HTMLVideoElement,
   ) {
+    worker.onmessage = (e: MessageEvent<WorkerReply>) => {
+      if (e.data.type === 'result') this.onResult(e.data.result, e.data.ms);
+    };
     this.onVideoFrame();
   }
 
-  /**
-   * Runs MediaPipe once per new camera frame. The display runs faster than the
-   * camera (60-120 Hz vs about 30), and video.currentTime moves every display
-   * frame even without a new image, so checking it ran MediaPipe several times
-   * on the same picture, each time with slightly different joints.
-   */
-  private onVideoFrame = (): void => {
-    if (this.stopped) return;
-    if (this.video.readyState >= 2) {
-      const now = performance.now();
-      resultToHands(this.landmarker.detectForVideo(this.video, now), this.seen, this.assigner, now);
-      const spent = performance.now() - now;
-      this.detectMs += (spent - this.detectMs) * 0.1;
-      if (this.lastCameraAt > 0) this.cameraMs += (Math.min(now - this.lastCameraAt, 200) - this.cameraMs) * 0.1;
-      this.lastCameraAt = now;
-      this.smooth.left.camera(this.seen.left, now, this.cameraMs);
-      this.smooth.right.camera(this.seen.right, now, this.cameraMs);
-    }
-    this.video.requestVideoFrameCallback(this.onVideoFrame);
-  };
-
   static async start(): Promise<WebcamSource> {
-    const landmarker = await createHandLandmarker();
+    const worker = new Worker(new URL('./hand-landmarker.worker.ts', import.meta.url), { type: 'module' });
+    const ready = new Promise<void>((resolve, reject) => {
+      worker.onmessage = (e: MessageEvent<WorkerReply>) => {
+        if (e.data.type === 'ready') resolve();
+        else if (e.data.type === 'error') reject(new Error(e.data.message));
+      };
+      worker.onerror = (e) => reject(new Error(e.message || 'hand tracking worker failed to start'));
+    });
     const video = document.createElement('video');
     video.muted = video.playsInline = true;
     // Small mirrored preview in the corner, so you can see what the camera sees.
     video.style.cssText =
       'position:fixed;left:12px;top:12px;width:200px;z-index:10;transform:scaleX(-1);' +
       'border-radius:8px;opacity:.85;pointer-events:none';
-    video.srcObject = await navigator.mediaDevices.getUserMedia({
-      // MediaPipe shrinks every image to about 256 px, so a small camera frame
-      // loses nothing and is much cheaper to hand over (720p measured 28-38 ms per frame).
-      video: { width: 640, height: 360, facingMode: 'user' },
-      audio: false,
-    });
-    document.body.append(video);
-    await video.play();
-    return new WebcamSource(landmarker, video);
+    try {
+      video.srcObject = await navigator.mediaDevices.getUserMedia({
+        // MediaPipe shrinks every image to about 256 px, so a small camera frame
+        // loses nothing and is cheaper to copy to the worker.
+        video: { width: 640, height: 360, facingMode: 'user' },
+        audio: false,
+      });
+      document.body.append(video);
+      await video.play();
+      await ready;
+      return new WebcamSource(worker, video);
+    } catch (e) {
+      worker.terminate();
+      for (const track of (video.srcObject as MediaStream | null)?.getTracks() ?? []) track.stop();
+      video.remove();
+      throw e;
+    }
+  }
+
+  /** Sends each new camera frame to the worker, unless it's still busy with the last one. */
+  private onVideoFrame = (): void => {
+    if (this.stopped) return;
+    if (!this.busy && this.video.readyState >= 2) {
+      this.busy = true;
+      createImageBitmap(this.video)
+        .then((bitmap) => {
+          if (this.stopped) return bitmap.close();
+          const msg: WorkerRequest = { type: 'frame', bitmap, t: performance.now() };
+          this.worker.postMessage(msg, [bitmap]);
+        })
+        .catch(() => (this.busy = false));
+    }
+    this.video.requestVideoFrameCallback(this.onVideoFrame);
+  };
+
+  private onResult(result: LandmarkerResult, ms: number): void {
+    this.busy = false;
+    const now = performance.now();
+    this.detectMs += (ms - this.detectMs) * 0.1;
+    if (this.lastResultAt > 0) this.frameMs += (Math.min(now - this.lastResultAt, 200) - this.frameMs) * 0.1;
+    this.lastResultAt = now;
+    resultToHands(result, this.seen, this.assigner, now);
+    this.smooth.left.camera(this.seen.left, now, this.frameMs);
+    this.smooth.right.camera(this.seen.right, now, this.frameMs);
   }
 
   update(_t: number, left: HandFrame, right: HandFrame): void {
@@ -90,14 +118,14 @@ export class WebcamSource implements HandSource {
   }
 
   status(): string {
-    return `camera ${(1000 / this.cameraMs).toFixed(0)} fps · MediaPipe ${this.detectMs.toFixed(0)} ms`;
+    return `tracking ${(1000 / this.frameMs).toFixed(0)} fps · MediaPipe ${this.detectMs.toFixed(0)} ms (background)`;
   }
 
   dispose(): void {
     this.stopped = true;
+    this.worker.terminate();
     for (const track of (this.video.srcObject as MediaStream | null)?.getTracks() ?? []) track.stop();
     this.video.remove();
-    this.landmarker.close();
   }
 }
 

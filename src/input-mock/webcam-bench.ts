@@ -4,8 +4,8 @@ import { createHandFrame, type HandFrame, type Handedness } from '../engine/hand
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import { downloadRecording, handCardHtml } from './hand-card';
 import { HandAssigner } from './hand-assigner';
-import { createHandLandmarker, resultToHands, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
-import { handednessFromLabel } from './mediapipe-hands';
+import { createHandLandmarker, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
+import { handednessFromLabel, resultToHands } from './mediapipe-hands';
 
 // MediaPipe's 21-landmark skeleton, for drawing the overlay.
 // prettier-ignore

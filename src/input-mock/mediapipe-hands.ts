@@ -4,7 +4,8 @@
 //
 // Caveats compared with a headset: depth comes from one camera (approximate),
 // the viewpoint is the webcam's (facing the player), and the noise differs.
-import { JOINT_COUNT, type HandFrame, type Handedness } from '../engine/hands/hand';
+import { createHandFrame, JOINT_COUNT, type HandFrame, type Handedness, type Vec3 } from '../engine/hands/hand';
+import type { HandAssigner } from './hand-assigner';
 
 /** A MediaPipe landmark: image coords are 0..1 (x right, y down); world coords are metres. */
 export interface Landmark {
@@ -91,4 +92,48 @@ export function mediapipeToHandFrame(
   out.tracked = true;
   out.validJoints = JOINT_COUNT;
   return out;
+}
+
+/** The parts of MediaPipe's HandLandmarkerResult we use; plain data, so it can come from a worker. */
+export interface LandmarkerResult {
+  landmarks: Landmark[][];
+  worldLandmarks: Landmark[][];
+  handedness: { categoryName: string }[][];
+}
+
+const scratch = [createHandFrame('left'), createHandFrame('right')];
+
+/**
+ * Writes a landmarker result into both hands; hands it didn't see are left untracked.
+ * With an assigner, each hand keeps its side when MediaPipe's label flips for a frame.
+ */
+export function resultToHands(
+  result: LandmarkerResult,
+  hands: Record<Handedness, HandFrame>,
+  assigner?: HandAssigner,
+  nowMs = 0,
+): void {
+  hands.left.tracked = hands.right.tracked = false;
+  hands.left.validJoints = hands.right.validJoints = 0;
+  const n = Math.min(result.landmarks.length, 2);
+  const labels: Handedness[] = [];
+  const wrists: Vec3[] = [];
+  for (let i = 0; i < n; i++) {
+    labels.push(handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left'));
+    const p = mediapipeToHandFrame(result.worldLandmarks[i], result.landmarks[i], scratch[i]).positions;
+    wrists.push([p[0], p[1], p[2]]);
+  }
+  const sides: Handedness[] = assigner
+    ? assigner.assign(labels, wrists, nowMs)
+    : labels[0] === labels[1]
+      ? [labels[0], labels[0] === 'left' ? 'right' : 'left']
+      : labels;
+  for (let i = 0; i < n; i++) copyHand(scratch[i], hands[sides[i]]);
+}
+
+function copyHand(src: HandFrame, out: HandFrame): void {
+  out.positions.set(src.positions);
+  out.radii.set(src.radii);
+  out.tracked = src.tracked;
+  out.validJoints = src.validJoints;
 }
