@@ -4,7 +4,8 @@
 import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision';
 import wasmLoaderPath from '@mediapipe/tasks-vision/vision_wasm_internal.js?url';
 import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?url';
-import type { HandFrame, Handedness } from '../engine/hands/hand';
+import { createHandFrame, type HandFrame, type Handedness, type Vec3 } from '../engine/hands/hand';
+import type { HandAssigner } from './hand-assigner';
 import { handednessFromLabel, mediapipeToHandFrame } from './mediapipe-hands';
 
 const MODEL_URL =
@@ -21,13 +22,39 @@ export async function createHandLandmarker(): Promise<HandLandmarker> {
   });
 }
 
-/** Writes a landmarker result into both hands; hands it didn't see are left untracked. */
-export function resultToHands(result: HandLandmarkerResult, hands: Record<Handedness, HandFrame>): void {
+const scratch = [createHandFrame('left'), createHandFrame('right')];
+
+/**
+ * Writes a landmarker result into both hands; hands it didn't see are left untracked.
+ * With an assigner, each hand keeps its side when MediaPipe's label flips for a frame.
+ */
+export function resultToHands(
+  result: HandLandmarkerResult,
+  hands: Record<Handedness, HandFrame>,
+  assigner?: HandAssigner,
+  nowMs = 0,
+): void {
   hands.left.tracked = hands.right.tracked = false;
   hands.left.validJoints = hands.right.validJoints = 0;
-  result.landmarks.forEach((image, i) => {
-    const side = handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left');
-    if (hands[side].tracked) return; // two hands with the same label: keep the first
-    mediapipeToHandFrame(result.worldLandmarks[i], image, hands[side]);
-  });
+  const n = Math.min(result.landmarks.length, 2);
+  const labels: Handedness[] = [];
+  const wrists: Vec3[] = [];
+  for (let i = 0; i < n; i++) {
+    labels.push(handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left'));
+    const p = mediapipeToHandFrame(result.worldLandmarks[i], result.landmarks[i], scratch[i]).positions;
+    wrists.push([p[0], p[1], p[2]]);
+  }
+  const sides: Handedness[] = assigner
+    ? assigner.assign(labels, wrists, nowMs)
+    : labels[0] === labels[1]
+      ? [labels[0], labels[0] === 'left' ? 'right' : 'left']
+      : labels;
+  for (let i = 0; i < n; i++) copyHand(scratch[i], hands[sides[i]]);
+}
+
+function copyHand(src: HandFrame, out: HandFrame): void {
+  out.positions.set(src.positions);
+  out.radii.set(src.radii);
+  out.tracked = src.tracked;
+  out.validJoints = src.validJoints;
 }

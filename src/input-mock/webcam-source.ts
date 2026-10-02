@@ -6,6 +6,7 @@
 // Turning (not mirroring) keeps left and right hands their true shape. See
 // ADR 0004 for how webcam hands differ from a headset's.
 import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
+import { HandAssigner } from './hand-assigner';
 import { createHandLandmarker, resultToHands, type HandLandmarker } from './hand-landmarker';
 import { clearHand, type HandSource } from './hand-source';
 
@@ -20,12 +21,30 @@ export class WebcamSource implements HandSource {
     left: createHandFrame('left'),
     right: createHandFrame('right'),
   };
-  private lastVideoTime = -1;
+  private readonly assigner = new HandAssigner();
+  private stopped = false;
 
   private constructor(
     private readonly landmarker: HandLandmarker,
     private readonly video: HTMLVideoElement,
-  ) {}
+  ) {
+    this.onVideoFrame();
+  }
+
+  /**
+   * Runs MediaPipe once per new camera frame. The display runs faster than the
+   * camera (60-120 Hz vs about 30), and video.currentTime moves every display
+   * frame even without a new image, so checking it ran MediaPipe several times
+   * on the same picture, each time with slightly different joints.
+   */
+  private onVideoFrame = (): void => {
+    if (this.stopped) return;
+    if (this.video.readyState >= 2) {
+      const now = performance.now();
+      resultToHands(this.landmarker.detectForVideo(this.video, now), this.seen, this.assigner, now);
+    }
+    this.video.requestVideoFrameCallback(this.onVideoFrame);
+  };
 
   static async start(): Promise<WebcamSource> {
     const landmarker = await createHandLandmarker();
@@ -45,15 +64,12 @@ export class WebcamSource implements HandSource {
   }
 
   update(_t: number, left: HandFrame, right: HandFrame): void {
-    if (this.video.readyState >= 2 && this.video.currentTime !== this.lastVideoTime) {
-      this.lastVideoTime = this.video.currentTime;
-      resultToHands(this.landmarker.detectForVideo(this.video, performance.now()), this.seen);
-    }
     copyPlaced(this.seen.left, left);
     copyPlaced(this.seen.right, right);
   }
 
   dispose(): void {
+    this.stopped = true;
     for (const track of (this.video.srcObject as MediaStream | null)?.getTracks() ?? []) track.stop();
     this.video.remove();
     this.landmarker.close();

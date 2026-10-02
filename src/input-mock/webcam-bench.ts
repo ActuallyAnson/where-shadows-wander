@@ -3,6 +3,7 @@
 import { createHandFrame, type HandFrame, type Handedness } from '../engine/hands/hand';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import { downloadRecording, handCardHtml } from './hand-card';
+import { HandAssigner } from './hand-assigner';
 import { createHandLandmarker, resultToHands, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
 import { handednessFromLabel } from './mediapipe-hands';
 
@@ -23,7 +24,7 @@ const hands: Record<Handedness, HandFrame> = { left: createHandFrame('left'), ri
 let landmarker: HandLandmarker | null = null;
 let recording: HandRecording | null = null;
 let recordStart = 0;
-let lastVideoTime = -1;
+const assigner = new HandAssigner();
 let frames = 0;
 let fpsAt = performance.now();
 let fps = 0;
@@ -47,19 +48,19 @@ async function start(): Promise<void> {
     $('empty').hidden = true;
     $<HTMLButtonElement>('rec').disabled = false;
     button.textContent = 'Camera on';
-    requestAnimationFrame(loop);
+    video.requestVideoFrameCallback(loop);
   } catch (e) {
     button.disabled = false;
     status.textContent = `Couldn't start: ${e instanceof Error ? e.message : String(e)}. Check camera permission and that no other app is using the camera.`;
   }
 }
 
+/** Runs once per new camera frame (see WebcamSource for why not once per display frame). */
 function loop(): void {
-  if (landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
+  if (landmarker && video.readyState >= 2) {
     const now = performance.now();
     const result = landmarker.detectForVideo(video, now);
-    resultToHands(result, hands);
+    resultToHands(result, hands, assigner, now);
     draw(result);
     if (recording) recordFrame(recording, (now - recordStart) / 1000, hands.left, hands.right, null);
     frames++;
@@ -72,7 +73,7 @@ function loop(): void {
     status.textContent = `${fps.toFixed(0)} fps · ${result.landmarks.length} hand(s)${rec}`;
     render();
   }
-  requestAnimationFrame(loop);
+  video.requestVideoFrameCallback(loop);
 }
 
 function draw(result: HandLandmarkerResult): void {
