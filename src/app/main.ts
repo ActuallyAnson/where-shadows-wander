@@ -73,7 +73,7 @@ async function start(): Promise<void> {
     stageView.place(stage, lantern);
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
-    if (mock) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
+    if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
     rigPlaced = true;
   };
   const headMatrix = new Matrix4();
