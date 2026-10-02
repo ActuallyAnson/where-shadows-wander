@@ -105,6 +105,7 @@ export class HandLab {
     this.mode.setSource(source);
     this.shapes.reset();
     this.gestures.reset();
+    this.gestureLog.length = 0;
   }
 
   private get synthetic(): SyntheticSource | null {
@@ -328,7 +329,7 @@ export class HandLab {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === 'Space') {
       if (this.guided) return e.preventDefault();
       this.mode.paused = !this.mode.paused;

@@ -124,6 +124,30 @@ describe('pinch-and-release', () => {
     expect(drive(2, dropout(0.3)).events).toEqual([]);
   });
 
+  it('drops a pinch silently when the hand closes into a fist, so opening it fires nothing', () => {
+    const closing = clonePose(PRESETS.fist);
+    const blend = (t: number, from: HandPose, to: HandPose, at: number) =>
+      lerpPose(from, to, Math.min(Math.max((t - at) / 0.25, 0), 1), closing);
+    // Pinch, then close into a fist over 0.25 s, hold, then open to relaxed.
+    const pose = (t: number): PoseAt =>
+      t < 0.3
+        ? 'relaxed'
+        : t < 0.6
+          ? pinch()
+          : t < 1.2
+            ? blend(t, pinch(), PRESETS.fist, 0.6)
+            : blend(t, PRESETS.fist, PRESETS.relaxed, 1.2);
+    expect(drive(2, pose).events).toEqual([]);
+    // A rabbit closing into a fist passes the thumb over the index tip on the way: no pinch either.
+    const rabbitFist = (t: number): PoseAt =>
+      t < 0.5
+        ? 'rabbit'
+        : t < 1.2
+          ? blend(t, PRESETS.rabbit, PRESETS.fist, 0.5)
+          : blend(t, PRESETS.fist, PRESETS.rabbit, 1.2);
+    expect(drive(2, rabbitFist).events).toEqual([]);
+  });
+
   it('places the release where the hand is', () => {
     const { events } = drive(1.5, pinchBetween(0.5, 0.8), { wrist: () => [0.3, 1.2, -0.2] });
     expect(events[0].position[0]).toBeGreaterThan(0.2);
@@ -151,6 +175,11 @@ describe('cover-flame', () => {
   it("doesn't fire for an open or cupped hand over the lantern", () => {
     expect(drive(1.5, () => 'flat', { lantern: palmOf('flat') }).events).toEqual([]);
     expect(drive(1.5, () => 'cup', { lantern: palmOf('cup') }).events).toEqual([]);
+  });
+
+  it('stays fired through a tracking dropout while covering', () => {
+    const { events } = drive(3, (t) => (t >= 1.5 && t < 1.8 ? null : 'fist'), { lantern });
+    expect(events.filter((e) => e.type === 'cover-flame')).toHaveLength(1);
   });
 
   it('fires once while held, and again only after leaving and the cooldown', () => {
@@ -220,20 +249,30 @@ describe('gesture detector', () => {
     expect(d.state.right.paused).toBe(true);
   });
 
-  it('makes no gestures while playing every shape, with the lantern on the table in front', () => {
+  it('while playing every shape with the lantern right under the hand, only fists cover it, and nothing pinches', () => {
+    // Both hands play the guided script with 0.15 s blends between poses and 2 mm of noise; the lantern sits
+    // where each hand's palm rests, the hardest place for false triggers.
     const script = new ShapeScript(SHAPES_SCRIPT);
-    const pose = clonePose(PRESETS.relaxed);
-    const tableLantern: Vec3 = [0, 0.78, -0.1]; // on the table, below the hands
-    const { events } = drive(
-      script.duration,
-      (t) => {
-        const i = script.lastStepFor('right', t);
-        const shape = i < 0 ? null : script.steps[i].shape;
-        if (shape === null) return null;
-        return lerpPose(PRESETS[shape], PRESETS[shape], 0, pose);
-      },
-      { lantern: tableLantern, jitter: 0.002 },
-    );
-    expect(events).toEqual([]);
+    const lantern = palmOf('relaxed');
+    const shown = clonePose(PRESETS.relaxed);
+    const poseFor =
+      (side: Handedness) =>
+      (t: number): PoseAt => {
+        const i = script.lastStepFor(side, t);
+        if (i < 0) return null;
+        const to = script.steps[i].shape;
+        const prev = script.prevForHand[i];
+        const from = prev < 0 ? to : script.steps[prev].shape;
+        if (to === null) return null;
+        const k = Math.min((t - script.starts[i]) / 0.15, 1);
+        return lerpPose(PRESETS[from ?? to], PRESETS[to], k, shown);
+      };
+    const { events } = drive(script.duration, poseFor('right'), { lantern, jitter: 0.002 });
+    expect(events.filter((e) => e.type === 'pinch-release')).toEqual([]);
+    for (const e of events) {
+      const step = script.steps[script.stepAt(e.t)];
+      expect(`${e.type} during ${step.shape}`).toBe('cover-flame during fist');
+    }
+    expect(events.length).toBeGreaterThan(0); // the test has teeth: the fist step does cover it
   });
 });
