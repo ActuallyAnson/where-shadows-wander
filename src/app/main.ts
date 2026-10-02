@@ -7,6 +7,7 @@ import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
@@ -15,6 +16,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { mountLabLink } from './lab-link';
+import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 
 const SIM_HZ = 60;
@@ -36,6 +38,8 @@ async function start(): Promise<void> {
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
+  // What the session provides (hands, passthrough, planes, anchors), and the detected planes for StageFrame.
+  const capabilities = new CapabilityDetector();
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
@@ -58,17 +62,25 @@ async function start(): Promise<void> {
   const dots = new JointDots();
   world.scene.add(dots.mesh);
 
-  diagnostics.addSource(() => ({
-    sim: { hz: SIM_HZ, steps: sim.steps },
-    handReadMethod: { ...hands.method },
-    mock: mock ? { source: mock.source.name } : null,
-  }));
+  // addSource keeps only one source, so everything we report goes through reportSource.
+  diagnostics.addSource(() =>
+    reportSource({
+      simHz: SIM_HZ,
+      simSteps: sim.steps,
+      handReadMethod: hands.method,
+      mockSource: mock ? mock.source.name : null,
+      capabilities,
+    }),
+  );
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
+    // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
+    if (session && !mock) capabilities.sessionStarted(session);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     diagnostics.sessionEnded();
+    capabilities.sessionEnded();
     recorder?.finish();
   });
 
@@ -85,7 +97,10 @@ async function start(): Promise<void> {
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
       if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
-      else if (frame && refSpace) hands.update(frame, refSpace, this.world.player.matrixWorld);
+      else if (frame && refSpace) {
+        hands.update(frame, refSpace, this.world.player.matrixWorld);
+        capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
+      }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       if (recorder) {
         const viewer = frame && refSpace ? frame.getViewerPose(refSpace)?.transform.position : undefined;
@@ -101,5 +116,6 @@ async function start(): Promise<void> {
   world.registerSystem(FrameDriverSystem, { priority: 10 });
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
-  if (import.meta.env.DEV) Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab } });
+  if (import.meta.env.DEV)
+    Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, capabilities } });
 }
