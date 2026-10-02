@@ -8,6 +8,12 @@ import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
+import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
+import { createStagePlane } from '../engine/shadow/pure/stage-plane';
+import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { ShadowDebug } from '../engine/shadow/shadow-debug';
+import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
@@ -46,6 +52,30 @@ async function start(): Promise<void> {
   const gestures = new GestureDetector();
   gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
   let clock = 0;
+
+  // Hand shadows, on a stand-in stage and lantern until StageFrame (A) and the lantern (B) exist:
+  // ?stage=table (the tabletop theatre, default) or ?stage=wall. ?debug=shadow shows the capsules.
+  const params = new URLSearchParams(location.search);
+  const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
+  const stage = createStagePlane();
+  const lantern = new Float64Array(3);
+  const projector = new ShadowProjector();
+  const shadowRenderer = new ShadowRenderer();
+  const stageView = new TestStageView();
+  stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
+  const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
+  world.scene.add(stageView.group, shadowRenderer.mesh);
+  if (shadowDebug) world.scene.add(shadowDebug.group);
+  let rigPlaced = false;
+  let shadowMs = 0;
+  const placeRig = (head: ArrayLike<number>, yaw: number) => {
+    placeTestRig(stageMode, head, yaw, stage, lantern);
+    stageView.place(stage, lantern);
+    gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
+    rigPlaced = true;
+  };
+  // In mock mode the player's eyes are the desktop camera; in XR the rig is placed on the first frame.
+  if (mockOptions) placeRig(MOCK_HEAD, 0);
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
@@ -74,12 +104,19 @@ async function start(): Promise<void> {
     mock: mock ? { source: mock.source.name } : null,
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
+    shadow: {
+      stage: stageMode,
+      placed: rigPlaced,
+      msAvg: Math.round(shadowMs * 1000) / 1000,
+      onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
+    },
   }));
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    if (!mock) rigPlaced = false; // placed again from the head at the next session
     diagnostics.sessionEnded();
     recorder?.finish();
   });
@@ -111,6 +148,21 @@ async function start(): Promise<void> {
       const handsT = mock ? mock.time : clock;
       shapes.update(hands.hands, handsT);
       gestures.update(hands.hands, handsT, shapes);
+      if (!rigPlaced && !mock && frame && refSpace) {
+        // Reference space equals scene space while the XR origin is at identity, as in this seated game.
+        const pose = frame.getViewerPose(refSpace)?.transform;
+        if (pose) {
+          const o = pose.orientation;
+          placeRig([pose.position.x, pose.position.y, pose.position.z], yawOf(o.x, o.y, o.z, o.w));
+        }
+      }
+      if (rigPlaced) {
+        const s0 = performance.now();
+        projector.update(hands.hands, stage, lantern);
+        shadowRenderer.update(projector.shadows, stage);
+        shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
+        shadowMs += (performance.now() - s0 - shadowMs) * 0.05;
+      }
       if (recorder) {
         const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
         const viewer = pose?.transform.position;
@@ -142,5 +194,7 @@ async function start(): Promise<void> {
 
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
   if (import.meta.env.DEV)
-    Object.assign(window, { __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes, gestures } });
+    Object.assign(window, {
+      __wsw: { world, hands, diagnostics, recorder, mock, lab, shapes, gestures, projector, stage },
+    });
 }
