@@ -30,9 +30,22 @@ export default tseslint.config(
         'error',
         {
           patterns: [
-            { group: ['@iwsdk/*', 'three', 'three/*', 'super-three', 'iwer', 'iwer/*', '@mediapipe/*'], message: 'Pure code must not import IWSDK, three.js, the emulator or MediaPipe.' },
             {
-              group: ['**/app/**', '**/debug/**', '**/input-mock/**', '**/ui/**', '**/xr/**', '**/shadow/**', '**/render/**', '**/anim/**', '**/services/**'],
+              group: ['@iwsdk/*', 'three', 'three/*', 'super-three', 'iwer', 'iwer/*', '@mediapipe/*'],
+              message: 'Pure code must not import IWSDK, three.js, the emulator or MediaPipe.',
+            },
+            {
+              group: [
+                '**/app/**',
+                '**/debug/**',
+                '**/input-mock/**',
+                '**/ui/**',
+                '**/xr/**',
+                '**/shadow/**',
+                '**/render/**',
+                '**/anim/**',
+                '**/services/**',
+              ],
               message: 'Pure code must not import engine-facing folders.',
             },
           ],

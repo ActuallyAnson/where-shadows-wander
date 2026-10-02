@@ -7,7 +7,8 @@ function flatHand(handedness: Handedness) {
   // Thumb side is -X for a right hand palm down, +X for a left hand.
   const side = handedness === 'right' ? 1 : -1;
   const fingers = ['index', 'middle', 'ring', 'pinky'] as const;
-  const set = (name: string, x: number, y: number, z: number) => hand.positions.set([x, y, z], JOINT[name as keyof typeof JOINT] * 3);
+  const set = (name: string, x: number, y: number, z: number) =>
+    hand.positions.set([x, y, z], JOINT[name as keyof typeof JOINT] * 3);
   set('wrist', 0, 1, 0);
   fingers.forEach((f, i) => {
     const x = side * (i - 1) * 0.02; // middle finger on the Z axis

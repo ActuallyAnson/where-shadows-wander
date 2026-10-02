@@ -53,7 +53,13 @@ export function handednessFromLabel(label: string): Handedness {
  * @param depthM how far in front of the camera to place the hand
  * @param widthM scene width that the camera image spans at that depth
  */
-export function mediapipeToHandFrame(world: Landmark[], image: Landmark[], out: HandFrame, depthM = 0.5, widthM = 0.6): HandFrame {
+export function mediapipeToHandFrame(
+  world: Landmark[],
+  image: Landmark[],
+  out: HandFrame,
+  depthM = 0.5,
+  widthM = 0.6,
+): HandFrame {
   if (world.length !== 21 || image.length !== 21) {
     out.tracked = false;
     out.validJoints = 0;
@@ -62,7 +68,9 @@ export function mediapipeToHandFrame(world: Landmark[], image: Landmark[], out: 
   // Hand centre in the scene from the wrist's image position.
   const cx = (image[0].x - 0.5) * widthM;
   const cy = (0.5 - image[0].y) * widthM * 0.75;
-  const ox = cx - world[0].x, oy = cy + world[0].y, oz = -depthM + world[0].z;
+  const ox = cx - world[0].x,
+    oy = cy + world[0].y,
+    oz = -depthM + world[0].z;
   const p = out.positions;
   for (let j = 0; j < JOINT_COUNT; j++) {
     let m = FROM_MEDIAPIPE[j];

@@ -13,8 +13,14 @@ export default async function run({ frame, page }) {
         shown &&= p.visible;
         if (p !== world.scene) path.unshift(p.name || p.type);
       }
-      rows.push(`${shown ? 'shown ' : 'hidden'} ${o.type}${o.isInstancedMesh ? `(count ${o.count})` : ''} ${o.material?.type ?? ''} ${path.slice(-4).join('/')}`);
+      rows.push(
+        `${shown ? 'shown ' : 'hidden'} ${o.type}${o.isInstancedMesh ? `(count ${o.count})` : ''} ${o.material?.type ?? ''} ${path.slice(-4).join('/')}`,
+      );
     });
-    return { inXR: world.renderer.xr.isPresenting, drawCalls: world.renderer.info.render.calls, rows: rows.filter((r) => !r.includes('LevelRoot')) };
+    return {
+      inXR: world.renderer.xr.isPresenting,
+      drawCalls: world.renderer.info.render.calls,
+      rows: rows.filter((r) => !r.includes('LevelRoot')),
+    };
   });
 }

@@ -42,7 +42,13 @@ export function createRecording(note: string, userAgent: string, recordedAt: str
   };
 }
 
-export function recordFrame(rec: HandRecording, t: number, left: HandFrame, right: HandFrame, head: [number, number, number] | null): void {
+export function recordFrame(
+  rec: HandRecording,
+  t: number,
+  left: HandFrame,
+  right: HandFrame,
+  head: [number, number, number] | null,
+): void {
   rec.frames.push({
     t: Math.round(t * 1000) / 1000,
     left: left.tracked ? toMm(left.positions) : null,

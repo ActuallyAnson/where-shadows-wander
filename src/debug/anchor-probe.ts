@@ -109,7 +109,8 @@ export class AnchorProbe {
     this.state = 'creating';
     let pending: Promise<XRAnchor | undefined>;
     try {
-      pending = frame.createAnchor(new XRRigidTransform({ x: 0, y: 0.8, z: -0.5 }), refSpace) ?? Promise.resolve(undefined);
+      pending =
+        frame.createAnchor(new XRRigidTransform({ x: 0, y: 0.8, z: -0.5 }), refSpace) ?? Promise.resolve(undefined);
     } catch (e) {
       r.error = String(e);
       this.settle();
