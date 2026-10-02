@@ -3,9 +3,11 @@
 //
 //   idle -> candidate (a clear winner; the hold timer runs) -> committed
 //
-// - A candidate must stay inside its normal ranges for the whole hold (it
-//   matches continuously). A committed shape stays while it's inside ranges
-//   widened by `hysteresis` units, so a hand near a boundary doesn't flicker.
+// - A candidate must stay inside its normal ranges for the whole hold, give or
+//   take `holdSlack` units of tracking noise (a webcam's joints wobble enough
+//   to cross a range edge for a frame). A committed shape stays while it's
+//   inside ranges widened by `hysteresis` units, so a hand near a boundary
+//   doesn't flicker.
 // - Switching: when the committed shape X has drifted outside its normal
 //   ranges and another shape Y leads it by the ambiguity gap, Y is held as a
 //   candidate and replaces X only when Y commits (release(switch) then commit,
@@ -27,8 +29,10 @@ export interface ClassifierConfig {
   companionHoldS: number;
   /** Accessibility tolerance, 1 = normal; each step above 1 widens every range by one unit. */
   tolerance: number;
-  /** Extra units a candidate or committed shape keeps before it lets go. */
+  /** Extra units a committed shape keeps before it lets go. */
   hysteresis: number;
+  /** Units a candidate may dip outside its ranges during its hold (tracking noise). Keep below `hysteresis`. */
+  holdSlack: number;
   /** A shape must lead every other matching shape by this many units to be picked. */
   ambiguityGap: number;
   /** A tracking dropout longer than this cancels a candidate (seconds). */
@@ -42,6 +46,7 @@ export const DEFAULT_CLASSIFIER_CONFIG: Readonly<ClassifierConfig> = {
   companionHoldS: 1,
   tolerance: 1,
   hysteresis: 1,
+  holdSlack: 0.5,
   ambiguityGap: 0.25,
   freezeS: 0.2,
   lostReleaseS: 0.5,
@@ -114,7 +119,7 @@ export class ShapeClassifier {
 
     if (this.candidate >= 0) {
       const y = this.candidate;
-      if (this.margins[y] < 0) {
+      if (this.margins[y] < -c.holdSlack) {
         events.push('cancel', this.hand, SHAPES[y], t, this.margins[y], this.heldS);
         this.candidate = -1;
         this.heldS = 0;
