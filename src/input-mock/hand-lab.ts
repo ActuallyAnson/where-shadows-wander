@@ -268,7 +268,7 @@ export class HandLab {
            ${btn('hide', '', s.shapeOf(this.selected) === null ? 'Show' : 'Hide', false, 'H')}
            ${btn('jitter', '', 'Jitter', s.jitter > 0, 'J: add a few mm of tracking noise')}</div>
          <div class="grid">${SHAPE_KEYS.map((p, i) => btn('shape', p, `<kbd>${i}</kbd>${p}`, s.shapeOf(this.selected) === p)).join('')}</div>
-         <p class="keys">Keys: 0–6 shapes · R/L hand · H hide · arrows move (Shift: depth) · Q/E roll · Z/X turn · J jitter · Space pause</p>`
+         <p class="keys">Keys: 0–6 shapes · R/L hand · H hide · arrows move (Shift: depth) · Q/E roll · Z/X turn · T/Y tilt fingers up/down · J jitter · Space pause</p>`
       : '';
     this.root.querySelector('#lab-controls')!.innerHTML = `
       <h2>Source</h2><div class="row">${sources}</div>
@@ -352,6 +352,8 @@ export class HandLab {
     else if (k === 'e') s.turn(sel, TURN_DEG, 0);
     else if (k === 'z') s.turn(sel, 0, TURN_DEG);
     else if (k === 'x') s.turn(sel, 0, -TURN_DEG);
+    else if (k === 't') s.turn(sel, 0, 0, TURN_DEG);
+    else if (k === 'y') s.turn(sel, 0, 0, -TURN_DEG);
     else if (e.key === 'ArrowLeft') s.move(sel, -STEP_M, 0, 0);
     else if (e.key === 'ArrowRight') s.move(sel, STEP_M, 0, 0);
     else if (e.key === 'ArrowUp') s.move(sel, 0, e.shiftKey ? 0 : STEP_M, e.shiftKey ? -STEP_M : 0);

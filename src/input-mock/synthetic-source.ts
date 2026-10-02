@@ -28,6 +28,7 @@ interface HandState {
   /** Added to the preset's wrist orientation, degrees. */
   rollDeg: number;
   yawDeg: number;
+  pitchDeg: number;
   /** Thumb pulled onto the index tip (0..1), blending toward `pinchOn`. */
   pinch: number;
   pinchOn: boolean;
@@ -64,8 +65,9 @@ export class SyntheticSource implements HandSource {
     w[2] += dz;
   }
 
-  /** Turns a hand by `rollDeg` about its fingers and `yawDeg` about the vertical. */
-  turn(hand: Handedness, rollDeg: number, yawDeg: number): void {
+  /** Turns a hand by `rollDeg` about its fingers, `yawDeg` about the vertical and `pitchDeg` fingers-up. */
+  turn(hand: Handedness, rollDeg: number, yawDeg: number, pitchDeg = 0): void {
+    this.hands[hand].pitchDeg += pitchDeg;
     this.hands[hand].rollDeg += rollDeg;
     this.hands[hand].yawDeg += yawDeg;
   }
@@ -112,6 +114,7 @@ export class SyntheticSource implements HandSource {
     copyPose(h.current, h.shown);
     h.shown.rollDeg += h.rollDeg;
     h.shown.yawDeg += h.yawDeg;
+    h.shown.pitchDeg += h.pitchDeg;
     if (h.pinch > 0) {
       h.shown.thumb.pinch = Math.max(h.shown.thumb.pinch, h.pinch);
       h.shown.thumb.pinchTo = 'index';
@@ -135,6 +138,7 @@ function state(target: PresetName, wrist: Readonly<Vec3>): HandState {
     wrist: [...wrist],
     rollDeg: 0,
     yawDeg: 0,
+    pitchDeg: 0,
     pinch: 0,
     pinchOn: false,
   };
