@@ -174,6 +174,26 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 Where Shadows Wander is a 2D game running on a single plane in 3D space, which keeps rendering cheap and lets the tabletop and wall modes share all game code.
 
+### Architecture
+
+The decisions are recorded in [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md) and [ADR 0002](adr/0002-plain-threejs-fallback.md).
+
+- **IWSDK** provides the XR session, the emulator and scene understanding (planes, anchors), and possibly spatial audio. Nothing else.
+- **Gameplay and simulation never import IWSDK or three.js.** They are plain TypeScript, and a build check enforces this.
+- **View layer:** plain three.js objects (`InstancedMesh`, custom shaders). IWSDK's ECS is used only where it clearly saves work.
+- **Loop:** the simulation runs on our own fixed-timestep loop, driven by a single IWSDK system once per display frame.
+- **Versions:** IWSDK is pinned to exactly 1.0.0, and three.js is IWSDK's `super-three@0.181.0` fork. There is never a second copy of three.
+- **Fallback:** plain three.js + `@iwsdk/xr-input`. The entry file is about 54 lines and was tested in the emulator; see ADR 0002.
+
+### Test devices
+
+We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pico-as-stand-in-test-device.md).
+
+- **Develop on the Pico, confirm on a Quest.** Working on Pico means it will probably work on Quest, but only a Quest run proves it. A Quest check (remote tester or a borrowed headset) closes each milestone that matters, and always comes before submission.
+- **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected. Plane labels are only a hint. Nothing may work on one headset and break on the other.
+- **Testing order:** IWER emulator for logic, the webcam hand bench for hand shapes, Pico for real-device behaviour, Quest for final confirmation.
+- **Hand data without a headset:** the webcam hand bench (`webcam.html`) tracks hands from a laptop camera and converts them to the same 25-joint data the game reads. Headset sessions and the bench can both save hand recordings for replay in tests and in the Hand Recording Player. See [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
+
 ### Stack
 
 | Area | Choice |
@@ -182,7 +202,7 @@ Where Shadows Wander is a 2D game running on a single plane in 3D space, which k
 | Session | immersive-ar (passthrough) |
 | XR features | Hand tracking, plane detection, mesh detection (optional), anchors |
 | 2D physics | Lightweight 2D library or a small custom solver in plane space |
-| Hosting | Static site (e.g. GitHub Pages or Vercel), opened in Quest Browser |
+| Hosting | Static HTTPS site on GitHub Pages, deployed by the Actions workflow (classic Jekyll Pages drops IWSDK's `_virtual_*` chunk), opened in Quest Browser |
 | Performance | Minimum 60 fps (judging requirement), target 72 fps |
 
 ### Plane-space game
@@ -220,7 +240,9 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger spread | Angle between adjacent finger directions |
 | Palm orientation | Derived palm normal relative to the stage plane |
 
-- Each shape is a set of ranges on these features, hand-tuned and tested on several people.
+First implementation (`src/hands/hand-features.ts`, used by the game and the webcam bench): per-finger curl, thumb-to-index gap only, and spread as the angle between the index and pinky directions. Pinch to other fingertips and per-pair spread can be added when a shape needs them.
+
+- Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
 - A shape must match continuously for about 0.4 s to commit (1 s for companions).
 
@@ -238,7 +260,9 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 
 ### Open questions
 
-- [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission.
+- [ ] Which Pico model do we have (Pico 4, 4 Ultra, Neo 3)? The first diagnostics report's user agent will tell us.
+
+- [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission. Also ask about the plain three.js + `@iwsdk/xr-input` fallback, which may raise the same question Babylon.js did.
 
 - [ ] Verify persistent anchor support in the current Quest Browser on device.
 
@@ -318,11 +342,11 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Milestones (7 weeks to 19 Nov)
 
-1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell on device: hands, passthrough, table and wall detection, lantern placement. Confirm submission rules.
+1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hands, passthrough, table and wall detection, lantern placement. Run it on the Pico and collect its diagnostics report and a hand recording. Host the build on GitHub Pages (HTTPS) and, if a remote Quest tester is available, have them send a report too. Confirm submission rules.
 
 2.  **Week 2 (to 15 Oct):** Planar shadow rendering and the 2D plane-space game layer, working in both stage modes.
 
-3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Test with at least 3 other people.
+3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Develop on the webcam hand bench, check against Pico recordings, and test with at least 3 other people (the bench works on any laptop).
 
 4.  **Week 4 (to 29 Oct):** Traveller and puzzles 1–3, including the wordless tutorial.
 
@@ -334,11 +358,22 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 ### Risks
 
+Everything in the IWSDK spike ran in the emulator only. The rows marked *Device* need a real headset. The Pico answers them first, but only a Quest run confirms them for the judges' device (see Test devices).
+
 | Risk | Impact | Mitigation |
 |----|----|----|
-| Shape recognition feels unreliable to new players | High | Week 3 stranger tests; tolerance slider; physical-outline collision for simple roles |
+| Shape recognition feels unreliable to new players | High | Week 3 stranger tests on the webcam bench and the Pico; replay saved hand recordings as regression tests; tolerance slider; physical-outline collision for simple roles |
 | No usable wall in the judge's room | High | Tabletop theatre is the default mode |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
+| Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |
 | Slow cold start in Quest Browser | Medium | Small initial bundle; stream chapter assets after the lantern appears |
 | Anchor persistence unreliable | Medium | Store gallery relative to detected surfaces |
 | Scope creep | Medium | One chapter only; feature freeze end of week 6 |
+| *Device:* real passthrough and cold start in the headset browser over Wi-Fi | Medium | Report checks `alpha-blend` and time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
+| *Device:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
+| *Device:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
+| *Device:* room-setup planes missing or noisy near the player; plane normal sign | High | Report lists planes with labels, size, distance and normal direction; tabletop default; normal is flipped toward the viewer in code |
+| *Device:* persistent anchors across browser restarts | Medium | Report creates, persists and restores a probe anchor; gallery stored relative to detected surfaces if it fails |
+| *Device:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
+| Works on Pico but not on Quest (different browser, tracker and chip) | High | Standard WebXR only, everything feature-detected; Quest check at each milestone and before submission; compare Pico and Quest reports |
+| No Quest available before submission | High | Line up a remote Quest tester (or borrow a headset) by week 4 at the latest; the submission checklist requires a fresh Quest 3S test |

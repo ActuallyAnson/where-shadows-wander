@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Webcam Hand Bench</title>
+    <style>
+      :root {
+        --bg: #eef0f4; --panel: #fff; --ink: #1b2130; --muted: #5d6578; --line: #c9cfdb; --stage: #dfe3ea;
+        --right: #c76a12; --left: #2f6f9f; --rec: #b3261e;
+        --body: system-ui, -apple-system, 'Segoe UI', sans-serif; --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #12151d; --panel: #1a1e29; --ink: #e6e8ee; --muted: #9aa2b4; --line: #2c3242; --stage: #0d1017;
+          --right: #f09a3e; --left: #6fb0e0; --rec: #f28b82; color-scheme: dark; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--body); }
+      .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 32px; display: grid; gap: 14px; }
+      h1 { margin: 0; font-size: 22px; }
+      .sub { margin: 2px 0 0; color: var(--muted); max-width: 70ch; }
+      .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      button { font: 500 14px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+      button.rec { color: var(--rec); border-color: var(--rec); }
+      .status { font: 12px var(--mono); color: var(--muted); }
+      .main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; }
+      @media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+      .stage { position: relative; background: var(--stage); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; }
+      .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+      .stage .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+      .hands { display: grid; gap: 12px; align-content: start; }
+      .hand { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 8px; }
+      .hand h2 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; display: flex; gap: 8px; align-items: center; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; }
+      .shape { font-size: 20px; font-weight: 600; }
+      .none { color: var(--muted); }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 13px; }
+      dt { color: var(--muted); }
+      dd { margin: 0; text-align: right; font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
+      .curls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+      .curl { display: grid; gap: 2px; justify-items: center; font: 10px var(--mono); color: var(--muted); }
+      .curl .b { width: 100%; height: 36px; background: var(--stage); border-radius: 4px; position: relative; overflow: hidden; }
+      .curl .b i { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; }
+      .note { color: var(--muted); font-size: 12.5px; max-width: 80ch; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Webcam Hand Bench</h1>
+        <p class="sub">Tracks your hands with the laptop camera (MediaPipe), converts them to the game's 25-joint hand data, and shows the features the shape classifier will use. Nothing leaves your computer.</p>
+      </header>
+      <div class="bar">
+        <button id="start" class="primary" type="button">Start camera</button>
+        <button id="rec" class="rec" type="button" disabled>Record</button>
+        <span class="status" id="status">Camera off</span>
+      </div>
+      <div class="main">
+        <div class="stage">
+          <div class="empty" id="empty">Press <b>Start camera</b> and allow camera access.<br />The first start downloads the hand model (about 8 MB).</div>
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="hands">
+          <section class="hand" id="hand-right"></section>
+          <section class="hand" id="hand-left"></section>
+        </div>
+      </div>
+      <p class="note">The picture is mirrored like a selfie, so your right hand appears on the right. Depth comes from a single camera and is approximate, and a webcam sees your hand from the front, not from above like a headset. Use this page to check shapes and features. Real tracking noise needs a headset. The shape label is a rough guide only; the real classifier adds palm direction, hold time and hysteresis.</p>
+    </div>
+    <script type="module" src="/src/webcam/main.ts"></script>
+  </body>
+</html>
