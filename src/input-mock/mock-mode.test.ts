@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import demo from '../../recordings/emulator-demo.handrec.json';
 import { createHandFrame, type HandFrame } from '../engine/hands/hand';
 import { handFeatures, roughShape } from '../engine/hands/hand-features';
-import { parseRecording } from '../engine/hands/hand-recording';
+import { createRecording, parseRecording, recordFrame } from '../engine/hands/hand-recording';
 import type { HandSource } from './hand-source';
 import { MockMode, mockOptionsFromUrl } from './mock-mode';
 import { ReplaySource } from './replay-source';
 import { SHAPES_SCRIPT, ScriptedSource } from './scripted-source';
 import { BLEND_S, SyntheticSource } from './synthetic-source';
 
-const recording = parseRecording(demo);
+/** A 6 s recording made here from the scripted hands (recordings/ is gitignored, so tests can't rely on it). */
+function makeRecording() {
+  const rec = createRecording('test', 'ua', '2026-10-03T00:00:00Z');
+  const src = new ScriptedSource();
+  const l = createHandFrame('left'),
+    r = createHandFrame('right');
+  for (let i = 0; i <= 6 * 72; i++) {
+    src.update(i / 72, l, r);
+    recordFrame(rec, i / 72, l, r, null);
+  }
+  return parseRecording(JSON.parse(JSON.stringify(rec)));
+}
+const recording = makeRecording();
 
 /** Runs a source through mock mode at a given frame rate and returns every frame's joints. */
 function run(source: HandSource, fps: number, seconds: number): { t: number; left: number[]; right: number[] }[] {
