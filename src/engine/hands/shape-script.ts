@@ -47,7 +47,7 @@ const HOW: Readonly<Record<PresetName, string>> = {
   cup: 'Palm up, fingers curled',
   spread: 'Fingers spread wide',
   rabbit: 'Index and middle up, others pinched to the thumb',
-  fox: 'Fingers together, thumb up as an ear',
+  fox: 'Fingers together, thumb out like an L, turned so the thumb points up',
 };
 
 /** The prompt at some time. `index` is -1 before the script starts and `steps.length` once it's done. */

@@ -10,7 +10,7 @@ IWSDK + three.js        XR session, renderer, display loop, emulator, plane/anch
 Engine-facing code      src/app, src/engine/xr, src/engine/shadow, src/engine/render,
         │               src/engine/anim (adapters), src/engine/services, src/ui, src/debug, src/input-mock
         │
-Pure code               src/engine/hands, src/engine/sim, src/engine/stage, src/game
+Pure code               src/engine/hands, src/engine/sim, src/engine/stage, src/game, src/engine/shadow/pure
                         (plain TypeScript; no IWSDK, three.js or browser globals)
 ```
 
@@ -37,7 +37,7 @@ flowchart LR
 
 1. **Read hands** (`engine/xr`): raw WebXR joints into `HandFrame`, 25 joints per hand in scene space ([ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md)). In mock mode the webcam or a recording fills the same `HandFrame`.
 2. **Classify** (`engine/hands`): features, then the shape classifier with hold-to-commit and hysteresis, which emits shape events (`ShapeRecognizer`). Then the lantern gestures on the same features (`GestureDetector`): pinch-and-release to place or relight, a closed hand over the flame to pause.
-3. **Shadows** (`engine/shadow`): project each hand onto the stage plane from the lantern. This draws the shadow and outputs collision capsules in 2D stage space.
+3. **Shadows** (`engine/shadow`): `ShadowProjector` (pure, in `shadow/pure`) projects each hand onto the stage from the lantern with one matrix blended toward orthographic (k = 0.9), filling `HandShadow` (in `engine/hands`, for the solver): 28 capsules per hand in 2D stage space, an outline and an edge blur. `ShadowRenderer` draws both hands from those capsules in one draw call, soft-edged and clipped to the stage. Until StageFrame and the lantern exist, a stand-in rig (`shadow/pure/test-rig.ts`) places a paper screen and lantern in front of the player.
 4. **Simulate** (`engine/sim`, `game`): the fixed-step loop advances the 2D simulation at a constant rate, whatever the display rate (72, 90 or 120 Hz). It returns an interpolation factor for rendering.
 5. **Present** (`engine/render`, `engine/anim`): draw entity state (interpolated) as instanced sprites with animation poses.
 6. **Services** (`engine/services`): audio and saves react to game events and never block a frame.
@@ -52,7 +52,7 @@ The stage is a 2D world on one real surface. `StageFrame` (`engine/stage`) conve
 | `src/app` | Anson | No | Entry point: `World.create`, the driver system, wiring, the no-AR notice, IWSDK manifests |
 | `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder |
 | `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
-| `src/engine/shadow` | Anson | No | Projected-shadow renderer and collision capsules |
+| `src/engine/shadow` | Anson | No (`pure/` yes) | Projected-shadow renderer; `pure/`: projection maths, capsules, stand-in rig |
 | `src/input-mock` | Anson | No | Hand Lab (`?mock=1`) and its hand sources, webcam bench, MediaPipe conversion and worker |
 | `src/engine/sim` | A | Yes | Fixed-step loop, 2D collision solver, entities, object pools |
 | `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D, choosing a table or wall, snapping |

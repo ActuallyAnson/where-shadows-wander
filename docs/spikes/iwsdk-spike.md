@@ -152,7 +152,7 @@ See `src/spike/shadow.ts`.
 
   This confirms the GDD's reasoning. A pure point light at lantern distance makes the shadow size swing 3× across 1–3 m, while k≈0.9 keeps it within ±10 %. A "shadow size" setting is just a scale on the ortho term.
 - **Screenshot:** `img/emulator-ar-shadow-k09.png` shows a palm shadow on the paper stage at k=0.9.
-- **Not done (game work, not a risk):** clipping the shadow to the stage rectangle and the distance-dependent edge blur.
+- **Not done (game work, not a risk):** clipping the shadow to the stage rectangle and the distance-dependent edge blur. *Update (#9): both done; the shadow is now drawn from the collision capsules with a soft-edged shader (`src/engine/shadow`), and k = 0.9 is the default.*
 
 ### 6. 500 instanced quads: PASS on desktop; Quest unknown
 
