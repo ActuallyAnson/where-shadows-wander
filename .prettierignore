@@ -2,6 +2,8 @@ dist/
 dist-*/
 spikes/
 recordings/
+eval-reports/
+src/engine/hands/fixtures/*.handrec.json
 package-lock.json
 # Prose and the pandoc-converted GDD are formatted by hand.
 *.md
