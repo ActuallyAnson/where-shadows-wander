@@ -78,6 +78,9 @@ export class CapabilityDetector {
   private readonly tracker: PlaneTracker;
   private session: XRSession | null = null;
   private planesBroken = false;
+  /** enabledFeatures granted these, so a frame without the set means "not ready yet", not "unsupported". */
+  private planesGranted = false;
+  private meshesGranted = false;
   /** enabledFeatures says anchors weren't granted: no API check can change that. */
   private anchorsRefused = false;
   private meshesBroken = false;
@@ -94,7 +97,9 @@ export class CapabilityDetector {
 
   sessionStarted(session: XRSession): void {
     const c = this.capabilities;
-    const keep = { version: c.version, handsVersion: c.handsVersion, planesVersion: c.planesVersion };
+    // In case the previous session never reported its end.
+    this.tracker.clear();
+    const keep = { version: c.version, handsVersion: c.handsVersion + 1, planesVersion: c.planesVersion + 1 };
     Object.assign(c, noSession(), keep);
     this.session = session;
     this.planesBroken = this.meshesBroken = false;
@@ -110,6 +115,8 @@ export class CapabilityDetector {
     c.planes.basis = c.meshes.basis = c.anchors.basis = basis;
     c.planes.status = granted('plane-detection') === 'no' ? 'unsupported' : 'none-yet';
     c.meshes.status = granted('mesh-detection') === 'no' ? 'unsupported' : 'none-yet';
+    this.planesGranted = granted('plane-detection') === 'yes';
+    this.meshesGranted = granted('mesh-detection') === 'yes';
     this.anchorsRefused = granted('anchors') === 'no';
     c.anchors.available = this.anchorsRefused ? 'no' : 'unknown';
 
@@ -153,6 +160,11 @@ export class CapabilityDetector {
     this.updatePlanes(frame, refSpace, originMatrix, now);
     this.updateMeshes(frame);
     this.updateAnchors(frame);
+    const stored = Array.isArray(session.persistentAnchors) ? session.persistentAnchors.length : null;
+    if (stored !== c.persistentAnchors.storedCount) {
+      c.persistentAnchors.storedCount = stored;
+      this.changed = true;
+    }
     this.settlePersistence();
     if (this.changed) c.version++;
   }
@@ -220,7 +232,7 @@ export class CapabilityDetector {
       this.planesBroken = true;
       this.lastError = `detectedPlanes: ${e instanceof Error ? e.message : String(e)}`;
     }
-    if (!set) return this.setStatus(p, 'unsupported');
+    if (!set) return this.setStatus(p, this.planesGranted && !this.planesBroken ? 'none-yet' : 'unsupported');
     if (this.tracker.update(set, frame, refSpace, origin, now)) c.planesVersion++;
     const count = this.tracker.active.length;
     if (count !== p.count || this.tracker.overflow !== p.overflow) {
@@ -241,7 +253,7 @@ export class CapabilityDetector {
       this.meshesBroken = true;
       this.lastError = `detectedMeshes: ${e instanceof Error ? e.message : String(e)}`;
     }
-    if (!set) return this.setStatus(m, 'unsupported');
+    if (!set) return this.setStatus(m, this.meshesGranted && !this.meshesBroken ? 'none-yet' : 'unsupported');
     if (set.size !== m.count) {
       m.count = set.size;
       this.changed = true;
@@ -279,7 +291,7 @@ export class CapabilityDetector {
     const available: Tri =
       c.anchors.available === 'no' || !p.restore || p.handleRequest === 'no'
         ? 'no'
-        : c.anchors.available === 'yes'
+        : c.anchors.available === 'yes' && p.handleRequest === 'yes'
           ? 'yes'
           : 'unknown';
     if (available !== p.available) {

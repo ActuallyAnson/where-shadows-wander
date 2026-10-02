@@ -35,8 +35,8 @@ describe('plane tracker', () => {
     const p = tracker.active[0];
     expect(plain(p.normal)).toEqual([0, 1, 0]);
     expect(det3(p.matrix)).toBeCloseTo(1);
-    // Flipping about X negates local Z, so the polygon's z values flip too.
-    expect([...p.polygon.slice(0, 2)]).toEqual([-0.5, 0.4].map((v) => Math.fround(v)));
+    // Flipping about X negates local Z, so z values flip, and the polygon is read backwards to keep its winding.
+    expect([...p.polygon.slice(0, 2)]).toEqual([-0.5, -0.4].map((v) => Math.fround(v)));
     expect([...p.extent]).toEqual([-0.5, 0.5, -0.4, 0.4].map((v) => Math.fround(v)));
   });
 
@@ -110,9 +110,6 @@ describe('plane tracker', () => {
     const idA = recA.id;
     set.delete(a);
     const c = fakePlane({ matrix: poseMatrix(1, 1, 1), polygon: SQUARE });
-    set.add(c);
-    // c reuses a's record only after a has been swept, so remove first, then add.
-    set.delete(c);
     run(16);
     expect(tracker.active).toHaveLength(1);
     set.add(c);
@@ -143,10 +140,42 @@ describe('plane tracker', () => {
     moved[13] = 0.1;
     tracker.update(set, frame, ref, moved, 10);
     expect(frame.poseCalls).toBe(calls + 1);
-    tracker.update(set, frame, fakeRefSpace(), moved, 20);
+    const ref2 = fakeRefSpace();
+    tracker.update(set, frame, ref2, moved, 20);
     expect(frame.poseCalls).toBe(calls + 2);
-    ref.listeners.get('reset')!(); // the old space's reset still marks planes
-    expect(tracker.active[0].centre[1]).toBeCloseTo(0.8);
+    expect(ref.listeners.has('reset')).toBe(false); // the old space's listener was removed
+    ref2.listeners.get('reset')!();
+    tracker.update(set, frame, ref2, moved, 30);
+    expect(frame.poseCalls).toBe(calls + 3);
+  });
+
+  it("doesn't re-read planes when the origin is rotated or offset but unchanged", () => {
+    const { tracker, set, frame, ref } = setup([
+      fakePlane({ matrix: poseMatrix(0, 0.7, -0.5), polygon: SQUARE, time: 1 }),
+    ]);
+    const c = Math.cos(0.3),
+      s = Math.sin(0.3);
+    const origin = [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0.1, 0, 0.3, 1]; // values a Float32 can't hold exactly
+    tracker.update(set, frame, ref, origin, 0);
+    const calls = frame.poseCalls;
+    for (let i = 1; i <= 10; i++) tracker.update(set, frame, ref, origin, i * 16);
+    expect(frame.poseCalls).toBe(calls);
+  });
+
+  it('keeps the winding when a polygon is flipped', () => {
+    const area = (p: Float32Array, n: number) => {
+      let a = 0;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        a += p[i * 2] * p[j * 2 + 1] - p[j * 2] * p[i * 2 + 1];
+      }
+      return a;
+    };
+    const up = setup([fakePlane({ matrix: poseMatrix(0, 0.7, -0.5), polygon: SQUARE })]);
+    up.run();
+    const down = setup([fakePlane({ matrix: poseMatrix(0, 0.7, -0.5, -1), polygon: SQUARE })]);
+    down.run();
+    expect(Math.sign(area(down.tracker.active[0].polygon, 4))).toBe(Math.sign(area(up.tracker.active[0].polygon, 4)));
   });
 
   it('grows polygon storage only for a bigger polygon', () => {

@@ -52,7 +52,13 @@ describe('capabilities', () => {
       restore: true,
       persistentAnchors: ['a'],
     });
-    const { d, c } = run(session, { planes: threePlanes(), meshes: new Set([{}]), createAnchor: true });
+    const anchor = { requestPersistentHandle: () => Promise.resolve('uuid') };
+    const { d, c } = run(session, {
+      planes: threePlanes(),
+      meshes: new Set([{}]),
+      createAnchor: true,
+      trackedAnchors: new Set([anchor]),
+    });
     expect(c.session).toBe('active');
     expect(c.handTracking).toMatchObject({ available: 'yes', basis: 'enabledFeatures' });
     expect(c.handTracking.left.tracked && c.handTracking.right.tracked).toBe(true);
@@ -61,7 +67,7 @@ describe('capabilities', () => {
     expect(c.meshes).toEqual({ status: 'found', basis: 'enabledFeatures', count: 1 });
     expect(c.anchors).toEqual({ available: 'yes', basis: 'enabledFeatures' });
     expect(c.persistentAnchors).toMatchObject({ restore: true, storedCount: 1 });
-    expect(c.persistentAnchors.available).not.toBe('no');
+    expect(c.persistentAnchors.available).toBe('yes');
     expect(d.planes).toHaveLength(3);
   });
 
@@ -74,6 +80,29 @@ describe('capabilities', () => {
   it('no planes: API absent and enabledFeatures not reported', () => {
     const { c } = run(fakeSession(), { planes: 'absent' });
     expect(c.planes).toMatchObject({ status: 'unsupported', basis: 'api' });
+  });
+
+  it('granted planes that are missing for a frame are "none yet", not unsupported', () => {
+    const { c } = run(fakeSession({ enabledFeatures: ALL }), { planes: 'absent' });
+    expect(c.planes.status).toBe('none-yet');
+  });
+
+  it('counts persistent anchors stored during the session', () => {
+    const session = fakeSession({ enabledFeatures: ALL, restore: true, persistentAnchors: [] });
+    const d = new CapabilityDetector();
+    d.sessionStarted(session);
+    const ref = fakeRefSpace();
+    d.update(fakeFrame(session), ref, hands(true, true), IDENTITY, 0);
+    (session.persistentAnchors as string[]).push('world');
+    d.update(fakeFrame(session), ref, hands(true, true), IDENTITY, 16);
+    expect(d.capabilities.persistentAnchors.storedCount).toBe(1);
+  });
+
+  it('a new session without an end event drops the old planes', () => {
+    const { d } = run(fakeSession({ enabledFeatures: ALL }), { planes: threePlanes() });
+    expect(d.planes).toHaveLength(3);
+    d.sessionStarted(fakeSession({ enabledFeatures: ALL }));
+    expect(d.planes).toHaveLength(0);
   });
 
   it('no planes: reading detectedPlanes throws', () => {

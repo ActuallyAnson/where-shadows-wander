@@ -27,7 +27,11 @@ interface Slot {
 }
 
 export class PlaneTracker {
-  /** The tracked planes. The array is reused; only its length changes, when the plane set changes. */
+  /**
+   * The tracked planes. The array is reused and changes (length and order) only
+   * when the plane set changes. Records are reused for new planes with a new
+   * `id`, so key on `id`, not on the object.
+   */
   readonly active: DetectedPlane[] = [];
   /** Planes beyond the pool's size, not tracked. */
   overflow = 0;
@@ -38,9 +42,10 @@ export class PlaneTracker {
   private readonly activeSlots: Slot[] = [];
   private readonly free: Slot[] = [];
   private readonly bySource = new Map<XRPlane, Slot>();
-  private readonly origin = new Float32Array(16);
-  private readonly scratch = new Float32Array(16);
-  private readonly viewer = new Float32Array(3);
+  // Float64 like three.js's Matrix4.elements, so an unchanged origin compares equal.
+  private readonly origin = new Float64Array(16);
+  private readonly scratch = new Float64Array(16);
+  private readonly viewer = new Float64Array(3);
   private refSpace: XRReferenceSpace | null = null;
   private stamp = 0;
   private nextId = 1;
@@ -97,6 +102,7 @@ export class PlaneTracker {
       }
     }
     if (refSpace !== this.refSpace) {
+      this.refSpace?.removeEventListener?.('reset', this.markAllForPose);
       this.refSpace = refSpace;
       refSpace.addEventListener?.('reset', this.markAllForPose);
       originMoved = true;
@@ -122,12 +128,13 @@ export class PlaneTracker {
     this.active.length = 0;
     this.bySource.clear();
     this.overflow = 0;
+    this.refSpace?.removeEventListener?.('reset', this.markAllForPose);
     this.refSpace = null;
     if (had) this.version++;
   }
 
   private readonly markAllForPose = (): void => {
-    for (const slot of this.activeSlots) slot.needsPose = true;
+    for (let i = 0; i < this.activeSlots.length; i++) this.activeSlots[i].needsPose = true;
   };
 
   private readonly visit = (plane: XRPlane): void => {
@@ -180,9 +187,12 @@ export class PlaneTracker {
 
     let differs = rec.vertexCount !== n || rec.orientation !== orientation || rec.label !== label;
     for (let i = 0; i < 16 && !differs; i++) differs = Math.abs(m[i] - rec.matrix[i]) > EPS;
+    // Flipping mirrors local z, which would reverse the winding, so a flipped polygon is also
+    // read backwards: it keeps the browser's winding as seen from the (new) +Y side.
     for (let i = 0; i < n && !differs; i++) {
-      const z = flip ? -poly[i].z : poly[i].z;
-      differs = Math.abs(poly[i].x - rec.polygon[i * 2]) > EPS || Math.abs(z - rec.polygon[i * 2 + 1]) > EPS;
+      const v = poly[flip ? n - 1 - i : i];
+      const z = flip ? -v.z : v.z;
+      differs = Math.abs(v.x - rec.polygon[i * 2]) > EPS || Math.abs(z - rec.polygon[i * 2 + 1]) > EPS;
     }
 
     if (differs) {
@@ -200,8 +210,9 @@ export class PlaneTracker {
         minZ = Infinity,
         maxZ = -Infinity;
       for (let i = 0; i < n; i++) {
-        const x = poly[i].x;
-        const z = flip ? -poly[i].z : poly[i].z;
+        const v = poly[flip ? n - 1 - i : i];
+        const x = v.x;
+        const z = flip ? -v.z : v.z;
         rec.polygon[i * 2] = x;
         rec.polygon[i * 2 + 1] = z;
         minX = Math.min(minX, x);
@@ -225,7 +236,7 @@ export class PlaneTracker {
   }
 
   /** The viewer's position in scene space, looked up at most once per update. */
-  private viewerPosition(frame: XRFrame): Float32Array | null {
+  private viewerPosition(frame: XRFrame): Float64Array | null {
     if (this.viewerState === 0) {
       const p = frame.getViewerPose(this.refSpace!)?.transform.position;
       this.viewerState = p ? 1 : -1;
@@ -263,7 +274,7 @@ export class PlaneTracker {
 }
 
 /** out = a · b for column-major 4x4 matrices. `out` must not be `a` or `b`. */
-export function mulMat4(a: ArrayLike<number>, b: ArrayLike<number>, out: Float32Array): void {
+export function mulMat4(a: ArrayLike<number>, b: ArrayLike<number>, out: Float32Array | Float64Array): void {
   for (let c = 0; c < 4; c++) {
     for (let r = 0; r < 4; r++) {
       out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
@@ -272,7 +283,7 @@ export function mulMat4(a: ArrayLike<number>, b: ArrayLike<number>, out: Float32
 }
 
 /** Turns a pose 180° about its local X axis: local Y and Z flip, so the normal points the other way. */
-export function flipAboutX(m: Float32Array): void {
+export function flipAboutX(m: Float32Array | Float64Array): void {
   for (let i = 4; i < 7; i++) m[i] = -m[i];
   for (let i = 8; i < 11; i++) m[i] = -m[i];
 }

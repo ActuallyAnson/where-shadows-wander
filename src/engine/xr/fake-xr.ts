@@ -99,6 +99,9 @@ export function fakeRefSpace(): XRReferenceSpace & { listeners: Map<string, () =
   return {
     listeners,
     addEventListener: (type: string, fn: () => void) => listeners.set(type, fn),
+    removeEventListener: (type: string, fn: () => void) => {
+      if (listeners.get(type) === fn) listeners.delete(type);
+    },
   } as unknown as XRReferenceSpace & { listeners: Map<string, () => void> };
 }
 

@@ -22,7 +22,8 @@ export interface DetectedPlane {
   /** Unit normal (the matrix's Y axis). */
   readonly normal: Float32Array;
   /**
-   * Polygon in plane-local X/Z, packed x0, z0, x1, z1, ...; only the first
+   * Polygon in plane-local X/Z, packed x0, z0, x1, z1, ..., in the browser's
+   * winding as seen from +Y (the side facing the viewer); only the first
    * `vertexCount` pairs are valid. The array is replaced when a larger polygon
    * arrives, so read it again after `planesVersion` changes.
    */
