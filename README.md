@@ -5,6 +5,9 @@ A seated, hands-only mixed reality puzzle game: light a tiny lantern on your rea
 **Status:** week 1, XR shell. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, emulator, webcam, headset testing, troubleshooting.
+- [Contributing](CONTRIBUTING.md): who owns what, issues, branches, PRs, code rules
+- [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
+- [Work plan](docs/WORKPLAN.md): tasks per person per week
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
 - Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md)
