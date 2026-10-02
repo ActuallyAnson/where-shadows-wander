@@ -1,9 +1,9 @@
 // A stand-in stage and lantern, until Teammate A's StageFrame and Teammate B's
 // lantern exist: placed once from where the player sits and faces. Plain TypeScript.
 //
-// table: the tabletop theatre (GDD): a 45 × 32 cm paper screen standing on the
-//   table about 75 cm ahead, the lantern on the near edge of the table, the
-//   hands in between.
+// table: the tabletop theatre (GDD): a 50 × 42 cm paper screen standing on the
+//   table about 75 cm ahead, tall enough for hands turned up toward it, the
+//   lantern on the near edge of the table, the hands in between.
 // wall: a larger screen 1.5 m ahead, as on a wall.
 import type { Vec3 } from '../../hands/hand';
 import type { MutableStagePlane } from './stage-plane';
@@ -35,7 +35,7 @@ export function placeTestRig(
   lantern[1] = table + 0.1;
   lantern[2] = head[2] + fz * 0.15;
   const [ahead, width, height, centreY] =
-    mode === 'table' ? [0.75, 0.45, 0.32, table + 0.17] : [1.5, 0.9, 0.7, head[1] - 0.2];
+    mode === 'table' ? [0.75, 0.5, 0.42, table + 0.24] : [1.5, 0.9, 0.7, head[1] - 0.2];
   stage.origin[0] = head[0] + fx * ahead;
   stage.origin[1] = centreY;
   stage.origin[2] = head[2] + fz * ahead;
