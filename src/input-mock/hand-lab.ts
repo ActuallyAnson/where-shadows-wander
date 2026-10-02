@@ -4,7 +4,9 @@
 import type { PerspectiveCamera, Scene } from '@iwsdk/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { HandFrame, Handedness } from '../engine/hands/hand';
+import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
+import { SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-script';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
@@ -12,6 +14,7 @@ import { downloadRecording, handCardHtml } from './hand-card';
 import { MOCK_WRIST } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
+import { ScriptedSource } from './scripted-source';
 import { SyntheticSource } from './synthetic-source';
 
 const PANEL_W = 320;
@@ -32,6 +35,9 @@ export class HandLab {
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
   private recording: HandRecording | null = null;
+  /** A guided recording in progress: prompts every shape and labels the file. */
+  private guided: GuidedRecording | null = null;
+  private guidedStart = 0;
   private recordStart = 0;
   private busy = false;
   private message = '';
@@ -62,6 +68,8 @@ export class HandLab {
     this.bones.update([this.hands.left, this.hands.right]);
     if (this.recording)
       recordFrame(this.recording, this.mode.time - this.recordStart, this.hands.left, this.hands.right, null);
+    if (this.guided && !this.guided.frame(this.mode.time - this.guidedStart, this.hands.left, this.hands.right, null))
+      this.finishGuided();
   }
 
   /** Keeps the hands centred in the part of the window the panel doesn't cover. */
@@ -100,6 +108,39 @@ export class HandLab {
     }
     this.busy = false;
     this.renderControls();
+  }
+
+  /**
+   * Starts a guided recording with the current source. With the Script source
+   * the script restarts from 0 so the poses line up with the prompts, which
+   * gives a labelled synthetic recording.
+   */
+  private startGuided(): void {
+    if (this.recording || this.guided) return;
+    this.message = '';
+    this.mode.paused = false;
+    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
+    this.guidedStart = this.mode.time;
+    this.guided = new GuidedRecording(
+      new ShapeScript(SHAPES_SCRIPT),
+      `Hand Lab guided, ${this.mode.source.name}`,
+      navigator.userAgent,
+      new Date().toISOString(),
+    );
+    this.renderControls();
+  }
+
+  /** Ends a guided recording (finished or stopped early) and downloads it with its labels. */
+  private finishGuided(): void {
+    if (!this.guided) return;
+    const rec = this.guided.finish();
+    this.guided = null;
+    if (rec.frames.length) downloadRecording(rec, 'wsw-lab-guided');
+    else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
+    // The run used a one-shot script; go back to the looping one the Script button promises.
+    if (this.mode.source instanceof ScriptedSource) this.mode.setSource(new ScriptedSource());
+    this.renderControls();
+    this.renderLive();
   }
 
   private toggleRecording(): void {
@@ -153,6 +194,10 @@ export class HandLab {
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
+      else if (act === 'guided') {
+        if (this.guided) this.finishGuided();
+        else this.startGuided();
+      }
       this.renderControls();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -160,7 +205,12 @@ export class HandLab {
     window.addEventListener('drop', (e) => {
       e.preventDefault();
       const dropped = e.dataTransfer?.files[0];
-      if (dropped) void this.switchSource('replay', dropped);
+      if (!dropped) return;
+      if (this.guided) {
+        this.message = 'Stop the guided recording before replaying a file.';
+        return this.renderControls();
+      }
+      void this.switchSource('replay', dropped);
     });
     this.renderControls();
     this.renderLive();
@@ -169,8 +219,10 @@ export class HandLab {
   private renderControls(): void {
     const s = this.synthetic;
     const kind = kindOf(this.mode.source.name);
+    // While a guided recording runs, its clock must keep moving forward: no source changes or pausing.
+    const locked = new Set(this.guided ? ['source', 'pause', 'record'] : this.recording ? ['guided'] : []);
     const btn = (act: string, arg: string, label: string, on = false, title = '') =>
-      `<button type="button" data-act="${act}" data-arg="${arg}" class="${on ? 'on' : ''}" ${title ? `title="${title}"` : ''} ${this.busy ? 'disabled' : ''}>${label}</button>`;
+      `<button type="button" data-act="${act}" data-arg="${arg}" class="${on ? 'on' : ''}" ${title ? `title="${title}"` : ''} ${this.busy || locked.has(act) ? 'disabled' : ''}>${label}</button>`;
     const sources = (
       [
         ['synthetic', 'Synthetic', 'Hands you pose with buttons or keys'],
@@ -194,7 +246,11 @@ export class HandLab {
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
-        <span class="time" id="lab-time"></span></div>`;
+        ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (66 s) and saves a labelled recording')}
+        <span class="time" id="lab-time"></span></div>
+      <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
+    // Fill the new prompt element now rather than leaving it blank until the next live update.
+    if (this.guided) this.renderLive();
   }
 
   private renderLive(): void {
@@ -208,6 +264,15 @@ export class HandLab {
           this.mode.source.shapeOf?.(side) ?? null,
         );
     }
+    const prompt = this.root.querySelector('#lab-prompt');
+    if (prompt && this.guided) {
+      const p = this.guided.prompt;
+      const [title, detail] = p.text.split('\n');
+      const done = Math.min(Math.max((this.mode.time - this.guidedStart) / this.guided.script.duration, 0), 1);
+      prompt.innerHTML =
+        `<b>${title}</b>${detail ? `<span>${detail}</span>` : ''}` +
+        `<em>${p.remaining > 0 ? Math.ceil(p.remaining) : ''}</em><i style="width:${(done * 100).toFixed(1)}%"></i>`;
+    }
     const time = this.root.querySelector('#lab-time');
     if (time) {
       const rec = this.recording ? ` · recording ${(this.mode.time - this.recordStart).toFixed(1)} s` : '';
@@ -219,6 +284,7 @@ export class HandLab {
   private onKey(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement) return;
     if (e.code === 'Space') {
+      if (this.guided) return e.preventDefault();
       this.mode.paused = !this.mode.paused;
       e.preventDefault();
       return this.renderControls();
@@ -274,6 +340,13 @@ const CSS = `
 .lab button:disabled { opacity: .5; cursor: default; }
 .lab kbd { font: 10px ui-monospace, monospace; opacity: .6; margin-right: 4px; }
 .lab .msg { margin: 0; color: var(--accent); }
+.lab .prompt { position: relative; overflow: hidden; display: grid; gap: 2px; padding: 12px 14px 16px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--accent); }
+.lab .prompt[hidden] { display: none; }
+.lab .prompt b { font-size: 20px; }
+.lab .prompt span { color: var(--muted); }
+.lab .prompt em { position: absolute; right: 14px; top: 10px; font: 600 22px ui-monospace, monospace; color: var(--accent); font-style: normal; }
+.lab .prompt i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); }
 .lab .time { font: 11.5px ui-monospace, monospace; color: var(--muted); }
 .lab .hand { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
 .lab .hand h2 { margin: 0; color: var(--ink); display: flex; gap: 8px; align-items: center; }
