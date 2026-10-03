@@ -9,7 +9,13 @@ export class JointDots {
   private readonly colors = { right: new Color(0xf09a3e), left: new Color(0x5aa0d8) };
 
   constructor() {
-    this.mesh = new InstancedMesh(new SphereGeometry(1, 8, 6), new MeshBasicMaterial(), JOINT_COUNT * 2);
+    // Drawn last and without a depth test, so the hand occluder (hand-occluder.ts) can't hide them.
+    this.mesh = new InstancedMesh(
+      new SphereGeometry(1, 8, 6),
+      new MeshBasicMaterial({ depthTest: false }),
+      JOINT_COUNT * 2,
+    );
+    this.mesh.renderOrder = 4;
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
   }

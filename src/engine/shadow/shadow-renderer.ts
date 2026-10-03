@@ -37,6 +37,8 @@ export class ShadowRenderer {
       vertexShader: shadowVertex,
       fragmentShader: shadowFragment,
       transparent: true,
+      premultipliedAlpha: false, // blends as src-alpha over a (0,0,0,0) clear, which is premultiplied in the XR target
+      toneMapped: false, // black stays black whatever the scene's tone mapping is
       depthWrite: false,
       side: DoubleSide,
     });

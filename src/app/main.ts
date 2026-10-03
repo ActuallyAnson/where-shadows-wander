@@ -16,6 +16,7 @@ import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { CapabilityDetector } from '../engine/xr/capabilities';
+import { HandOccluder } from '../engine/xr/hand-occluder';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
@@ -25,6 +26,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { probePixels } from './composite-probe';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -115,6 +117,11 @@ async function start(): Promise<void> {
   });
   const dots = new JointDots();
   world.scene.add(dots.mesh);
+  // Real hands stay visible in front of the paper and shadow. On in a headset (?occlude=0 turns it off to compare);
+  // off in mock mode, where there is no passthrough, unless ?occlude=1 (for the composite probe).
+  const occluder = new HandOccluder();
+  occluder.enabled = mockOptions ? params.get('occlude') === '1' : params.get('occlude') !== '0';
+  world.scene.add(...occluder.meshes);
 
   // addSource keeps only one source, so everything we report goes through it.
   diagnostics.addSource(() => ({
@@ -128,12 +135,27 @@ async function start(): Promise<void> {
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
+    render: renderReport(),
     shadow: {
       stage: stageMode,
       placed: rigPlaced,
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
     },
   }));
+  // What the compositor receives from us. Read lazily, at report time.
+  const TONE_MAPPING = ['none', 'linear', 'reinhard', 'cineon', 'aces', 'custom', 'agx', 'neutral'];
+  const renderReport = () => {
+    const session = world.renderer.xr.getSession();
+    const layers = session?.renderState.layers;
+    return {
+      clearAlpha: world.renderer.getClearAlpha(),
+      toneMapping: TONE_MAPPING[world.renderer.toneMapping] ?? String(world.renderer.toneMapping),
+      outputColorSpace: world.renderer.outputColorSpace,
+      blendMode: session?.environmentBlendMode ?? null,
+      layer: session ? (layers && layers.length ? 'projection' : 'webgl') : null,
+      handOccluder: occluder.enabled,
+    };
+  };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) diagnostics.sessionStarted(session, world.renderer);
@@ -234,6 +256,7 @@ async function start(): Promise<void> {
         }
       }
       sim.advance(delta);
+      occluder.update(handList);
       dots.update(handList);
       timings.begin(SLOT.lab);
       lab?.frame();
@@ -248,6 +271,22 @@ async function start(): Promise<void> {
   // Dev-only handle for the iwsdk CLI scripts in scripts/.
   if (import.meta.env.DEV)
     Object.assign(window, {
-      __wsw: { world, hands, diagnostics, recorder, mock, lab, capabilities, shapes, gestures, projector, stage },
+      __wsw: {
+        world,
+        hands,
+        diagnostics,
+        recorder,
+        mock,
+        lab,
+        capabilities,
+        shapes,
+        gestures,
+        projector,
+        stage,
+        occluder,
+        dots,
+        probe: (points: readonly (readonly number[])[]) =>
+          probePixels(world.renderer, world.scene, world.camera, points),
+      },
     });
 }

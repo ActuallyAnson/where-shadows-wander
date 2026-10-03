@@ -60,7 +60,7 @@ Goal: the traveller, and puzzles 1–3 including the wordless tutorial.
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Composite the stage and shadows over passthrough | #13 | |
+| Anson | Composite the stage and shadows over passthrough | #13 | ⏳ |
 | Anson | Classifier tuning from week-3 test recordings | #12 | |
 | A | Puzzle framework: JSON levels, win conditions, solution tracking | | |
 | A | Puzzles 1–3, including the tutorial gap | | |
