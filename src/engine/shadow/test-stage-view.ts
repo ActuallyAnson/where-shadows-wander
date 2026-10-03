@@ -85,7 +85,8 @@ export class TestStageView {
    * follows the light. A lantern that is out leaves the paper at half brightness.
    */
   applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
-    const level = 0.5 + 0.5 * Math.min(Math.max(light.intensity, 0), 1.2);
+    // Lit, the paper follows the light's brightness exactly (1 plus or minus the flicker); out, it falls to half.
+    const level = 0.5 + 0.5 * Math.min(Math.max(2 * light.intensity - 1, 0), 1.3);
     // Tint toward the flame's colour a little, so the paper warms as the flame reddens.
     this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
     this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12).multiplyScalar(level);
