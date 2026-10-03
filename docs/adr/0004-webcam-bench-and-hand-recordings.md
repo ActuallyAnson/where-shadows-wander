@@ -84,3 +84,12 @@ So the webcam is for **shapes and classifier logic**. Headset recordings are for
 - Classifier work in week 3 can start at a desk, daily, without a headset, and can include other people (the GDD asks for at least 3 testers).
 - Bugs found in recordings become regression tests: save the recording and add a test that replays it.
 - The bench depends on Google's hosted model file at first start. If that becomes a problem, copy the model into `public/` and point `MODEL_URL` at it.
+
+## Update 7 (3 Oct 2026): first calibrated webcam runs
+
+Three calibrated guided webcam runs by one person, both hands, scored 60.7 % frame accuracy before the change and 70.3 % after (flat 32 → 75 %, cup 47 → 63 %, fox 0 → 40 %; fist 89 %, spread 88 %, rabbit 64 %, no flicker). Findings and changes:
+
+- On a webcam the thumb angle can't separate a flat hand from a fox: a flat right hand measured about 47° and the fox thumb about 42°, so flat read as fox. Palm direction does separate them (flat about −0.9, fox about 0 to −0.2). Fox now needs the palm sideways (−0.7 to 0.7 against the stage normal) and a thumb of at least 38°; flat allows a thumb up to 50°.
+- Cup's least-curled finger may be 0.15 (was 0.2).
+- A palm-down fox with the thumb out is now a flat hand, by design; the synthetic fox fixture was regenerated with the palm sideways.
+- One person is not enough to tune on: these are geometry fixes, not threshold fitting. Rabbit (64 %) and fox (40 %) are the weakest; wait for more people and the Pico before moving the curl and thumb bounds.

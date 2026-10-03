@@ -23,8 +23,9 @@ export const FIXTURES: readonly Fixture[] = [
   {
     file: 'synthetic-fox-4mm-noise.handrec.json',
     why:
-      'Synthetic fox with 4 mm of joint noise at 30 fps (webcam-like). Noise pushed the mean curl over its limit ' +
-      'for single frames, which restarted the 1 s hold, so fox never committed. Fixed by holdSlack.',
+      'Synthetic fox (L thumb, palm sideways) with 1.5 mm of joint noise at 30 fps (webcam-like). Noise pushed the ' +
+      'mean curl over its limit for single frames, which restarted the 1 s hold, so fox never committed. Fixed by holdSlack. ' +
+      'Regenerated when fox gained a palm-direction range: the first version had the palm facing down, which is also a flat hand.',
     expect: { minAccuracy: 0.9, allHit: true, maxFalseCommits: 0, maxFlicker: 0 },
   },
 ];

@@ -250,12 +250,12 @@ Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): 
 
 | Shape | Ranges (starting values, tuned with recordings) |
 |----|----|
-| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 35° of the fingers |
+| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 50° of the fingers |
 | Fist | every finger curl ≥ 0.65 |
-| Cup | every finger curl 0.2–0.6, palm facing away from the stage (≥ 0.5) |
+| Cup | every finger curl 0.15–0.6, palm facing away from the stage (≥ 0.5) |
 | Spread | mean curl ≤ 0.19 and no finger above 0.35, index–pinky spread ≥ 25° |
 | Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4, thumb tip within 0.35 hand lengths of the ring or pinky tip and at least 0.4 from the index tip |
-| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 50° from the fingers |
+| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 38° from the fingers, palm facing sideways (palm · stage normal −0.7 to 0.7) |
 
 Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider (1 to 3) widens every range by whole units; hysteresis keeps a committed shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
 
