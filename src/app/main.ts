@@ -8,6 +8,7 @@ import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
+import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { createStagePlane } from '../engine/shadow/pure/stage-plane';
@@ -77,6 +78,18 @@ async function start(): Promise<void> {
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
+  // The lantern's flicker: ?flicker=0..1 sets how much (0 is steady); the default is gentler under reduced motion.
+  const flickerParam = Number(params.get('flicker'));
+  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lanternLight = new LanternLightModel({
+    amplitude:
+      params.has('flicker') && Number.isFinite(flickerParam)
+        ? Math.min(Math.max(flickerParam, 0), 1)
+        : reduceMotion
+          ? 0.3
+          : 1,
+  });
+  const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
   stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
   const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
@@ -260,6 +273,11 @@ async function start(): Promise<void> {
         }
       }
       sim.advance(delta);
+      // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
+      lanternLight.update(clock, rigPlaced ? lantern : null, true);
+      world.camera.getWorldQuaternion(cameraQuat);
+      stageView.applyLight(lanternLight.light, cameraQuat);
+      lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
       dots.update(handList);
       timings.begin(SLOT.lab);
@@ -289,6 +307,7 @@ async function start(): Promise<void> {
         stage,
         occluder,
         sharpen,
+        lanternLight,
         dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),

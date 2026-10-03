@@ -14,6 +14,8 @@ import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
 import { HandBones } from './hand-bones';
+import type { Quaternion } from '@iwsdk/core';
+import type { LanternLight } from '../engine/shadow/pure/lantern-light';
 import { LanternMarker } from './lantern-marker';
 import { downloadRecording, handCardHtml } from './hand-card';
 import { MOCK_WRIST, type HandSource } from './hand-source';
@@ -83,6 +85,11 @@ export class HandLab {
   }
 
   /** Call once per frame, after the hands are filled. */
+  /** The lantern marker's glow follows the flickering light. */
+  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+    this.marker.setLight(light, cameraQuaternion);
+  }
+
   frame(): void {
     this.bones.update([this.hands.left, this.hands.right]);
     const g = this.gestures;
