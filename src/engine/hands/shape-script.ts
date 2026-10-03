@@ -43,11 +43,11 @@ export const SHAPES_SCRIPT: readonly ScriptStep[] = (['right', 'left'] as const)
 /** How to make each shape (GDD, "Shape vocabulary"), shown under the prompt and in the Hand Lab's guide. */
 export const SHAPE_HOW: Readonly<Record<PresetName, string>> = {
   relaxed: 'Let the hand rest',
-  flat: 'Palm down, fingers together',
+  flat: 'Palm down, fingers straight and touching, thumb tucked against the side',
   fist: 'Closed hand',
-  cup: 'Palm up, fingers curled',
-  spread: 'Fingers spread wide',
-  rabbit: 'Index and middle up, others pinched to the thumb',
+  cup: 'Palm up, all four fingers clearly curled, like holding water',
+  spread: 'Fingers straight and spread wide',
+  rabbit: 'Index and middle straight up, ring and pinky curled onto the thumb',
   fox: 'Fingers together, thumb out like an L, turned so the thumb points up',
 };
 
