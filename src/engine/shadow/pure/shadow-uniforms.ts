@@ -20,6 +20,7 @@ export interface ShadowUniformArrays {
 }
 
 const HANDS: readonly Handedness[] = ['left', 'right'];
+const MIN_PAD_M = 0.001;
 
 /** Fills `out` from the shadows; returns whether any hand has a shadow on the stage. */
 export function packShadowUniforms(
@@ -51,7 +52,8 @@ export function packShadowUniforms(
       maxBlur = Math.max(maxBlur, blur);
     }
     // The capsules' bounds already include the radius; the soft edge reaches half a blur further.
-    const pad = maxBlur / 2;
+    // At least a millimetre: the shader never draws an edge narrower than a pixel (about 0.4 mm at arm's length).
+    const pad = Math.max(maxBlur / 2, MIN_PAD_M);
     out.bounds[h * 4] = s.bounds[0] - pad;
     out.bounds[h * 4 + 1] = s.bounds[1] - pad;
     out.bounds[h * 4 + 2] = s.bounds[2] + pad;

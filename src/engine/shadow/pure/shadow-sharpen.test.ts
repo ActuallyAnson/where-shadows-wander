@@ -94,14 +94,13 @@ describe('shadow sharpen', () => {
     expect(s.value.right).toBeGreaterThan(0.99);
   });
 
-  it('holds its value while tracking is paused', () => {
+  it('holds its value while tracking is paused with the shape still in force', () => {
     const s = new ShadowSharpen();
     const st = states();
     st.right.phase = 'committed';
     st.right.committed = 'fist';
     run(s, st, 0.5);
-    st.right.phase = 'paused';
-    st.right.committed = null;
+    st.right.phase = 'paused'; // the classifier keeps the committed shape while it waits
     run(s, st, 1);
     expect(s.value.right).toBeGreaterThan(0.99);
   });
@@ -139,5 +138,30 @@ describe('shadow sharpen', () => {
     s.reset();
     expect(s.value.right).toBe(0);
     expect(s.look.right.blurScale).toBe(1);
+  });
+
+  it('a hand lost for good (paused with nothing held) relaxes instead of staying crisp', () => {
+    const s = new ShadowSharpen();
+    const st = states();
+    st.right.phase = 'committed';
+    st.right.committed = 'fist';
+    run(s, st, 0.5);
+    st.right.phase = 'paused';
+    st.right.committed = null; // the classifier released it: lost
+    run(s, st, 1);
+    expect(s.value.right).toBeLessThan(0.05);
+  });
+
+  it('ignores a NaN or negative time step', () => {
+    const s = new ShadowSharpen();
+    const st = states();
+    st.right.phase = 'committed';
+    st.right.committed = 'fist';
+    run(s, st, 0.2);
+    const before = s.value.right;
+    s.update(st, new ShapeEventQueue(), NaN);
+    s.update(st, new ShapeEventQueue(), -1);
+    expect(s.value.right).toBe(before);
+    expect(Number.isFinite(s.look.right.blurScale)).toBe(true);
   });
 });

@@ -35,6 +35,10 @@ export const shadowFragment = /* glsl */ `
 
   void main() {
     vec2 p = (vUv - 0.5) * uSize;
+    // One pixel's footprint in stage metres, worked out here where every fragment runs it together (derivatives
+    // are undefined inside the bounds tests below, which differ between neighbouring pixels). A distance field
+    // changes by at most the footprint per pixel.
+    float aa = 1.5 * (length(dFdx(p)) + length(dFdy(p)));
     float alpha = 0.0;
     // Only test a hand's capsules where its shadow can reach: most of the stage is skipped.
     for (int h = 0; h < 2; h++) {
@@ -46,7 +50,7 @@ export const shadowFragment = /* glsl */ `
         vec2 rb = uRadBlur[i];
         float d = segmentDistance(p, c.xy, c.zw) - rb.x;
         // A sharpened edge is never narrower than about a pixel, so it stays anti-aliased.
-        float w = max(rb.y, 1.5 * fwidth(d));
+        float w = max(rb.y, aa);
         float a = (1.0 - smoothstep(-0.5 * w, 0.5 * w, d)) * uOpacity[h];
         alpha = max(alpha, a);
       }

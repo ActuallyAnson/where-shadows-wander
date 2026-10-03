@@ -58,6 +58,14 @@ describe('shadow uniforms', () => {
     expect(out.bounds[6]).toBeCloseTo(0.3 + 0.0025, 6);
   });
 
+  it('pads the bounds by at least a millimetre even when the blur is tiny', () => {
+    const s = shadows();
+    for (let c = 0; c < CAPSULES_PER_HAND; c++) s.right.blur[c] = 0.0002;
+    const out = arrays();
+    packShadowUniforms(s, null, 0.88, out);
+    expect(out.bounds[4]).toBeCloseTo(-0.01 - 0.001, 6);
+  });
+
   it('adds the opacity boost to the base, capped at 1, per hand', () => {
     const s = shadows();
     s.left.active = s.left.onStage = true;

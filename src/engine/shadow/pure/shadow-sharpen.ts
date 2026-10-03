@@ -75,7 +75,7 @@ export class ShadowSharpen {
    */
   update(states: Readonly<Record<Handedness, Readonly<ShapeState>>>, events: ShapeEventQueue, dt: number): void {
     const s = this.settings;
-    const step = Math.min(Math.max(dt, 0), MAX_DT);
+    const step = dt > 0 ? Math.min(dt, MAX_DT) : 0; // a NaN or negative step changes nothing
     for (let i = 0; i < events.count; i++) {
       const e = events.at(i);
       if (e.type === 'commit') this.pulse[e.hand] = 1;
@@ -86,8 +86,9 @@ export class ShadowSharpen {
       const st = states[h];
       this.pulse[h] *= pulseDecay;
       // A role stays in force while another shape's hold is under way (a switch), so it stays sharp.
-      // While tracking is partial the classifier waits, and so does the shadow.
-      if (st.phase !== 'paused') {
+      // While tracking is partial the classifier waits, and so does the shadow, unless it has already let
+      // the shape go (lost for too long): then there is nothing left to keep sharp.
+      if (st.phase !== 'paused' || (!st.committed && !st.candidate)) {
         const target = st.committed ? 1 : st.candidate ? s.candidateLevel * smoothstep(st.progress) : 0;
         const tau = Math.max(target > this.value[h] ? s.riseS : s.relaxS, 1e-3);
         this.value[h] += (target - this.value[h]) * (1 - Math.exp(-step / tau));
