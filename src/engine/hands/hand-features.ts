@@ -139,7 +139,7 @@ export function computeHandFeatures(
     direction(p, PROXIMAL[i], PROXIMAL[i] + 1, v);
     const d = v[0] * n[0] + v[1] * n[1] + v[2] * n[2];
     for (let k = 0; k < 3; k++) v[k] -= d * n[k];
-    projectedOk[i] = Math.hypot(v[0], v[1], v[2]) >= MIN_PROJECTED_M;
+    projectedOk[i] = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) >= MIN_PROJECTED_M;
   }
   out.spreadDeg = projectedAngle(0, 3);
   for (let i = 0; i < 3; i++) out.pairSpreadDeg[i] = projectedAngle(i, i + 1);
@@ -148,7 +148,7 @@ export function computeHandFeatures(
   out.palmUp = n[1];
 
   direction(p, JOINT['thumb-phalanx-proximal'], thumbTip, a);
-  const len = Math.hypot(a[0], a[1], a[2]);
+  const len = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
   const f = palm.forward;
   if (len < 1e-6) {
     out.thumbFwdDeg = 0;
@@ -172,13 +172,16 @@ function direction(p: Float32Array, from: number, to: number, out: Float64Array)
 }
 
 function dist(p: Float32Array, i: number, j: number): number {
-  return Math.hypot(p[j * 3] - p[i * 3], p[j * 3 + 1] - p[i * 3 + 1], p[j * 3 + 2] - p[i * 3 + 2]);
+  const dx = p[j * 3] - p[i * 3],
+    dy = p[j * 3 + 1] - p[i * 3 + 1],
+    dz = p[j * 3 + 2] - p[i * 3 + 2];
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 /** Angle between two vectors, radians; 0 if either is (near) zero. */
 function angle(u: Float64Array, v: Float64Array): number {
-  const lu = Math.hypot(u[0], u[1], u[2]),
-    lv = Math.hypot(v[0], v[1], v[2]);
+  const lu = Math.sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]),
+    lv = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
   if (lu < 1e-9 || lv < 1e-9) return 0;
   const c = (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (lu * lv);
   return Math.acos(Math.max(-1, Math.min(1, c)));
