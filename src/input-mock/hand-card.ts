@@ -3,10 +3,9 @@
 // the features. Shared by the webcam bench and the Hand Lab (?mock=1). Styling
 // uses the classes .shape, .none, .guess, .hold, .margins, dl, .curls, .curl
 // and .b, and the --right/--left colours.
-import { download } from './download';
+import { saveRecording } from '../engine/xr/save-recording';
 import { derivePalm, type HandFrame } from '../engine/hands/hand';
 import { FINGER_NAMES, handFeatures } from '../engine/hands/hand-features';
-import type { HandRecording } from '../engine/hands/hand-recording';
 import type { ShapeState } from '../engine/hands/shape-events';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
@@ -73,20 +72,5 @@ function classifierHtml(
   return `<div class="shape${state.committed ? '' : ' none'}">${big}</div>${hold}${posed}${bars}`;
 }
 
-/**
- * Saves a recording as `<prefix>-<time>.handrec.json`: into recordings/ through
- * the dev server when it is running (no browser download, which has crashed
- * Chrome for Testing), else as a browser download. Resolves to where it went.
- */
-export async function downloadRecording(rec: HandRecording, prefix: string): Promise<string> {
-  const name = `${prefix}-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`;
-  const text = JSON.stringify(rec);
-  try {
-    const res = await fetch(`./__wsw/recordings/${name}`, { method: 'POST', body: text });
-    if (res.ok) return `Saved recordings/${name}`;
-  } catch {
-    // No dev server (a built page): fall through to the download.
-  }
-  download(text, name);
-  return `Downloaded ${name}`;
-}
+/** Saves a recording: into recordings/ through the dev server, else as a download. Resolves to where it went. */
+export const downloadRecording = saveRecording;

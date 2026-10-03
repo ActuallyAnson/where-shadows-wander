@@ -10,6 +10,7 @@ import { GuidedRecording } from '../hands/guided-recording';
 import type { HandFrame } from '../hands/hand';
 import { createRecording, recordFrame, type HandRecording } from '../hands/hand-recording';
 import { SHAPES_SCRIPT, ShapeScript, type Prompt, type ScriptStep } from '../hands/shape-script';
+import { downloadJson, postRecording, recordingFileName } from './save-recording';
 
 /** Scripts that &script=<name> can choose. */
 export const SCRIPTS: Readonly<Record<string, readonly ScriptStep[]>> = { shapes: SHAPES_SCRIPT };
@@ -91,21 +92,28 @@ export class HandRecorder {
   }
 }
 
-/** Adds a "Download recording" button to the page once a recording is finished. */
+/**
+ * Offers a finished recording on the page. It is first sent to the dev server, which writes it into
+ * recordings/ on the computer running the game (no file to get off the headset); if there is no dev
+ * server the page shows a "Download recording" button instead.
+ */
 export function offerDownload(rec: HandRecording): void {
   const json = JSON.stringify(rec);
-  const name = `wsw-hands-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`;
+  const name = recordingFileName(rec, 'wsw-hands');
   const b = document.createElement('button');
   const labels = rec.labels.length ? `, ${rec.labels.length} labels` : '';
-  b.textContent = `Download recording (${rec.frames.length} frames${labels}, ${Math.round(json.length / 1024)} KB)`;
+  const summary = `${rec.frames.length} frames${labels}, ${Math.round(json.length / 1024)} KB`;
+  b.textContent = `Saving recording (${summary})...`;
   b.style.cssText =
     'position:fixed;right:12px;bottom:12px;z-index:10;font:14px system-ui,sans-serif;padding:10px 14px;' +
     'border-radius:8px;border:1px solid #8a7a45;background:#fffbe9;color:#111;cursor:pointer';
-  b.onclick = () => {
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: name });
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  };
   document.body.append(b);
+  void postRecording(name, json).then((saved) => {
+    if (saved) {
+      b.textContent = `Saved recordings/${name} (${summary})`;
+    } else {
+      b.textContent = `Download recording (${summary})`;
+      b.onclick = () => downloadJson(json, name);
+    }
+  });
 }
