@@ -84,6 +84,22 @@ At 72 fps a frame has **13.9 ms**. Judges require at least 60 fps (16.7 ms), so 
 
 These are starting estimates. Desktop measurements so far: our whole frame was about 0.06 ms, and 500 instanced quads about 0.08 ms. Expect a headset to be 3–5× slower. Teammate B's profiler (`src/debug`) will measure each module against this table on the Pico, and the table should be updated from real numbers.
 
+## Compositing over passthrough
+
+The stage and shadows are drawn into the same frame as the room camera image (`immersive-ar`, `alpha-blend`). What we hand the compositor, and how it is kept right:
+
+| Rule | Why |
+|---|---|
+| The frame clears to transparent black and the scene has no background | IWSDK sets this itself in an AR session; the report's `render.clearAlpha` must be 0 |
+| Stage materials are `transparent`, `premultipliedAlpha: false` and `toneMapped: false` | Blending `src-alpha` over a transparent clear stores premultiplied colour, which is what the compositor expects. Black stays black whatever tone mapping a scene environment adds |
+| Draw order: hand occluder -1, paper 1, shadow 2, debug and stage sprites 3, joint dots 4 | Opaque things draw first, then the transparent paper and shadow, then overlays |
+| `HandOccluder` draws each hand into the depth buffer only (no colour) | The paper and shadow cover the camera image, so without it a real hand held in front of the stage would be hidden behind them. Fragments behind the occluder fail the depth test and the camera image shows through. On in a headset; `?occlude=0` turns it off to compare |
+| Any colour shader we add includes `colorspace_fragment` | The XR target is sRGB. Only black-only shaders (the shadow) may skip it |
+
+Without a headset: `scripts/composite-probe.mjs <dev server URL>` renders the live scene into an sRGB RGBA8 target like WebXR's and reads the pixel at four stage points: off the stage (alpha 0), bare paper (alpha 0.85, premultiplied), inside a shadow (alpha 0.98), and paper behind a hand (alpha 0 with the occluder on). It cannot show what the headset's compositor then does with the frame; see the headset checklist in the pull request for #13.
+
+The diagnostics report has a `render` section (`clearAlpha`, `toneMapping`, `outputColorSpace`, `blendMode`, `layer`, `handOccluder`) to read this off a real session. Stop and report if `clearAlpha` is not 0 in a session, the blend mode is `additive` or `opaque`, or the tone mapping is not `none`: black shadows are invisible on an additive display.
+
 ## Rules that keep it working
 
 | Rule | Why |

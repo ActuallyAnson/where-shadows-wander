@@ -6,7 +6,7 @@
 //   off the stage          alpha 0 (the room shows through)
 //   bare paper             alpha 0.85, linear rgb = paper colour x 0.85 (premultiplied)
 //   inside a hand's shadow alpha 0.88 + 0.85 x 0.12 = 0.98, linear rgb = paper x 0.85 x 0.12 (the shadow is 88 % black)
-//   paper behind a hand    alpha 0 with the occluder on (the real hand stays visible), 0.85 with it off
+//   paper behind a hand    alpha 0 with the occluder on (the real hand stays visible), opaque with it off
 // The target is sRGB like WebXR's: blending happens in linear light and the bytes are sRGB-encoded afterwards,
 // so rgb is compared after decoding.
 import { chromium } from 'playwright';
@@ -74,11 +74,7 @@ for (const occlude of ['1', '0']) {
   if (occlude === '1')
     check('paper behind a hand is transparent (hand stays visible)', behind && behind[3] === 0, JSON.stringify(behind));
   else
-    check(
-      'without the occluder the paper covers the hand',
-      behind && near(behind[3] / 255, PAPER_ALPHA, 0.15),
-      JSON.stringify(behind),
-    );
+    check('without the occluder something opaque covers the hand', behind && behind[3] >= 200, JSON.stringify(behind));
   check('no page errors', errors.length === 0, errors.join('; '));
   await ctx.close();
 }
