@@ -171,15 +171,17 @@ describe('shape classifier', () => {
   });
 
   it("drops a hold that's outside its ranges while another shape matches", () => {
-    // At tolerance 2 flat allows a thumb up to 43° and fox from 42°. Flat starts its hold; then
-    // the thumb sits at 43.2°: flat is 0.025 units out (inside the slack) and fox 0.15 in, not
-    // enough of a lead to switch. The flat hold must drop rather than commit flat.
+    // Palm at -0.6, where flat (<= -0.5) and fox (>= -0.7) are equally far inside on the palm. At
+    // tolerance 2 flat allows a thumb up to 66°. Flat starts its hold; then the thumb sits at 66.2°:
+    // flat is 0.025 units out (inside the slack) while fox matches with a clear lead. The flat hold
+    // must drop rather than commit flat.
     const c = new ShapeClassifier('right', { tolerance: 2 });
     const q = new ShapeEventQueue();
     const f = handFeatures(writeHandPose(PRESETS.flat, W, createHandFrame('right')))!;
+    f.palmStage = -0.6;
     const events: string[] = [];
     for (let i = 0; i < FPS; i++) {
-      f.thumbFwdDeg = i === 0 ? 10 : 43.2;
+      f.thumbFwdDeg = i === 0 ? 10 : 66.2;
       q.clear();
       c.update(f, 25, 1 / FPS, i / FPS, q);
       for (let k = 0; k < q.count; k++) events.push(`${q.at(k).type} ${q.at(k).shape}`);
@@ -255,11 +257,13 @@ describe('shape classifier', () => {
   });
 
   it('picks no candidate when two shapes match about equally', () => {
-    // At tolerance 2, a thumb at 42.5° is just inside both flat (<= 43°) and fox (>= 42°).
+    // A palm at -0.6 and a thumb at 44° are equally far inside flat (palm <= -0.5, thumb <= 50°)
+    // and fox (palm >= -0.7, thumb >= 38°).
     const c = new ShapeClassifier('right', { tolerance: 2 });
     const q = new ShapeEventQueue();
     const f = handFeatures(writeHandPose(PRESETS.flat, W, createHandFrame('right')))!;
-    f.thumbFwdDeg = 42.5;
+    f.palmStage = -0.6;
+    f.thumbFwdDeg = 44;
     for (let i = 0; i < 100; i++) c.update(f, 25, 1 / FPS, i / FPS, q);
     expect(c.margins[0]).toBeGreaterThan(0); // flat matches
     expect(c.margins[5]).toBeGreaterThan(0); // fox matches
@@ -271,10 +275,11 @@ describe('shape classifier', () => {
     r.setHoldTimes(0.2, 0.5);
     const { events } = drive(1, (t) => (t < 0.5 ? 'relaxed' : 'fist'), { recognizer: r });
     expect(events.find((e) => e.type === 'commit')!.t - 0.5).toBeCloseTo(0.2, 1);
-    // Tolerance changes results: a flat hand with the thumb out at 38° (flat allows 35°, fox needs 50°)
-    // is no shape normally, but flat with one more unit of tolerance (flat allows 43°, fox needs 42°).
+    // Tolerance changes results: a palm-down hand with the thumb out at 52° (flat allows 50°) is no
+    // shape normally, but flat with more tolerance (flat allows 58°; fox's palm bound stays out).
     const f = handFeatures(writeHandPose(PRESETS.flat, W, createHandFrame('right')))!;
-    f.thumbFwdDeg = 38;
+    f.palmStage = -0.9;
+    f.thumbFwdDeg = 52;
     const strict = new ShapeClassifier('right');
     const lenient = new ShapeClassifier('right', { tolerance: 2 });
     const q = new ShapeEventQueue();

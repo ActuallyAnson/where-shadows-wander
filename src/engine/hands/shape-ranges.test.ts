@@ -64,10 +64,14 @@ describe('shape ranges', () => {
       const ok = turns.filter((t) => classify(shape, 'right', t) === shape).length;
       expect(ok / turns.length, shape).toBeGreaterThanOrEqual(0.95);
     }
-    // Shadow puppets are often made sideways: rabbit, fox and fist don't depend on the palm.
-    for (const shape of ['rabbit', 'fox', 'fist'] as const)
+    // Shadow puppets are often made sideways: rabbit and fist don't depend on the palm.
+    for (const shape of ['rabbit', 'fist'] as const)
       for (const roll of [-90, 90])
         expect(classify(shape, 'right', { roll, pitch: 0, yaw: 0 }), `${shape} ${roll}`).toBe(shape);
+    // The fox is turned so its palm faces sideways; with the palm down it is a flat hand with the thumb out.
+    expect(classify('fox', 'right', { roll: 0, pitch: 0, yaw: 0 })).toBe('fox');
+    for (const roll of [-90, 90])
+      expect(classify('fox', 'right', { roll, pitch: 0, yaw: 0 }), `fox rolled ${roll}`).not.toBe('fox');
   });
 
   it('a flat hand turned palm-sideways is not flat', () => {

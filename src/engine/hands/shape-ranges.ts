@@ -76,12 +76,12 @@ export const SHAPE_RANGES: Readonly<Record<Shape, ShapeRanges>> = {
     maxCurl: [-ANY, 0.35],
     spreadDeg: [-ANY, 18],
     palmStage: [-ANY, -0.5],
-    thumbFwdDeg: [-ANY, 35],
+    thumbFwdDeg: [-ANY, 50],
   }),
   /** Closed hand, any orientation. */
   fist: ranges({ minCurl: [0.65, ANY] }),
   /** Palm up, fingers half curled. */
-  cup: ranges({ minCurl: [0.2, ANY], maxCurl: [-ANY, 0.6], palmStage: [0.5, ANY] }),
+  cup: ranges({ minCurl: [0.15, ANY], maxCurl: [-ANY, 0.6], palmStage: [0.5, ANY] }),
   /** Fingers straight and wide. */
   spread: ranges({ meanCurl: [-ANY, 0.19], maxCurl: [-ANY, 0.35], spreadDeg: [25, ANY] }),
   /** Index and middle up, ring and pinky curled onto the thumb. */
@@ -93,8 +93,18 @@ export const SHAPE_RANGES: Readonly<Record<Shape, ShapeRanges>> = {
     tipGapRingPinky: [-ANY, 0.35],
     tipGapIndex: [0.4, ANY],
   }),
-  /** Fingers straight and together, thumb up as an ear (away from the fingers). */
-  fox: ranges({ meanCurl: [-ANY, 0.19], maxCurl: [-ANY, 0.35], spreadDeg: [-ANY, 18], thumbFwdDeg: [50, ANY] }),
+  /**
+   * Fingers straight and together, thumb up as an ear (away from the fingers),
+   * the hand turned so the palm faces sideways. The palm bounds keep a palm-down
+   * flat hand (whose thumb often sits 45° out) from reading as a fox.
+   */
+  fox: ranges({
+    meanCurl: [-ANY, 0.19],
+    maxCurl: [-ANY, 0.35],
+    spreadDeg: [-ANY, 18],
+    palmStage: [-0.7, 0.7],
+    thumbFwdDeg: [38, ANY],
+  }),
 };
 
 /** Writes the features the ranges use into `out` (length FEATURE_COUNT). */
