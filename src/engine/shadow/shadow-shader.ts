@@ -5,8 +5,9 @@
 // capsule, which is what the collision solver uses. One draw call for both
 // hands; overlaps never darken twice, which matters over passthrough.
 
-export const CAPSULES_PER_SLOT = 28;
-export const MAX_CAPSULES = 2 * CAPSULES_PER_SLOT; // one slot per hand
+import { CAPSULES_PER_SLOT, MAX_CAPSULES } from './pure/shadow-uniforms';
+
+export { CAPSULES_PER_SLOT, MAX_CAPSULES };
 
 export const shadowVertex = /* glsl */ `
   varying vec2 vUv;
@@ -23,7 +24,7 @@ export const shadowFragment = /* glsl */ `
   uniform int uActive[2];
   uniform vec2 uSize;  // stage width, height
   uniform vec3 uColor;
-  uniform float uOpacity;
+  uniform float uOpacity[2];  // per hand: the base opacity plus its sharpen boost
   varying vec2 vUv;
 
   float segmentDistance(vec2 p, vec2 a, vec2 b) {
@@ -44,10 +45,13 @@ export const shadowFragment = /* glsl */ `
         vec4 c = uCaps[i];
         vec2 rb = uRadBlur[i];
         float d = segmentDistance(p, c.xy, c.zw) - rb.x;
-        alpha = max(alpha, 1.0 - smoothstep(-0.5 * rb.y, 0.5 * rb.y, d));
+        // A sharpened edge is never narrower than about a pixel, so it stays anti-aliased.
+        float w = max(rb.y, 1.5 * fwidth(d));
+        float a = (1.0 - smoothstep(-0.5 * w, 0.5 * w, d)) * uOpacity[h];
+        alpha = max(alpha, a);
       }
     }
     if (alpha < 0.003) discard;
-    gl_FragColor = vec4(uColor, alpha * uOpacity);
+    gl_FragColor = vec4(uColor, alpha);
   }
 `;
