@@ -206,7 +206,10 @@ export class GestureDetector {
       return;
     }
     const pos = f.palm.position;
-    const dist = Math.hypot(pos[0] - this.lantern[0], pos[1] - this.lantern[1], pos[2] - this.lantern[2]);
+    const dx = pos[0] - this.lantern[0],
+      dy = pos[1] - this.lantern[1],
+      dz = pos[2] - this.lantern[2];
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
     s.lanternDistM = dist;
     s.nearLantern = dist <= c.coverRadiusM + c.coverExitMarginM;
     const covering = k.coverS > 0 || k.coverLatched;
