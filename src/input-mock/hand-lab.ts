@@ -48,6 +48,8 @@ export class HandLab {
   /** A guided recording in progress: prompts every shape and labels the file. */
   private guided: GuidedRecording | null = null;
   private guidedStart = 0;
+  /** The webcam's lock row before a guided recording took it over. */
+  private lockBeforeGuided: Handedness | null = null;
   private recordStart = 0;
   private busy = false;
   private message = '';
@@ -95,6 +97,7 @@ export class HandLab {
       recordFrame(this.recording, this.mode.time - this.recordStart, this.hands.left, this.hands.right, null);
     if (this.guided && !this.guided.frame(this.mode.time - this.guidedStart, this.hands.left, this.hands.right, null))
       this.finishGuided();
+    else if (this.guided) this.lockToPrompt();
   }
 
   /** Keeps the hands centred in the part of the window the panel doesn't cover. */
@@ -157,6 +160,7 @@ export class HandLab {
     this.mode.paused = false;
     if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource(SHAPES_SCRIPT, false));
     this.guidedStart = this.mode.time;
+    this.lockBeforeGuided = this.webcam()?.lockSide ?? null;
     this.guided = new GuidedRecording(
       new ShapeScript(SHAPES_SCRIPT),
       `Hand Lab guided, ${this.mode.source.name}`,
@@ -164,6 +168,17 @@ export class HandLab {
       new Date().toISOString(),
     );
     this.renderControls();
+  }
+
+  private webcam(): WebcamSource | null {
+    return this.mode.source.name === 'webcam' ? (this.mode.source as WebcamSource) : null;
+  }
+
+  /** During a guided recording the webcam's lone hand is the one the prompt names, so MediaPipe's left/right guess can't mislabel it. */
+  private lockToPrompt(): void {
+    const src = this.webcam();
+    const step = this.guided?.script.steps[this.guided.prompt.index];
+    if (step && src) src.lockSide = step.hand;
   }
 
   /** Saves a recording and says where it went. */
@@ -179,6 +194,8 @@ export class HandLab {
     if (!this.guided) return;
     const rec = this.guided.finish();
     this.guided = null;
+    const cam = this.webcam();
+    if (cam) cam.lockSide = this.lockBeforeGuided;
     if (rec.frames.length) this.save(rec, 'wsw-lab-guided');
     else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
     // The run used a one-shot script; go back to the looping one the Script button promises.
