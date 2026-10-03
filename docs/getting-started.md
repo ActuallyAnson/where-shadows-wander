@@ -168,6 +168,7 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 | No hand dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
+| No way into AR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own AR prompt, which is all IWSDK relies on. The page adds its own **Enter AR** button at the bottom centre when the browser has no such prompt. If you don't see it, update to the latest `main`. |
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
 | Hand Lab opens as the plain game | The address lost `?mock=1` (the window `npm run dev` opens drops it on reload). Use a normal Chrome tab. |

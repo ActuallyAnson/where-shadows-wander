@@ -46,3 +46,8 @@ To keep that rule true, the code follows the WebXR standard, not one headset:
 - The remote Quest tester's role shrinks from "our only device" to periodic confirmation.
 - Each Quest check compares its diagnostics report against the latest Pico report. Differences there are where Quest-specific bugs will come from.
 - When we get a Quest, it becomes the main device and this ADR is superseded.
+
+## Update (3 Oct 2026): first Pico report
+
+The first Pico report came from a PICO 4 (OS 5.13.8) running PicoBrowser 3.3.54 on Chrome 105. Its user agent contains "like Quest" and "OculusBrowser/7.0", so never detect a headset from the user agent. It supports `immersive-ar` and `immersive-vr`, and starts the game in about 2.7 s over the local network from a dev build. It has no `navigator.xr.offerSession`, which is the only way IWSDK offers a session (it draws no button itself), so the page added its own **Enter AR** button (`src/app/enter-ar-button.ts`) for browsers like this. Hand tracking, planes and anchors on the Pico are still unknown until a report is taken inside a session.
+
