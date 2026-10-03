@@ -59,7 +59,7 @@ export class HandOccluder {
         const p = hand.positions;
         const r = hand.radii;
         for (let j = 0; j < JOINT_COUNT; j++) {
-          const s = Math.max(r[j] * PAD, MIN_RADIUS_M);
+          const s = Math.max((r[j] || 0) * PAD, MIN_RADIUS_M); // `|| 0`: a source with no radii (NaN) still gets an occluder
           this.m.makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
           this.joints.setMatrixAt(nj++, this.m);
         }
@@ -73,7 +73,7 @@ export class HandOccluder {
           if (len < 1e-6) continue;
           this.q.setFromUnitVectors(UP, this.d.multiplyScalar(1 / len));
           this.mid.addVectors(this.a, this.b).multiplyScalar(0.5);
-          const s = Math.max(Math.min(r[i], r[j]) * PAD, MIN_RADIUS_M);
+          const s = Math.max((Math.min(r[i], r[j]) || 0) * PAD, MIN_RADIUS_M);
           this.scale.set(s, len, s);
           this.m.compose(this.mid, this.q, this.scale);
           this.bones.setMatrixAt(nb++, this.m);
