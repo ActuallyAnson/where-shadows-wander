@@ -25,6 +25,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { FrameTimings, SLOT } from './frame-timings';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
@@ -77,7 +78,7 @@ async function start(): Promise<void> {
   world.scene.add(stageView.group, shadowRenderer.mesh);
   if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
-  let shadowMs = 0;
+  const timings = new FrameTimings();
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
     stageView.place(stage, lantern);
@@ -126,10 +127,10 @@ async function start(): Promise<void> {
     }),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
+    perf: timings.toJSON(),
     shadow: {
       stage: stageMode,
       placed: rigPlaced,
-      msAvg: Math.round(shadowMs * 1000) / 1000,
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
     },
   }));
@@ -165,20 +166,27 @@ async function start(): Promise<void> {
   class FrameDriverSystem extends createSystem({}) {
     update(delta: number) {
       const t0 = performance.now();
+      timings.begin(SLOT.total);
       diagnostics.mark('firstFrame');
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
+      timings.begin(SLOT.read);
       if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
       else if (frame && refSpace) {
         hands.update(frame, refSpace, this.world.player.matrixWorld);
         capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
       }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
+      timings.end(SLOT.read);
       // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
       clock += delta;
       const handsT = mock ? mock.time : clock;
+      timings.begin(SLOT.classify);
       shapes.update(hands.hands, handsT);
+      timings.end(SLOT.classify);
+      timings.begin(SLOT.gestures);
       gestures.update(hands.hands, handsT, shapes);
+      timings.end(SLOT.gestures);
       if (!mock && frame && refSpace && refSpace !== resetWatched) {
         // Recentring moves the player's frame: place the rig again from the new head pose.
         refSpace.addEventListener('reset', () => (rigPlaced = false));
@@ -194,16 +202,20 @@ async function start(): Promise<void> {
         }
       }
       if (rigPlaced) {
-        const s0 = performance.now();
+        timings.begin(SLOT.shadow);
         projector.update(hands.hands, stage, lantern);
         shadowRenderer.update(projector.shadows, stage);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
-        shadowMs += (performance.now() - s0 - shadowMs) * 0.05;
+        timings.end(SLOT.shadow);
       }
       if (recorder) {
         const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
         const viewer = pose?.transform.position;
-        if (viewer) [head[0], head[1], head[2]] = [viewer.x, viewer.y, viewer.z];
+        if (viewer) {
+          head[0] = viewer.x;
+          head[1] = viewer.y;
+          head[2] = viewer.z;
+        }
         recorder.frame(performance.now(), hands.hands.left, hands.hands.right, viewer ? head : null);
         if (panel && pose && recorder.script) {
           const o = pose.transform.orientation;
@@ -223,7 +235,11 @@ async function start(): Promise<void> {
       }
       sim.advance(delta);
       dots.update(handList);
+      timings.begin(SLOT.lab);
       lab?.frame();
+      timings.end(SLOT.lab);
+      timings.end(SLOT.total);
+      timings.endFrame();
       diagnostics.frame(frame, refSpace, hands.hands, performance.now() - t0);
     }
   }

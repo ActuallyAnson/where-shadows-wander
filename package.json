@@ -16,7 +16,8 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:three && npm test",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "perf": "vitest bench --run --config vitest.perf.config.ts"
   },
   "dependencies": {
     "@iwsdk/core": "1.0.0",
