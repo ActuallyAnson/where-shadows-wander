@@ -5,7 +5,8 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
-    // The allocation test (frame-pipeline.alloc.test.ts) forces garbage collection to read the heap.
-    poolOptions: { forks: { execArgv: ['--expose-gc'] } },
+    // The allocation test (frame-pipeline.alloc.test.ts) forces a collection first and gives the young generation
+    // room for its whole measuring window, so the heap it reads has seen no collection.
+    poolOptions: { forks: { execArgv: ['--expose-gc', '--min-semi-space-size=64', '--max-semi-space-size=128'] } },
   },
 });

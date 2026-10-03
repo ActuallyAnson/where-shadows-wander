@@ -37,4 +37,22 @@ describe('frame timings', () => {
     expect(timings.toJSON().msAvg.total).toBe(2);
     expect(timings.toJSON().msWorst.total).toBe(2);
   });
+
+  it('averages a slot over the frames it ran in, not every frame', () => {
+    let t = 0;
+    const timings = new FrameTimings(() => t, 4);
+    // The shadow only runs in two of the four frames, costing 2 ms each time.
+    for (const runs of [false, true, false, true]) {
+      if (runs) {
+        timings.begin(SLOT.shadow);
+        t += 2;
+        timings.end(SLOT.shadow);
+      }
+      timings.endFrame();
+    }
+    const r = timings.toJSON();
+    expect(r.msAvg.shadow).toBe(2);
+    expect(r.frameShare.shadow).toBe(0.5);
+    expect(r.frameShare.lab).toBe(0);
+  });
 });

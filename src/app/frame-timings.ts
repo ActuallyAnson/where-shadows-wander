@@ -13,9 +13,11 @@ export class FrameTimings {
   readonly window: number;
   private readonly started = new Float64Array(COUNT);
   private readonly sum = new Float64Array(COUNT);
+  private readonly hits = new Float64Array(COUNT);
   private readonly worst = new Float64Array(COUNT);
   private readonly lastAvg = new Float64Array(COUNT);
   private readonly lastWorst = new Float64Array(COUNT);
+  private readonly lastHits = new Float64Array(COUNT);
   private frames = 0;
   private lastFrames = 0;
 
@@ -33,6 +35,7 @@ export class FrameTimings {
   end(slot: number): void {
     const ms = this.now() - this.started[slot];
     this.sum[slot] += ms;
+    this.hits[slot]++;
     if (ms > this.worst[slot]) this.worst[slot] = ms;
   }
 
@@ -40,24 +43,35 @@ export class FrameTimings {
   endFrame(): void {
     if (++this.frames < this.window) return;
     for (let i = 0; i < COUNT; i++) {
-      this.lastAvg[i] = this.sum[i] / this.frames;
+      // Averaged over the frames the slot ran in, so a stage that only runs sometimes (the shadow, once the rig
+      // is placed) isn't diluted by the frames it skipped.
+      this.lastAvg[i] = this.hits[i] ? this.sum[i] / this.hits[i] : 0;
       this.lastWorst[i] = this.worst[i];
+      this.lastHits[i] = this.hits[i];
     }
     this.lastFrames = this.frames;
     this.frames = 0;
     this.sum.fill(0);
+    this.hits.fill(0);
     this.worst.fill(0);
   }
 
-  /** Milliseconds per slot over the last full window, rounded to microseconds. Allocates: call at report time only. */
-  toJSON(): { frames: number; msAvg: Record<string, number>; msWorst: Record<string, number> } {
+  /** Milliseconds per slot over the last full window (per frame the slot ran in; `frameShare` is the fraction of frames that was), rounded to microseconds. Allocates: call at report time only. */
+  toJSON(): {
+    frames: number;
+    msAvg: Record<string, number>;
+    msWorst: Record<string, number>;
+    frameShare: Record<string, number>;
+  } {
     const round = (v: number) => Math.round(v * 1000) / 1000;
     const msAvg: Record<string, number> = {};
     const msWorst: Record<string, number> = {};
+    const frameShare: Record<string, number> = {};
     for (let i = 0; i < COUNT; i++) {
       msAvg[NAMES[i]] = round(this.lastAvg[i]);
       msWorst[NAMES[i]] = round(this.lastWorst[i]);
+      frameShare[NAMES[i]] = this.lastFrames ? round(this.lastHits[i] / this.lastFrames) : 0;
     }
-    return { frames: this.lastFrames, msAvg, msWorst };
+    return { frames: this.lastFrames, msAvg, msWorst, frameShare };
   }
 }

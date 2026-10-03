@@ -90,7 +90,7 @@ These are starting estimates. Desktop measurements so far: our whole frame was a
 |---|---|---|
 | Our stages on a headset | `perf` in the diagnostics report (Copy report): `msAvg` and `msWorst` per stage (`read`, `classify`, `gestures`, `shadow`, `lab`, `total`) over the last 300 frames | Compare each stage with the table above. Browsers coarsen timers on Pages, so trust averages, not single frames |
 | Our stages on a desktop | `npm run perf` | Per-stage time per frame. Headset budget divided by 4 is the desktop guide: read 0.1 ms, classify and gestures 0.175 ms, shadow 0.225 ms. Measured 3 Oct 2026: recognizer 3.4 µs, shadow 4.3 µs per frame |
-| Allocation | `frame-pipeline.alloc.test.ts`, part of `npm test` | Runs recognizer, gestures and projector for 10,000 frames and fails above 1.25 KB a frame. The stages build no objects or arrays; the measured 0.5–0.8 KB is the JavaScript engine boxing numbers |
+| Allocation | `frame-pipeline.alloc.test.ts`, part of `npm test` | Runs recognizer, gestures and projector for 3,000 frames with no garbage collection inside the window (it fails if one runs) and fails above 700 B a frame. The stages build no objects or arrays. Measured 454 B a frame, which is the engine boxing numbers returned by small helpers; it was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths |
 | GPU time | Pico or Quest performance overlay | Not visible from JavaScript. Check with both shadows covering the stage and `?debug=shadow` |
 
 ## Rules that keep it working

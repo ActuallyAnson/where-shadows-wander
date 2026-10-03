@@ -19,7 +19,10 @@ import { ShadowProjector } from './shadow-projector';
 import { createStagePlane } from './stage-plane';
 
 // The project's TypeScript config has no Node types: reach the two Node globals we need through globalThis.
-const node = globalThis as unknown as { gc?: () => void; process: { memoryUsage(): { heapUsed: number } } };
+const node = globalThis as unknown as {
+  gc?: () => void;
+  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
+};
 const gc = node.gc;
 const FPS = 72;
 const CYCLE: readonly PresetName[] = ['relaxed', 'fist', 'flat', 'rabbit', 'cup', 'spread', 'fox'];
@@ -78,38 +81,67 @@ function makePipeline(extra?: () => void) {
   };
 }
 
-/** Heap growth over `frames` steps after a warm-up and a full collection (no collection runs inside the window). */
+/**
+ * Heap growth over `frames` steps, after a warm-up and a full collection. The young generation is sized
+ * (vitest.config.ts) so no collection runs in the window; the heap is sampled as it goes and the test
+ * fails if it ever shrinks, because a collection would then have freed exactly the short-lived garbage
+ * this test exists to find.
+ */
 function measure(step: () => void, frames: number): { heapBytes: number } {
-  for (let i = 0; i < 2000; i++) step(); // warm up: JIT, first-use buffers
+  for (let i = 0; i < 60000; i++) step(); // warm up: JIT, first-use buffers
   gc!();
   const before = node.process.memoryUsage().heapUsed;
-  for (let i = 0; i < frames; i++) step();
+  let last = before;
+  for (let i = 0; i < frames; i++) {
+    step();
+    if (i % 100 === 99) {
+      const now = node.process.memoryUsage().heapUsed;
+      if (now < last)
+        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
+      last = now;
+    }
+  }
   return { heapBytes: node.process.memoryUsage().heapUsed - before };
 }
 
-const FRAMES = 10_000;
+const FRAMES = 3_000;
 /**
- * The stages build no objects or arrays per frame (they write into reused
- * structs). V8 still boxes some doubles (Math.hypot, Math.acos results, keyed
- * stores), about 0.5-0.8 KB a frame measured, which is a few dozen KB a second:
- * one cheap young-generation collection every few minutes. The budget is set
- * above that, so it only fails when a stage starts allocating real structures
- * (a copied joint array is 300 B a hand, a per-frame event object more).
+ * The stages build no objects or arrays per frame: they write into reused structs. V8 still boxes some
+ * doubles that small helper functions return (about 450 B a frame measured). Math.hypot used to add
+ * another 6.4 KB a frame and was replaced with Math.sqrt. The budget is 1.5 times the baseline, so a
+ * stage that starts allocating real structures fails it (two copied 75-float joint arrays add about 380 B).
  */
-const BUDGET_BYTES_PER_FRAME = 1250;
+const BUDGET_BYTES_PER_FRAME = 700;
+
+// Running without --expose-gc skips the checks below; in CI that must be an error, not a silent pass.
+it('has garbage collection exposed when running in CI', () => {
+  expect(gc !== undefined || !node.process.env.CI).toBe(true);
+});
 
 describe.skipIf(!gc)('frame pipeline allocation', () => {
   it('recognizer, gestures and shadow projector stay under the allocation budget', () => {
     const { heapBytes } = measure(makePipeline(), FRAMES);
+    console.info(`pipeline allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
     expect(heapBytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
   });
 
-  it('the check catches a stage that allocates (a control for the test itself)', () => {
-    const keep: number[][] = [];
-    const leaky = makePipeline(() => {
-      keep.push(new Array(512).fill(0.5)); // a few KB a frame, retained
-    });
-    const { heapBytes } = measure(leaky, FRAMES);
+  it('catches a stage that allocates and throws it away (a control for the test itself)', () => {
+    const { heapBytes } = measure(
+      makePipeline(() => void new Array(256).fill(0.5)), // about 2 KB of garbage a frame, never retained
+      FRAMES,
+    );
+    expect(heapBytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
+  });
+
+  it('catches the regression the docs name: a joint array copied per hand per frame', () => {
+    const joints = new Float32Array(75);
+    const { heapBytes } = measure(
+      makePipeline(() => {
+        void Float32Array.from(joints);
+        void Float32Array.from(joints);
+      }),
+      FRAMES,
+    );
     expect(heapBytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
   });
 });
