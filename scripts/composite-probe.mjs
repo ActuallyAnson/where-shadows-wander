@@ -1,3 +1,4 @@
+/* global window */
 // Checks what the scene would hand to a passthrough compositor, without a headset.
 // Usage: start a dev server (npx vite --port 8091 --strictPort) then
 //   node scripts/composite-probe.mjs https://localhost:8091
