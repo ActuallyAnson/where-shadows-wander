@@ -1,7 +1,8 @@
 import { execSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 function buildId(): string {
   try {
@@ -11,8 +12,43 @@ function buildId(): string {
   }
 }
 
+/**
+ * Dev server only: POST /__wsw/recordings/<name>.handrec.json writes the body
+ * to recordings/, so the Hand Lab can save a recording without a browser
+ * download (which can crash Chrome for Testing) and the file lands where
+ * `npm run eval` reads it.
+ */
+function saveRecordings(): Plugin {
+  const dir = fileURLToPath(new URL('./recordings/', import.meta.url));
+  return {
+    name: 'wsw-save-recordings',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__wsw/recordings/', (req, res) => {
+        const name = (req.url ?? '').replace(/^\//, '');
+        if (req.method !== 'POST' || !/^[\w.-]+\.handrec\.json$/.test(name)) {
+          res.statusCode = 400;
+          return res.end('bad request');
+        }
+        const chunks: Buffer[] = [];
+        let size = 0;
+        req.on('data', (c: Buffer) => {
+          size += c.length;
+          if (size > 64e6) req.destroy();
+          else chunks.push(c);
+        });
+        req.on('end', () => {
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(dir + name, Buffer.concat(chunks));
+          res.end('ok');
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [iwsdkDev()],
+  plugins: [iwsdkDev(), saveRecordings()],
   server: { host: '0.0.0.0', port: 8081, open: false },
   // Relative URLs so the build works under a GitHub Pages project subpath.
   base: './',

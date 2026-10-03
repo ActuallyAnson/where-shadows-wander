@@ -73,7 +73,20 @@ function classifierHtml(
   return `<div class="shape${state.committed ? '' : ' none'}">${big}</div>${hold}${posed}${bars}`;
 }
 
-/** Saves a recording as `<prefix>-<time>.handrec.json`. */
-export function downloadRecording(rec: HandRecording, prefix: string): void {
-  download(JSON.stringify(rec), `${prefix}-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`);
+/**
+ * Saves a recording as `<prefix>-<time>.handrec.json`: into recordings/ through
+ * the dev server when it is running (no browser download, which has crashed
+ * Chrome for Testing), else as a browser download. Resolves to where it went.
+ */
+export async function downloadRecording(rec: HandRecording, prefix: string): Promise<string> {
+  const name = `${prefix}-${rec.recordedAt.replace(/[:.]/g, '-')}.handrec.json`;
+  const text = JSON.stringify(rec);
+  try {
+    const res = await fetch(`./__wsw/recordings/${name}`, { method: 'POST', body: text });
+    if (res.ok) return `Saved recordings/${name}`;
+  } catch {
+    // No dev server (a built page): fall through to the download.
+  }
+  download(text, name);
+  return `Downloaded ${name}`;
 }

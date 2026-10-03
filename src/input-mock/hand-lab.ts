@@ -166,12 +166,20 @@ export class HandLab {
     this.renderControls();
   }
 
+  /** Saves a recording and says where it went. */
+  private save(rec: HandRecording, prefix: string): void {
+    void downloadRecording(rec, prefix).then((where) => {
+      this.message = where;
+      this.renderControls();
+    });
+  }
+
   /** Ends a guided recording (finished or stopped early) and downloads it with its labels. */
   private finishGuided(): void {
     if (!this.guided) return;
     const rec = this.guided.finish();
     this.guided = null;
-    if (rec.frames.length) downloadRecording(rec, 'wsw-lab-guided');
+    if (rec.frames.length) this.save(rec, 'wsw-lab-guided');
     else this.message = 'Guided recording stopped before it recorded anything, so nothing was saved.';
     // The run used a one-shot script; go back to the looping one the Script button promises.
     if (this.mode.source instanceof ScriptedSource) this.setSource(new ScriptedSource());
@@ -188,7 +196,7 @@ export class HandLab {
       );
       this.recordStart = this.mode.time;
     } else {
-      downloadRecording(this.recording, 'wsw-lab');
+      this.save(this.recording, 'wsw-lab');
       this.recording = null;
     }
     this.renderControls();

@@ -148,7 +148,7 @@ function finishGuided(): void {
   if (!guided) return;
   const rec = guided.finish();
   guided = null;
-  if (rec.frames.length) downloadRecording(rec, 'wsw-webcam-guided');
+  if (rec.frames.length) void downloadRecording(rec, 'wsw-webcam-guided');
   $('guide').textContent = 'Guided recording';
   $<HTMLButtonElement>('rec').disabled = false;
   prompt.hidden = true;
@@ -180,6 +180,6 @@ function toggleRecording(): void {
   const rec = recording;
   recording = null;
   button.textContent = 'Record';
-  downloadRecording(rec, 'wsw-webcam');
+  void downloadRecording(rec, 'wsw-webcam');
   $<HTMLButtonElement>('guide').disabled = false;
 }
