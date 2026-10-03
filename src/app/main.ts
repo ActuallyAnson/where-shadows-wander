@@ -8,6 +8,7 @@ import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
+import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { createStagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
@@ -74,6 +75,8 @@ async function start(): Promise<void> {
   const lantern = new Float64Array(3);
   const projector = new ShadowProjector();
   const shadowRenderer = new ShadowRenderer();
+  // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
+  const sharpen = new ShadowSharpen();
   const stageView = new TestStageView();
   stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
   const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
@@ -209,6 +212,7 @@ async function start(): Promise<void> {
       timings.begin(SLOT.gestures);
       gestures.update(hands.hands, handsT, shapes);
       timings.end(SLOT.gestures);
+      sharpen.update({ left: shapes.left.state, right: shapes.right.state }, shapes.events, delta);
       if (!mock && frame && refSpace && refSpace !== resetWatched) {
         // Recentring moves the player's frame: place the rig again from the new head pose.
         refSpace.addEventListener('reset', () => (rigPlaced = false));
@@ -226,7 +230,7 @@ async function start(): Promise<void> {
       if (rigPlaced) {
         timings.begin(SLOT.shadow);
         projector.update(hands.hands, stage, lantern);
-        shadowRenderer.update(projector.shadows, stage);
+        shadowRenderer.update(projector.shadows, stage, sharpen.look);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
       }
@@ -284,6 +288,7 @@ async function start(): Promise<void> {
         projector,
         stage,
         occluder,
+        sharpen,
         dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
