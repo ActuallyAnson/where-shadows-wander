@@ -51,12 +51,16 @@ for (const occlude of ['1', '0']) {
       ((s.origin[0] - cam.x) * n[0] + (s.origin[1] - cam.y) * n[1] + (s.origin[2] - cam.z) * n[2]) /
       (d[0] * n[0] + d[1] * n[1] + d[2] * n[2]);
     const behind = [0, 1, 2].map((i) => [cam.x, cam.y, cam.z][i] + d[i] * t);
-    const points = [at(s.width / 2 + 0.12, 0), at(-s.width / 2 + 0.04, -s.height / 2 + 0.04), core, behind];
+    const points = [at(s.width / 2 + 0.03, 0), at(-s.width / 2 + 0.04, -s.height / 2 + 0.04), core, behind];
     return { pixels: w.probe(points), t, hand: w.hands.hands.right.tracked };
   });
   console.log(`--- occlude=${occlude}  (hand tracked: ${r.hand}, eye-to-stage ratio past the palm: ${r.t.toFixed(2)})`);
   const [off, paper, shadow, behind] = r.pixels;
-  check('off the stage is transparent', off === null || off[3] === 0, JSON.stringify(off));
+  check(
+    'off the stage is transparent (and on screen, so a pixel was read)',
+    off !== null && off[3] === 0,
+    JSON.stringify(off),
+  );
   check(
     'bare paper is premultiplied at alpha 0.85',
     paper &&

@@ -16,6 +16,8 @@ export function probePixels(
   camera: PerspectiveCamera,
   points: readonly (readonly number[])[],
 ): (number[] | null)[] {
+  // In a session three swaps in the XR cameras, so the pixels would not match the projected points.
+  if (renderer.xr.isPresenting) throw new Error('probePixels is for the desktop view, not an XR session');
   const target = new WebGLRenderTarget(SIZE, SIZE, { format: RGBAFormat, type: UnsignedByteType });
   target.texture.colorSpace = SRGBColorSpace;
   const oldTarget = renderer.getRenderTarget();
