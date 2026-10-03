@@ -30,6 +30,7 @@ import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mo
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { probePixels } from './composite-probe';
 import { FrameTimings, SLOT } from './frame-timings';
+import { mountEnterArButtonIfNeeded } from './enter-ar-button';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
@@ -55,6 +56,8 @@ async function start(): Promise<void> {
     if (emulated) emulated.primaryInputMode = 'hand';
   }
   diagnostics.mark('worldCreated');
+  // Browsers that never offer an AR session (Pico Browser) get an Enter AR button.
+  if (!mockOptions) void mountEnterArButtonIfNeeded(world);
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
