@@ -74,7 +74,7 @@ Goal: puzzles 4–6, the rabbit and fox, the chapter ending and the saved galler
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Performance pass on hands and shadows (Pico) | | |
+| Anson | Performance pass on hands and shadows (Pico) | | ⏳ |
 | A | Puzzles 4–6 | | |
 | A | Companions: rabbit and fox | | |
 | A | Creature discovery | | |
@@ -89,8 +89,8 @@ Goal: art, audio, onboarding polish and accessibility. No new features after thi
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Lantern light and flicker shader | #14 | |
-| Anson | Recognition sharpen effect | #15 | |
+| Anson | Lantern light and flicker shader | #14 | ⏳ |
+| Anson | Recognition sharpen effect | #15 | ⏳ |
 | A | Debug tools; bug fixing | | |
 | B | Accessibility settings: tolerance, hold time, shadow size, high contrast, captions | | |
 | B | Hint system | | |
