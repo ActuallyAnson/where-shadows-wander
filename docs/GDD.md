@@ -233,6 +233,8 @@ Switching between tabletop and wall only swaps the plane frame. All gameplay cod
 
 - A small blur on the shadow edge, scaled by the hand's distance from the plane, gives a soft, natural edge.
 
+- Recognition sharpens the shadow (`src/engine/shadow/pure/shadow-sharpen.ts`): per hand, the edge blur shrinks and the shadow darkens a little as the hold fills (up to 70 % of the effect at the end of the hold), snaps to its crispest on commit with a brief extra pulse, and relaxes over about a quarter of a second on cancel or release. The shadow's shape and collision capsules never change, only how its edge is drawn; the edge never gets narrower than a pixel. `strength` (0 to 1, default 1) is the setting for accessibility (0 turns it off) and the other values are in `DEFAULT_SHARPEN_SETTINGS`. The paper rustle and the thump belong to audio: play the rustle on a ShapeEvent `candidate` and the thump on `commit`.
+
 - This avoids real-time shadow maps entirely and costs only two extra draw calls.
 
 ### Pose classifier
