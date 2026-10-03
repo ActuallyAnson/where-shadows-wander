@@ -57,14 +57,14 @@ The emulator's hands are perfect and synthetic. It's for checking that code work
 
 The Hand Lab is mock mode (`?mock=1`): the game runs in a normal browser with hands from a mock source instead of a headset.
 
-1. With `npm run dev` running, open **https://localhost:8081/?mock=1** in a normal Chrome tab, or press **Open Hand Lab** (top left) on the game page. Don't use the window `npm run dev` opens by itself: it drops `?mock=1` when the page reloads, and it doesn't save downloads to your Downloads folder.
+1. With `npm run dev` running, open **https://localhost:8081/?mock=1** in a normal Chrome tab, or press **Open Hand Lab** (top left) on the game page. Don't use the window `npm run dev` opens by itself: it drops `?mock=1` when the page reloads, and its downloads don't reach your Downloads folder (recordings don't need them: see below).
 2. Pick a **Source** in the panel on the right:
    - **Synthetic:** choose **Left** or **Right**, then click a shape (or press 0–6). **Hide** takes a hand away (as if tracking were lost) and **Jitter** adds a few millimetres of tracking noise. Keys: R/L pick a hand, arrows move it (Shift for depth), Q/E roll, Z/X turn, T/Y tilt the fingers up or down, Space pauses. Lantern gestures: P pinches (press again to let go: the log shows a pinch-release where the fingertips met), G moves the hand over the stand-in lantern (then 2 for a fist covers the flame), B brings it back. The **Lantern gestures** box logs each gesture.
    - **Script:** every shape on the right hand, then the left, in a loop.
    - **Replay…:** pick a `.handrec.json`, or drag one onto the page.
    - **Webcam:** your own hands. Allow camera access; the first start downloads the hand model (about 8 MB). The status line shows the tracking rate and MediaPipe's time per frame, which runs in the background and doesn't slow the page.
 3. Drag to look around the hands, scroll to zoom. The cards show each hand's palm direction, thumb–index gap, finger spread and finger curl. The big label is the shape the hand is posed as (Synthetic and Script); the rough guess under it only knows flat, fist and open until the classifier lands.
-4. **● Record**, then **Stop and download**, saves a `.handrec.json` to your Downloads folder.
+4. **● Record**, then **Stop and download**, saves a `.handrec.json` into the repo's `recordings/` folder through the dev server (the message under Source says where). On a built page without the dev server it downloads to your Downloads folder instead.
 5. **Calibration:** with real hands, press **Calibrate right** (or left) and hold that hand flat, fingers straight and together, for 2 seconds. Curl is then measured from your own straight, which removes the webcam's offset (it reads straight fingers as somewhat bent). It's remembered in this browser; **Clear** removes it. The **Shape guide** shows a picture of each shape and how to make it.
 6. **Guided recording** prompts you through every shape, right hand then left (84 s: each shape held 4.5 s with 2 s rests, with a picture of each), and saves a recording with **shape labels**: which shape each hand was asked to make, and when. Those are what the classifier is scored against (#12). Use it with the **Webcam** source. With **Script** it gives a labelled synthetic recording. Press **Stop guided** to end early; you keep the labels for the prompts you finished.
 
@@ -171,6 +171,6 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
 | Hand Lab opens as the plain game | The address lost `?mock=1` (the window `npm run dev` opens drops it on reload). Use a normal Chrome tab. |
-| Hand Lab recording didn't download | You're in the window `npm run dev` opens, which doesn't save downloads. Use a normal Chrome tab. |
+| Hand Lab recording isn't in `recordings/` | The dev server must be running (`npm run dev`) with the new vite.config.ts: restart it once after pulling. Without it the page falls back to a browser download. |
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |
