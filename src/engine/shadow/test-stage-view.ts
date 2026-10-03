@@ -28,7 +28,14 @@ export class TestStageView {
   constructor() {
     this.paper = new Mesh(
       new PlaneGeometry(1, 1),
-      new MeshBasicMaterial({ color: 0xf2e6c9, transparent: true, opacity: 0.85, depthWrite: false }),
+      new MeshBasicMaterial({
+        color: 0xf2e6c9,
+        transparent: true,
+        premultipliedAlpha: false,
+        toneMapped: false,
+        opacity: 0.85,
+        depthWrite: false,
+      }),
     );
     this.paper.renderOrder = PAPER_RENDER_ORDER;
     const corners = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
