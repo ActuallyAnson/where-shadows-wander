@@ -102,6 +102,8 @@ export interface LandmarkerResult {
 }
 
 const scratch = [createHandFrame('left'), createHandFrame('right')];
+/** Two detections whose wrists are closer than this are one hand reported twice, with opposite labels. */
+const DUPLICATE_WRIST_M = 0.06;
 
 /**
  * Writes a landmarker result into both hands; hands it didn't see are left untracked.
@@ -109,6 +111,8 @@ const scratch = [createHandFrame('left'), createHandFrame('right')];
  * With `lockSide`, a single hand is always that side: MediaPipe often guesses a
  * lone hand's side wrong (worst when the back of the hand faces the camera),
  * which also flips its palm direction.
+ * MediaPipe also sometimes reports one hand twice (once as each side); the
+ * second detection is dropped, so a single hand never shows up as two.
  */
 export function resultToHands(
   result: LandmarkerResult,
@@ -119,13 +123,21 @@ export function resultToHands(
 ): void {
   hands.left.tracked = hands.right.tracked = false;
   hands.left.validJoints = hands.right.validJoints = 0;
-  const n = Math.min(result.landmarks.length, 2);
+  let n = Math.min(result.landmarks.length, 2);
   const labels: Handedness[] = [];
   const wrists: Vec3[] = [];
   for (let i = 0; i < n; i++) {
     labels.push(handednessFromLabel(result.handedness[i]?.[0]?.categoryName ?? 'Left'));
     const p = mediapipeToHandFrame(result.worldLandmarks[i], result.landmarks[i], scratch[i]).positions;
     wrists.push([p[0], p[1], p[2]]);
+  }
+  if (
+    n === 2 &&
+    Math.hypot(wrists[0][0] - wrists[1][0], wrists[0][1] - wrists[1][1], wrists[0][2] - wrists[1][2]) <
+      DUPLICATE_WRIST_M
+  ) {
+    n = 1;
+    labels.length = wrists.length = 1;
   }
   const sides: Handedness[] =
     lockSide && n === 1

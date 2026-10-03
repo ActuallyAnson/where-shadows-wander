@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHandFrame, derivePalm, JOINT } from '../engine/hands/hand';
-import { handednessFromLabel, mediapipeToHandFrame, type Landmark } from './mediapipe-hands';
+import { handednessFromLabel, mediapipeToHandFrame, resultToHands, type Landmark } from './mediapipe-hands';
 
 /**
  * A right hand held up, palm toward the camera, in MediaPipe world coords
@@ -52,5 +52,18 @@ describe('MediaPipe to HandFrame', () => {
         h.positions[a + 2] - h.positions[b + 2],
       );
     expect(d(meta, wrist) / d(knuckle, wrist)).toBeCloseTo(0.15, 3);
+  });
+
+  it('drops a hand that MediaPipe reports twice with opposite labels', () => {
+    const lm = rightHandPalmToCamera();
+    const result = {
+      landmarks: [lm, lm],
+      worldLandmarks: [lm, lm],
+      handedness: [[{ categoryName: 'Right' }], [{ categoryName: 'Left' }]],
+    };
+    const hands = { left: createHandFrame('left'), right: createHandFrame('right') };
+    resultToHands(result, hands);
+    expect([hands.left.tracked, hands.right.tracked].filter(Boolean)).toHaveLength(1);
+    expect(hands.right.tracked).toBe(true);
   });
 });
