@@ -51,10 +51,10 @@ describe('lantern light', () => {
     expect(m.light.intensity).toBeLessThan(1.1);
   });
 
-  it('goes out within the fade time plus a frame when put out', () => {
+  it('goes out within the fade time (0.25 s) plus a frame when put out', () => {
     const m = new LanternLightModel();
     for (let i = 0; i <= FPS; i++) m.update(i / FPS, at, true);
-    for (let i = 1; i <= Math.ceil(0.35 * FPS); i++) m.update(1 + i / FPS, at, false);
+    for (let i = 1; i <= Math.ceil(0.25 * FPS) + 1; i++) m.update(1 + i / FPS, at, false);
     expect(m.light.intensity).toBe(0);
   });
 
@@ -100,5 +100,16 @@ describe('lantern light', () => {
     const m = new LanternLightModel();
     for (let i = 0; i <= 2 * FPS; i++) m.update(i / FPS, at, true);
     expect(Array.from(m.light.position)).toEqual(at);
+  });
+
+  it('a bad clock value changes nothing', () => {
+    const m = new LanternLightModel();
+    for (let i = 0; i <= FPS; i++) m.update(i / FPS, at, true);
+    const before = m.light.intensity;
+    m.update(NaN, at, true);
+    m.update(Infinity, at, true);
+    expect(m.light.intensity).toBe(before);
+    m.update(1 + 1 / FPS, at, true);
+    expect(Number.isFinite(m.light.intensity)).toBe(true);
   });
 });

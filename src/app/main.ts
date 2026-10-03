@@ -89,6 +89,11 @@ async function start(): Promise<void> {
           ? 0.3
           : 1,
   });
+  // Follow the OS reduced-motion setting while the page is open, unless ?flicker= was given.
+  if (!params.has('flicker') && typeof matchMedia === 'function')
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+      lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
+    });
   const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
   stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern

@@ -84,12 +84,12 @@ export class HandLab {
     setInterval(() => this.renderLive(), 100);
   }
 
-  /** Call once per frame, after the hands are filled. */
   /** The lantern marker's glow follows the flickering light. */
   applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
     this.marker.setLight(light, cameraQuaternion);
   }
 
+  /** Call once per frame, after the hands are filled. */
   frame(): void {
     this.bones.update([this.hands.left, this.hands.right]);
     const g = this.gestures;

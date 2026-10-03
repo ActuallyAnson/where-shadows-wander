@@ -62,9 +62,11 @@ export class LanternLightModel {
   /**
    * @param t the caller's clock, seconds
    * @param position the flame's position (scene space), or null for no lantern
-   * @param lit whether the flame is burning
+   * @param lit whether the flame is burning. It fades over `fadeS` each way, so don't toggle it faster than
+   *   about twice a second: a flame flashing on and off is a flicker of its own.
    */
   update(t: number, position: ArrayLike<number> | null, lit: boolean): void {
+    if (!Number.isFinite(t)) return; // a bad clock changes nothing, rather than poisoning the brightness for good
     const s = this.settings;
     const dt = Number.isNaN(this.lastT) ? 0 : Math.min(Math.max(t - this.lastT, 0), 0.1);
     this.lastT = t;
