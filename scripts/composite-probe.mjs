@@ -21,7 +21,9 @@ const check = (name, ok, detail) => {
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const lin = (byte) => ((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))(byte / 255);
-const PAPER_LINEAR = [0xf2, 0xe6, 0xc9].map(lin); // TestStageView's paper colour
+// TestStageView's paper colour, tinted 12 % toward the steady flame colour (flicker=0, intensity 1).
+const AMBER = [1, 0.56, 0.24];
+const PAPER_LINEAR = [0xf2, 0xe6, 0xc9].map(lin).map((c, i) => c * 0.88 + AMBER[i] * 0.12);
 const PAPER_ALPHA = 0.85;
 const SHADOW_ALPHA = 0.88;
 
@@ -30,7 +32,7 @@ for (const occlude of ['1', '0']) {
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`${base}/?mock=1&occlude=${occlude}`);
+  await page.goto(`${base}/?mock=1&flicker=0&occlude=${occlude}`);
   await page.waitForFunction(() => window.__wsw?.projector?.shadows.right.active, null, { timeout: 60000 });
   await page.waitForTimeout(1500);
   const r = await page.evaluate(() => {

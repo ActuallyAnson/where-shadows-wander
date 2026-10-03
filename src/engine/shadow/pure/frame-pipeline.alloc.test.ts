@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { GestureDetector } from '../../hands/gesture-detector';
 import { createHandFrame, type HandFrame, type Handedness } from '../../hands/hand';
 import { ShapeRecognizer } from '../../hands/shape-recognizer';
+import { LanternLightModel } from './lantern-light';
+import { ShadowSharpen } from './shadow-sharpen';
 import {
   jitterHand,
   lerpPose,
@@ -57,6 +59,9 @@ function makePipeline(extra?: () => void) {
   const baked = bakeFrames();
   const shapes = new ShapeRecognizer();
   const gestures = new GestureDetector();
+  const sharpen = new ShadowSharpen();
+  const light = new LanternLightModel();
+  const states = { left: shapes.left.state, right: shapes.right.state };
   const projector = new ShadowProjector();
   const stage = createStagePlane();
   stage.origin.set([0, 0.75, -0.75]);
@@ -75,6 +80,8 @@ function makePipeline(extra?: () => void) {
     const t = frame / FPS;
     shapes.update(hands, t);
     gestures.update(hands, t, shapes);
+    sharpen.update(states, shapes.events, 1 / FPS);
+    light.update(t, lantern, true);
     projector.update(hands, stage, lantern);
     extra?.();
     frame++;
@@ -107,7 +114,7 @@ function measure(step: () => void, frames: number): { heapBytes: number } {
 const FRAMES = 3_000;
 /**
  * The stages build no objects or arrays per frame: they write into reused structs. V8 still boxes some
- * doubles that small helper functions return (about 450 B a frame measured). Math.hypot used to add
+ * doubles that small helper functions return (about 530 B a frame measured with the sharpen and lantern models included). Math.hypot used to add
  * another 6.4 KB a frame and was replaced with Math.sqrt. The budget is 1.5 times the baseline, so a
  * stage that starts allocating real structures fails it (two copied 75-float joint arrays add about 380 B).
  */

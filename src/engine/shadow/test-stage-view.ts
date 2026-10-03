@@ -4,6 +4,7 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  Color,
   Group,
   LineBasicMaterial,
   LineLoop,
@@ -11,9 +12,13 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
-  SphereGeometry,
 } from '@iwsdk/core';
+import type { Quaternion } from '@iwsdk/core';
+import { LanternGlow } from './lantern-glow';
+import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
+
+const PAPER = new Color(0xf2e6c9);
 
 /** The paper draws before the shadows (SHADOW_RENDER_ORDER = 2). */
 const PAPER_RENDER_ORDER = 1;
@@ -22,21 +27,21 @@ export class TestStageView {
   readonly group = new Group();
   private readonly paper: Mesh;
   private readonly border: LineLoop;
-  private readonly flame: Mesh;
+  private readonly paperMaterial: MeshBasicMaterial;
+  private readonly flame = new LanternGlow();
+  private readonly lit = new Color();
   private readonly m = new Matrix4();
 
   constructor() {
-    this.paper = new Mesh(
-      new PlaneGeometry(1, 1),
-      new MeshBasicMaterial({
-        color: 0xf2e6c9,
-        transparent: true,
-        premultipliedAlpha: false,
-        toneMapped: false,
-        opacity: 0.85,
-        depthWrite: false,
-      }),
-    );
+    this.paperMaterial = new MeshBasicMaterial({
+      color: PAPER,
+      transparent: true,
+      premultipliedAlpha: false,
+      toneMapped: false,
+      opacity: 0.85,
+      depthWrite: false,
+    });
+    this.paper = new Mesh(new PlaneGeometry(1, 1), this.paperMaterial);
     this.paper.renderOrder = PAPER_RENDER_ORDER;
     const corners = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
     const g = new BufferGeometry();
@@ -46,8 +51,7 @@ export class TestStageView {
       o.matrixAutoUpdate = false;
       o.frustumCulled = false;
     }
-    this.flame = new Mesh(new SphereGeometry(0.012, 12, 8), new MeshBasicMaterial({ color: 0xffd27a }));
-    this.group.add(this.paper, this.border, this.flame);
+    this.group.add(this.paper, this.border, this.flame.mesh);
     this.group.visible = false;
   }
 
@@ -67,12 +71,25 @@ export class TestStageView {
     this.paper.matrix.copy(this.m);
     this.border.matrix.copy(this.m);
     this.paper.matrixWorldNeedsUpdate = this.border.matrixWorldNeedsUpdate = true;
-    this.flame.position.set(lantern[0], lantern[1], lantern[2]);
+    this.flame.mesh.position.set(lantern[0], lantern[1], lantern[2]);
     this.group.visible = true;
   }
 
   /** The stand-in flame (hidden where another lantern view is shown, e.g. the Hand Lab's). */
   set flameVisible(v: boolean) {
-    this.flame.visible = v;
+    this.flame.mesh.visible = v;
+  }
+
+  /**
+   * The lantern's flicker lights the paper: it brightens and dims a little and warms with the flame, and the glow
+   * follows the light. A lantern that is out leaves the paper at half brightness.
+   */
+  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+    // Lit, the paper follows the light's brightness exactly (1 plus or minus the flicker); out, it falls to half.
+    const level = 0.5 + 0.5 * Math.min(Math.max(2 * light.intensity - 1, 0), 1.3);
+    // Tint toward the flame's colour a little, so the paper warms as the flame reddens.
+    this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
+    this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12).multiplyScalar(level);
+    this.flame.update(light, cameraQuaternion);
   }
 }

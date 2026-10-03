@@ -164,6 +164,8 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 - **Lighting:** The only bright object in the scene is the lantern. Its gentle flicker drives a subtle shimmer across the stage.
 
+  The flicker (`src/engine/shadow/pure/lantern-flicker.ts`, `lantern-light.ts`) is slow and calm: two sine waves and a little noise, all under 4 Hz, with at most a 0.11 change from one frame to the next at 72 Hz, so it never strobes. At full strength it swings the flame's brightness by plus or minus 8 % and reddens it slightly when it dips; the paper brightens and dims with it and warms toward the flame's colour. Shadows stay pure black, and the point the shadows are cast from stays still, so shadows and collision never shimmer. The flicker amount is a setting (0 to 1, `?flicker=` in the address, 0 is a steady light); it starts at 0.3 when the device asks for reduced motion.
+
 - **Passthrough:** Left untinted so the real room stays recognisable; the stage glows warmly within it.
 
 ### Audio
