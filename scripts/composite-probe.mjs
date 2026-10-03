@@ -4,9 +4,11 @@
 // Opens ?mock=1&occlude=1 (and ?occlude=0 for contrast) in headless Chromium and
 // reads the rendered pixels at four stage points through __wsw.probe (dev builds only):
 //   off the stage          alpha 0 (the room shows through)
-//   bare paper             premultiplied paper: alpha 0.85, rgb = paper colour x 0.85
-//   inside a hand's shadow nearly black, nearly opaque
+//   bare paper             alpha 0.85, linear rgb = paper colour x 0.85 (premultiplied)
+//   inside a hand's shadow alpha 0.88 + 0.85 x 0.12 = 0.98, linear rgb = paper x 0.85 x 0.12 (the shadow is 88 % black)
 //   paper behind a hand    alpha 0 with the occluder on (the real hand stays visible), 0.85 with it off
+// The target is sRGB like WebXR's: blending happens in linear light and the bytes are sRGB-encoded afterwards,
+// so rgb is compared after decoding.
 import { chromium } from 'playwright';
 
 const base = process.argv[2] ?? 'https://localhost:8081';
@@ -17,6 +19,10 @@ const check = (name, ok, detail) => {
   if (!ok) failed++;
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
+const lin = (byte) => ((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))(byte / 255);
+const PAPER_LINEAR = [0xf2, 0xe6, 0xc9].map(lin); // TestStageView's paper colour
+const PAPER_ALPHA = 0.85;
+const SHADOW_ALPHA = 0.88;
 
 for (const occlude of ['1', '0']) {
   const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1000, height: 800 } });
@@ -28,6 +34,7 @@ for (const occlude of ['1', '0']) {
   await page.waitForTimeout(1500);
   const r = await page.evaluate(() => {
     const w = window.__wsw;
+    w.dots.mesh.visible = false; // the debug joint dots draw over everything
     const s = w.stage;
     const at = (x, y) => [0, 1, 2].map((i) => s.origin[i] + s.right[i] * x + s.up[i] * y);
     const sh = w.projector.shadows.right;
@@ -49,10 +56,29 @@ for (const occlude of ['1', '0']) {
   console.log(`--- occlude=${occlude}  (hand tracked: ${r.hand}, eye-to-stage ratio past the palm: ${r.t.toFixed(2)})`);
   const [off, paper, shadow, behind] = r.pixels;
   check('off the stage is transparent', off === null || off[3] === 0, JSON.stringify(off));
-  check('bare paper is premultiplied at alpha 0.85', paper && near(paper[3], 217, 3) && paper[0] <= paper[3], JSON.stringify(paper));
-  check('shadow core is near black and near opaque', shadow && shadow[0] <= 8 && shadow[3] >= 245, JSON.stringify(shadow));
-  if (occlude === '1') check('paper behind a hand is transparent (hand stays visible)', behind && behind[3] === 0, JSON.stringify(behind));
-  else check('without the occluder the paper covers the hand', behind && behind[3] >= 200, JSON.stringify(behind));
+  check(
+    'bare paper is premultiplied at alpha 0.85',
+    paper &&
+      near(paper[3] / 255, PAPER_ALPHA, 0.01) &&
+      [0, 1, 2].every((i) => near(lin(paper[i]), PAPER_LINEAR[i] * PAPER_ALPHA, 0.012)),
+    JSON.stringify(paper),
+  );
+  const covered = PAPER_ALPHA * (1 - SHADOW_ALPHA);
+  check(
+    'inside a shadow: 88 % black over the paper, alpha 0.98',
+    shadow &&
+      near(shadow[3] / 255, SHADOW_ALPHA + covered, 0.012) &&
+      [0, 1, 2].every((i) => near(lin(shadow[i]), PAPER_LINEAR[i] * covered, 0.012)),
+    JSON.stringify(shadow),
+  );
+  if (occlude === '1')
+    check('paper behind a hand is transparent (hand stays visible)', behind && behind[3] === 0, JSON.stringify(behind));
+  else
+    check(
+      'without the occluder the paper covers the hand',
+      behind && near(behind[3] / 255, PAPER_ALPHA, 0.15),
+      JSON.stringify(behind),
+    );
   check('no page errors', errors.length === 0, errors.join('; '));
   await ctx.close();
 }

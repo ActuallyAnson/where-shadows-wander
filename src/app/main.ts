@@ -268,6 +268,7 @@ async function start(): Promise<void> {
         projector,
         stage,
         occluder,
+        dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
       },
