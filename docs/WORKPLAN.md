@@ -8,7 +8,7 @@ When time runs short, protect P1. Features freeze at the end of week 6.
 
 ## Week 1 (to 8 Oct): XR shell on a headset
 
-Goal: the shell runs on the Pico with hands, passthrough and plane detection, and we have its report.
+Goal: the shell runs on the Pico with hand tracking in a VR session, and we have its report. (From 5 Oct the game is a virtual room, so passthrough and plane detection are no longer goals; see [ADR 0005](adr/0005-virtual-room.md).)
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
@@ -22,22 +22,26 @@ Goal: the shell runs on the Pico with hands, passthrough and plane detection, an
 | B | Take over CI and the Pages deploy | | |
 | A | Loop scheduler (from `src/engine/sim/fixed-step.ts`): interpolation, pause/resume, determinism | | |
 | A | StageFrame maths: first version on a fixed test plane | | |
-| All | Confirm submission rules on the Meta Developer Forum | | |
+| All | Confirm submission rules on the Meta Developer Forum (include: how a VR-only entry is scored) | | |
+| Anson, B | Find why the Pico browser gives our page no hand joints although the WebXR hands sample shows them in Wolvic (`?xrfeatures=sample`, `?xrmode=vr`) | | ⏳ |
+| All | Eligibility: submitter joins the Meta VR Start Program, Developer Access, everyone 18 or older | | |
 
 ## Week 2 (to 15 Oct): shadows and the 2D stage
 
-Goal: hand shadows on the stage, and a 2D world in stage space, in both stage modes.
+Goal: hand shadows on the wall, and a 2D world in stage space.
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
 | Anson | Projected-shadow renderer and collision capsules | #9 | ⏳ |
 | Anson | Lantern gestures (pinch to place, hand over the flame to pause) | #10 | ⏳ |
-| A | StageFrame: choosing a table or wall, snapping, placement fallback | | |
+| A | StageFrame for the fixed virtual wall (no detection; a real-surface frame is a later mode) | | |
 | A | Entity system and object pools | | |
 | A | 2D collision solver: first version against the shadow capsules | | |
 | B | Stage renderer: instanced sprites from entity state | | |
 | B | Lantern flow: place and light, pause, relight | | |
 | B | Asset pipeline: lantern visible in under 5 s | | |
+| B | Virtual room: table, lantern, paper wall, shelf, lighting (first version, placeholder art) | | |
+| Anson | Hand visuals: draw the player's hands from the 25 joints; no-hands notice; visibility pause signal | | |
 
 ## Week 3 (to 22 Oct): recognising shapes
 
@@ -60,7 +64,7 @@ Goal: the traveller, and puzzles 1–3 including the wordless tutorial.
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| Anson | Composite the stage and shadows over passthrough | #13 | ⏳ |
+| Anson | ~~Composite the stage and shadows over passthrough~~ not needed for v1 (VR room); kept for a possible real-room mode | #13 | — |
 | Anson | Classifier tuning from week-3 test recordings | #12 | |
 | A | Puzzle framework: JSON levels, win conditions, solution tracking | | |
 | A | Puzzles 1–3, including the tutorial gap | | |
@@ -94,15 +98,15 @@ Goal: art, audio, onboarding polish and accessibility. No new features after thi
 | A | Debug tools; bug fixing | | |
 | B | Accessibility settings: tolerance, hold time, shadow size, high contrast, captions | | |
 | B | Hint system | | |
-| B | Art and audio in (CC0 or royalty-free, tracked in CREDITS.md) | | |
+| B | Room and hand art, art and audio in (CC0 or royalty-free, tracked in CREDITS.md) | | |
 
 ## Week 7 (to 19 Nov): ship
 
-Goal: tested in different rooms, fast enough, submitted.
+Goal: tested in different lighting, fast enough, submitted.
 
 | Owner | Task | Issue | Status |
 |---|---|---|---|
-| All | Testing in different rooms, on the Pico and a Quest | | |
+| All | Testing in different lighting (hand tracking depends on it), on the Pico and a Quest | | |
 | All | Performance against the frame budget | | |
 | B | Remote Quest tester round 3 on a fresh Quest 3S | | |
 | B | Demo video (under 3 minutes, best shot in the first 10 s) | | |

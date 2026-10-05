@@ -51,3 +51,14 @@ To keep that rule true, the code follows the WebXR standard, not one headset:
 
 The first Pico report came from a PICO 4 (OS 5.13.8) running PicoBrowser 3.3.54 on Chrome 105. Its user agent contains "like Quest" and "OculusBrowser/7.0", so never detect a headset from the user agent. It supports `immersive-ar` and `immersive-vr`, and starts the game in about 2.7 s over the local network from a dev build. It has no `navigator.xr.offerSession`, which is the only way IWSDK offers a session (it draws no button itself), so the page added its own **Enter AR** button (`src/app/enter-ar-button.ts`) for browsers like this. Hand tracking, planes and anchors on the Pico are still unknown until a report is taken inside a session.
 
+
+## Update 2 (5 Oct 2026): hand data on the Pico
+
+What the Pico testing found so far (PICO 4, OS 5.13.8):
+
+- PicoBrowser 3.3 (Chrome 105): `hand-tracking` requested as required makes `requestSession` fail with `NotSupportedError` in AR; requested as optional, the session starts but `session.inputSources` stays empty. The headset itself tracks the hands (the system pointer rings show it).
+- Wolvic 1.10 with our page, `hand-tracking` optional, VR: the Pico runs a **hands-as-controllers** mode; the two sources have `profiles: ["pico-4", ...]` and `hand` is null, so no joints.
+- The official WebXR hands sample ([immersive-hands.html](https://immersive-web.github.io/webxr-samples/immersive-hands.html)) in Wolvic **does show the joints**. It asks for `local-floor`, `bounded-floor` and `hand-tracking`, all optional. Our page asks for seven optional features (adding `layers`, `anchors`, `plane-detection`, `mesh-detection`).
+- So the headset can deliver hands to a page; our page's request or setup differs. Test switches in `src/app/enter-ar-button.ts`: `?xrfeatures=sample` (exactly the sample's list), `?xrfeatures=a,b` (any list), `?xrmode=vr`. If `?xrmode=vr&xrfeatures=sample` gives joints in Wolvic, bisect the extra features.
+- Not established: whether PicoBrowser gives hands to the sample (to check), and that requiring `hand-tracking` fixes the controller emulation (the sample works with it optional, so it probably is not the cause).
+- Meta documents WebXR hand input as supported in Quest Browser; a Quest run is still needed to confirm it for our game.
