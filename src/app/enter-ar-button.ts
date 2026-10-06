@@ -207,4 +207,3 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
     appendLog('XR session ended.', '#8b949e');
   });
 }
-

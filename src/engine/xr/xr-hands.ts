@@ -67,8 +67,12 @@ export class XRHandReader {
       this.lastWatchedSession = frame.session;
       frame.session.addEventListener('inputsourceschange', (e: Event) => {
         const evt = e as XRInputSourcesChangeEvent;
-        const added = (evt.added ?? []).map((s: XRInputSource) => `${s.handedness}:${s.targetRayMode}:${s.hand ? 'hand' : 'ctl'}`).join(',');
-        const removed = (evt.removed ?? []).map((s: XRInputSource) => `${s.handedness}:${s.targetRayMode}:${s.hand ? 'hand' : 'ctl'}`).join(',');
+        const added = (evt.added ?? [])
+          .map((s: XRInputSource) => `${s.handedness}:${s.targetRayMode}:${s.hand ? 'hand' : 'ctl'}`)
+          .join(',');
+        const removed = (evt.removed ?? [])
+          .map((s: XRInputSource) => `${s.handedness}:${s.targetRayMode}:${s.hand ? 'hand' : 'ctl'}`)
+          .join(',');
         this.debug.inputSourceEvents.push(`+(${added}) -(${removed})`);
       });
     }
@@ -124,11 +128,12 @@ export class XRHandReader {
       // Path 2: Map iterator / entries if spaces[0] missing
       if (!this.spaces[0]) {
         try {
-          const iter = typeof (xrHand as unknown as { entries?: () => Iterable<[string, XRJointSpace]> }).entries === 'function'
-            ? (xrHand as unknown as { entries: () => Iterable<[string, XRJointSpace]> }).entries()
-            : typeof (xrHand as unknown as Iterable<unknown>)[Symbol.iterator] === 'function'
-              ? (xrHand as unknown as Iterable<unknown>)
-              : null;
+          const iter =
+            typeof (xrHand as unknown as { entries?: () => Iterable<[string, XRJointSpace]> }).entries === 'function'
+              ? (xrHand as unknown as { entries: () => Iterable<[string, XRJointSpace]> }).entries()
+              : typeof (xrHand as unknown as Iterable<unknown>)[Symbol.iterator] === 'function'
+                ? (xrHand as unknown as Iterable<unknown>)
+                : null;
           if (iter) {
             for (const item of iter) {
               if (Array.isArray(item)) {
@@ -152,9 +157,10 @@ export class XRHandReader {
               (typeof key === 'string' && (key as JointName) in JOINT ? (key as JointName) : null) ??
               (typeof val === 'string' && (val as JointName) in JOINT ? (val as JointName) : null) ??
               ((val as { jointName?: string })?.jointName as JointName | undefined);
-            const js = (val && typeof val === 'object' && !('jointName' in val && typeof key === 'string'))
-              ? (val as XRJointSpace)
-              : (key as XRJointSpace);
+            const js =
+              val && typeof val === 'object' && !('jointName' in val && typeof key === 'string')
+                ? (val as XRJointSpace)
+                : (key as XRJointSpace);
             if (name && name in JOINT && js) {
               this.spaces[JOINT[name]] = js;
             }
@@ -250,4 +256,3 @@ export class XRHandReader {
     }
   }
 }
-
