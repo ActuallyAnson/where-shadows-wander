@@ -2,7 +2,7 @@
 
 ## Overview
 
-Where Shadows Wander is a seated, hands-only mixed reality puzzle game: light a tiny lantern on your real table, and your hands' shadows help a little traveller cross your real wall, one short chapter a night.
+Where Shadows Wander is a seated, hands-only virtual reality puzzle game: sit in a small, cosy, lantern-lit room, light the lantern on the table in front of you, and your hands' shadows help a little traveller cross the wall, one short chapter a night.
 
 | Item | Detail |
 |----|----|
@@ -10,17 +10,21 @@ Where Shadows Wander is a seated, hands-only mixed reality puzzle game: light a 
 | Track | Gaming |
 | Division | New Experience (built from 24 Sep 2026) |
 | Submission deadline | 19 Nov 2026, 4:00am SGT |
-| Platform | Meta Quest 3 / 3S, Quest Browser (WebXR) |
-| Engine | IWSDK (three.js) for the XR session, emulator and scene understanding; gameplay in our own TypeScript code |
-| Input | Hand tracking only; no controller needed |
+| Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
+| Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
+| Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
 | Session length | 5–8 minutes per chapter |
 | Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
+
+### Direction (5 Oct 2026)
+
+The game is set in a **virtual room**, not the player's real one. A lantern on a table lights a wall, the player's hands cast shadows on it, and a traveller walks across it. We chose this because the art and lighting are then the same for every player, nothing depends on finding a table or wall in the real room, and testing is predictable. The costs are that passthrough is not used (the judging criteria reward passthrough that is purposeful, and scene understanding and anchoring, for entries that use them) and that the player's hands, which they can no longer see, must be drawn. The earlier real-room plan (a tabletop theatre or a real wall, in passthrough) is out of v1 and could return as a second mode: the stage code takes any surface, so it would only swap the surface. The passthrough compositing, hand occluder and plane detection already written stay in the repository, switched off for v1.
 
 ### Design pillars
 
 1.  **Your hands are the toolkit.** Every action is a hand shape. Nothing on screen needs to be pointed at or pressed.
 
-2.  **Your room is the stage.** The real wall or tabletop is where the story plays. Turn passthrough off and there is no game.
+2.  **One room, one light, one wall.** A small room built so nothing competes with the shadows: a lantern on a table lights a wall, and the wall is the stage.
 
 3.  **Readable at a glance.** Silhouettes, one light source, one surface. A first-time player understands the scene within seconds.
 
@@ -28,11 +32,11 @@ Where Shadows Wander is a seated, hands-only mixed reality puzzle game: light a 
 
 ## Core experience and setup
 
-The player places a small lantern on the near edge of their table, reaches into its beam, and their hand shadows land on a stage in front of them.
+The player sits at a table in a small virtual room, places a lantern on it, reaches into its beam, and their hand shadows land on the wall in front of them.
 
 ### The lantern
 
-The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it is the first action of every session; blowing it out ends or pauses the session.
+The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it on the table is the first action of every session; covering the flame pauses the session.
 
 Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with recordings):
 
@@ -40,14 +44,17 @@ Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with r
 - **Covering the flame** pauses: a closed hand with the palm within 12 cm of the flame for 0.5 s. It fires once, then waits for the hand to leave.
 - Each gesture has a 1 s cooldown across both hands. A closed hand over the flame is also the fist shape; the game can tell the two apart with `nearLantern`.
 
-### Two stage modes
+### The stage
 
-| Mode | When it is used | What it looks like |
-|----|----|----|
-| Tabletop theatre | Default; always available | A small paper folding screen unfolds on the table, about 40 cm wide |
-| Wall stage | A suitable wall is detected within about 1–3 m in front of the player | The story plays on the real wall at a larger scale |
+The stage is a large cream paper screen on the wall of the virtual room, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The lantern stands on the table close to the player, the hands are between the lantern and the wall, and the shadows land on the wall.
 
-The tabletop theatre is the primary mode. It needs only a table plane, works facing any direction, and passes the airplane-tray test. The wall stage is the upgrade that makes the trailer shot. Both modes run the same game; only the stage surface differs.
+### The room and the hands
+
+- **The room:** small, warm and mostly dark, lit only by the lantern. A table with the lantern, the paper wall ahead, a few quiet objects (a window, a shelf where the creature gallery sits, a rug). Nothing moves except the flame, a few dust motes and the story. Anything near the shadow area stays light and low-contrast so the black shadows stay readable. The art style is open: flat paper-cut layers, or a richer lit diorama in the manner of Octopath Traveler (without real-time bloom or depth-of-field, which are too costly on a headset).
+
+- **The hands:** in VR the player cannot see their real hands, so the game draws a hand for each tracked hand, following the 25 joints. The look is open (a dark paper-cut glove or a simple stylised hand). Rules: always visible while tracked, simple and low-detail rather than realistic, never covering the shadow area, fading out when tracking is lost with a gentle "show me your hands" cue. The shadow is cast from the tracked joints, not from the hand model, so the model can look any way without changing the game.
+
+- **Comfort:** seated, a fixed viewpoint, no locomotion, a steady floor and horizon.
 
 ### Light geometry
 
@@ -120,11 +127,11 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 ### First five minutes
 
-1.  **0–10 s:** Passthrough fades in. An unlit lantern floats near the player's hands with a soft glow on the table below.
+1.  **0–10 s:** The headset fades in on the cosy room. An unlit lantern sits on the table in front of the player, with a bare paper wall ahead.
 
-2.  **10–20 s:** The player sets the lantern down with a pinch-and-release. It lights, and the tabletop theatre unfolds (or the wall stage is offered if a wall is found).
+2.  **10–20 s:** The player picks the lantern up and sets it down with a pinch-and-release (it settles on the table). It lights, and the paper wall glows warm.
 
-3.  **20–40 s:** The player's hand shadows appear on the stage. They wave and see their shadow move. No prompt is needed.
+3.  **20–40 s:** The player's hand shadows appear on the wall. They wave and see their shadow move. No prompt is needed.
 
 4.  **40–90 s:** The traveller walks in and stops at a gap. A faint ghost outline of a flat hand appears over the gap. The player matches it, and the traveller crosses.
 
@@ -146,7 +153,7 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 - A new chapter unlocks each real night (v1 can ship with a teaser for chapter 2).
 
-- The stage keeps a gallery of creatures the player has discovered, anchored in place between sessions.
+- The room keeps a gallery of the creatures the player has discovered, shown as paper figures on a shelf and saved in the browser.
 
 - Each puzzle tracks which solutions the player has found, encouraging replays to find the alternative.
 
@@ -162,11 +169,11 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 - **Motion:** Characters animate like rod puppets, with a little stiffness and bounce rather than smooth realism.
 
-- **Lighting:** The only bright object in the scene is the lantern. Its gentle flicker drives a subtle shimmer across the stage.
+- **Lighting:** The only bright object in the scene is the lantern. Its gentle flicker drives a subtle shimmer across the wall and the room.
 
   The flicker (`src/engine/shadow/pure/lantern-flicker.ts`, `lantern-light.ts`) is slow and calm: two sine waves and a little noise, all under 4 Hz, with at most a 0.11 change from one frame to the next at 72 Hz, so it never strobes. At full strength it swings the flame's brightness by plus or minus 8 % and reddens it slightly when it dips; the paper brightens and dims with it and warms toward the flame's colour. Shadows stay pure black, and the point the shadows are cast from stays still, so shadows and collision never shimmer. The flicker amount is a setting (0 to 1, `?flicker=` in the address, 0 is a steady light); it starts at 0.3 when the device asks for reduced motion.
 
-- **Passthrough:** Left untinted so the real room stays recognisable; the stage glows warmly within it.
+- **Room:** Dark and warm towards the edges so the lit wall and the shadows dominate; scenery near the shadow area stays light and low-contrast so the shadows stay readable.
 
 ### Audio
 
@@ -180,13 +187,13 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 ## Technical design
 
-Where Shadows Wander is a 2D game running on a single plane in 3D space, which keeps rendering cheap and lets the tabletop and wall modes share all game code.
+Where Shadows Wander is a 2D game running on a single plane in 3D space, which keeps rendering cheap and lets any surface (the virtual wall now, a real table or wall in a possible later mode) share all game code.
 
 ### Architecture
 
 The decisions are recorded in [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md) and [ADR 0002](adr/0002-plain-threejs-fallback.md).
 
-- **IWSDK** provides the XR session, the emulator and scene understanding (planes, anchors), and possibly spatial audio. Nothing else.
+- **IWSDK** provides the XR session, the emulator and possibly spatial audio. Nothing else. (Scene understanding, planes and anchors are not used in the virtual room.)
 - **Gameplay and simulation never import IWSDK or three.js.** They are plain TypeScript, and a build check enforces this.
 - **View layer:** plain three.js objects (`InstancedMesh`, custom shaders). IWSDK's ECS is used only where it clearly saves work.
 - **Loop:** the simulation runs on our own fixed-timestep loop, driven by a single IWSDK system once per display frame.
@@ -198,24 +205,25 @@ The decisions are recorded in [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)
 We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pico-as-stand-in-test-device.md).
 
 - **Develop on the Pico, confirm on a Quest.** Working on Pico means it will probably work on Quest, but only a Quest run proves it. A Quest check (remote tester or a borrowed headset) closes each milestone that matters, and always comes before submission.
-- **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected. Plane labels are only a hint. Nothing may work on one headset and break on the other.
+- **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected. Nothing may work on one headset and break on the other.
 - **Testing order:** IWER emulator for logic, the webcam hand bench for hand shapes, Pico for real-device behaviour, Quest for final confirmation.
+- **Hand data on the Pico:** works in Wolvic Chromium 1.4 (a sideloaded build, not the Pico Store's Wolvic), in a VR session that asks only for `local-floor`, `bounded-floor` and `hand-tracking`; the headset rejects anchors, plane and mesh detection and projection layers. PicoBrowser 3.3 (Chrome 105) and the Pico Store's Wolvic (Gecko) give no joints. See [ADR 0003](adr/0003-pico-as-stand-in-test-device.md). Meta documents WebXR hand input as supported in Quest Browser; still to confirm on a Quest.
 - **Hand data without a headset:** the webcam hand bench (`webcam.html`) tracks hands from a laptop camera and converts them to the same 25-joint data the game reads. Headset sessions and the bench can both save hand recordings for replay in tests and in the Hand Recording Player. See [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
 
 ### Stack
 
 | Area | Choice |
 |----|----|
-| Engine | IWSDK (three.js) for the XR session, emulator and scene understanding; gameplay in our own TypeScript code |
-| Session | immersive-ar (passthrough) |
-| XR features | Hand tracking, plane detection, mesh detection (optional), anchors |
+| Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
+| Session | immersive-vr, seated (local-floor reference space) |
+| XR features | Hand tracking; nothing else is needed in the virtual room |
 | 2D physics | Lightweight 2D library or a small custom solver in plane space |
 | Hosting | Static HTTPS site on GitHub Pages, deployed by the Actions workflow (classic Jekyll Pages drops IWSDK's `_virtual_*` chunk), opened in Quest Browser |
 | Performance | Minimum 60 fps (judging requirement), target 72 fps |
 
 ### Plane-space game
 
-1.  Detect the stage plane: a table plane for the tabletop theatre, or a vertical plane for the wall stage.
+1.  The stage plane is the fixed virtual wall: its position, size and orientation are known when the room is built.
 
 2.  Build a 2D coordinate frame on that plane (origin, right axis, up axis, scale).
 
@@ -225,7 +233,7 @@ We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pi
 
 5.  Render 2D game objects as flat quads placed on the plane.
 
-Switching between tabletop and wall only swaps the plane frame. All gameplay code is identical.
+Because the wall is fixed there is no detection step and no fallback. A real table or wall (a possible later mode) would only supply a different plane frame; all gameplay code is identical.
 
 ### Shadow rendering
 
@@ -273,19 +281,21 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 ### Persistence
 
-- Spatial anchors store the lantern and stage positions between sessions.
-
-- If anchor persistence is unreliable in Quest Browser, the gallery is stored relative to the detected table or wall instead.
-
 - Chapter progress, discovered creatures and solutions found are saved in browser storage.
+
+- The room needs no spatial anchors: it is the same every session.
 
 ### Open questions
 
-- [ ] Which Pico model do we have (Pico 4, 4 Ultra, Neo 3)? The first diagnostics report's user agent will tell us.
+- [x] Which Pico do we have? A Pico 4 (OS 5.13.8, PicoBrowser 3.3.54); see ADR 0003.
 
 - [ ] Confirm on the Meta Developer Forum that an IWSDK WebXR link with gameplay in our own code is an acceptable submission. Also ask about the plain three.js + `@iwsdk/xr-input` fallback, which may raise the same question Babylon.js did.
 
-- [ ] Verify persistent anchor support in the current Quest Browser on device.
+- [ ] Confirm hand tracking in an immersive-vr session on the Quest Browser, and why the Pico delivers hands to the WebXR sample but not to our page.
+
+- [ ] Decide the hand look (paper glove or a simple stylised hand) and the room art style.
+
+- [ ] Ask the organisers how a VR-only entry (no passthrough, no scene understanding) is scored under Technical implementation, since that criterion names them for entries that use them.
 
 - [ ] Measure cold-start load time on Quest Browser; target under 5 seconds to the lantern.
 
@@ -313,14 +323,15 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 
 ## Competition fit
 
-Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldest Original Concept and Best First Five Minutes as the strongest special-award chances.
+Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldest Original Concept and Best First Five Minutes as the strongest special-award chances. The organisers' rules, judging criteria, dates and links are summarised in [COMPETITION.md](COMPETITION.md).
 
 ### Requirements and guidelines
 
 | Rule | How Where Shadows Wander meets it |
 |----|----|
 | Hands-first, completable without a controller | Hands are the only input; no controller code path is needed |
-| Seated-optimised (airplane seat test) | All play happens on a table or a wall in front of the player, within reach |
+| Seated-optimised (airplane seat test) | All play happens seated at a table in a virtual room, with the wall in view and the hands within reach |
+| Passthrough (judged for purpose if used) | Not used. The entry leans on hands-first design, the first five minutes, accessibility and polish instead |
 | Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, 5–8 minute chapters |
 | Original, not a wrapper (take it away test) | All gameplay is built in-house; no third-party service |
 | New Experience division | Codebase started on or after 24 Sep 2026 |
@@ -329,17 +340,22 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 | Award | Why Where Shadows Wander fits |
 |----|----|
-| Boldest Original Concept | Hand shadows as physical game objects on your real room |
+| Boldest Original Concept | Your own hands' shadows as the only controls, in a lantern-lit shadow theatre. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
 | Best First Five Minutes | No instructions; the first puzzle is solved by instinct |
 | Best Accessibility Forward Experience | One-handed play, tolerance and hold-time settings, high-contrast mode |
 | Best Reason to Come Back | Nightly chapters and a persistent creature gallery |
-| Best Narrative Game |  |
 
 ### Submission checklist
 
 - [ ] Playable WebXR link hosted and tested on a fresh Quest 3S
 
-- [ ] Demo video under 3 minutes, best shot (shadow story on a real wall) in the first 10 seconds
+- [ ] The person submitting has joined the Meta VR Start Program, and everyone on the team is 18 or older
+
+- [ ] Devpost: track Gaming and division New Experience selected; video is public on YouTube or Vimeo
+
+- [ ] The deployed page stays up until the winners are announced (about 11 Dec) and is not changed after 18 Nov 12:00 PM Pacific (19 Nov 4:00 AM Singapore)
+
+- [ ] Demo video under 3 minutes, best shot (the shadow story on the lit wall) in the first 10 seconds
 
 - [ ] Tagline under 140 characters
 
@@ -359,15 +375,16 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 |---------------------------------|-------------------------------------|
 | Chapter 1 (6 puzzles)           | Chapters 2+ and nightly unlocks     |
 | 4 verb shapes, 2 companions     | Two-handed shapes (bird, butterfly) |
-| Tabletop theatre and wall stage | Multiplayer shadow duets            |
+| Virtual room with a wall stage  | Multiplayer shadow duets            |
+| —                               | Real-room mode (table or wall in passthrough) |
 | Creature gallery                | Player-made shadow stories          |
 | Accessibility settings          | Localisation                        |
 
 ### Milestones (7 weeks to 19 Nov)
 
-1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hands, passthrough, table and wall detection, lantern placement. Run it on the Pico and collect its diagnostics report and a hand recording. Host the build on GitHub Pages (HTTPS) and, if a remote Quest tester is available, have them send a report too. Confirm submission rules.
+1.  **Week 1 (to 8 Oct):** IWSDK WebXR shell: hand tracking in a VR session, a placeholder room, lantern placement. Run it on the Pico (through Wolvic if PicoBrowser gives no hands) and collect its diagnostics report and a hand recording. Host the build on GitHub Pages (HTTPS) and, if a remote Quest tester is available, have them send a report too. Confirm submission rules.
 
-2.  **Week 2 (to 15 Oct):** Planar shadow rendering and the 2D plane-space game layer, working in both stage modes.
+2.  **Week 2 (to 15 Oct):** Planar shadow rendering on the wall and the 2D plane-space game layer.
 
 3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Develop on the webcam hand bench, check against Pico recordings, and test with at least 3 other people (the bench works on any laptop).
 
@@ -375,9 +392,9 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 5.  **Week 5 (to 5 Nov):** Puzzles 4–6, rabbit and fox companions, chapter ending, saved gallery.
 
-6.  **Week 6 (to 12 Nov):** Art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
+6.  **Week 6 (to 12 Nov):** The room and hand models, art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
 
-7.  **Week 7 (to 19 Nov):** Testing in different rooms, performance, demo video, submission form.
+7.  **Week 7 (to 19 Nov):** Testing on the Pico and Quest in different lighting (hand tracking depends on it), performance, demo video, submission form.
 
 ### Risks
 
@@ -386,17 +403,17 @@ Everything in the IWSDK spike ran in the emulator only. The rows marked *Device*
 | Risk | Impact | Mitigation |
 |----|----|----|
 | Shape recognition feels unreliable to new players | High | Week 3 stranger tests on the webcam bench and the Pico; replay saved hand recordings as regression tests; tolerance slider; physical-outline collision for simple roles |
-| No usable wall in the judge's room | High | Tabletop theatre is the default mode |
+| Judging favours passthrough, scene understanding and anchors, which a VR-only entry does not use | High | Lead with hands-first design, accessibility, polish and the first five minutes; ask the organisers; keep the real-room mode as a possible later addition |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
 | Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |
 | Slow cold start in Quest Browser | Medium | Small initial bundle; stream chapter assets after the lantern appears |
-| Anchor persistence unreliable | Medium | Store gallery relative to detected surfaces |
+| Hand models look wrong or hide the shadows | Medium | Keep them simple, dark and low-detail; the shadow comes from the joints, not the model; check on the headset |
 | Scope creep | Medium | One chapter only; feature freeze end of week 6 |
-| *Device:* real passthrough and cold start in the headset browser over Wi-Fi | Medium | Report checks `alpha-blend` and time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
+| *Device:* cold start in the headset browser over Wi-Fi | Medium | Report records time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
 | *Device:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
 | *Device:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
-| *Device:* room-setup planes missing or noisy near the player; plane normal sign | High | Report lists planes with labels, size, distance and normal direction; tabletop default; normal is flipped toward the viewer in code |
-| *Device:* persistent anchors across browser restarts | Medium | Report creates, persists and restores a probe anchor; gallery stored relative to detected surfaces if it fails |
+| *Device:* hand joints depend on the browser: on the Pico only Wolvic Chromium (sideloaded) delivers them, and only when the session asks for little | Medium | The session asks for just the three features (in the launcher); Quest Browser is documented to support hand input; confirm on a Quest |
+| The virtual room and hand models are more art work than flat paper | Medium | A small room, few assets, free CC0 assets where licensing allows, flat silhouettes for everything near the shadows |
 | *Device:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
 | Works on Pico but not on Quest (different browser, tracker and chip) | High | Standard WebXR only, everything feature-detected; Quest check at each milestone and before submission; compare Pico and Quest reports |
 | No Quest available before submission | High | Line up a remote Quest tester (or borrow a headset) by week 4 at the latest; the submission checklist requires a fresh Quest 3S test |

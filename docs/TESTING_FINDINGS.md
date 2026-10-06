@@ -1,5 +1,7 @@
 # Where Shadows Wander: Pico 4 WebXR Testing Findings & Investigation Report
 
+> Note (5 Oct 2026): this is Damon's investigation log. Stage 7 concludes that `hand-tracking` must be *required*; Stage 8 and the validation run show the working setup is the opposite (optional, with only `local-floor` and `bounded-floor` alongside). The summary of what works is in [ADR 0003](adr/0003-pico-as-stand-in-test-device.md), update 2.
+
 **Document Date:** October 5, 2026  
 **Target Hardware:** Pico 4 Standalone VR Headset (PICO OS 5.13.8)  
 **Tested Browsers:** PicoBrowser 3.3.54 (Chromium 105.0.5195.68), Wolvic Browser 1.10 (Gecko 153.0), Wolvic Browser 1.4 (Chromium Generic Release APK)  

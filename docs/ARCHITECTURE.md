@@ -5,7 +5,7 @@ How Where Shadows Wander is put together: the layers, what runs each frame, whic
 ## Layers
 
 ```
-IWSDK + three.js        XR session, renderer, display loop, emulator, plane/anchor systems
+IWSDK + three.js        XR session, renderer, display loop, emulator
         │
 Engine-facing code      src/app, src/engine/xr, src/engine/shadow, src/engine/render,
         │               src/engine/anim (adapters), src/engine/services, src/ui, src/debug, src/input-mock
@@ -14,7 +14,7 @@ Pure code               src/engine/hands, src/engine/sim, src/engine/stage, src/
                         (plain TypeScript; no IWSDK, three.js or browser globals)
 ```
 
-- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session, the emulator, scene understanding (planes, anchors) and possibly spatial audio, and nothing else. Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
+- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session, the emulator and possibly spatial audio, and nothing else (v1 is a virtual room, so no scene understanding, planes or anchors). Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
 - **Engine-facing code** talks to IWSDK, three.js, WebXR and the DOM. It turns the outside world into plain data, and plain data into things on screen.
 - **Pure code** holds the logic: hand maths and the classifier, the simulation, stage geometry and gameplay. It's unit-tested in Node and can't see the engine, which ESLint enforces. This is also why the plain three.js fallback stays cheap ([ADR 0002](adr/0002-plain-threejs-fallback.md)).
 
@@ -43,19 +43,19 @@ flowchart LR
 6. **Services** (`engine/services`): audio and saves react to game events and never block a frame.
 7. IWSDK renders the scene.
 
-The stage is a 2D world on one real surface. `StageFrame` (`engine/stage`) converts between 3D scene space and 2D stage space, so the tabletop and wall modes run the same game.
+The stage is a 2D world on one surface, the fixed virtual wall of the room. `StageFrame` (`engine/stage`) converts between 3D scene space and 2D stage space; a real table or wall (a possible later mode) would only supply a different frame.
 
 ## Modules
 
 | Folder | Owner | Pure | Responsibility |
 |---|---|---|---|
 | `src/app` | Anson | No | Entry point: `World.create`, the driver system, wiring, the no-AR notice, IWSDK manifests |
-| `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder |
+| `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder, hand visuals (to build) |
 | `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
 | `src/engine/shadow` | Anson | No (`pure/` yes) | Projected-shadow renderer; `pure/`: projection maths, capsules, stand-in rig |
 | `src/input-mock` | Anson | No | Hand Lab (`?mock=1`) and its hand sources, webcam bench, MediaPipe conversion and worker |
 | `src/engine/sim` | A | Yes | Fixed-step loop, 2D collision solver, entities, object pools |
-| `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D, choosing a table or wall, snapping |
+| `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D for the fixed virtual wall (a real surface in a later mode) |
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
 | `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
@@ -93,7 +93,21 @@ These are starting estimates. Desktop measurements so far: our whole frame was a
 | Allocation | `frame-pipeline.alloc.test.ts`, part of `npm test` | Runs recognizer, gestures and projector for 3,000 frames with no garbage collection inside the window (it fails if one runs) and fails above 700 B a frame. The stages build no objects or arrays. Measured about 530 B a frame (recognizer, gestures, projector, sharpen and lantern light), which is the engine boxing numbers returned by small helpers; it was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths |
 | GPU time | Pico or Quest performance overlay | Not visible from JavaScript. Check with both shadows covering the stage and `?debug=shadow` |
 
-## Compositing over passthrough
+## The virtual room (v1)
+
+The game runs in an `immersive-vr` session, seated (`local-floor`), and asks the headset for one feature: `hand-tracking`. The decision and its trade-offs are in [ADR 0005](adr/0005-virtual-room.md).
+
+| Part | How it works | Owner |
+|---|---|---|
+| The room | A small scene: table, lantern, the paper wall, a shelf for the creature gallery, lit by the lantern. Opaque geometry; scenery near the shadows stays light and low-contrast | B |
+| The stage | The paper wall is a known `StagePlane` (position, size, orientation fixed when the room is built). No plane detection and no fallback. The shadow renderer lifts the shadow 2 mm off the wall as before | A (frame), B (look) |
+| The hands | The player cannot see their real hands, so `HandVisual` (`engine/xr`, to build) draws one simple hand model per tracked hand from the 25 joints, and fades it out when tracking is lost. The shadow comes from the joints, not from the model | Anson (rig and mapping), B (art) |
+| No-hands cue | When the headset delivers no hand data (hand tracking off, controllers held, a browser that does not pass joints), a short in-scene notice says so | Anson (signal), B (text) |
+| Pause | The session `visibilityState` going `hidden` or `visible-blurred` pauses the simulation and saves | Anson (signal), A, B |
+
+Switched off for v1 (still in the repository for a possible real-room mode): `HandOccluder` (**it must default to off in VR**: in a VR session a depth-only hand would cut a hole in the room behind it), the plane tracker and plane capabilities, the passthrough compositing rules below, and the composite probe. The hand-tracking, shape, gesture, shadow, sharpen, flicker and performance work is used as built.
+
+## Compositing over passthrough (real-room mode only; not used in v1)
 
 The stage and shadows are drawn into the same frame as the room camera image (`immersive-ar`, `alpha-blend`). What we hand the compositor, and how it is kept right:
 
