@@ -20,13 +20,27 @@ export function hideIwsdkHandMeshes(world: World): void {
   const hands = world.input.xr.visualAdapters.hand;
   hideSkinned(hands.left.visual?.model);
   hideSkinned(hands.right.visual?.model);
+
+  const controllers = world.input.xr.visualAdapters.controller;
+  hideVisual(controllers.left.visual?.model);
+  hideVisual(controllers.right.visual?.model);
 }
 
 function hideSkinned(root: Object3D | undefined): void {
   root?.traverse(hideIfSkinned);
 }
 
+function hideVisual(root: Object3D | undefined): void {
+  if (!root) return;
+  root.visible = false;
+  root.traverse(hideIfVisible);
+}
+
 // Module-level so traverse() doesn't get a new closure every frame.
 function hideIfSkinned(o: Object3D): void {
   if ((o as { isSkinnedMesh?: boolean }).isSkinnedMesh && o.visible) o.visible = false;
+}
+
+function hideIfVisible(o: Object3D): void {
+  if ((o as { visible?: boolean }).visible) (o as { visible?: boolean }).visible = false;
 }

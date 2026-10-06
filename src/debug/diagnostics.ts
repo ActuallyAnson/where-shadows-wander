@@ -53,6 +53,11 @@ export class Diagnostics {
     addEventListener('error', (e) => this.error(e.message));
     addEventListener('unhandledrejection', (e) => this.error(`unhandled rejection: ${String(e.reason)}`));
     addEventListener('pagehide', () => this.save());
+    const origError = console.error;
+    console.error = (...args: unknown[]) => {
+      this.error(args.map((a) => (typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a))).join(' '));
+      origError.apply(console, args);
+    };
     void this.probeSupport();
   }
 

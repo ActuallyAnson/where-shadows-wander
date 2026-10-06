@@ -23,10 +23,12 @@ export class JointDots {
   update(hands: readonly HandFrame[]): void {
     let n = 0;
     for (const hand of hands) {
-      if (!hand.tracked) continue;
+      if (hand.validJoints === 0) continue;
       for (let j = 0; j < JOINT_COUNT; j++) {
-        const s = Math.max(hand.radii[j] * 0.4, 0.0025);
         const p = hand.positions;
+        if (p[j * 3] === 0 && p[j * 3 + 1] === 0 && p[j * 3 + 2] === 0) continue;
+        const r = hand.radii[j] || 0.01;
+        const s = Math.max(r * 0.4, 0.006);
         this.m.makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
         this.mesh.setColorAt(n, this.colors[hand.handedness]);
         this.mesh.setMatrixAt(n++, this.m);

@@ -2,7 +2,7 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
+import { Color, Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
@@ -104,6 +104,8 @@ async function start(): Promise<void> {
   world.scene.add(stageView.group, shadowRenderer.mesh);
   if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
+  let rigCalibratedFromHead = false;
+  let everPlaced = false;
   const timings = new FrameTimings();
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
@@ -112,14 +114,16 @@ async function start(): Promise<void> {
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
     rigPlaced = true;
+    everPlaced = true;
   };
   const headMatrix = new Matrix4();
   const headPos = new Vector3();
   const headRot = new Quaternion();
   const headScale = new Vector3();
   let resetWatched: XRReferenceSpace | null = null;
-  // In mock mode the player's eyes are the desktop camera; in XR the rig is placed on the first frame.
+  // In mock mode the player's eyes are the desktop camera; in XR initialize with a default seated rig so the scene is immediately visible.
   if (mockOptions) placeRig(MOCK_HEAD, 0);
+  else placeRig([0, 1.2, 0], 0);
   // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
@@ -163,7 +167,21 @@ async function start(): Promise<void> {
     shadow: {
       stage: stageMode,
       placed: rigPlaced,
+      everPlaced,
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
+    },
+    xrInput: {
+      readerUpdateCalls: hands.debug.updateCalls,
+      readerSourcesSeen: hands.debug.sourcesSeen,
+      readerSources: hands.debug.sources,
+      readerEvents: hands.debug.inputSourceEvents,
+      readerLastError: hands.debug.lastError,
+      iwsdkAdapters: {
+        handLeft: world.input.xr.visualAdapters.hand.left.connected,
+        handRight: world.input.xr.visualAdapters.hand.right.connected,
+        controllerLeft: world.input.xr.visualAdapters.controller.left.connected,
+        controllerRight: world.input.xr.visualAdapters.controller.right.connected,
+      },
     },
   }));
   // What the compositor receives from us. Read lazily, at report time.
@@ -182,14 +200,25 @@ async function start(): Promise<void> {
   };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
-    if (session) diagnostics.sessionStarted(session, world.renderer);
+    if (session) {
+      if (session.environmentBlendMode === 'opaque') {
+        world.scene.background = new Color(0x14161c);
+        world.renderer.setClearColor(0x14161c, 1);
+      } else {
+        world.scene.background = null;
+        world.renderer.setClearColor(0x000000, 0);
+      }
+      diagnostics.sessionStarted(session, world.renderer);
+    }
     // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
     if (session && !mock) capabilities.sessionStarted(session);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    world.scene.background = null;
+    world.renderer.setClearColor(0x000000, 0);
     if (!mock) {
-      rigPlaced = false; // placed again from the head at the next session
-      stageView.group.visible = shadowRenderer.mesh.visible = false;
+      rigCalibratedFromHead = false;
+      placeRig([0, 1.2, 0], 0);
     }
     diagnostics.sessionEnded();
     capabilities.sessionEnded();
@@ -235,17 +264,17 @@ async function start(): Promise<void> {
       timings.end(SLOT.gestures);
       sharpen.update({ left: shapes.left.state, right: shapes.right.state }, shapes.events, delta);
       if (!mock && frame && refSpace && refSpace !== resetWatched) {
-        // Recentring moves the player's frame: place the rig again from the new head pose.
-        refSpace.addEventListener('reset', () => (rigPlaced = false));
+        // Recentring moves the player's frame: recalibrate the rig from the new head pose.
+        refSpace.addEventListener('reset', () => (rigCalibratedFromHead = false));
         resetWatched = refSpace;
       }
-      if (!rigPlaced && !mock && frame && refSpace) {
+      if (!rigCalibratedFromHead && !mock && frame && refSpace) {
         const pose = frame.getViewerPose(refSpace);
-        // Skip poses the browser estimates (tracking not ready yet); hands are in scene space, so the head is too.
-        if (pose && !pose.emulatedPosition) {
+        if (pose) {
           headMatrix.fromArray(pose.transform.matrix).premultiply(this.world.player.matrixWorld);
           headMatrix.decompose(headPos, headRot, headScale);
           placeRig([headPos.x, headPos.y, headPos.z], yawOf(headRot.x, headRot.y, headRot.z, headRot.w));
+          if (!pose.emulatedPosition) rigCalibratedFromHead = true;
         }
       }
       if (rigPlaced) {
