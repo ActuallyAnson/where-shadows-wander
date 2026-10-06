@@ -23,7 +23,7 @@ Goal: the shell runs on the Pico with hand tracking in a VR session, and we have
 | A | Loop scheduler (from `src/engine/sim/fixed-step.ts`): interpolation, pause/resume, determinism | | |
 | A | StageFrame maths: first version on a fixed test plane | | |
 | All | Confirm submission rules on the Meta Developer Forum (include: how a VR-only entry is scored) | | |
-| Anson, B | Find why the Pico browser gives our page no hand joints although the WebXR hands sample shows them in Wolvic (`?xrfeatures=sample`, `?xrmode=vr`) | | ⏳ |
+| Damon | Pico hand tracking: real 25-joint hands, shadows and shape recognition running on a Pico 4 (Wolvic Chromium 1.4, VR session asking only for `local-floor`, `bounded-floor`, `hand-tracking`); see [ADR 0003](adr/0003-pico-as-stand-in-test-device.md), PR #40. Still to check on a Quest | | ✅ |
 | All | Eligibility: submitter joins the Meta VR Start Program, Developer Access, everyone 18 or older | | |
 
 ## Week 2 (to 15 Oct): shadows and the 2D stage
