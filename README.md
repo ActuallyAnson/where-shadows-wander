@@ -5,9 +5,7 @@ A seated, hands-only virtual reality puzzle game: light a lantern in a small cos
 **Status:** week 1, XR shell. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, emulator, webcam, headset testing, troubleshooting.
-- [Contributing](CONTRIBUTING.md): who owns what, issues, branches, PRs, code rules
 - [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
-- [Work plan](docs/WORKPLAN.md): tasks per person per week
 - [Competition reference](docs/COMPETITION.md): rules, dates, judging criteria and useful links
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
