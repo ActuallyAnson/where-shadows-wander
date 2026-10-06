@@ -2,10 +2,11 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { Color, Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
+import { AmbientLight, Color, Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
+import { CandleView } from '../engine/render/candle-view';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
@@ -99,9 +100,11 @@ async function start(): Promise<void> {
     });
   const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
-  stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
+  stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
+  const candleView = new CandleView();
+  const ambientLight = new AmbientLight(0x1a1410, 0.04);
   const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
-  world.scene.add(stageView.group, shadowRenderer.mesh);
+  world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
   if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
@@ -110,6 +113,7 @@ async function start(): Promise<void> {
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
     stageView.place(stage, lantern);
+    candleView.place(lantern);
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -169,6 +173,13 @@ async function start(): Promise<void> {
       placed: rigPlaced,
       everPlaced,
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
+    },
+    candle: {
+      placed: rigPlaced,
+      position: [lantern[0], lantern[1], lantern[2]],
+      lit: lanternLight.light.lit,
+      intensity: lanternLight.light.intensity,
+      pointLightIntensity: candleView.lightIntensity,
     },
     xrInput: {
       readerUpdateCalls: hands.debug.updateCalls,
@@ -314,6 +325,7 @@ async function start(): Promise<void> {
       lanternLight.update(clock, rigPlaced ? lantern : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
       stageView.applyLight(lanternLight.light, cameraQuat);
+      candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
       dots.update(handList);
@@ -345,6 +357,7 @@ async function start(): Promise<void> {
         occluder,
         sharpen,
         lanternLight,
+        candleView,
         dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
