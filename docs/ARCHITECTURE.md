@@ -54,7 +54,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
 | `src/engine/shadow` | Anson | No (`pure/` yes) | Projected-shadow renderer; `pure/`: projection maths, capsules, stand-in rig |
 | `src/input-mock` | Anson | No | Hand Lab (`?mock=1`) and its hand sources, webcam bench, MediaPipe conversion and worker |
-| `src/engine/sim` | A | Yes | Fixed-step loop, 2D collision solver, entities, object pools |
+| `src/engine/sim` | A | Yes | Fixed-step loop, 2D collision solver, entities, object pools, the loader that turns editor-authored scene files into entities ([ADR 0006](adr/0006-editor-authored-layouts.md)) |
 | `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D for the fixed virtual wall (a real surface in a later mode) |
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
