@@ -19,11 +19,13 @@ import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
+import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
 import { PromptPanel } from '../engine/xr/prompt-panel';
 import { clearFor, occluderDefault, sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
@@ -37,6 +39,7 @@ import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 
 const SIM_HZ = 60;
+const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
 // The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
@@ -71,6 +74,10 @@ async function start(): Promise<void> {
   const hands = new XRHandReader();
   // What the session provides (hands, passthrough, planes, anchors), and the detected planes for StageFrame.
   const capabilities = new CapabilityDetector();
+  // Whether hand data is arriving (tracking, lost, or unavailable), for the in-scene "Show me your hands" message.
+  const handsStatus = new HandsStatus();
+  // The session's visibility: the simulation pauses on it (Teammate A) and saves can listen to it (Teammate B).
+  const visibility = new SessionVisibility();
 
   // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
   const shapes = new ShapeRecognizer();
@@ -180,6 +187,8 @@ async function start(): Promise<void> {
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
     },
     xrInput: {
+      handsStatus: { state: HANDS_STATE_NAMES[handsStatus.state], showMessage: handsStatus.showMessage },
+      visibility: visibility.state,
       readerUpdateCalls: hands.debug.updateCalls,
       readerSourcesSeen: hands.debug.sourcesSeen,
       readerSources: hands.debug.sources,
@@ -218,7 +227,11 @@ async function start(): Promise<void> {
       diagnostics.sessionStarted(session, world.renderer);
     }
     // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
-    if (session && !mock) capabilities.sessionStarted(session);
+    if (session && !mock) {
+      capabilities.sessionStarted(session);
+      handsStatus.start();
+    }
+    if (session) visibility.attach(session);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     world.scene.background = null;
@@ -230,6 +243,9 @@ async function start(): Promise<void> {
     }
     diagnostics.sessionEnded();
     capabilities.sessionEnded();
+    handsStatus.stop();
+    visibility.detach();
+    handsPanel?.hide();
     recorder?.finish();
   });
 
@@ -243,6 +259,10 @@ async function start(): Promise<void> {
   // The head pose is in reference space, which is the XR origin's space.
   if (panel) world.player.add(panel.mesh);
   let panelAtStart = false;
+  // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
+  const handsPanel = mock ? null : new PromptPanel();
+  if (handsPanel) world.player.add(handsPanel.mesh);
+  let handsPanelVersion = handsStatus.version;
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
@@ -253,24 +273,50 @@ async function start(): Promise<void> {
       diagnostics.mark('firstFrame');
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
+      // The headset's system menu (visible-blurred) or a hidden page: no hand data arrives and the game holds still.
+      const paused = visibility.paused;
+      // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
+      const step = Math.min(delta, MAX_STEP_S);
       timings.begin(SLOT.read);
       if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
-      else if (frame && refSpace) {
+      else if (frame && refSpace && !paused) {
         hands.update(frame, refSpace, this.world.player.matrixWorld);
         capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
+        handsStatus.update(step, hands.hands.left.tracked || hands.hands.right.tracked, hands.handSources);
       }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       timings.end(SLOT.read);
       // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
-      clock += delta;
+      if (!paused) clock += step;
       const handsT = mock ? mock.time : clock;
-      timings.begin(SLOT.classify);
-      shapes.update(hands.hands, handsT);
-      timings.end(SLOT.classify);
-      timings.begin(SLOT.gestures);
-      gestures.update(hands.hands, handsT, shapes);
-      timings.end(SLOT.gestures);
-      sharpen.update({ left: shapes.left.state, right: shapes.right.state }, shapes.events, delta);
+      if (!paused) {
+        timings.begin(SLOT.classify);
+        shapes.update(hands.hands, handsT);
+        timings.end(SLOT.classify);
+        timings.begin(SLOT.gestures);
+        gestures.update(hands.hands, handsT, shapes);
+        timings.end(SLOT.gestures);
+        sharpen.update({ left: shapes.left.state, right: shapes.right.state }, shapes.events, step);
+      }
+      if (handsPanel && handsStatus.version !== handsPanelVersion) {
+        if (!handsStatus.showMessage) {
+          handsPanel.hide();
+          handsPanelVersion = handsStatus.version;
+        } else {
+          const pose = frame && refSpace ? frame.getViewerPose(refSpace) : undefined;
+          if (handsPanel.placed || pose) {
+            if (pose && !handsPanel.placed) {
+              const p = pose.transform.position;
+              head[0] = p.x;
+              head[1] = p.y;
+              head[2] = p.z;
+              handsPanel.anchor(head, pose.transform.orientation);
+            }
+            handsPanel.show(handsStatus.message, 0);
+            handsPanelVersion = handsStatus.version;
+          }
+        }
+      }
       if (!mock && frame && refSpace && refSpace !== resetWatched) {
         // Recentring moves the player's frame: recalibrate the rig from the new head pose.
         refSpace.addEventListener('reset', () => (rigCalibratedFromHead = false));
@@ -317,7 +363,7 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      sim.advance(delta);
+      if (!paused) sim.advance(delta);
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       lanternLight.update(clock, rigPlaced ? lantern : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
@@ -346,6 +392,8 @@ async function start(): Promise<void> {
         mock,
         lab,
         capabilities,
+        handsStatus,
+        visibility,
         shapes,
         gestures,
         projector,
