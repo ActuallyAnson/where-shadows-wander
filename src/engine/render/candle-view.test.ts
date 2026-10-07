@@ -78,27 +78,33 @@ describe('CandleView', () => {
     expect(res.state).toBe('placed');
     expect(candle.isHeld).toBe(false);
 
-    // Hands brought together near the candle (<0.22m from candle, <0.24m between hands)
-    setPalm(left, -0.08, 0.76, -0.4);
-    setPalm(right, 0.08, 0.76, -0.4);
-    res = candle.updateInteraction({ left, right }, 0.016);
+    // Hands brought together grasping the saucer (<0.13m from candle, height matched)
+    setPalm(left, -0.05, 0.76, -0.4);
+    setPalm(right, 0.05, 0.76, -0.4);
+    // Dwell step 1 (0.05s elapsed < 0.12s dwell requirement): preview aura, still placed
+    res = candle.updateInteraction({ left, right }, 0.05);
+    expect(res.state).toBe('placed');
+    expect(candle.isHeld).toBe(false);
+
+    // Dwell step 2 (additional 0.10s elapsed >= 0.12s): confirmed pickup!
+    res = candle.updateInteraction({ left, right }, 0.1);
     expect(res.state).toBe('held');
     expect(res.justPickedUp).toBe(true);
     expect(candle.isHeld).toBe(true);
     expect(candle.flame.mesh.scale.x).toBeCloseTo(1.25, 2);
 
     // Hands move forward and to the right
-    setPalm(left, 0.1, 0.8, -0.5);
-    setPalm(right, 0.2, 0.8, -0.5);
+    setPalm(left, 0.05, 0.78, -0.45);
+    setPalm(right, 0.15, 0.78, -0.45);
     res = candle.updateInteraction({ left, right }, 0.1);
     expect(res.state).toBe('held');
     expect(candle.group.position.x).toBeGreaterThan(0.0);
     expect(candle.group.position.z).toBeLessThan(-0.4);
     expect(candle.flamePosition[1]).toBeCloseTo(candle.group.position.y + 0.095, 4);
 
-    // Hands move far enough apart (>0.28m) -> triggers placement and 1-second feedback
-    setPalm(left, -0.1, 0.8, -0.5);
-    setPalm(right, 0.25, 0.8, -0.5); // 0.35m distance apart
+    // Hands move far enough apart (>0.22m) -> triggers placement and 1-second feedback
+    setPalm(left, -0.15, 0.78, -0.45);
+    setPalm(right, 0.15, 0.78, -0.45); // 0.30m distance apart
     res = candle.updateInteraction({ left, right }, 0.016);
     expect(res.state).toBe('placing');
     expect(res.justPlaced).toBe(true);
@@ -115,6 +121,35 @@ describe('CandleView', () => {
     expect(candle.isPlacing).toBe(false);
     expect(candle.isHeld).toBe(false);
     expect(candle.flame.mesh.scale.x).toBeCloseTo(1.0, 2);
+  });
+
+  it('dims light when a hand is close to the flame (light occlusion)', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    const cameraQuat = new Quaternion(0, 0, 0, 1);
+    const light: LanternLight = {
+      position: new Float64Array([0, 1, 0]),
+      lit: true,
+      intensity: 1.0,
+      color: new Float32Array([1.0, 0.6, 0.2]),
+      flicker: 0,
+    };
+
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+
+    // Hands far from flame: full intensity (1.0 * 1.5 = 1.5)
+    setPalm(left, -0.4, 0.75, -0.4);
+    setPalm(right, 0.4, 0.75, -0.4);
+    candle.updateInteraction({ left, right }, 0.016);
+    candle.update(light, cameraQuat);
+    expect(candle.lightIntensity).toBeCloseTo(1.5, 3);
+
+    // Hand placed right over the flame (flame at y = 0.75 + 0.095 = 0.845)
+    setPalm(left, 0.0, 0.86, -0.4); // ~1.5 cm from flame
+    candle.updateInteraction({ left, right }, 0.016);
+    candle.update(light, cameraQuat);
+    expect(candle.lightIntensity).toBeLessThan(0.4); // strongly occluded
   });
 
   it('disposes resources cleanly without error', () => {

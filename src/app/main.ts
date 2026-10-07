@@ -338,7 +338,7 @@ async function start(): Promise<void> {
       candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
-      dots.update(handList);
+      dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       timings.begin(SLOT.lab);
       lab?.frame();
       timings.end(SLOT.lab);

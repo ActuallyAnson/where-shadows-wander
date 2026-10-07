@@ -53,6 +53,13 @@ describe('shadow projector', () => {
     expect(p.shadows.right.onStage).toBe(true);
   });
 
+  it('does not cast a shadow when the hand is behind the light source', () => {
+    const p = new ShadowProjector();
+    // Lantern is at z = 0.6; hand with wrist at z = 0.8 is behind the light
+    p.update(hands([0, -0.05, 0.8]), stage, LANTERN);
+    expect(p.shadows.right.active).toBe(false);
+  });
+
   it('puts every joint inside the outline, and capsule ends on the projected joints', () => {
     const p = new ShadowProjector();
     p.update(hands(), stage, LANTERN);

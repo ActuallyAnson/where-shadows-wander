@@ -57,6 +57,8 @@ export class CandleView {
   private _state: CandleInteractionState = 'placed';
   private placingTimer = 0;
   private cooldownTimer = 0;
+  private pickupDwellTimer = 0;
+  private lightOcclusion = 1.0;
 
   // Scratch arrays for zero-allocation interaction tracking
   private readonly leftPalm = new Float64Array(3);
@@ -246,24 +248,60 @@ export class CandleView {
       const drz = this.rightPalm[2] - cz;
       const rightDist = Math.sqrt(drx * drx + dry * dry + drz * drz);
 
-      // 1. Check pickup condition when resting
-      if (this._state === 'placed' && this.cooldownTimer <= 0) {
-        if (leftDist < 0.22 && rightDist < 0.22 && midDist < 0.2 && handDist < 0.24) {
-          this._state = 'held';
-          justPickedUp = true;
+      // Check proximity to flame to calculate light occlusion (hands blocking the light)
+      const fx = this.flamePosition[0];
+      const fy = this.flamePosition[1];
+      const fz = this.flamePosition[2];
+
+      const dflx = this.leftPalm[0] - fx;
+      const dfly = this.leftPalm[1] - fy;
+      const dflz = this.leftPalm[2] - fz;
+      const leftDistFlame = Math.sqrt(dflx * dflx + dfly * dfly + dflz * dflz);
+
+      const dfrx = this.rightPalm[0] - fx;
+      const dfry = this.rightPalm[1] - fy;
+      const dfrz = this.rightPalm[2] - fz;
+      const rightDistFlame = Math.sqrt(dfrx * dfrx + dfry * dfry + dfrz * dfrz);
+
+      const minFlameDist = Math.min(leftDistFlame, rightDistFlame);
+      if (minFlameDist < 0.16) {
+        this.lightOcclusion = Math.max(0.12, minFlameDist / 0.16);
+      } else {
+        this.lightOcclusion = 1.0;
+      }
+
+      // 1. Check pickup condition when resting (small, intentional grasp around the 18cm saucer)
+      if (this._state === 'placed') {
+        const heightMatch = Math.abs(this.leftPalm[1] - cy) < 0.07 && Math.abs(this.rightPalm[1] - cy) < 0.07;
+        const inGrabZone =
+          leftDist < 0.13 && rightDist < 0.13 && midDist < 0.08 && handDist >= 0.06 && handDist <= 0.19 && heightMatch;
+
+        if (inGrabZone && this.cooldownTimer <= 0) {
+          this.pickupDwellTimer += delta;
           this.auraMesh.visible = true;
-          this.auraMaterial.opacity = 0.85;
-          this.auraMaterial.color.setHex(0xffaa33);
-          this.flame.mesh.scale.setScalar(1.25);
+          this.auraMaterial.opacity = 0.35; // gentle approach preview
+
+          if (this.pickupDwellTimer >= 0.12) {
+            this._state = 'held';
+            justPickedUp = true;
+            this.pickupDwellTimer = 0;
+            this.auraMaterial.opacity = 0.85;
+            this.auraMaterial.color.setHex(0xffaa33);
+            this.flame.mesh.scale.setScalar(1.25);
+          }
+        } else {
+          this.pickupDwellTimer = 0;
+          this.auraMesh.visible = false;
         }
       }
 
       // 2. Check holding & moving
       if (this._state === 'held') {
         // Separation check: moving hands far enough apart triggers placement!
-        if (handDist > 0.28) {
+        if (handDist > 0.22) {
           this._state = 'placing';
           this.placingTimer = 1.0; // 1-second feedback timer
+          this.cooldownTimer = 0.6; // Cooldown before can pick up again
           justPlaced = true;
           this.placementRingMesh.visible = true;
           this.placementRingMesh.scale.setScalar(1.0);
@@ -292,10 +330,13 @@ export class CandleView {
       // If tracking lost on both hands while held, settle smoothly
       this._state = 'placing';
       this.placingTimer = 1.0;
+      this.cooldownTimer = 0.6;
       justPlaced = true;
       this.placementRingMesh.visible = true;
       this.placementRingMesh.scale.setScalar(1.0);
       this.placementRingMaterial.opacity = 0.9;
+    } else {
+      this.lightOcclusion = 1.0;
     }
 
     // 3. Process 1-second placement feedback animation
@@ -320,7 +361,6 @@ export class CandleView {
         this.auraMaterial.opacity = 0.0;
         this.auraMaterial.color.setHex(0xffaa33);
         this.flame.mesh.scale.setScalar(1.0);
-        this.cooldownTimer = 0.5; // Cooldown before can pick up again
       }
     }
 
@@ -334,7 +374,7 @@ export class CandleView {
   update(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
     this.flame.update(light, cameraQuaternion);
     this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
-    this.pointLight.intensity = light.lit ? light.intensity * 1.5 : 0;
+    this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion;
   }
 
   /** Frees allocated geometries and materials. */

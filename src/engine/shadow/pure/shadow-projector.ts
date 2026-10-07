@@ -80,10 +80,16 @@ export class ShadowProjector {
       const h = distanceToPlane(stage, x, y, z);
       this.height[j] = h;
       // A joint pushed through the stage casts no smaller shadow than one on it.
-      this.mag[j] = magnification(lightD, Math.max(h, 0), s.blend);
+      // Clamped just in front of the light so magnification stays finite.
+      const safeH = Math.min(Math.max(h, 0), lightD - 0.005);
+      this.mag[j] = magnification(lightD, safeH, s.blend);
       heightSum += h;
     }
     out.distanceM = heightSum / JOINT_COUNT;
+
+    // A hand behind the candle cannot cast a shadow onto the stage (candle is between hand and screen).
+    // Only a hand in front of the candle (between candle and stage) intercepts rays to cast shadows.
+    if (out.distanceM >= lightD - 0.02) return;
 
     // Shadow size: scale about the palm's shadow (between the middle finger's base and knuckle, where
     // derivePalm puts the palm), so a bigger shadow stays under the hand.
