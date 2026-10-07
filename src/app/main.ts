@@ -2,7 +2,7 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { Color, Matrix4, Quaternion, Vector3, World, createSystem } from '@iwsdk/core';
+import { Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
@@ -23,6 +23,7 @@ import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { JointDots } from '../engine/xr/joint-dots';
 import { PromptPanel } from '../engine/xr/prompt-panel';
+import { clearFor, occluderDefault, sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
@@ -38,6 +39,8 @@ import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 const SIM_HZ = 60;
 
 const mockOptions = mockOptionsFromUrl(location.search);
+// The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
+const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
 mountReportPanel(diagnostics);
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
@@ -49,14 +52,19 @@ if (!mockOptions && import.meta.env.DEV) mountLabLink();
 start().catch((e) => diagnostics.error(`start failed: ${String(e)}`));
 
 async function start(): Promise<void> {
-  const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
+  // iwsdk.config.json says VR; ?xr=ar overrides the session mode before the world (and its enter offer) is made.
+  const worldOptions =
+    projectOptions.xr && xrMode === 'ar'
+      ? { ...projectOptions, xr: { ...projectOptions.xr, sessionMode: SessionMode.ImmersiveAR } }
+      : projectOptions;
+  const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, worldOptions);
   // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
   if (import.meta.env.DEV) {
     const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
     if (emulated) emulated.primaryInputMode = 'hand';
   }
   diagnostics.mark('worldCreated');
-  // Browsers that never offer an AR session (Pico Browser) get an Enter AR button.
+  // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   if (!mockOptions) void mountEnterArButtonIfNeeded(world);
   disableIwsdkRays(world);
 
@@ -145,10 +153,11 @@ async function start(): Promise<void> {
   });
   const dots = new JointDots();
   world.scene.add(dots.mesh);
-  // Real hands stay visible in front of the paper and shadow. On in a headset (?occlude=0 turns it off to compare);
-  // off in mock mode, where there is no passthrough, unless ?occlude=1 (for the composite probe).
+  // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
+  // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
   const occluder = new HandOccluder();
-  occluder.enabled = mockOptions ? params.get('occlude') === '1' : params.get('occlude') !== '0';
+  const occludeParam = params.get('occlude');
+  occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
   world.scene.add(...occluder.meshes);
 
   // addSource keeps only one source, so everything we report goes through it.
@@ -196,18 +205,16 @@ async function start(): Promise<void> {
       blendMode: session?.environmentBlendMode ?? null,
       layer: session ? (layers && layers.length ? 'projection' : 'webgl') : null,
       handOccluder: occluder.enabled,
+      urlMode: sessionModeOf(xrMode),
     };
   };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     if (session) {
-      if (session.environmentBlendMode === 'opaque') {
-        world.scene.background = new Color(0x14161c);
-        world.renderer.setClearColor(0x14161c, 1);
-      } else {
-        world.scene.background = null;
-        world.renderer.setClearColor(0x000000, 0);
-      }
+      occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
+      const clear = clearFor(session.environmentBlendMode, xrMode);
+      world.scene.background = clear.background === null ? null : new Color(clear.background);
+      world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
       diagnostics.sessionStarted(session, world.renderer);
     }
     // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
@@ -216,6 +223,7 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionend', () => {
     world.scene.background = null;
     world.renderer.setClearColor(0x000000, 0);
+    occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
     if (!mock) {
       rigCalibratedFromHead = false;
       placeRig([0, 1.2, 0], 0);

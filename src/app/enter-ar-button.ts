@@ -1,4 +1,5 @@
 import type { World } from '@iwsdk/core';
+import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 
 export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   const xr = navigator.xr;
@@ -170,10 +171,11 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   const iwsdkBtn = makeBtn('⚡ Enter via IWSDK', '#2d1840', '#bc8cff', '#a371f7', () => {
     statusLine.textContent = '● Launching via IWSDK...';
     statusLine.style.color = '#bc8cff';
-    appendLog('Calling world.launchXR({ sessionMode: "immersive-vr", features: { handTracking: true } })...');
+    const mode = sessionModeOf(xrModeFromUrl(location.search));
+    appendLog(`Calling world.launchXR({ sessionMode: "${mode}", features: { handTracking: true } })...`);
     try {
       world.launchXR({
-        sessionMode: 'immersive-vr' as unknown as import('@iwsdk/core').SessionMode,
+        sessionMode: mode as unknown as import('@iwsdk/core').SessionMode,
         features: { handTracking: true },
       });
     } catch (err: unknown) {
