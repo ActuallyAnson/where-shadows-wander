@@ -5,12 +5,13 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   Group,
   LineBasicMaterial,
   LineLoop,
   Matrix4,
   Mesh,
-  MeshBasicMaterial,
+  MeshStandardMaterial,
   PlaneGeometry,
 } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
@@ -27,19 +28,22 @@ export class TestStageView {
   readonly group = new Group();
   private readonly paper: Mesh;
   private readonly border: LineLoop;
-  private readonly paperMaterial: MeshBasicMaterial;
+  private readonly paperMaterial: MeshStandardMaterial;
   private readonly flame = new LanternGlow();
   private readonly lit = new Color();
   private readonly m = new Matrix4();
 
   constructor() {
-    this.paperMaterial = new MeshBasicMaterial({
+    this.paperMaterial = new MeshStandardMaterial({
       color: PAPER,
+      roughness: 0.85,
+      metalness: 0.05,
       transparent: true,
       premultipliedAlpha: false,
       toneMapped: false,
-      opacity: 0.85,
+      opacity: 0.95,
       depthWrite: false,
+      side: DoubleSide,
     });
     this.paper = new Mesh(new PlaneGeometry(1, 1), this.paperMaterial);
     this.paper.renderOrder = PAPER_RENDER_ORDER;
@@ -81,15 +85,12 @@ export class TestStageView {
   }
 
   /**
-   * The lantern's flicker lights the paper: it brightens and dims a little and warms with the flame, and the glow
-   * follows the light. A lantern that is out leaves the paper at half brightness.
+   * The lantern's flame warms the paper, while the PointLight provides the dynamic illumination.
    */
   applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
-    // Lit, the paper follows the light's brightness exactly (1 plus or minus the flicker); out, it falls to half.
-    const level = 0.5 + 0.5 * Math.min(Math.max(2 * light.intensity - 1, 0), 1.3);
-    // Tint toward the flame's colour a little, so the paper warms as the flame reddens.
+    // Tint toward the flame's colour so the paper warms with the flame.
     this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
-    this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12).multiplyScalar(level);
+    this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12);
     this.flame.update(light, cameraQuaternion);
   }
 }

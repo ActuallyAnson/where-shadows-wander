@@ -7,26 +7,62 @@
 // - Wick: matte charcoal cylinder centered on the top of the wax.
 // - Flame: soft glowing billboard quad from LanternGlow at the tip of the wick.
 // - Dynamic Scene Light: non-shadow-casting PointLight matching the flame position and flickering with it.
+// - Interactive feedback:
+//   - Aura Ring: warm glowing halo around the saucer indicating the candle is "picked up".
+//   - Placement Ring: 1-second expanding ripple animation when hands separate to place the candle.
 //
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
-import { CylinderGeometry, Group, Mesh, MeshStandardMaterial, PointLight, TorusGeometry } from '@iwsdk/core';
+import {
+  CylinderGeometry,
+  DoubleSide,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  PointLight,
+  RingGeometry,
+  TorusGeometry,
+} from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
+import type { HandFrame, Handedness } from '../hands/hand';
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
+
+export type CandleInteractionState = 'placed' | 'held' | 'placing';
 
 export class CandleView {
   readonly group = new Group();
   readonly flame = new LanternGlow();
   readonly pointLight: PointLight;
+  /** Live coordinates of the flame tip in world space [x, y, z]. */
+  readonly flamePosition = new Float64Array(3);
 
   private readonly plateGeometry: CylinderGeometry;
   private readonly rimGeometry: TorusGeometry;
   private readonly waxGeometry: CylinderGeometry;
   private readonly wickGeometry: CylinderGeometry;
+  private readonly auraGeometry: TorusGeometry;
+  private readonly placementRingGeometry: RingGeometry;
 
   private readonly plateMaterial: MeshStandardMaterial;
   private readonly waxMaterial: MeshStandardMaterial;
   private readonly wickMaterial: MeshStandardMaterial;
+  private readonly auraMaterial: MeshBasicMaterial;
+  private readonly placementRingMaterial: MeshBasicMaterial;
+
+  private readonly auraMesh: Mesh;
+  private readonly placementRingMesh: Mesh;
+
+  // Interaction state
+  private _state: CandleInteractionState = 'placed';
+  private placingTimer = 0;
+  private cooldownTimer = 0;
+
+  // Scratch arrays for zero-allocation interaction tracking
+  private readonly leftPalm = new Float64Array(3);
+  private readonly rightPalm = new Float64Array(3);
+  private readonly handsMidpoint = new Float64Array(3);
+  private readonly targetPos = new Float64Array(3);
 
   constructor() {
     // 1. Plate / Saucer: radiusTop 0.09m, radiusBottom 0.07m, height 0.015m, 24 segments
@@ -72,21 +108,223 @@ export class CandleView {
 
     // 6. Dynamic Scene Light: PointLight at wick tip (Y ≈ 0.095m)
     // VR constraint: castShadow = false (shadow puppetry silhouettes are rendered separately by ShadowRenderer)
-    this.pointLight = new PointLight(0xffeedd, 1.0, 3.5, 2.0);
+    this.pointLight = new PointLight(0xffeedd, 1.2, 3.5, 2.0);
     this.pointLight.position.set(0, 0.095, 0);
     this.pointLight.castShadow = false;
 
-    this.group.add(plateMesh, rimMesh, waxMesh, wickMesh, this.flame.mesh, this.pointLight);
+    // 7. Pickup Feedback Aura Ring: glowing highlight on the rim when held
+    this.auraGeometry = new TorusGeometry(0.088, 0.004, 8, 24);
+    this.auraMaterial = new MeshBasicMaterial({
+      color: 0xffaa33,
+      transparent: true,
+      opacity: 0.0,
+      toneMapped: false,
+    });
+    this.auraMesh = new Mesh(this.auraGeometry, this.auraMaterial);
+    this.auraMesh.rotation.x = Math.PI / 2;
+    this.auraMesh.position.set(0, 0.015, 0);
+    this.auraMesh.visible = false;
+
+    // 8. Placement Feedback Ripple Ring: 1-second expanding pulse when let go
+    this.placementRingGeometry = new RingGeometry(0.08, 0.095, 32);
+    this.placementRingMaterial = new MeshBasicMaterial({
+      color: 0xffe080,
+      transparent: true,
+      opacity: 0.0,
+      side: DoubleSide,
+      toneMapped: false,
+    });
+    this.placementRingMesh = new Mesh(this.placementRingGeometry, this.placementRingMaterial);
+    this.placementRingMesh.rotation.x = -Math.PI / 2;
+    this.placementRingMesh.position.set(0, 0.002, 0);
+    this.placementRingMesh.visible = false;
+
+    this.group.add(
+      plateMesh,
+      rimMesh,
+      waxMesh,
+      wickMesh,
+      this.flame.mesh,
+      this.pointLight,
+      this.auraMesh,
+      this.placementRingMesh,
+    );
   }
 
   /** Sets the world position of the candle group. */
   place(position: ArrayLike<number>): void {
     this.group.position.set(position[0], position[1], position[2]);
+    this.flamePosition[0] = position[0];
+    this.flamePosition[1] = position[1] + 0.095;
+    this.flamePosition[2] = position[2];
   }
 
   /** Current intensity of the dynamic point light. */
   get lightIntensity(): number {
     return this.pointLight.intensity;
+  }
+
+  /** Current interaction state ('placed' | 'held' | 'placing'). */
+  get state(): CandleInteractionState {
+    return this._state;
+  }
+
+  get isHeld(): boolean {
+    return this._state === 'held';
+  }
+
+  get isPlacing(): boolean {
+    return this._state === 'placing';
+  }
+
+  /**
+   * Updates candle pickup and placement interaction with the player's hands.
+   * - Pickup: Bringing two hands close to the candle (<0.22m from candle, <0.24m between hands)
+   *   transitions to 'held' with golden rim aura feedback.
+   * - Moving: While held, the candle smoothly follows the hands midpoint.
+   * - Placement: Moving the 2 hands far enough apart (>0.28m) triggers 1 second of placement
+   *   feedback (expanding ripple and settling flare) and places the candle.
+   *
+   * Zero per-frame allocations.
+   */
+  updateInteraction(
+    hands: Readonly<Record<Handedness, HandFrame>>,
+    delta: number,
+    minTableY?: number,
+  ): { state: CandleInteractionState; justPlaced: boolean; justPickedUp: boolean } {
+    if (this.cooldownTimer > 0) {
+      this.cooldownTimer = Math.max(0, this.cooldownTimer - delta);
+    }
+
+    let justPlaced = false;
+    let justPickedUp = false;
+
+    const left = hands.left;
+    const right = hands.right;
+    const leftTracked = left.tracked && left.validJoints >= 20;
+    const rightTracked = right.tracked && right.validJoints >= 20;
+
+    if (leftTracked && rightTracked) {
+      // Compute palm coordinates (midpoint of middle finger metacarpal joint 10 and proximal joint 11)
+      const lp = left.positions;
+      this.leftPalm[0] = (lp[30] + lp[33]) * 0.5;
+      this.leftPalm[1] = (lp[31] + lp[34]) * 0.5;
+      this.leftPalm[2] = (lp[32] + lp[35]) * 0.5;
+
+      const rp = right.positions;
+      this.rightPalm[0] = (rp[30] + rp[33]) * 0.5;
+      this.rightPalm[1] = (rp[31] + rp[34]) * 0.5;
+      this.rightPalm[2] = (rp[32] + rp[35]) * 0.5;
+
+      // Distance between both hands
+      const dx = this.leftPalm[0] - this.rightPalm[0];
+      const dy = this.leftPalm[1] - this.rightPalm[1];
+      const dz = this.leftPalm[2] - this.rightPalm[2];
+      const handDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      // Midpoint between hands
+      this.handsMidpoint[0] = (this.leftPalm[0] + this.rightPalm[0]) * 0.5;
+      this.handsMidpoint[1] = (this.leftPalm[1] + this.rightPalm[1]) * 0.5;
+      this.handsMidpoint[2] = (this.leftPalm[2] + this.rightPalm[2]) * 0.5;
+
+      const cx = this.group.position.x;
+      const cy = this.group.position.y;
+      const cz = this.group.position.z;
+
+      const dmx = this.handsMidpoint[0] - cx;
+      const dmy = this.handsMidpoint[1] - cy;
+      const dmz = this.handsMidpoint[2] - cz;
+      const midDist = Math.sqrt(dmx * dmx + dmy * dmy + dmz * dmz);
+
+      const dlx = this.leftPalm[0] - cx;
+      const dly = this.leftPalm[1] - cy;
+      const dlz = this.leftPalm[2] - cz;
+      const leftDist = Math.sqrt(dlx * dlx + dly * dly + dlz * dlz);
+
+      const drx = this.rightPalm[0] - cx;
+      const dry = this.rightPalm[1] - cy;
+      const drz = this.rightPalm[2] - cz;
+      const rightDist = Math.sqrt(drx * drx + dry * dry + drz * drz);
+
+      // 1. Check pickup condition when resting
+      if (this._state === 'placed' && this.cooldownTimer <= 0) {
+        if (leftDist < 0.22 && rightDist < 0.22 && midDist < 0.2 && handDist < 0.24) {
+          this._state = 'held';
+          justPickedUp = true;
+          this.auraMesh.visible = true;
+          this.auraMaterial.opacity = 0.85;
+          this.auraMaterial.color.setHex(0xffaa33);
+          this.flame.mesh.scale.setScalar(1.25);
+        }
+      }
+
+      // 2. Check holding & moving
+      if (this._state === 'held') {
+        // Separation check: moving hands far enough apart triggers placement!
+        if (handDist > 0.28) {
+          this._state = 'placing';
+          this.placingTimer = 1.0; // 1-second feedback timer
+          justPlaced = true;
+          this.placementRingMesh.visible = true;
+          this.placementRingMesh.scale.setScalar(1.0);
+          this.placementRingMaterial.opacity = 0.9;
+          this.auraMaterial.color.setHex(0xffe080);
+          this.auraMaterial.opacity = 1.0;
+        } else {
+          // Follow hands midpoint
+          const targetY =
+            minTableY !== undefined ? Math.max(minTableY, this.handsMidpoint[1] - 0.03) : this.handsMidpoint[1] - 0.03;
+          this.targetPos[0] = this.handsMidpoint[0];
+          this.targetPos[1] = targetY;
+          this.targetPos[2] = this.handsMidpoint[2];
+
+          const lerpFactor = Math.min(1.0, delta * 15.0);
+          const nx = cx + (this.targetPos[0] - cx) * lerpFactor;
+          const ny = cy + (this.targetPos[1] - cy) * lerpFactor;
+          const nz = cz + (this.targetPos[2] - cz) * lerpFactor;
+          this.place([nx, ny, nz]);
+
+          // Aura pulsing animation while held
+          this.auraMaterial.opacity = 0.7 + 0.15 * Math.sin(performance.now() * 0.008);
+        }
+      }
+    } else if (this._state === 'held') {
+      // If tracking lost on both hands while held, settle smoothly
+      this._state = 'placing';
+      this.placingTimer = 1.0;
+      justPlaced = true;
+      this.placementRingMesh.visible = true;
+      this.placementRingMesh.scale.setScalar(1.0);
+      this.placementRingMaterial.opacity = 0.9;
+    }
+
+    // 3. Process 1-second placement feedback animation
+    if (this._state === 'placing') {
+      this.placingTimer -= delta;
+      const progress = Math.max(0, Math.min(1.0, 1.0 - this.placingTimer / 1.0));
+
+      // Expand placement ripple from 1.0 to 2.6x
+      this.placementRingMesh.scale.setScalar(1.0 + progress * 1.6);
+      this.placementRingMaterial.opacity = (1.0 - progress) * 0.9;
+
+      // Aura fade out
+      this.auraMaterial.opacity = (1.0 - progress) * 0.85;
+
+      // Settle flame scale back to 1.0
+      this.flame.mesh.scale.setScalar(1.25 - progress * 0.25);
+
+      if (this.placingTimer <= 0) {
+        this._state = 'placed';
+        this.placementRingMesh.visible = false;
+        this.auraMesh.visible = false;
+        this.auraMaterial.opacity = 0.0;
+        this.auraMaterial.color.setHex(0xffaa33);
+        this.flame.mesh.scale.setScalar(1.0);
+        this.cooldownTimer = 0.5; // Cooldown before can pick up again
+      }
+    }
+
+    return { state: this._state, justPlaced, justPickedUp };
   }
 
   /**
@@ -96,7 +334,7 @@ export class CandleView {
   update(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
     this.flame.update(light, cameraQuaternion);
     this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
-    this.pointLight.intensity = light.lit ? light.intensity * 1.2 : 0;
+    this.pointLight.intensity = light.lit ? light.intensity * 1.5 : 0;
   }
 
   /** Frees allocated geometries and materials. */
@@ -105,8 +343,12 @@ export class CandleView {
     this.rimGeometry.dispose();
     this.waxGeometry.dispose();
     this.wickGeometry.dispose();
+    this.auraGeometry.dispose();
+    this.placementRingGeometry.dispose();
     this.plateMaterial.dispose();
     this.waxMaterial.dispose();
     this.wickMaterial.dispose();
+    this.auraMaterial.dispose();
+    this.placementRingMaterial.dispose();
   }
 }

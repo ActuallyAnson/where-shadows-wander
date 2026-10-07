@@ -78,7 +78,7 @@ async function start(): Promise<void> {
   const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
   const stage = createStagePlane();
   const lantern = new Float64Array(3);
-  const projector = new ShadowProjector();
+  const projector = new ShadowProjector({ blend: 0.5 });
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
@@ -177,9 +177,12 @@ async function start(): Promise<void> {
     candle: {
       placed: rigPlaced,
       position: [lantern[0], lantern[1], lantern[2]],
+      flamePosition: [candleView.flamePosition[0], candleView.flamePosition[1], candleView.flamePosition[2]],
       lit: lanternLight.light.lit,
       intensity: lanternLight.light.intensity,
       pointLightIntensity: candleView.lightIntensity,
+      state: candleView.state,
+      isHeld: candleView.isHeld,
     },
     xrInput: {
       readerUpdateCalls: hands.debug.updateCalls,
@@ -289,8 +292,15 @@ async function start(): Promise<void> {
         }
       }
       if (rigPlaced) {
+        const tableY = headPos.y - 0.45;
+        const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
+        if (candleAction.state === 'held' || candleAction.justPlaced) {
+          lantern[0] = candleView.group.position.x;
+          lantern[1] = candleView.group.position.y;
+          lantern[2] = candleView.group.position.z;
+        }
         timings.begin(SLOT.shadow);
-        projector.update(hands.hands, stage, lantern);
+        projector.update(hands.hands, stage, candleView.flamePosition);
         shadowRenderer.update(projector.shadows, stage, sharpen.look);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
@@ -322,7 +332,7 @@ async function start(): Promise<void> {
       }
       sim.advance(delta);
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
-      lanternLight.update(clock, rigPlaced ? lantern : null, true);
+      lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
       stageView.applyLight(lanternLight.light, cameraQuat);
       candleView.update(lanternLight.light, cameraQuat);
