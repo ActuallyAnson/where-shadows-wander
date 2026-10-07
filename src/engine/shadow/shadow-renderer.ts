@@ -62,8 +62,10 @@ export class ShadowRenderer {
     shadows: Readonly<Record<Handedness, HandShadow>>,
     stage: StagePlane,
     looks: Readonly<Record<Handedness, ShadowLook>> | null = null,
+    lightOcclusion = 1.0,
   ): void {
-    const any = packShadowUniforms(shadows, looks, this.baseOpacity, this.uniforms);
+    const any =
+      lightOcclusion > 0.001 && packShadowUniforms(shadows, looks, this.baseOpacity * lightOcclusion, this.uniforms);
     this.mesh.visible = any;
     if (!this.mesh.visible) return;
 

@@ -179,6 +179,11 @@ export class CandleView {
     return this._state === 'placing';
   }
 
+  /** Current light occlusion factor (0 = fully blocked, 1 = fully open). */
+  get occlusion(): number {
+    return this.lightOcclusion;
+  }
+
   /**
    * Updates candle pickup and placement interaction with the player's hands.
    * - Pickup: Bringing two hands close to the candle (<0.22m from candle, <0.24m between hands)
@@ -206,18 +211,43 @@ export class CandleView {
     const leftTracked = left.tracked && left.validJoints >= 20;
     const rightTracked = right.tracked && right.validJoints >= 20;
 
-    if (leftTracked && rightTracked) {
-      // Compute palm coordinates (midpoint of middle finger metacarpal joint 10 and proximal joint 11)
+    // Check proximity to flame to calculate light occlusion (hands cupping/covering the flame)
+    const fx = this.flamePosition[0];
+    const fy = this.flamePosition[1];
+    const fz = this.flamePosition[2];
+    let minFlameDist = Infinity;
+
+    if (leftTracked) {
       const lp = left.positions;
       this.leftPalm[0] = (lp[30] + lp[33]) * 0.5;
       this.leftPalm[1] = (lp[31] + lp[34]) * 0.5;
       this.leftPalm[2] = (lp[32] + lp[35]) * 0.5;
+      const dflx = this.leftPalm[0] - fx;
+      const dfly = this.leftPalm[1] - fy;
+      const dflz = this.leftPalm[2] - fz;
+      minFlameDist = Math.min(minFlameDist, Math.sqrt(dflx * dflx + dfly * dfly + dflz * dflz));
+    }
 
+    if (rightTracked) {
       const rp = right.positions;
       this.rightPalm[0] = (rp[30] + rp[33]) * 0.5;
       this.rightPalm[1] = (rp[31] + rp[34]) * 0.5;
       this.rightPalm[2] = (rp[32] + rp[35]) * 0.5;
+      const dfrx = this.rightPalm[0] - fx;
+      const dfry = this.rightPalm[1] - fy;
+      const dfrz = this.rightPalm[2] - fz;
+      minFlameDist = Math.min(minFlameDist, Math.sqrt(dfrx * dfrx + dfry * dfry + dfrz * dfrz));
+    }
 
+    if (minFlameDist < 0.16) {
+      // Smoothly ramp from 0.0 (smothered at <= 4cm) to 1.0 (clear at >= 16cm)
+      const t = Math.max(0.0, Math.min(1.0, (minFlameDist - 0.04) / 0.12));
+      this.lightOcclusion = t * t * (3 - 2 * t);
+    } else {
+      this.lightOcclusion = 1.0;
+    }
+
+    if (leftTracked && rightTracked) {
       // Distance between both hands
       const dx = this.leftPalm[0] - this.rightPalm[0];
       const dy = this.leftPalm[1] - this.rightPalm[1];
@@ -247,28 +277,6 @@ export class CandleView {
       const dry = this.rightPalm[1] - cy;
       const drz = this.rightPalm[2] - cz;
       const rightDist = Math.sqrt(drx * drx + dry * dry + drz * drz);
-
-      // Check proximity to flame to calculate light occlusion (hands blocking the light)
-      const fx = this.flamePosition[0];
-      const fy = this.flamePosition[1];
-      const fz = this.flamePosition[2];
-
-      const dflx = this.leftPalm[0] - fx;
-      const dfly = this.leftPalm[1] - fy;
-      const dflz = this.leftPalm[2] - fz;
-      const leftDistFlame = Math.sqrt(dflx * dflx + dfly * dfly + dflz * dflz);
-
-      const dfrx = this.rightPalm[0] - fx;
-      const dfry = this.rightPalm[1] - fy;
-      const dfrz = this.rightPalm[2] - fz;
-      const rightDistFlame = Math.sqrt(dfrx * dfrx + dfry * dfry + dfrz * dfrz);
-
-      const minFlameDist = Math.min(leftDistFlame, rightDistFlame);
-      if (minFlameDist < 0.16) {
-        this.lightOcclusion = Math.max(0.12, minFlameDist / 0.16);
-      } else {
-        this.lightOcclusion = 1.0;
-      }
 
       // 1. Check pickup condition when resting (small, intentional grasp around the 18cm saucer)
       if (this._state === 'placed') {
@@ -335,8 +343,6 @@ export class CandleView {
       this.placementRingMesh.visible = true;
       this.placementRingMesh.scale.setScalar(1.0);
       this.placementRingMaterial.opacity = 0.9;
-    } else {
-      this.lightOcclusion = 1.0;
     }
 
     // 3. Process 1-second placement feedback animation

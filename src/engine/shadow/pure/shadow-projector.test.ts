@@ -110,4 +110,31 @@ describe('shadow projector edge cases', () => {
     expect(s.distanceM).toBeLessThan(0);
     for (let c = 0; c < 28; c++) expect(s.capsules[c * 5 + 4]).toBeGreaterThan(0.003);
   });
+
+  it('smoothly fades opacity across the transition zone in front of the candle', () => {
+    const p = new ShadowProjector({ blend: 0 });
+    // Hand well in front of candle (z = 0.3 vs lantern at 0.6 -> dAhead >= 0.08m)
+    p.update(hands([0, -0.05, 0.3]), stage, LANTERN);
+    expect(p.shadows.right.active).toBe(true);
+    expect(p.shadows.right.opacity).toBe(1.0);
+
+    // Hand in transition zone (wrist at 0.65 vs lantern at 0.6 -> fingers reach toward stage, dAhead in 0..0.08m)
+    p.update(hands([0, -0.05, 0.65]), stage, LANTERN);
+    expect(p.shadows.right.active).toBe(true);
+    expect(p.shadows.right.opacity).toBeGreaterThan(0.0);
+    expect(p.shadows.right.opacity).toBeLessThan(1.0);
+
+    // Hand behind the candle (wrist at 0.8 vs lantern at 0.6 -> entirely behind candle)
+    p.update(hands([0, -0.05, 0.8]), stage, LANTERN);
+    expect(p.shadows.right.active).toBe(false);
+    expect(p.shadows.right.opacity).toBe(0.0);
+  });
+
+  it('hands perpendicular/to the side of candle cast rays that miss the stage in perspective', () => {
+    const p = new ShadowProjector({ blend: 0 });
+    // Hand placed to the side of the candle (x = 0.25, z = 0.5 vs lantern at [0, 0, 0.6])
+    // The perspective rays shoot sideways past the hand and miss the 0.4m wide stage
+    p.update(hands([0.25, -0.05, 0.5]), stage, LANTERN);
+    expect(p.shadows.right.onStage).toBe(false);
+  });
 });

@@ -66,6 +66,7 @@ export class ShadowProjector {
   private project(hand: HandFrame, stage: StagePlane, lightD: number, out: HandShadow): void {
     // A partly tracked hand keeps stale positions for its missing joints: no shadow rather than a wrong one.
     out.active = false;
+    out.opacity = 0;
     if (!hand.tracked || hand.validJoints < JOINT_COUNT) return;
     const s = this.settings;
     const p = hand.positions;
@@ -74,22 +75,44 @@ export class ShadowProjector {
       const x = p[j * 3],
         y = p[j * 3 + 1],
         z = p[j * 3 + 2];
-      if (!(projectToStage(this.matrix, stage, x, y, z, this.xy) > 1e-9)) return; // behind the light
-      out.joints[j * 2] = this.xy[0];
-      out.joints[j * 2 + 1] = this.xy[1];
       const h = distanceToPlane(stage, x, y, z);
       this.height[j] = h;
-      // A joint pushed through the stage casts no smaller shadow than one on it.
-      // Clamped just in front of the light so magnification stays finite.
-      const safeH = Math.min(Math.max(h, 0), lightD - 0.005);
-      this.mag[j] = magnification(lightD, safeH, s.blend);
       heightSum += h;
+
+      // Safe clamp in front of the light plane so projectToStage stays valid even when crossing the light plane:
+      const maxH = lightD - 0.005;
+      let px = x,
+        py = y,
+        pz = z;
+      if (h >= maxH) {
+        const delta = h - maxH;
+        px -= delta * stage.normal[0];
+        py -= delta * stage.normal[1];
+        pz -= delta * stage.normal[2];
+      }
+      if (!(projectToStage(this.matrix, stage, px, py, pz, this.xy) > 1e-9)) return;
+      out.joints[j * 2] = this.xy[0];
+      out.joints[j * 2 + 1] = this.xy[1];
+
+      // A joint pushed through the stage casts no smaller shadow than one on it.
+      // Clamped in front of the light so magnification stays finite (max 5x).
+      const safeH = Math.min(Math.max(h, 0), lightD - 0.04);
+      this.mag[j] = Math.min(5.0, magnification(lightD, safeH, s.blend));
     }
     out.distanceM = heightSum / JOINT_COUNT;
 
     // A hand behind the candle cannot cast a shadow onto the stage (candle is between hand and screen).
     // Only a hand in front of the candle (between candle and stage) intercepts rays to cast shadows.
-    if (out.distanceM >= lightD - 0.02) return;
+    const dAhead = lightD - out.distanceM;
+    if (dAhead <= 0) return;
+
+    // Smooth opacity fade across an 8 cm transition zone in front of the candle plane to eliminate abrupt pops:
+    if (dAhead < 0.08) {
+      const t = dAhead / 0.08;
+      out.opacity = t * t * (3 - 2 * t);
+    } else {
+      out.opacity = 1.0;
+    }
 
     // Shadow size: scale about the palm's shadow (between the middle finger's base and knuckle, where
     // derivePalm puts the palm), so a bigger shadow stays under the hand.

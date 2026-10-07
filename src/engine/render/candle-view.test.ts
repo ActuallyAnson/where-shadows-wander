@@ -143,13 +143,28 @@ describe('CandleView', () => {
     setPalm(right, 0.4, 0.75, -0.4);
     candle.updateInteraction({ left, right }, 0.016);
     candle.update(light, cameraQuat);
+    expect(candle.occlusion).toBe(1.0);
     expect(candle.lightIntensity).toBeCloseTo(1.5, 3);
 
     // Hand placed right over the flame (flame at y = 0.75 + 0.095 = 0.845)
-    setPalm(left, 0.0, 0.86, -0.4); // ~1.5 cm from flame
+    setPalm(left, 0.0, 0.86, -0.4); // ~1.5 cm from flame (< 4cm)
     candle.updateInteraction({ left, right }, 0.016);
     candle.update(light, cameraQuat);
-    expect(candle.lightIntensity).toBeLessThan(0.4); // strongly occluded
+    expect(candle.occlusion).toBe(0.0);
+    expect(candle.lightIntensity).toBe(0.0);
+
+    // Hand intermediate distance (~10 cm from flame)
+    setPalm(left, 0.0, 0.945, -0.4); // 10 cm from flame
+    candle.updateInteraction({ left, right }, 0.016);
+    candle.update(light, cameraQuat);
+    expect(candle.occlusion).toBeGreaterThan(0.0);
+    expect(candle.occlusion).toBeLessThan(1.0);
+
+    // Single hand tracked cupping the flame still occludes
+    right.tracked = false;
+    setPalm(left, 0.0, 0.86, -0.4);
+    candle.updateInteraction({ left, right }, 0.016);
+    expect(candle.occlusion).toBe(0.0);
   });
 
   it('disposes resources cleanly without error', () => {

@@ -86,11 +86,13 @@ export class TestStageView {
 
   /**
    * The lantern's flame warms the paper, while the PointLight provides the dynamic illumination.
+   * `occlusion` (0..1) dims the paper down to ambient level when hands cup/smother the flame.
    */
-  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>, occlusion = 1.0): void {
     // Tint toward the flame's colour so the paper warms with the flame.
     this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
-    this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12);
+    const brightness = light.lit ? Math.max(0.04, occlusion * (0.15 + 0.85 * light.intensity)) : 0.04;
+    this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12).multiplyScalar(brightness);
     this.flame.update(light, cameraQuaternion);
   }
 }

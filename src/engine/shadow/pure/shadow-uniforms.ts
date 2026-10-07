@@ -33,11 +33,11 @@ export function packShadowUniforms(
   for (let h = 0; h < HANDS.length; h++) {
     const s = shadows[HANDS[h]];
     const look = looks ? looks[HANDS[h]] : null;
-    out.active[h] = s.active && s.onStage ? 1 : 0;
+    out.active[h] = s.active && s.onStage && s.opacity > 0.001 ? 1 : 0;
     if (!out.active[h]) continue;
     any = true;
     const blurScale = look ? look.blurScale : 1;
-    out.opacity[h] = Math.min(1, baseOpacity + (look ? look.opacityBoost : 0));
+    out.opacity[h] = Math.min(1, (baseOpacity + (look ? look.opacityBoost : 0)) * s.opacity);
     let maxBlur = 0;
     for (let c = 0; c < CAPSULES_PER_HAND; c++) {
       const o = c * CAPSULE_STRIDE,

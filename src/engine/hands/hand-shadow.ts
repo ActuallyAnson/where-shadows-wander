@@ -31,6 +31,8 @@ export interface HandShadow {
   readonly bounds: Float32Array;
   /** Mean distance of the joints from the stage plane, metres; negative if the hand is pushed through the stage. */
   distanceM: number;
+  /** Smooth opacity fade (0..1) as hand crosses the light plane. */
+  opacity: number;
 }
 
 export function createHandShadow(hand: Handedness): HandShadow {
@@ -45,5 +47,6 @@ export function createHandShadow(hand: Handedness): HandShadow {
     outlineCount: 0,
     bounds: new Float32Array(4),
     distanceM: 0,
+    opacity: 1.0,
   };
 }

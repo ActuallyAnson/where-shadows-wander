@@ -78,7 +78,7 @@ async function start(): Promise<void> {
   const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
   const stage = createStagePlane();
   const lantern = new Float64Array(3);
-  const projector = new ShadowProjector({ blend: 0.5 });
+  const projector = new ShadowProjector({ blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
@@ -301,7 +301,7 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         projector.update(hands.hands, stage, candleView.flamePosition);
-        shadowRenderer.update(projector.shadows, stage, sharpen.look);
+        shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
       }
@@ -334,7 +334,7 @@ async function start(): Promise<void> {
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
-      stageView.applyLight(lanternLight.light, cameraQuat);
+      stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
       candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
