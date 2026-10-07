@@ -8,3 +8,5 @@ src/engine/hands/fixtures/gestures/*.handrec.json
 package-lock.json
 # Prose and the pandoc-converted GDD are formatted by hand.
 *.md
+# Scene files are written by IWSDK's editor in its own format; Prettier would fight it on every save.
+public/scenes/

@@ -9,7 +9,7 @@ A seated, hands-only virtual reality puzzle game: light a lantern in a small cos
 - [Competition reference](docs/COMPETITION.md): rules, dates, judging criteria and useful links
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
-- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md), [ADR 0005: a virtual room instead of the real one](docs/adr/0005-virtual-room.md)
+- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md), [ADR 0005: a virtual room instead of the real one](docs/adr/0005-virtual-room.md), [ADR 0006: room and puzzle layouts in IWSDK's scene editor](docs/adr/0006-editor-authored-layouts.md)
 
 ## Develop
 

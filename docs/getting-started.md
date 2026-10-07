@@ -157,6 +157,23 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is at https://actuallyanson.github.io/where-shadows-wander/ (and the webcam bench at `.../webcam.html`). The published site is public even though the repo is private.
 
+## 12. Edit the room and puzzle layouts
+
+The room (`public/scenes/main.iwsdk.scene.json`) and the puzzle layouts (`public/scenes/chapter-1.iwsdk.scene.json`) are IWSDK scene files, edited in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). With `npm run dev` running, the editor is in the browser window IWSDK manages (it opens the scene from the editor's own file list). From a terminal: `npx iwsdk scene open --input-json '{"path":"public/scenes/chapter-1.iwsdk.scene.json"}'`, and `npx iwsdk scene state` shows the open file and any problems.
+
+Everything the game needs is set with the inspector's own fields, so you never edit the file by hand:
+
+| In the editor | What it means to the game |
+|---|---|
+| **Asset** `piece-rock`, `piece-crow`, `piece-fox`, `piece-traveller`, `piece-rabbit`, `piece-raindrop`, `piece-firefly` | An entity of that kind. Change the kind by choosing another asset |
+| **Asset** `marker-gap`, `marker-goal`, `marker-plate` | A named spot for the puzzle code |
+| **Position** x, y (metres) | Where it is on the stage; z is ignored (the stage is the x and y plane, like a wall, so dragging on the floor of the 3D view moves z, which does nothing) |
+| **Scale** | A piece's radius (scale 0.08 is a radius of 0.08 m; the ball you see is the size the game uses). A marker's width and height are its scale x and y |
+| **Add Component, `Piece`** (optional) | Starting speed `vx`, `vy` and the flags `isStatic`, `isSensor`, `hidden` |
+| **Visible** off | The node, and everything under it, is left out |
+
+Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one with `parseLayout(doc, 'puzzle-1')` and `spawnLayout` (nothing calls them yet; Teammate A's puzzle code will). The editor's scene-graph hide is preview-only and is not saved; use the inspector's **Visible** toggle to leave a node out. Groups can nest and their positions add up; rotation and scale on a parent are ignored and reported. `npm test` checks every scene file against IWSDK's validator and our loader.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -168,7 +185,7 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 | No hand dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
-| No way into AR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own AR prompt, which is all IWSDK relies on. The page adds its own **Enter AR** button at the bottom centre when the browser has no such prompt. If you don't see it, update to the latest `main`. |
+| No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always adds its own **Enter VR** buttons (and **Enter AR** when the browser supports it) at the bottom centre, so use those. If you don't see them, update to the latest `main`. |
 | On the Pico, hands show as a pointer and a click but no joint dots ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the launcher's **Enter VR** button), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |

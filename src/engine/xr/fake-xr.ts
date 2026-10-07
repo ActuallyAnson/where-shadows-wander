@@ -81,16 +81,40 @@ export interface FakeSessionInit {
   hands?: ('left' | 'right')[];
   restore?: boolean;
   persistentAnchors?: string[];
+  /** Starts as this (default 'visible'). */
+  visibilityState?: XRVisibilityState;
 }
 
-export function fakeSession(init: FakeSessionInit = {}): XRSession & { inputSources: XRInputSource[] } {
-  return {
+export type FakeSession = XRSession & {
+  inputSources: XRInputSource[];
+  /** Changes `visibilityState` and fires `visibilitychange`, like the headset's system menu opening. */
+  setVisibility(state: XRVisibilityState): void;
+  /** How many `visibilitychange` listeners are attached. */
+  visibilityListeners(): number;
+};
+
+export function fakeSession(init: FakeSessionInit = {}): FakeSession {
+  const listeners = new Set<() => void>();
+  const session = {
     enabledFeatures: init.enabledFeatures,
     environmentBlendMode: init.blend,
     inputSources: (init.hands ?? []).map((handedness) => ({ handedness, hand: {} })),
     restorePersistentAnchor: init.restore ? () => Promise.resolve({}) : undefined,
     persistentAnchors: init.persistentAnchors,
-  } as unknown as XRSession & { inputSources: XRInputSource[] };
+    visibilityState: init.visibilityState ?? 'visible',
+    addEventListener: (type: string, fn: () => void) => {
+      if (type === 'visibilitychange') listeners.add(fn);
+    },
+    removeEventListener: (type: string, fn: () => void) => {
+      if (type === 'visibilitychange') listeners.delete(fn);
+    },
+    setVisibility(state: XRVisibilityState) {
+      session.visibilityState = state;
+      for (const fn of [...listeners]) fn();
+    },
+    visibilityListeners: () => listeners.size,
+  };
+  return session as unknown as FakeSession;
 }
 
 /** A reference space with addEventListener, like a real one. */

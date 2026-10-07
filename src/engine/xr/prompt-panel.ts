@@ -69,6 +69,11 @@ export class PromptPanel {
     this.mesh.visible = true;
   }
 
+  /** Takes the panel out of the scene until the next `anchor`. */
+  hide(): void {
+    this.mesh.visible = false;
+  }
+
   /**
    * Shows `text` (first line large), a countdown and, when given, an example
    * picture of the shape on the left. Redraws only when the text or the second changes.

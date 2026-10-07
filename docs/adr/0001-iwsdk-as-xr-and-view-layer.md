@@ -80,6 +80,6 @@ In the emulator on 1.0.0, with both hands tracked, every IWSDK hand and ray mesh
 ## Consequences
 
 - Switching to plain three.js costs about one entry file, as long as the boundary check holds. See [ADR 0002](0002-plain-threejs-fallback.md).
-- We give up IWSDK's editor, scene JSON and ECS tooling for game objects.
+- We give up IWSDK's editor, scene JSON and ECS tooling for game objects. The editor can still place the room and puzzle layouts as scene files that a small loader turns into entities ([ADR 0006](0006-editor-authored-layouts.md)).
 - Every IWSDK upgrade needs: re-check the pins, `npm run check`, the emulator run, the lucide alias, and the hand-mesh workaround.
 - Device-only questions stay open until a Quest run. See the Risks table in the [GDD](../GDD.md#risks).
