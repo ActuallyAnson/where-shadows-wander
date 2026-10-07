@@ -95,7 +95,9 @@ These are starting estimates. Desktop measurements so far: our whole frame was a
 
 ## The virtual room (v1)
 
-The game runs in an `immersive-vr` session, seated (`local-floor`), and asks the headset for one feature: `hand-tracking`. The decision and its trade-offs are in [ADR 0005](adr/0005-virtual-room.md).
+The game runs in an `immersive-vr` session, seated (`local-floor`), and, beyond the `local-floor` and `bounded-floor` reference spaces, asks the headset for one feature: `hand-tracking`. The decision and its trade-offs are in [ADR 0005](adr/0005-virtual-room.md).
+
+**How the session starts.** `iwsdk.config.json` sets `xr.mode` to `vr`, so IWSDK's own enter offer (`navigator.xr.offerSession`, which a headset browser may show as its own enter prompt; not yet seen on a Quest) and `world.launchXR` both ask for `immersive-vr`. The page launcher (`src/app/enter-ar-button.ts`) mounts whenever the browser has `navigator.xr`, next to any native prompt, and has its own Enter VR buttons asking for exactly `local-floor`, `bounded-floor` and `hand-tracking` (and an Enter AR button when the browser supports AR). On a browser with no enter prompt of its own, such as the Pico's, it is the only way in. IWSDK adds one more optional feature, `layers`, to the requests it makes itself, whatever the config says. The launcher's Enter AR button, or `?xr=ar` for IWSDK's own offer, starts the old passthrough session instead (`src/engine/xr/session-mode.ts`: the mode, the occluder default and the background rule, all unit-tested). On an opaque display (VR) the scene has a solid dark background and the frame clears opaque; passthrough clears to transparent. The `render` section of the diagnostics report shows `urlMode` (what the page address asks for: the launcher's own buttons can request the other mode), `blendMode` (what the session actually got) and `handOccluder`.
 
 | Part | How it works | Owner |
 |---|---|---|
@@ -105,7 +107,7 @@ The game runs in an `immersive-vr` session, seated (`local-floor`), and asks the
 | No-hands cue | When the headset delivers no hand data (hand tracking off, controllers held, a browser that does not pass joints), a short in-scene notice says so | Anson (signal), B (text) |
 | Pause | The session `visibilityState` going `hidden` or `visible-blurred` pauses the simulation and saves | Anson (signal), A, B |
 
-Switched off for v1 (still in the repository for a possible real-room mode): `HandOccluder` (**it must default to off in VR**: in a VR session a depth-only hand would cut a hole in the room behind it), the plane tracker and plane capabilities, the passthrough compositing rules below, and the composite probe. The hand-tracking, shape, gesture, shadow, sharpen, flicker and performance work is used as built.
+Switched off for v1 (still in the repository for a possible real-room mode): `HandOccluder` (**it follows the session**: off in VR, where the display is opaque and a depth-only hand would cut a hole in the room behind it, and on over passthrough; `?occlude=1` or `?occlude=0` overrides it for testing), the plane tracker and plane capabilities, the passthrough compositing rules below, and the composite probe. The hand-tracking, shape, gesture, shadow, sharpen, flicker and performance work is used as built.
 
 ## Compositing over passthrough (real-room mode only; not used in v1)
 
@@ -116,7 +118,7 @@ The stage and shadows are drawn into the same frame as the room camera image (`i
 | The frame clears to transparent black and the scene has no background | IWSDK sets this itself in an AR session (the report's `render.clearAlpha` shows it); three clears to transparent in an `alpha-blend` session anyway |
 | Stage materials are `transparent`, `premultipliedAlpha: false` and `toneMapped: false` | Blending `src-alpha` over a transparent clear stores premultiplied colour, which is what the compositor expects. Black stays black whatever tone mapping a scene environment adds |
 | Draw order: hand occluder -1, paper 1, shadow 2, debug and stage sprites 3, joint dots 4 | Opaque things draw first, then the transparent paper and shadow, then overlays |
-| `HandOccluder` draws each hand into the depth buffer only (no colour) | The paper and shadow cover the camera image, so without it a real hand held in front of the stage would be hidden behind them. Fragments behind the occluder fail the depth test and the camera image shows through. On in a headset; `?occlude=0` turns it off to compare |
+| `HandOccluder` draws each hand into the depth buffer only (no colour) | The paper and shadow cover the camera image, so without it a real hand held in front of the stage would be hidden behind them. Fragments behind the occluder fail the depth test and the camera image shows through. On whenever the session is passthrough, off in VR; `?occlude=0` turns it off to compare |
 | Any colour shader we add includes `colorspace_fragment` | The XR target is sRGB. Only black-only shaders (the shadow) may skip it |
 
 The lantern's glow (`LanternGlow`) is a camera-facing quad with a bright core and a soft halo, drawn at order 3 with ordinary alpha blending (never additive, which would vanish on a passthrough display) and `colorspace_fragment`. It and the paper's shimmer read one `LanternLight` (position, lit, intensity, colour) from `LanternLightModel`; Teammate B's lantern flow sets `lit` and the position.
