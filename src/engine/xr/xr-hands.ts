@@ -49,6 +49,8 @@ export class XRHandReader {
     inputSourceEvents: [],
     lastError: null,
   };
+  /** Input sources this frame that are hands (not controllers); 0 when hand tracking is off or the browser gives no joints. */
+  handSources = 0;
   private readonly poses = new Float32Array(16 * JOINT_COUNT);
   private readonly spaces: (XRJointSpace | undefined)[] = new Array(JOINT_COUNT);
   private readonly m = new Matrix4();
@@ -61,6 +63,7 @@ export class XRHandReader {
     this.debug.updateCalls++;
     this.hands.left.tracked = this.hands.right.tracked = false;
     this.hands.left.validJoints = this.hands.right.validJoints = 0;
+    this.handSources = 0;
     const f = frame as FrameWithFill;
 
     if (this.lastWatchedSession !== frame.session) {
@@ -105,6 +108,7 @@ export class XRHandReader {
       const source = sources[s];
       const xrHand = source.hand;
       if (!xrHand) continue;
+      this.handSources++;
 
       // Determine handedness: use explicit handedness or check profiles
       let assignedHandedness: Handedness | null =
