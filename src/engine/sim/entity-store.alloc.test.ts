@@ -1,0 +1,89 @@
+// The entity store must not allocate per frame: create, destroy, beginStep and a solver-style scan
+// run every step. This churns the store the way a chapter would (rain drops spawning and dying,
+// rocks and crows coming and going) for thousands of frames and checks the heap, as
+// frame-pipeline.alloc.test.ts does for the hand pipeline. Needs `--expose-gc` (vitest.config.ts sets it).
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_CAPACITIES, Kind } from './entity-kinds';
+import { EntityStore, NULL_HANDLE, type Handle } from './entity-store';
+import { circleVsCapsule, normalize, type Vec2 } from './vec2';
+
+// The project's TypeScript config has no Node types: reach the Node globals we need through globalThis.
+const node = globalThis as unknown as {
+  gc?: () => void;
+  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
+};
+const gc = node.gc;
+
+const DROPS = 40;
+const FRAMES = 3_000;
+const BUDGET_BYTES_PER_FRAME = 64;
+
+/** One frame of churn: spawn some drops, kill the oldest, a fixed step's worth of reads and writes. */
+function makeStep(extra?: () => void) {
+  const store = new EntityStore(DEFAULT_CAPACITIES);
+  // Ring of live handles in a typed array, so the test's own bookkeeping builds nothing.
+  const ring = new Int32Array(DROPS);
+  let head = 0;
+  let frame = 0;
+  const scratch: Vec2 = { x: 0, y: 0 };
+  store.create(Kind.Traveller, 0, 0, 0.1);
+  return () => {
+    store.beginStep();
+    const old = ring[head] as Handle;
+    if (old !== NULL_HANDLE) store.destroy(old);
+    ring[head] = store.create(Kind.Raindrop, (frame % 100) * 0.01, 1, 0.02, 0, -1);
+    head = (head + 1) % DROPS;
+    if (frame % 90 === 0) store.destroy(store.handleAt(store.kindStart[Kind.Crow]));
+    if (frame % 90 === 45) store.create(Kind.Crow, 1, 0.5, 0.08);
+    let sum = 0;
+    for (let s = 0; s < store.capacity; s++) {
+      if (!store.alive[s]) continue;
+      store.x[s] += store.vx[s] / 60;
+      store.y[s] += store.vy[s] / 60;
+      sum += circleVsCapsule(store.x[s], store.y[s], store.radius[s], 0, 0, 1, 0, 0.05, scratch);
+      sum += normalize(store.vx[s], store.vy[s], scratch);
+      sum += store.px[s] + (store.x[s] - store.px[s]) * 0.5;
+    }
+    if (sum === Infinity) throw new Error('unreachable');
+    extra?.();
+    frame++;
+  };
+}
+
+/** Heap growth over `frames` steps; fails if a collection ran in the window, which would hide the garbage. */
+function measure(step: () => void, frames: number): number {
+  for (let i = 0; i < 60000; i++) step();
+  gc!();
+  const before = node.process.memoryUsage().heapUsed;
+  let last = before;
+  for (let i = 0; i < frames; i++) {
+    step();
+    if (i % 100 === 99) {
+      const now = node.process.memoryUsage().heapUsed;
+      if (now < last)
+        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
+      last = now;
+    }
+  }
+  return node.process.memoryUsage().heapUsed - before;
+}
+
+it('has garbage collection exposed when running in CI', () => {
+  expect(gc !== undefined || !node.process.env.CI).toBe(true);
+});
+
+describe.skipIf(!gc)('entity store allocation', () => {
+  it('create, destroy, beginStep and a full scan stay under the allocation budget', () => {
+    const bytes = measure(makeStep(), FRAMES);
+    console.info(`entity store allocates ${(bytes / FRAMES).toFixed(1)} B a frame`);
+    expect(bytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
+  });
+
+  it('catches a step that allocates and throws it away (a control for the test itself)', () => {
+    const bytes = measure(
+      makeStep(() => void new Array(256).fill(0.5)),
+      FRAMES,
+    );
+    expect(bytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
+  });
+});
