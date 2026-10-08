@@ -2,10 +2,11 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
+import { AmbientLight, Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
+import { CandleView } from '../engine/render/candle-view';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
@@ -92,7 +93,7 @@ async function start(): Promise<void> {
   const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
   const stage = createStagePlane();
   const lantern = new Float64Array(3);
-  const projector = new ShadowProjector();
+  const projector = new ShadowProjector({ blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
@@ -114,9 +115,11 @@ async function start(): Promise<void> {
     });
   const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
-  stageView.flameVisible = !mockOptions; // the Hand Lab draws its own lantern
+  stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
+  const candleView = new CandleView();
+  const ambientLight = new AmbientLight(0x1a1410, 0.04);
   const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
-  world.scene.add(stageView.group, shadowRenderer.mesh);
+  world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
   if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
@@ -125,6 +128,7 @@ async function start(): Promise<void> {
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
     stageView.place(stage, lantern);
+    candleView.place(lantern);
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -185,6 +189,16 @@ async function start(): Promise<void> {
       placed: rigPlaced,
       everPlaced,
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
+    },
+    candle: {
+      placed: rigPlaced,
+      position: [lantern[0], lantern[1], lantern[2]],
+      flamePosition: [candleView.flamePosition[0], candleView.flamePosition[1], candleView.flamePosition[2]],
+      lit: lanternLight.light.lit,
+      intensity: lanternLight.light.intensity,
+      pointLightIntensity: candleView.lightIntensity,
+      state: candleView.state,
+      isHeld: candleView.isHeld,
     },
     xrInput: {
       handsStatus: { state: HANDS_STATE_NAMES[handsStatus.state], showMessage: handsStatus.showMessage },
@@ -332,9 +346,16 @@ async function start(): Promise<void> {
         }
       }
       if (rigPlaced) {
+        const tableY = headPos.y - 0.45;
+        const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
+        if (candleAction.state === 'held' || candleAction.justPlaced) {
+          lantern[0] = candleView.group.position.x;
+          lantern[1] = candleView.group.position.y;
+          lantern[2] = candleView.group.position.z;
+        }
         timings.begin(SLOT.shadow);
-        projector.update(hands.hands, stage, lantern);
-        shadowRenderer.update(projector.shadows, stage, sharpen.look);
+        projector.update(hands.hands, stage, candleView.flamePosition);
+        shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
       }
@@ -365,12 +386,13 @@ async function start(): Promise<void> {
       }
       if (!paused) sim.advance(delta);
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
-      lanternLight.update(clock, rigPlaced ? lantern : null, true);
+      lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
-      stageView.applyLight(lanternLight.light, cameraQuat);
+      stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
+      candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
-      dots.update(handList);
+      dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       timings.begin(SLOT.lab);
       lab?.frame();
       timings.end(SLOT.lab);
@@ -401,6 +423,7 @@ async function start(): Promise<void> {
         occluder,
         sharpen,
         lanternLight,
+        candleView,
         dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),

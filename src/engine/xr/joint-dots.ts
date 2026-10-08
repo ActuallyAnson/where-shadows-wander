@@ -7,6 +7,8 @@ export class JointDots {
   readonly mesh: InstancedMesh;
   private readonly m = new Matrix4();
   private readonly colors = { right: new Color(0xf09a3e), left: new Color(0x5aa0d8) };
+  private readonly litColor = new Color(0xffdf80); // warm bright candlelight
+  private readonly scratchColor = new Color();
 
   constructor() {
     // Drawn last and without a depth test, so the hand occluder (hand-occluder.ts) can't hide them.
@@ -20,17 +22,44 @@ export class JointDots {
     this.mesh.count = 0;
   }
 
-  update(hands: readonly HandFrame[]): void {
+  update(hands: readonly HandFrame[], flamePos?: ArrayLike<number> | null): void {
     let n = 0;
+    const fx = flamePos ? flamePos[0] : 0;
+    const fy = flamePos ? flamePos[1] : 0;
+    const fz = flamePos ? flamePos[2] : 0;
+    const hasFlame = flamePos !== null && flamePos !== undefined;
+
     for (const hand of hands) {
       if (hand.validJoints === 0) continue;
+      const baseColor = this.colors[hand.handedness];
       for (let j = 0; j < JOINT_COUNT; j++) {
         const p = hand.positions;
-        if (p[j * 3] === 0 && p[j * 3 + 1] === 0 && p[j * 3 + 2] === 0) continue;
+        const x = p[j * 3];
+        const y = p[j * 3 + 1];
+        const z = p[j * 3 + 2];
+        if (x === 0 && y === 0 && z === 0) continue;
         const r = hand.radii[j] || 0.01;
-        const s = Math.max(r * 0.4, 0.006);
-        this.m.makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
-        this.mesh.setColorAt(n, this.colors[hand.handedness]);
+        let s = Math.max(r * 0.4, 0.006);
+
+        if (hasFlame) {
+          const dx = x - fx;
+          const dy = y - fy;
+          const dz = z - fz;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < 0.22) {
+            // Joint is near candlelight: brighten and warm up!
+            const t = Math.max(0, 1.0 - dist / 0.22);
+            this.scratchColor.copy(baseColor).lerp(this.litColor, t * 0.9);
+            s *= 1.0 + t * 0.35;
+            this.mesh.setColorAt(n, this.scratchColor);
+          } else {
+            this.mesh.setColorAt(n, baseColor);
+          }
+        } else {
+          this.mesh.setColorAt(n, baseColor);
+        }
+
+        this.m.makeScale(s, s, s).setPosition(x, y, z);
         this.mesh.setMatrixAt(n++, this.m);
       }
     }
