@@ -3,19 +3,13 @@
 // `--expose-gc`. What remains (about 40 B a step, measured) is the engine boxing numbers across
 // calls it didn't inline, mostly in this test's own scripted shadows; see the note in solver.ts.
 import { describe, expect, it } from 'vitest';
+import { bytesPerFrame, gc, inCI } from './alloc-measure';
 import { createHandShadow } from '../hands/hand-shadow';
 import { DEFAULT_CAPACITIES, Kind } from './entity-kinds';
 import { EntityStore } from './entity-store';
 import { Rng } from './rng';
 import { cupShadow, flatShadow } from './shadow-shapes';
 import { LEFT, RIGHT, Solver, Touch, type Support } from './solver';
-
-// The project's TypeScript config has no Node types: reach the Node globals we need through globalThis.
-const node = globalThis as unknown as {
-  gc?: () => void;
-  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
-};
-const gc = node.gc;
 
 const FRAMES = 2_000;
 const TIMEOUT_MS = 60_000;
@@ -52,35 +46,17 @@ function makeStep(extra?: () => void) {
   };
 }
 
-/** Heap growth over `frames` steps; fails if a collection ran in the window, which would hide the garbage. */
-function measure(step: () => void, frames: number): number {
-  for (let i = 0; i < 20000; i++) step();
-  gc!();
-  const before = node.process.memoryUsage().heapUsed;
-  let last = before;
-  for (let i = 0; i < frames; i++) {
-    step();
-    if (i % 100 === 99) {
-      const now = node.process.memoryUsage().heapUsed;
-      if (now < last)
-        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
-      last = now;
-    }
-  }
-  return node.process.memoryUsage().heapUsed - before;
-}
-
 it('has garbage collection exposed when running in CI', () => {
-  expect(gc !== undefined || !node.process.env.CI).toBe(true);
+  expect(gc !== undefined || !inCI).toBe(true);
 });
 
 describe.skipIf(!gc)('solver allocation', () => {
   it(
     'a busy step and the queries stay under the allocation budget',
     () => {
-      const bytes = measure(makeStep(), FRAMES);
-      console.info(`solver allocates ${(bytes / FRAMES).toFixed(1)} B a step`);
-      expect(bytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
+      const bytes = bytesPerFrame(makeStep(), { frames: FRAMES, goodBelow: BUDGET_BYTES_PER_FRAME / 2 });
+      console.info(`solver allocates ${bytes.toFixed(1)} B a step`);
+      expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
     },
     TIMEOUT_MS,
   );
@@ -88,11 +64,11 @@ describe.skipIf(!gc)('solver allocation', () => {
   it(
     'catches a step that allocates (a control for the test itself)',
     () => {
-      const bytes = measure(
+      const bytes = bytesPerFrame(
         makeStep(() => void new Array(64).fill(0.5)),
-        FRAMES,
+        { frames: FRAMES, attempts: 1 },
       );
-      expect(bytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
+      expect(bytes).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
     },
     TIMEOUT_MS,
   );
