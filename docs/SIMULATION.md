@@ -9,8 +9,8 @@ All code here is pure TypeScript: no IWSDK, no three.js and no browser globals. 
 - **Deterministic.** The sim only changes state inside a fixed step. Randomness comes from `Rng`, never `Math.random()`. It never reads the wall clock. With the same seed and the same inputs, a run is identical at any display rate; `determinism.test.ts` checks this bit for bit.
 - **No per-frame allocation.**
   - Everything is allocated in a constructor or on puzzle load.
-  - Per-step code reuses typed arrays and pooled objects.
-  - Each per-step module has an `*.alloc.test.ts`, with a budget of 64 B a frame.
+  - Per-step code reuses typed arrays and pooled objects, and builds no objects or arrays.
+  - Each per-step module has an `*.alloc.test.ts` (measured with `src/engine/sim/alloc-measure.ts`). The bytes left over are V8 boxing numbers across calls it didn't inline, as in the hand pipeline's test. The budget is 64 B for the sim modules and about 1.5 times the measured figure for a whole game frame.
 - **Budget:** 2.0 ms of CPU per frame on the headset for all sim and gameplay steps together. That is roughly 0.5 ms on a desktop; check it with `npm run perf`.
 - **Units.**
   - Stage space is 2D metres on the paper wall. The origin is the stage centre, x is along the wall's `right` axis and y along its `up` axis.
@@ -19,15 +19,26 @@ All code here is pure TypeScript: no IWSDK, no three.js and no browser globals. 
 
 ## Frame flow
 
+`main.ts` makes one call a frame: `game.frame(input)`. Inside it:
+
 ```
-display frame (main.ts FrameDriverSystem)
-  hands → shape/gesture events → shadows (HandShadow capsules in stage space)
-  latch.capture(shape events, gesture events)      once per frame
-  alpha = loop.advance(delta)                      0..N fixed steps
-      step(dt):  read + latch.consume()            first step after a capture sees the events
-                 store.beginStep()                 px/py ← x/y
-                 gameplay, then solver             (later modules)
-  renderer draws px + (x - px) * alpha
+Game.frame(input)                                   once per display frame
+  events.clear()
+  paused?  -> stop here (on resume, loop.reset(): no catch-up)
+  latch.capture(shape events, gesture events)
+  abilities.setShadows(left, right)                 hand capsules -> solver.hands, hand velocity
+  alpha = loop.advance(dt)                          0..4 fixed steps of 1/60 s
+    step:  shape events -> discovery, abilities (roles)     then latch.consume()
+           store.beginStep()                                 px/py <- x/y
+           abilities.beforeSolve                             hand masks from roles
+           puzzle.step                                       hazards, wind, holds
+           creatures / traveller / companions think          speeds
+           solver.step
+           abilities.afterSolve                              catching, splashes on hands
+           puzzle.afterStep                                  contacts, gates, credit
+           traveller / companions / creatures after          goal, falls, fading
+           runner.update                                     credit, hint, win, outro -> next puzzle
+  return alpha                                      renderer draws px + (x - px) * alpha
 ```
 
 ## Fixed-step loop: `src/engine/sim/fixed-step.ts`
@@ -179,15 +190,255 @@ It runs on puzzle load, never per frame. `markerOf` and `markersOf` find markers
 
 `src/engine/sim/scene-layout.test.ts` now reads a small fixed fixture, `src/engine/sim/fixtures/sample-chapter.scene.json` (the first editor trial's file), so re-authoring the real chapter doesn't break the loader's tests. `level.test.ts` checks that every chapter-1 puzzle loads cleanly and fits on the wall.
 
+## The game: `src/game/game.ts`
+
+`Game` is the one object `main.ts` drives (see [ADR 0008](adr/0008-game-contract.md)). It owns:
+- the loop, store, solver and RNG
+- the traveller, abilities, companions and creatures
+- the puzzle runner, discovery and the save
+
+It also implements `GameContext` (`src/game/context.ts`), the view of the world every gameplay module receives.
+
+### Input and output
+
+```ts
+const game = new Game({ chapter: chapterDoc, puzzles: CHAPTER_1, save: readSave(stored) });
+// every display frame:
+const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right, shapeEvents: shapes.events });
+// then read game.events, game.store (+ alpha), game.fixtures, game.traveller.state, game.save
+```
+
+| Input | From |
+|---|---|
+| `dt`, `paused` | the frame delta; `SessionVisibility.paused` or the cover-flame pause |
+| `left`, `right` | `ShadowProjector.shadows` (stage space) |
+| `shapeEvents` | `ShapeRecognizer.events` |
+| `gestureEvents` | `GestureDetector.events` (latched; not used by gameplay yet) |
+
+| Output | For |
+|---|---|
+| `alpha` and `store` (`x/y/px/py/radius/kind/flags`) | the sprite renderer (B) |
+| `events` (`GameEventQueue`): one frame of events, cleared at the next `frame()` | audio, saves, UI, effects |
+| `fixtures` | the renderer: cloud, wind, gate, rope, plate, tunnel, window, creature hints |
+| `traveller.state`/`stateT`, `companions.rabbit/fox.state`, `abilities.hands[h].role` | animation (B) |
+| `save` (`SaveState`), changed on `puzzle-solved`, `creature-discovered` and `chapter-complete` | the save service (B) |
+
+### Control
+
+- `restart()` reloads the current puzzle.
+- `goto(i)` jumps to puzzle `i`.
+- `complete` is true once the last puzzle is solved: the final scene stays painted and the window is lit.
+
+### Fixed steps
+
+The loop runs at 60 Hz, at most 4 steps a frame.
+
+Pausing stops time completely. On resume the remainder is dropped, so the world never jumps.
+
+### Solver tuning: `gameSolverConfig()`
+
+- **Flyers:** crows and fireflies ignore gravity.
+- **Raindrops** fall at half gravity, on top of their starting speed.
+- **What collides:**
+  - Walkers (traveller, rocks, rabbit, fox) collide with each other and with drops.
+  - Crows collide only with the traveller, as sensors.
+  - Fireflies collide with nothing except a cup.
+  - Crows and fireflies ignore terrain.
+
+## Game events: `src/game/game-events.ts`
+
+`GameEventQueue` holds 128 pooled `GameEvent { type, id, hand, value, x, y, t }`. `id` is always a constant string.
+
+| type | id | value |
+|---|---|---|
+| `puzzle-start` | puzzle id | puzzle index |
+| `puzzle-solved` | the solution used | puzzle index; `x` = 1 if the solution is new |
+| `chapter-complete` | chapter id | |
+| `ability-start` / `ability-end` | role name (`bridge`, `rock`, `catcher`, `wall`, `companion`) | |
+| `traveller-state` | the new state | |
+| `traveller-fell` | | |
+| `companion-released` / `companion-gone` | `rabbit` / `fox` | |
+| `creature-discovered` | `rabbit` / `fox` | gallery size |
+| `hint-show` / `hint-hide` | the shape to make (show) | `x`, `y`: where |
+| `caught` | `raindrop` / `firefly` | how many the cup holds |
+| `splash` | `ground` / `hand` / `traveller` | |
+| `puzzle-event` | `rope-lowered`, `crows-flee`, `dig`, `gate-open`, `gate-close`, `cup-overflow` | |
+
+## The traveller: `src/game/traveller.ts`
+
+The traveller walks on its own at `WALK_SPEED` (0.12 m/s) toward the goal. The player never steers it.
+
+### States
+
+| State | When |
+|---|---|
+| `walk` | ground ahead (within a 3 cm step up or 5 cm step down) and no wall at stride height |
+| `blocked` | otherwise; it stands still |
+| `look-back` | blocked for 3 s: it looks at the player, the cue to help |
+| `held` | a puzzle called `hold(reason)` this step (rain ahead, crows on the path) |
+| `pushed` | wind (`push`) beats its stride |
+| `falling` | no ground for 0.15 s |
+| `goal` | inside the goal marker |
+
+### Probes
+
+It looks for ground with `solver.supportBelow` and for walls with `solver.blocked`. Hands count only when their role makes them solid to it.
+
+### No fail state
+
+If it falls (a bridge pulled away mid-crossing), it is put back at its start with `traveller-fell`. This is a design call, listed below.
+
+## Shape abilities: `src/game/abilities.ts`
+
+A `commit` gives the hand a role. The role ends on that shape's `release`, and a new shape's commit replaces it with no gap (GDD).
+
+| Shape | Role | The hand's shadow… | Solid to |
+|---|---|---|---|
+| flat | bridge | is a plank to walk on, and a roof that bursts rain | walkers, raindrops |
+| fist | rock | is a heavy solid; it presses plates and anchors the traveller in wind | walkers, raindrops, crows |
+| cup | catcher | catches raindrops (counted, `CUP_CAPACITY` 60, then it overflows) and fireflies (carried in the bowl until the cup is released) | walkers, raindrops, fireflies |
+| spread | wall | is a windbreak (`wallShelters`) and blocks rain and crows | walkers, raindrops, crows |
+| rabbit, fox | companion | releases the creature; the shadow itself is not solid | nothing |
+
+### How it works
+
+- **No role, no collision.** A hand with no role passes through everything, so moving a hand into place never knocks things over.
+- **The live outline collides.** Bridge and rock use the shadow's actual capsules, so a slightly imperfect shape still works (GDD).
+- **Hand velocity.** It comes from the shadow's centre, frame to frame, smoothed and capped at 3 m/s. A moving hand carries what rests on it and shoves what it hits.
+
+## Companions: `src/game/companions.ts`
+
+One rabbit and one fox can be out at a time. A companion appears at the hand's shadow when its shape commits (the classifier's 1 s companion hold), walks toward the goal, and fades after 15 s or when it leaves the stage. Making the shape again calls it back.
+
+### Rabbit
+
+- It leaps any gap ahead (about 0.68 m long and 0.34 m high) and turns back from walls.
+- `crossedAt` is where it landed after a leap. Puzzle 4 lowers the rope from it.
+- If it lands on a creature, it steps off rather than leaping.
+
+### Fox
+
+- At a gate (`TerrainTag.Gate`) it digs for 1.5 s, sets `dugGate`, and walks on through.
+- Crows near it take fright; puzzle 5 decides this.
+- It waits at a gap.
+
+## Creatures: `src/game/creatures.ts`
+
+- **Fireflies** drift in slow loops around where the layout placed them, unless carried.
+- **Crows** perch, then do one of two things:
+  - flee up and away when `Scared`, and are removed off the stage
+  - fly toward `lureX/lureY` when `Lured`
+
+  Puzzles set those flags (`src/game/flags.ts`, bits 8 and up).
+
+## Puzzles and the runner: `src/game/puzzle.ts`
+
+### A puzzle
+
+A `PuzzleDef` has:
+- `id`, `layoutId` and `title`
+- `solutions`: the intended one first
+- `hintShape`, plus an optional `hintDelayS`, `hintAt` and `groundY`
+- an optional `creatureHint`
+- hooks: `setup` (on load), `step` (before the traveller and solver) and `afterStep` (after the solver)
+
+### The runner
+
+- **Solution credit.**
+  - The puzzle calls `ctx.credit(id)` with evidence while the player plays. The runner adds credit for the role of the hand the traveller stands on.
+  - At the win, the solution with the most credit is recorded, or the first solution if none was credited.
+  - Credit for an id that isn't a solution is ignored.
+- **Hint.** After the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`, `hint-show` names the shape and a stage position. The default is 20 s (GDD); the tutorial uses 0.5 s. `hint-hide` follows once it has walked for 0.5 s.
+- **Win and outro.** The traveller reaching the goal emits `puzzle-solved` and saves the solution. After a 2.5 s outro the next puzzle loads, between frames. After the last puzzle comes `chapter-complete`, with the window lit.
+
+### Chapter 1: `src/game/puzzles/`
+
+| # | Puzzle | Obstacle | Solutions (intended first) | How the code decides |
+|---|---|---|---|---|
+| 1 | `p1-gap` (tutorial) | a 0.22 m gap | `bridge` | standing on a bridge hand |
+| 2 | `p2-rain` | a cloud rains on the path (seeded drops); the traveller waits while drops land just ahead or hit it | `cup`, `roof` | which cover is over it under the cloud |
+| 3 | `p3-wind` | wind from the right, stronger than its stride | `wall` (a spread hand on its windward side), `anchor` (a fist just above it) | sheltered by `wallShelters`, or a rock hand within 0.15 m above |
+| 4 | `p4-chasm` | a 0.5 m chasm, wider than one hand | `rabbit` (it leaps and lowers a rope), `two-bridges` | standing on the rope, or on both bridge hands |
+| 5 | `p5-crows` | three crows on the path | `fox` (scares them), `fireflies` (a cup of 3 or more lures the flock, then lift it away) | crows scared or lured |
+| 6 | `p6-gate` | a gate that opens while its plate (on a shelf above the path) is pressed | `rock` (a fist on the plate), `fox` (digs under) | plate pressed by a rock hand, or a dug tunnel |
+
+Creature hints: the rabbit's appears in puzzle 3 and the fox's in puzzle 4, each before it is needed.
+
+### Adding a puzzle
+
+1. **Layout.** In the scene editor, add a `puzzle-N` group to `public/scenes/chapter-1.iwsdk.scene.json` with:
+   - a `piece-traveller` at its start
+   - a `marker-goal`
+   - any `marker-gap` holes, `marker-plate` plates and pieces
+
+   Keep positions inside the 1.6 × 1.0 m stage around the group's origin.
+2. **Code.** Write a `PuzzleDef` in `src/game/puzzles/`. Keep per-puzzle state in a module-level object reset in `setup`, as the existing puzzles do (one puzzle plays at a time). Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
+3. **Register it.** List it in `src/game/puzzles/index.ts`.
+4. **Test it.** Add a headless test to `chapter-1.test.ts` that solves it every way it should be solvable, and checks the recorded solution.
+
+## Discovery and saves: `src/game/discovery.ts`, `src/game/save-state.ts`
+
+### Discovery
+
+- The first commit of a companion shape anywhere discovers that creature: `creature-discovered`, then it is added to `save.creatures` (the gallery).
+- A puzzle's `creatureHint` draws a `hint-<creature>` fixture until the creature is found.
+
+### The save
+
+`SaveState` is plain JSON:
+- `version` and `chapter`
+- `puzzle`: where to resume
+- `solutions`: per puzzle id, the solution ids found
+- `creatures`
+- `chapterComplete`
+
+`readSave(unknown)` turns untrusted stored data into a valid save. It never throws, and it is where future migrations go. Storage itself belongs to B's save service.
+
+## Fixtures: `src/game/fixtures.ts`
+
+Puzzle objects that aren't entities, for the renderer. Each has a `kind`, centre and size in stage metres, `active` and a kind-specific `value`.
+
+| kind | active means | value |
+|---|---|---|
+| `cloud` | | |
+| `wind` | | how hard it reaches the traveller (1, or 0.2 when sheltered) |
+| `gate` | shut | 1 while open |
+| `rope` | lowered | |
+| `plate` | | 1 while pressed |
+| `tunnel` | | |
+| `window` | lit (chapter end) | |
+| `hint-rabbit`, `hint-fox` | still undiscovered | |
+
+## Headless runner: `src/game/headless.ts`
+
+`Headless` plays the game from scripted hands:
+- `pose(hand, shape, x, y)`, `move` and `hide`
+- `run(seconds, each?)` and `runUntil(done, max)`
+- `saw(type, id)` checks the event log
+
+A stand-in classifier commits a shape after the GDD hold times (0.4 s, or 1 s for companions) and releases it on exit or switch. Shadows come from `shadow-shapes.ts`. Every puzzle test uses it, and it is handy for trying a puzzle idea before building it in the editor.
+
+## Cost of a game frame
+
+- **Time:** `game.perf.ts` measures 0.02–0.03 ms a frame on a desktop, in the rain puzzle (shower, cup and roof) and the crows puzzle (crows, fireflies in a cup). The budget is about 0.5 ms.
+- **Allocation:** `game.alloc.test.ts` measures about 210 B a frame in the rain puzzle, against a budget of 320 B. That is number boxing; no objects or arrays are built.
+
 ## Entity store, layouts, 2D maths
 
 These already exist; see the header comments in `entity-store.ts`, `entity-kinds.ts`, `scene-layout.ts` and `vec2.ts`, and [ADR 0006](adr/0006-editor-authored-layouts.md) for how layouts are authored.
 
 ## Design calls open for team review
 
-These choices are made in A's code because the GDD doesn't specify them. They are flagged here so the team can overrule them.
+The GDD doesn't specify these, so A's code makes them. They are flagged here so the team can overrule them.
 
-- **No fail state.** The traveller never dies; hazards stop it or push it back, and it waits.
+- **No fail state.**
+  - The traveller never dies. Hazards stop it or push it back, and it waits.
+  - A fall puts it back at the puzzle start (`traveller-fell`).
+- **A hand with no role is not solid.** Only a committed shape's shadow touches the world. It still always mirrors the hand visually.
+- **The traveller won't walk into rain or past crows.** In puzzles 2 and 5 it is the traveller's caution, not damage, that makes the obstacle.
+- **Puzzle 3 anchor:** the GDD's "fist rock as an anchor" is read as a fist held just above the traveller, which it holds on to.
+- **Puzzle 6 plate:** the weight plate sits on a shelf above the path, so a fist resting on it doesn't block the traveller.
+- **Discovery:** the first commit of a companion shape anywhere discovers it. The scenery hint is a nudge, not a requirement.
 - **A custom 2D solver rather than a library:** see [ADR 0007](adr/0007-custom-2d-solver.md).
-- **`content/levels` stays unused.** Per ADR 0006, layouts live in the scene file and puzzle logic lives in `src/game/puzzles/`.
-- **Stage size uses the GDD's constants** (about 2 m away, 1.6 m wide) until it is tuned in the headset.
+- **`content/levels` stays unused.** Per ADR 0006, layouts live in the scene file and puzzle logic in `src/game/puzzles/`.
+- **Stage size** uses the GDD's constants (about 2 m away, 1.6 m wide) until it is tuned in the headset. Puzzle sizes assume a hand shadow about 0.3 m long on the stage.

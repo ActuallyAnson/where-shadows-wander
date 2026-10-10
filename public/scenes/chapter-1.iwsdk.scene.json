@@ -507,11 +507,11 @@
             "type": "asset"
           },
           "id": "p6-plate",
-          "name": "Weight plate",
+          "name": "Weight plate (on a shelf)",
           "transform": {
             "position": [
-              -0.1,
-              -0.29,
+              0,
+              -0.06,
               0
             ],
             "scale": [
