@@ -193,3 +193,19 @@ Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one wi
 | Hand Lab recording isn't in `recordings/` | The dev server must be running (`npm run dev`) with the new vite.config.ts: restart it once after pulling. Without it the page falls back to a browser download. |
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |
+
+## 13. Add models, textures and sounds
+
+Put the file in `src/assets` and it is in the game ([ADR 0007](adr/0007-asset-pipeline.md)); there is no list to edit. The first folder under `src/assets` sets how it loads:
+
+| Folder | Loads | Use for |
+|---|---|---|
+| `src/assets/critical/` | Before the world starts (the page waits, and a missing file leaves a blank page) | Almost nothing. Keep it empty or tiny, all of it under 1 MB. Prefer loading the paper's texture later with the loader and drawing the procedural paper until then |
+| `src/assets/audio/` (`sfx/`, `music/`) | In the background after the critical files | Sounds. Music goes in a folder named `music` |
+| anywhere else, for example `src/assets/models/` | When first used | Models and textures |
+
+The id is the file name in lower case with hyphens (`Paper Crow.glb` is `paper-crow`). Models must be single-file `.glb`; extensions must be lower case (`npm run check` says so if not). A `.glb` dropped in while `npm run dev` is running appears in the scene editor's **Assets** panel within seconds, ready to add to a scene. In code, `new AssetLoader({ load: iwsdkLoad, fallback })` (`src/engine/services/assets`) gets a lazy or background one by id: it times out after 8 s, tries twice, shares a load between callers, and gives a stand-in rather than failing (it tries again after 10 s, or call `retry(id)`). It is not for critical files, and a loaded model is one shared object, so take copies with `AssetManager.getGLTF(id)`.
+
+**Size limits** (`src/engine/services/assets/budgets.mjs`): a texture 512 KB, a model 500 KB, a sound effect 300 KB, a music file 1.5 MB, the critical files together 1 MB, and the first-load JavaScript 800 KB gzipped. `npm run check` checks the files in the repository and `npm run build` checks the first-load bundle, so an over-budget file turns CI red (it blocks merging only if the repository requires the check), and on `main` it stops the Pages deploy. Use WebP or KTX2 for textures, Ogg or MP3 for sound, and keep textures to 2048 pixels or less: the limits are file sizes, not memory.
+
+**Cold start.** `npm run build`, then `npm run cold-start` loads the build with an empty cache, the CPU four times slower (`-- --cpu 6` for six) and fast 4G, and prints when the first frame's update began (the lantern is already in the scene). It needs Playwright's Chromium (`npx playwright install chromium`) and does not include tapping Enter VR. `-- --budget 5000` makes it fail if the median is later than 5 s. Headless Chromium draws in software and runs vary by a few hundred milliseconds, so use the numbers to compare changes, and confirm the real figure on a headset.
