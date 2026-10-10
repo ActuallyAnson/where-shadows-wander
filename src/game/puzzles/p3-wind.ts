@@ -21,8 +21,6 @@ const ANCHOR_REACH = 0.15;
 // The wind is stronger than the traveller's stride: on its own it never gets through.
 if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('p3-wind: the wind must out-push the traveller');
 
-const state: { wind: Fixture | null } = { wind: null };
-
 /** Whether a rock-role hand is close above the traveller for it to hold on to. */
 function anchored(ctx: GameContext, x: number, y: number): boolean {
   for (let h = 0; h < HAND_COUNT; h++) {
@@ -35,54 +33,58 @@ function anchored(ctx: GameContext, x: number, y: number): boolean {
   return false;
 }
 
-export const P3_WIND: PuzzleDef = {
-  id: 'p3-wind',
-  layoutId: 'puzzle-3',
-  title: 'Wind',
-  solutions: ['wall', 'anchor'],
-  hintShape: 'spread',
-  creatureHint: { creature: 'rabbit', x: 0.45, y: 0.25 },
+/** A fresh puzzle with its own state: one per Game, so two games never share it. */
+export function createWindPuzzle(): PuzzleDef {
+  const state: { wind: Fixture | null } = { wind: null };
+  return {
+    id: 'p3-wind',
+    layoutId: 'puzzle-3',
+    title: 'Wind',
+    solutions: ['wall', 'anchor'],
+    hintShape: 'spread',
+    creatureHint: { creature: 'rabbit', x: 0.45, y: 0.25 },
 
-  setup(ctx) {
-    const right = WALL_WIDTH_M / 2;
-    state.wind = ctx.fixtures.add(
-      'wind',
-      (WIND_FROM_X + right) / 2,
-      ctx.groundY + 0.25,
-      right - WIND_FROM_X,
-      0.5,
-      true,
-      1,
-    );
-  },
+    setup(ctx) {
+      const right = WALL_WIDTH_M / 2;
+      state.wind = ctx.fixtures.add(
+        'wind',
+        (WIND_FROM_X + right) / 2,
+        ctx.groundY + 0.25,
+        right - WIND_FROM_X,
+        0.5,
+        true,
+        1,
+      );
+    },
 
-  step(ctx) {
-    const t = ctx.traveller;
-    const s = t.slot(ctx);
-    const wind = state.wind;
-    if (s < 0 || t.state === 'goal' || !wind) return;
-    const { store } = ctx;
-    const x = store.x[s],
-      y = store.y[s],
-      r = store.radius[s];
-    // value: how hard the wind reaches the traveller (1 full, low when sheltered), for the renderer.
-    wind.value = 1;
-    if (x < WIND_FROM_X) return;
-    if (ctx.abilities.wallShelters(ctx, x, y, r, 1)) {
-      ctx.credit('wall', ctx.dt);
-      wind.value = 0.2;
-      return;
-    }
-    if (anchored(ctx, x, y)) {
-      ctx.credit('anchor', ctx.dt);
-      t.push = WIND_PUSH * ANCHORED_SHARE;
-      return;
-    }
-    t.push = WIND_PUSH;
-  },
+    step(ctx) {
+      const t = ctx.traveller;
+      const s = t.slot(ctx);
+      const wind = state.wind;
+      if (s < 0 || t.state === 'goal' || !wind) return;
+      const { store } = ctx;
+      const x = store.x[s],
+        y = store.y[s],
+        r = store.radius[s];
+      // value: how hard the wind reaches the traveller (1 full, low when sheltered), for the renderer.
+      wind.value = 1;
+      if (x < WIND_FROM_X) return;
+      if (ctx.abilities.wallShelters(ctx, x, y, r, 1)) {
+        ctx.credit('wall', ctx.dt);
+        wind.value = 0.2;
+        return;
+      }
+      if (anchored(ctx, x, y)) {
+        ctx.credit('anchor', ctx.dt);
+        t.push = WIND_PUSH * ANCHORED_SHARE;
+        return;
+      }
+      t.push = WIND_PUSH;
+    },
 
-  hintAt(ctx, out) {
-    out[0] = WIND_FROM_X + 0.15;
-    out[1] = ctx.groundY + 0.15;
-  },
-};
+    hintAt(ctx, out) {
+      out[0] = WIND_FROM_X + 0.15;
+      out[1] = ctx.groundY + 0.15;
+    },
+  };
+}

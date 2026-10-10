@@ -5,12 +5,22 @@
 // docs/SIMULATION.md, "Adding a puzzle"), list it here, and add a headless test that solves it each
 // way it should be solvable.
 import type { PuzzleDef } from '../puzzle';
-import { P1_GAP } from './p1-gap';
-import { P2_RAIN } from './p2-rain';
-import { P3_WIND } from './p3-wind';
-import { P4_CHASM } from './p4-chasm';
-import { P5_CROWS } from './p5-crows';
-import { P6_GATE } from './p6-gate';
+import { createGapPuzzle } from './p1-gap';
+import { createRainPuzzle } from './p2-rain';
+import { createWindPuzzle } from './p3-wind';
+import { createChasmPuzzle } from './p4-chasm';
+import { createCrowsPuzzle } from './p5-crows';
+import { createGatePuzzle } from './p6-gate';
 
-export const CHAPTER_1: readonly PuzzleDef[] = [P1_GAP, P2_RAIN, P3_WIND, P4_CHASM, P5_CROWS, P6_GATE];
+/** Chapter 1's puzzles, freshly made: pass a new list to each Game (puzzles keep per-game state). */
+export function createChapter1(): PuzzleDef[] {
+  return [
+    createGapPuzzle(),
+    createRainPuzzle(),
+    createWindPuzzle(),
+    createChasmPuzzle(),
+    createCrowsPuzzle(),
+    createGatePuzzle(),
+  ];
+}
 export const CHAPTER_1_ID = 'chapter-1';

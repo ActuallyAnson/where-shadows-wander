@@ -6,13 +6,13 @@ import { createHandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
 import { cupShadow, flatShadow } from '../engine/sim/shadow-shapes';
 import { Game, type GameInput } from './game';
-import { CHAPTER_1 } from './puzzles/index';
+import { createChapter1 } from './puzzles/index';
 import { newSave } from './save-state';
 
 function scene(puzzle: number, left: 'cup' | 'flat' | null, right: 'cup' | 'flat' | null) {
   const save = newSave();
   save.puzzle = puzzle;
-  const game = new Game({ chapter: chapter1, puzzles: CHAPTER_1, save });
+  const game = new Game({ chapter: chapter1, puzzles: createChapter1(), save });
   const l = createHandShadow('left'),
     r = createHandShadow('right');
   const q = new ShapeEventQueue();

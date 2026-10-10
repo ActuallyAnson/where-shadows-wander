@@ -20,13 +20,6 @@ const PRESS_SLACK = 0.015;
 /** The shelf under the plate: a thin plank as wide as the plate. */
 const SHELF_R = 0.012;
 
-const state = {
-  gate: -1,
-  gateFixture: null as Fixture | null,
-  plateFixture: null as Fixture | null,
-  dug: false,
-};
-
 /** Whether a rock-role hand presses the plate marker. */
 function pressed(ctx: GameContext): boolean {
   const plate = markerOf(ctx.layout, 'plate');
@@ -42,63 +35,72 @@ function pressed(ctx: GameContext): boolean {
   return false;
 }
 
-export const P6_GATE: PuzzleDef = {
-  id: 'p6-gate',
-  layoutId: 'puzzle-6',
-  title: 'The gate',
-  solutions: ['rock', 'fox'],
-  hintShape: 'fist',
+/** A fresh puzzle with its own state: one per Game, so two games never share it. */
+export function createGatePuzzle(): PuzzleDef {
+  const state = {
+    gate: -1,
+    gateFixture: null as Fixture | null,
+    plateFixture: null as Fixture | null,
+    dug: false,
+  };
+  return {
+    id: 'p6-gate',
+    layoutId: 'puzzle-6',
+    title: 'The gate',
+    solutions: ['rock', 'fox'],
+    hintShape: 'fist',
 
-  setup(ctx) {
-    state.dug = false;
-    const y0 = ctx.groundY + GATE_R,
-      y1 = ctx.groundY + GATE_HEIGHT;
-    state.gate = ctx.solver.terrain.add(GATE_X, y0, GATE_X, y1, GATE_R, TerrainTag.Gate);
-    state.gateFixture = ctx.fixtures.add('gate', GATE_X, (y0 + y1) / 2, 0.06, GATE_HEIGHT, true, 0);
-    const plate = markerOf(ctx.layout, 'plate');
-    state.plateFixture = null;
-    if (plate) {
-      const half = plate.params.width / 2,
-        sy = plate.y - plate.params.height / 2 - SHELF_R;
-      ctx.solver.terrain.add(plate.x - half + SHELF_R, sy, plate.x + half - SHELF_R, sy, SHELF_R, TerrainTag.Wall);
-      state.plateFixture = ctx.fixtures.add(
-        'plate',
-        plate.x,
-        plate.y,
-        plate.params.width,
-        plate.params.height,
-        true,
-        0,
-      );
-    }
-  },
+    setup(ctx) {
+      state.dug = false;
+      const y0 = ctx.groundY + GATE_R,
+        y1 = ctx.groundY + GATE_HEIGHT;
+      state.gate = ctx.solver.terrain.add(GATE_X, y0, GATE_X, y1, GATE_R, TerrainTag.Gate);
+      state.gateFixture = ctx.fixtures.add('gate', GATE_X, (y0 + y1) / 2, 0.06, GATE_HEIGHT, true, 0);
+      const plate = markerOf(ctx.layout, 'plate');
+      state.plateFixture = null;
+      if (plate) {
+        const half = plate.params.width / 2,
+          sy = plate.y - plate.params.height / 2 - SHELF_R;
+        ctx.solver.terrain.add(plate.x - half + SHELF_R, sy, plate.x + half - SHELF_R, sy, SHELF_R, TerrainTag.Wall);
+        state.plateFixture = ctx.fixtures.add(
+          'plate',
+          plate.x,
+          plate.y,
+          plate.params.width,
+          plate.params.height,
+          true,
+          0,
+        );
+      }
+    },
 
-  afterStep(ctx) {
-    if (state.gate < 0) return;
-    const terrain = ctx.solver.terrain;
-    if (!state.dug && ctx.companions.fox.dugGate === state.gate) {
-      state.dug = true;
-      ctx.credit('fox', 5);
-      ctx.fixtures.add('tunnel', GATE_X, ctx.groundY - 0.02, 0.12, 0.06);
-    }
-    const down = pressed(ctx);
-    if (down) ctx.credit('rock', ctx.dt);
-    if (state.plateFixture) state.plateFixture.value = down ? 1 : 0;
-    const s = ctx.traveller.slot(ctx);
-    const passing = s >= 0 && Math.abs(ctx.store.x[s] - GATE_X) < PASSING;
-    const wasOpen = terrain.enabled[state.gate] === 0;
-    const open = state.dug || down || (wasOpen && passing);
-    if (open !== wasOpen) {
-      terrain.enabled[state.gate] = open ? 0 : 1;
-      if (state.gateFixture) state.gateFixture.active = !open;
-      ctx.events.push('puzzle-event', open ? 'gate-open' : 'gate-close', ctx.time, 0, GATE_X, ctx.groundY);
-    }
-    if (state.gateFixture) state.gateFixture.value = open ? 1 : 0;
-  },
+    afterStep(ctx) {
+      if (state.gate < 0) return;
+      const terrain = ctx.solver.terrain;
+      if (!state.dug && ctx.companions.fox.dugGate === state.gate) {
+        state.dug = true;
+        ctx.credit('fox', 5);
+        ctx.fixtures.add('tunnel', GATE_X, ctx.groundY - 0.02, 0.12, 0.06);
+      }
+      const down = pressed(ctx);
+      if (down) ctx.credit('rock', ctx.dt);
+      if (state.plateFixture) state.plateFixture.value = down ? 1 : 0;
+      const s = ctx.traveller.slot(ctx);
+      const passing = s >= 0 && Math.abs(ctx.store.x[s] - GATE_X) < PASSING;
+      const wasOpen = terrain.enabled[state.gate] === 0;
+      const open = state.dug || down || (wasOpen && passing);
+      if (open !== wasOpen) {
+        terrain.enabled[state.gate] = open ? 0 : 1;
+        if (state.gateFixture) state.gateFixture.active = !open;
+        ctx.events.push('puzzle-event', open ? 'gate-open' : 'gate-close', ctx.time, 0, GATE_X, ctx.groundY);
+      }
+      if (state.gateFixture) state.gateFixture.value = open ? 1 : 0;
+    },
 
-  hintAt(ctx, out) {
-    const plate = markerOf(ctx.layout, 'plate');
-    out[0] = plate ? plate.x : 0;
-    out[1] = ctx.groundY + 0.08;
-  },
-};
+    hintAt(ctx, out) {
+      const plate = markerOf(ctx.layout, 'plate');
+      out[0] = plate ? plate.x : 0;
+      out[1] = ctx.groundY + 0.08;
+    },
+  };
+}

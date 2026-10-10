@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 import chapter1 from '../../../public/scenes/chapter-1.iwsdk.scene.json';
 import { Headless } from '../headless';
 import { newSave } from '../save-state';
-import { CHAPTER_1 } from './index';
+import { createChapter1 } from './index';
 
 function at(index: number, seed = 1) {
   const save = newSave();
   save.puzzle = index;
-  return new Headless({ chapter: chapter1, puzzles: CHAPTER_1, save, seed });
+  return new Headless({ chapter: chapter1, puzzles: createChapter1(), save, seed });
 }
 
 function travellerX(h: Headless) {
