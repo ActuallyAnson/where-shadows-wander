@@ -52,11 +52,15 @@ describe('Game', () => {
     expect(g.time - t).toBeLessThanOrEqual(MAX_STEPS_PER_FRAME * g.dt + 1e-9);
   });
 
-  it('clears the previous frame events at the start of each frame', () => {
+  it('delivers a load made between frames on the next frame, then clears events each frame', () => {
     const g = new Game(opts());
-    expect(g.events.count).toBeGreaterThan(0);
+    g.frame(input());
+    expect(g.events.has('puzzle-start', 'p1-gap')).toBe(true);
     g.frame(input());
     expect(g.events.has('puzzle-start')).toBe(false);
+    g.goto(2);
+    g.frame(input());
+    expect(g.events.has('puzzle-start', 'p3-wind')).toBe(true);
   });
 
   it('gives a committed flat hand the bridge role, solid to the traveller, until released', () => {

@@ -11,8 +11,9 @@
 //
 // Win: the traveller reaches the goal marker. Which solution was used is decided by credit: the
 // puzzle (and the runner, for the roles the traveller stands on) calls ctx.credit(id) with evidence
-// while the player plays; at the win, the solution with the most credit is recorded (the first
-// solution if none was credited). Credit for an id that isn't one of the puzzle's solutions is
+// while the player plays; at the win, the solution with the most credit is recorded. A win with no
+// credit at all is a way nobody designed (players are inventive): it is recorded as OTHER_SOLUTION,
+// not mislabelled as the intended one. Credit for an id that isn't one of the puzzle's solutions is
 // ignored, so the runner can credit role names freely.
 //
 // Hint: when the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`
@@ -48,6 +49,8 @@ export interface PuzzleDef {
   hintAt?(ctx: GameContext, out: Float64Array): void;
 }
 
+/** The solution recorded for a win no listed solution got credit for. */
+export const OTHER_SOLUTION = 'other';
 /** GDD: the ghost hint appears if the player is stuck for more than 20 seconds. */
 export const HINT_DELAY_S = 20;
 /** Seconds between the win and the next puzzle (the scene holds, the traveller rests). */
@@ -121,7 +124,8 @@ export class PuzzleRunner {
     }
 
     if (t.state === 'goal') {
-      this.solvedWith = def.solutions[this.best()];
+      const best = this.best();
+      this.solvedWith = this.credits[best] > 0 ? def.solutions[best] : OTHER_SOLUTION;
       this.phase = 'outro';
       this.phaseT = 0;
       if (this.hintVisible) this.hideHint(ctx);

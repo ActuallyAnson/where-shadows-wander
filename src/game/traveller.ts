@@ -20,7 +20,7 @@
 // `push` (a horizontal speed added by wind).
 
 import { Flag, Kind } from '../engine/sim/entity-kinds';
-import { NULL_HANDLE, type Handle } from '../engine/sim/entity-store';
+import { NULL_HANDLE, type EntityStore, type Handle } from '../engine/sim/entity-store';
 import type { LayoutMarker } from '../engine/sim/scene-layout';
 import { Touch, type Support } from '../engine/sim/solver';
 import type { GameContext } from './context';
@@ -113,7 +113,12 @@ export class Traveller {
       const feet = y - r;
       const ground = solver.supportBelow(ahead, feet + STEP_UP, feet - STEP_DOWN, TRAVELLER_BIT, this.support);
       // A circle above stride height just ahead: anything there is a wall, not a step.
-      const wall = solver.blocked(store, x + this.dir * (r * 0.5 + 0.02), y + 0.025, r * 0.75, TRAVELLER_BIT, s);
+      const px = x + this.dir * (r * 0.5 + 0.02),
+        py = y + 0.025,
+        pr = r * 0.75;
+      // A wall, or a creature or rock standing in the way: it waits rather than shoving it along
+      // (it would push a waiting fox into the chasm).
+      const wall = solver.blocked(store, px, py, pr, TRAVELLER_BIT, s) || bodyAhead(store, px, y, pr);
       if (ground && !wall) {
         next = 'walk';
         vx = this.dir * WALK_SPEED;
@@ -185,4 +190,22 @@ export class Traveller {
     this.stateT = 0;
     ctx.events.push('traveller-state', next, ctx.time);
   }
+}
+
+/** Kinds the traveller will not walk into: it stops for them as for a wall. */
+const STOPS_FOR = [Kind.Rock, Kind.Rabbit, Kind.Fox] as const;
+
+/** Whether a rock or companion overlaps the probe circle ahead (at body height). */
+function bodyAhead(store: EntityStore, x: number, y: number, r: number): boolean {
+  for (let k = 0; k < STOPS_FOR.length; k++) {
+    const kind = STOPS_FOR[k];
+    for (let s = store.kindStart[kind]; s < store.kindEnd[kind]; s++) {
+      if (!store.alive[s]) continue;
+      const dx = store.x[s] - x,
+        dy = store.y[s] - y,
+        rr = store.radius[s] + r;
+      if (dx * dx + dy * dy < rr * rr) return true;
+    }
+  }
+  return false;
 }
