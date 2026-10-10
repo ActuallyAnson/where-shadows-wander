@@ -3,7 +3,7 @@
 // per step.
 //
 //   flat    → bridge   a plank the traveller, rocks and companions stand on; a roof that stops rain
-//   fist    → rock     a heavy solid: pushes, blocks, presses weight plates, scares off crows it hits
+//   fist    → rock     a heavy solid: pushes, blocks, presses weight plates, anchors the traveller
 //   cup     → catcher  catches raindrops (absorbed, counted) and fireflies (carried until released)
 //   spread  → wall     blocks wind (puzzles test `wallShelters`), rain, crows and walkers
 //   rabbit, fox → companion: the creature breaks free (Companions); the shadow itself does nothing
@@ -270,7 +270,18 @@ export class Abilities {
     return false;
   }
 
-  /** Forgets roles and cups, e.g. when a puzzle loads (the classifier keeps its own state). */
+  /**
+   * On a puzzle load: cups are emptied (the drops and fireflies are gone with the old puzzle), but
+   * roles stay, because the classifier keeps its commits across a load and releases them later.
+   */
+  resetForPuzzle(): void {
+    for (const a of this.hands) {
+      a.water = 0;
+      a.carried = 0;
+    }
+  }
+
+  /** Forgets roles and cups entirely (a new game). */
   reset(): void {
     for (const a of this.hands) {
       a.role = Role.None;

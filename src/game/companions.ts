@@ -107,8 +107,16 @@ export class Companions {
 
   /** Takes both companions off the stage without events (a puzzle reload clears the store anyway). */
   reset(): void {
-    this.rabbit.state = this.fox.state = 'away';
-    this.rabbit.handle = this.fox.handle = NULL_HANDLE;
+    for (let i = 0; i < 2; i++) {
+      const c = i === 0 ? this.rabbit : this.fox;
+      c.state = 'away';
+      c.handle = NULL_HANDLE;
+      c.stateT = 0;
+      c.age = 0;
+      // What a companion did in the last puzzle must not count in the next (or a restart).
+      c.crossedAt = NaN;
+      c.dugGate = -1;
+    }
   }
 
   private thinkOne(c: Companion, ctx: GameContext): void {
@@ -141,12 +149,10 @@ export class Companions {
         }
         return;
       }
-      if (c.state === 'wait') {
-        store.vx[s] = 0;
-        return;
-      }
+      // Walk while there is ground ahead; wait at a gap, and walk on once it is bridged (or the
+      // gate it was digging at opened by itself).
       store.vx[s] = ground ? c.dir * FOX_SPEED : 0;
-      if (!ground) c.setState('wait');
+      c.setState(ground ? 'walk' : 'wait');
       return;
     }
     // Rabbit: leap any gap ahead; turn back from a wall. Standing on another creature (it landed on

@@ -40,7 +40,7 @@ import { Fixtures } from './fixtures';
 import { GameEventQueue } from './game-events';
 import { GROUND_Y, loadPuzzle, markerOf } from './level';
 import { PuzzleRunner, type PuzzleDef } from './puzzle';
-import { addSolution, newSave, type SaveState } from './save-state';
+import { addSolution, newSave, readSave, type SaveState } from './save-state';
 import { Traveller } from './traveller';
 
 /** The sim's fixed rate (main.ts's SIM_HZ). */
@@ -127,13 +127,17 @@ export class Game implements GameContext {
   private readonly seed: number;
   private wasPaused = false;
   private pendingLoad = -1;
+  /** Events were queued outside frame() (by a load) and the next frame must not clear them. */
+  private keepEvents = false;
 
   constructor(opts: GameOptions) {
     if (opts.puzzles.length === 0) throw new RangeError('a chapter needs at least one puzzle');
     this.chapter = opts.chapter;
     this.puzzles = opts.puzzles;
     this.seed = opts.seed ?? 1;
-    this.save = opts.save ?? newSave(opts.chapterId);
+    // A copy: the game changes its save as the player progresses, and the caller's object (say, a
+    // replay's options) must stay as it was.
+    this.save = opts.save ? readSave(opts.save, opts.save.chapter) : newSave(opts.chapterId);
     this.discovery = new Discovery(this.save);
     this.creatures = new Creatures(this.store.capacity);
     this.loop = new FixedStepLoop(SIM_HZ, (dt) => this.step(dt), MAX_STEPS_PER_FRAME);
@@ -158,7 +162,11 @@ export class Game implements GameContext {
 
   /** Once per display frame. @returns the interpolation factor for the renderer. */
   frame(input: GameInput): number {
-    this.events.clear();
+    // A load between frames (constructor, restart, goto) queued its events for this frame to deliver.
+    if (this.keepEvents) this.keepEvents = false;
+    else this.events.clear();
+    // Latch first: a shape committed or released while paused still counts once play resumes.
+    this.latch.capture(input.shapeEvents, input.gestureEvents ?? null);
     if (input.paused) {
       this.wasPaused = true;
       return this.loop.alpha;
@@ -171,9 +179,8 @@ export class Game implements GameContext {
     if (this.pendingLoad >= 0) {
       const i = this.pendingLoad;
       this.pendingLoad = -1;
-      this.load(i);
+      this.load(i, true);
     }
-    this.latch.capture(input.shapeEvents, input.gestureEvents ?? null);
     this.abilities.setShadows(input.left, input.right, input.dt, this.solver.hands);
     return this.loop.advance(input.dt);
   }
@@ -246,8 +253,14 @@ export class Game implements GameContext {
     this.pendingLoad = this.puzzleIndex + 1;
   }
 
-  /** Loads puzzle `index` (allocates: layouts, terrain, fixtures). */
-  private load(index: number): void {
+  /**
+   * Loads puzzle `index` (allocates: layouts, terrain, fixtures). `inFrame`: called from frame(),
+   * whose events are delivered anyway; otherwise the next frame keeps them.
+   */
+  private load(index: number, inFrame = false): void {
+    // Between frames, the queue still holds the last frame's events, already read: start afresh.
+    if (!inFrame) this.events.clear();
+    if (this.runner.hintVisible) this.events.push('hint-hide', '', this.time);
     const def = this.puzzles[index];
     this.puzzleIndex = index;
     this.groundY = def.groundY ?? GROUND_Y;
@@ -258,18 +271,21 @@ export class Game implements GameContext {
     this.rng.state = (this.seed * 2654435761 + index * 40503) >>> 0;
     this.fixtures.clear();
     this.latch.clear();
-    this.abilities.reset();
+    // Roles stay: the classifier still holds its commits across a load, and will release them later.
+    this.abilities.resetForPuzzle();
     this.companions.reset();
-    this.creatures.settle(this.store);
     this.traveller.spawn(this, markerOf(this.layout, 'goal'));
     this.runner.start(def);
     def.setup?.(this);
     this.discovery.setup(def, this);
+    // After setup, so fireflies a puzzle spawns itself also get their home.
+    this.creatures.settle(this.store);
     if (index === this.puzzles.length - 1 && !this.fixtures.find('window')) {
       // The chapter ends at a lit window by the last goal (GDD): drawn dark until the end.
       const goal = markerOf(this.layout, 'goal');
       if (goal) this.fixtures.add('window', goal.x, goal.y + 0.25, 0.16, 0.2, this.complete);
     }
     this.events.push('puzzle-start', def.id, this.time, index);
+    if (!inFrame) this.keepEvents = true;
   }
 }

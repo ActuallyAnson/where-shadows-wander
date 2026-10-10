@@ -154,7 +154,7 @@ describe('puzzle 6: the gate', () => {
 
   it('is solved with a fist rock on the weight plate', () => {
     const h = at(5);
-    h.pose('right', 'fist', 0, -0.03);
+    h.pose('right', 'fist', 0, 0.03);
     expect(h.runUntil(solved(h), 40)).toBe(true);
     expect(h.saw('puzzle-event', 'gate-open')).toBe(true);
     expect(h.saw('puzzle-solved', 'rock')).toBe(true);
@@ -170,7 +170,7 @@ describe('puzzle 6: the gate', () => {
 
   it('ends the chapter after the outro and lights the window', () => {
     const h = at(5);
-    h.pose('right', 'fist', 0, -0.03);
+    h.pose('right', 'fist', 0, 0.03);
     expect(h.runUntil(() => h.saw('chapter-complete'), 50)).toBe(true);
     expect(h.game.complete).toBe(true);
     expect(h.game.save.chapterComplete).toBe(true);

@@ -25,12 +25,14 @@ function pressed(ctx: GameContext): boolean {
   const plate = markerOf(ctx.layout, 'plate');
   if (!plate) return false;
   const top = plate.y + plate.params.height / 2,
+    bottom = plate.y - plate.params.height / 2,
     left = plate.x - plate.params.width / 2,
     right = plate.x + plate.params.width / 2;
   for (let h = 0; h < HAND_COUNT; h++) {
     if (!ctx.abilities.has(h, Role.Rock)) continue;
     const b = ctx.solver.hands[h].bounds;
-    if (b[1] <= top + PRESS_SLACK && b[2] >= left && b[0] <= right) return true;
+    // Resting on the plate: its lowest point at the plate's top, not anywhere below it.
+    if (b[1] <= top + PRESS_SLACK && b[1] >= bottom - PRESS_SLACK && b[2] >= left && b[0] <= right) return true;
   }
   return false;
 }

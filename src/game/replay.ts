@@ -34,6 +34,9 @@ export class InputRecorder {
   readonly eventNums: Float64Array;
   /** Events beyond EVENTS_PER_FRAME in a frame (should stay 0). */
   eventsDropped = 0;
+  /** Per frame: a debug command run just before it (0 none, 1 restart, 2 goto) and its argument. */
+  readonly command: Uint8Array;
+  readonly commandArg: Int16Array;
 
   constructor(readonly maxFrames = 72 * 60) {
     this.dt = new Float64Array(maxFrames);
@@ -44,6 +47,18 @@ export class InputRecorder {
     this.eventCount = new Uint8Array(maxFrames);
     this.eventCodes = new Uint8Array(maxFrames * EVENTS_PER_FRAME * 4);
     this.eventNums = new Float64Array(maxFrames * EVENTS_PER_FRAME * 3);
+    this.command = new Uint8Array(maxFrames);
+    this.commandArg = new Int16Array(maxFrames);
+  }
+
+  /**
+   * Notes a game.restart() or game.goto(i) made before the next frame, so a replay does the same.
+   * Call it alongside the command.
+   */
+  recordCommand(command: 'restart' | 'goto', arg = 0): void {
+    if (this.frames === this.maxFrames) return;
+    this.command[this.frames] = command === 'restart' ? 1 : 2;
+    this.commandArg[this.frames] = arg;
   }
 
   /** Records one frame's input; call with the same object passed to game.frame(). */
@@ -53,6 +68,10 @@ export class InputRecorder {
       return;
     }
     const f = this.frames++;
+    if (f + 1 < this.maxFrames) {
+      this.command[f + 1] = 0;
+      this.commandArg[f + 1] = 0;
+    }
     this.dt[f] = input.dt;
     this.paused[f] = input.paused ? 1 : 0;
     this.hand(f, 0, input.left);
@@ -95,6 +114,8 @@ export function replay(rec: InputRecorder, game: Game, each?: (frame: number) =>
   const queue = new ShapeEventQueue(EVENTS_PER_FRAME);
   const input: GameInput = { dt: 0, paused: false, left, right, shapeEvents: queue };
   for (let f = 0; f < rec.frames; f++) {
+    if (rec.command[f] === 1) game.restart();
+    else if (rec.command[f] === 2) game.goto(rec.commandArg[f]);
     input.dt = rec.dt[f];
     input.paused = rec.paused[f] === 1;
     restoreHand(rec, f, 0, left);

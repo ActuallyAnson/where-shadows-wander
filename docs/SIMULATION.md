@@ -23,9 +23,9 @@ All code here is pure TypeScript: no IWSDK, no three.js and no browser globals. 
 
 ```
 Game.frame(input)                                   once per display frame
-  events.clear()
+  events.clear()                                    (kept once after a load between frames)
+  latch.capture(shape events, gesture events)       even while paused: a commit made then counts
   paused?  -> stop here (on resume, loop.reset(): no catch-up)
-  latch.capture(shape events, gesture events)
   abilities.setShadows(left, right)                 hand capsules -> solver.hands, hand velocity
   alpha = loop.advance(dt)                          0..4 fixed steps of 1/60 s
     step:  shape events -> discovery, abilities (roles)     then latch.consume()
@@ -225,6 +225,7 @@ const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right,
 
 ### Control
 
+- Events from a load made between frames (the constructor, `restart`, `goto`) are delivered by the next `frame()`. A reload also takes down a visible hint (`hint-hide`).
 - `restart()` reloads the current puzzle.
 - `goto(i)` jumps to puzzle `i`.
 - `complete` is true once the last puzzle is solved: the final scene stays painted and the window is lit.
@@ -272,7 +273,7 @@ The traveller walks on its own at `WALK_SPEED` (0.12 m/s) toward the goal. The p
 
 | State | When |
 |---|---|
-| `walk` | ground ahead (within a 3 cm step up or 5 cm step down) and no wall at stride height |
+| `walk` | ground ahead (within a 3 cm step up or 5 cm step down), and no wall, rock or companion at stride height |
 | `blocked` | otherwise; it stands still |
 | `look-back` | blocked for 3 s: it looks at the player, the cue to help |
 | `held` | a puzzle called `hold(reason)` this step (rain ahead, crows on the path) |
@@ -283,6 +284,10 @@ The traveller walks on its own at `WALK_SPEED` (0.12 m/s) toward the goal. The p
 ### Probes
 
 It looks for ground with `solver.supportBelow` and for walls with `solver.blocked`. Hands count only when their role makes them solid to it.
+
+### Companions and rocks
+
+It stops for a rock or a companion in its way, as for a wall, rather than shoving it along. Shoving it could push a waiting fox into the chasm.
 
 ### No fail state
 
@@ -303,6 +308,8 @@ A `commit` gives the hand a role. The role ends on that shape's `release`, and a
 ### How it works
 
 - **No role, no collision.** A hand with no role passes through everything, so moving a hand into place never knocks things over.
+- **Roles survive a puzzle load.** The classifier keeps its commits through the outro, so a shape held into the next puzzle keeps its role. Cups are emptied.
+- **Hand velocity uses the display frame.** It is measured per display frame, so the same motion reads slightly differently at 72 and 120 Hz. Replays are exact, because frame times are recorded.
 - **The live outline collides.** Bridge and rock use the shadow's actual capsules, so a slightly imperfect shape still works (GDD).
 - **Hand velocity.** It comes from the shadow's centre, frame to frame, smoothed and capped at 3 m/s. A moving hand carries what rests on it and shoves what it hits.
 
@@ -320,7 +327,7 @@ One rabbit and one fox can be out at a time. A companion appears at the hand's s
 
 - At a gate (`TerrainTag.Gate`) it digs for 1.5 s, sets `dugGate`, and walks on through.
 - Crows near it take fright; puzzle 5 decides this.
-- It waits at a gap.
+- It waits at a gap, and walks on once the gap is bridged.
 
 ## Creatures: `src/game/creatures.ts`
 
@@ -346,7 +353,7 @@ A `PuzzleDef` has:
 
 - **Solution credit.**
   - The puzzle calls `ctx.credit(id)` with evidence while the player plays. The runner adds credit for the role of the hand the traveller stands on.
-  - At the win, the solution with the most credit is recorded, or the first solution if none was credited.
+  - At the win, the solution with the most credit is recorded. A win nothing was credited for is a way nobody designed (for example, one bridge carried along under the traveller over the chasm). It is recorded as `other` (`OTHER_SOLUTION`), not mislabelled as the intended solution.
   - Credit for an id that isn't a solution is ignored.
 - **Hint.** After the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`, `hint-show` names the shape and a stage position. The default is 20 s (GDD); the tutorial uses 0.5 s. `hint-hide` follows once it has walked for 0.5 s.
 - **Win and outro.** The traveller reaching the goal emits `puzzle-solved` and saves the solution. After a 2.5 s outro the next puzzle loads, between frames. After the last puzzle comes `chapter-complete`, with the window lit.
@@ -441,7 +448,8 @@ Drawing belongs to Teammate B's `src/debug`. These modules provide the data, and
   - the shape events
 
   It is allocated once (about 0.6 KB a frame; 60 s at 72 Hz is about 2.5 MB), and it stops when full.
-- `replay(recording, freshGame)` plays it back. The sim is deterministic, so the fresh game reaches the same state bit for bit, across puzzle loads (`debug.test.ts`).
+- Call `recordCommand('restart' | 'goto', i)` alongside `game.restart()` / `game.goto(i)`, so the replay does the same.
+- `replay(recording, freshGame)` plays it back. Build the fresh game from the same options; `Game` copies the save it is given, so the options stay as they were. The sim is deterministic, so the fresh game reaches the same state bit for bit, across puzzle loads (`debug.test.ts`).
 - Uses: turning a bug seen in the headset into a test, and checking a fix. `Headless` takes a `recorder` too.
 
 ### Commands
