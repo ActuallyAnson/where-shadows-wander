@@ -17,6 +17,8 @@ import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
+import { GameAudio } from '../engine/services/audio/game-audio';
+import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -125,6 +127,17 @@ async function start(): Promise<void> {
   let rigCalibratedFromHead = false;
   let everPlaced = false;
   const timings = new FrameTimings();
+  // Sound: plain Web Audio (docs/adr/0008-audio.md). It unlocks on the first gesture on the page, or when a
+  // headset session starts (which a button press or the browser's enter prompt began).
+  const audio = new AudioEngine();
+  audio.attachGestureUnlock(document);
+  const gameAudio = new GameAudio(audio);
+  // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
+  const audioPose = new Float64Array(9);
+  // Sound holds still with the game: the system menu, the headset off, or the page hidden.
+  const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
+  visibility.subscribe(syncAudioPause);
+  document.addEventListener('visibilitychange', syncAudioPause);
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
     stageView.place(stage, lantern);
@@ -233,6 +246,9 @@ async function start(): Promise<void> {
   };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
+    audio.unlock();
+    // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
+    if (session) audio.attachSessionUnlock(session as unknown as SessionEvents);
     if (session) {
       occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
       const clear = clearFor(session.environmentBlendMode, xrMode);
@@ -355,6 +371,7 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         projector.update(hands.hands, stage, candleView.flamePosition);
+        if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
         shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
@@ -391,6 +408,21 @@ async function start(): Promise<void> {
       stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
       candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
+      timings.begin(SLOT.audio);
+      world.camera.updateWorldMatrix(true, false);
+      const m = world.camera.matrixWorld.elements;
+      audioPose[0] = m[12];
+      audioPose[1] = m[13];
+      audioPose[2] = m[14];
+      audioPose[3] = -m[8];
+      audioPose[4] = -m[9];
+      audioPose[5] = -m[10];
+      audioPose[6] = m[4];
+      audioPose[7] = m[5];
+      audioPose[8] = m[6];
+      gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
+      audio.update(audioPose);
+      timings.end(SLOT.audio);
       occluder.update(handList);
       dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       timings.begin(SLOT.lab);
@@ -424,6 +456,8 @@ async function start(): Promise<void> {
         sharpen,
         lanternLight,
         candleView,
+        audio,
+        gameAudio,
         dots,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),

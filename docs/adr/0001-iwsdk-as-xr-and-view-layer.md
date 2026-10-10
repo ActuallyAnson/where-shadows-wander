@@ -19,7 +19,7 @@ IWSDK is young: 1.0.0 shipped on 24 Sep 2026, npm's `latest` tag still points at
 - The XR session (`immersive-ar` with passthrough), the renderer, scene, camera and display loop.
 - The IWER emulator and the `iwsdk` CLI for daily testing without a headset.
 - Scene understanding: plane and mesh detection, and anchors (we call the raw WebXR anchor API ourselves, because IWSDK only manages one world anchor).
-- Possibly spatial audio, decided when audio work starts.
+- Spatial audio: decided in [ADR 0008](0008-audio.md): not used; sound is plain Web Audio.
 
 ### What IWSDK does not do
 

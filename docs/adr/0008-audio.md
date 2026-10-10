@@ -1,0 +1,44 @@
+# ADR 0008: Sound is plain Web Audio, with placeholder sounds made in code
+
+| | |
+|---|---|
+| Status | Accepted |
+| Date | 11 Oct 2026 |
+
+## Context
+
+The game needs spatial sound that seems to come from the wall (the paper rustle when a shape is recognised, the thump when it commits, a chime when a puzzle is solved, the flame's crackle), a mixer with music, effects and ambience buses and a master volume, audio that starts only after a user gesture, and under 0.5 ms of CPU a frame with nothing allocated per frame. The sound files come later from the team (CC0). The architecture notes said IWSDK might provide spatial audio, "decided when audio work starts".
+
+## IWSDK's audio system
+
+`@iwsdk/core` has an `AudioSystem` and an `AudioSource` component (`node_modules/@iwsdk/core/dist/audio`): an entity per sound, a pool of three.js `Audio` and `PositionalAudio` objects per source, playback modes (restart, overlap, ignore), instance stealing (oldest, quietest, furthest), fades, a directional cone, distance culling, loading through its asset manager, and `AudioUtils.createOneShot`. It resumes its audio context when a session starts and suspends it when the session ends. three.js's `AudioListener` has a master volume and every three.js `Audio` has a gain node, so buses could be built by rerouting those. IWSDK registers this system whether or not the game uses it ("always-on"), which creates three.js's own `AudioContext` at `World.create`.
+
+## Decision
+
+Use plain Web Audio, in `src/engine/services/audio`. Reasons:
+
+1. **No buses.** Every IWSDK sound goes straight to the listener, and the master volume is the only mix control. Music, effects and ambience buses with per-bus mute (an accessibility need) would mean rerouting its nodes anyway.
+2. **Game state stays out of the ECS** ([ADR 0001](0001-iwsdk-as-xr-and-view-layer.md)). IWSDK plays a sound by creating an entity with a component. A shape event or a puzzle solved should be one function call, testable without a world.
+3. **Testable.** The mixer, the voice pool, the cooldowns, the sound table and the stage placement are plain TypeScript, and the engine runs against a fake `AudioContext` in unit tests, so the logic is covered in Node. IWSDK's system needs a running world.
+4. **Allocation and cost are ours to see.** The per-frame path writes numbers into audio parameters and nothing else (an allocation test covers it).
+5. **No dependency on IWSDK or three.js.** The listener pose is passed in, so the plain three.js fallback ([ADR 0002](0002-plain-threejs-fallback.md)) keeps its sound.
+
+What we give up: IWSDK's fades, cones and component-driven authoring in the editor. None is needed for four sounds; directional cones could be added to a panner if a sound ever needs one.
+
+## Design
+
+- **Graph.** One-shot source, voice gain, panner (HRTF, inverse distance), bus gain (music, effects, ambience), master, speakers. There are 12 one-shot voices; when all are busy a new sound takes the oldest voice of the lowest priority, but only if that is no more important than the new sound (`voice-pool.ts`). At most about seven sounds can overlap in practice, so stealing is a safety net. The flame's loop has voices of its own; a restart makes a fresh one, so a fading copy and a new copy never share a gain.
+- **Mixer** (`mixer.ts`, pure): master volume, three bus volumes, per-bus and global mute. Volumes are slider positions (0 to 1) and go through a square-law curve to gain, so half a slider is about half as loud to the ear. A version number means the engine only touches Web Audio when something changed, and it moves bus gains with a 30 ms time constant (about 0.1 s to settle), so a change does not click.
+- **Unlock.** Browsers keep audio locked until a user gesture, so the context is made on the first gesture on the page (`attachGestureUnlock`, listening in the capture phase so nothing can hide the event), and again when an XR session starts. A session started from the browser's own enter prompt (IWSDK offers one with `offerSession`) may give the page no user activation, and inside a session the page gets no clicks, so the engine also unlocks on the session's own `select`, `selectstart` and `squeezestart` (a hand pinch is `select`), and retries starting the context every couple of seconds of frames while it is locked. **Whether the Pico or Quest browser lets the context start from the Enter VR press or a pinch is not confirmed**: test it on a headset (read `__wsw.audio.state`) before relying on it. Sounds asked for while locked are dropped, except a loop, which is kept and starts the moment audio runs (the flame is usually lit before the first click).
+- **On the wall.** `GameAudio` (`game-audio.ts`) plays a shape event's sound at the middle of that hand's shadow on the stage (the shadow's bounds, in stage space, turned into a room position 5 cm in front of the wall), or on that hand's side of the wall if there is no shadow. The chime comes from the top middle of the wall. The crackle follows the flame. `stagePoint` does the stage-to-room maths and takes any `StagePlane`, so A's `StageFrame` works unchanged. The listener is the camera's world pose (position, forward and up from its matrix), which in a session is the head.
+- **Events.** Candidate: rustle. Commit: thump. Cancel and release: silent. A solved puzzle: `gameAudio.puzzleSolved(stage)`, for A's puzzle code to call. Each sound has a minimum gap per hand, so a flickering shape does not machine-gun but both hands can sound together; a sound dropped for want of a voice does not use its gap up.
+- **Paused** (the system menu, the headset off, the page hidden): the context is suspended and resumes with the game. This is driven by the session's visibility signal and the page's `visibilitychange`, not by the frame loop, which does not run while a session is hidden.
+- **Placeholder sounds** (`placeholder-sounds.ts`): the four sounds are made in code (a noise burst, a falling low sine, a small bell, a two-second loop of pops), the same every time, each the first time it is needed, with no third-party material ([CREDITS.md](../../CREDITS.md)). A real file replaces one through `AudioEngine.setBuffer(id, buffer)`. Loading and decoding files is not built: it needs the files, and the asset pipeline (on its own branch at the time of writing) to deliver them.
+
+## Consequences
+
+- Allocation: the engine's per-frame calls allocate about 4 bytes a frame in the allocation test (the listener pose is passed as a typed array; a first version that passed ten numbers measured 50 bytes, which was the test's own boxing, not the engine's).
+- Cost: `GameAudio.setFlame` plus `AudioEngine.update` take about 0.005 ms of main-thread JavaScript a frame in headless desktop Chromium, against the 0.5 ms services budget. That leaves out playing a sound (building a source node), reading the camera, and the HRTF mixing on the audio thread (up to 13 panners), and a headset is several times slower: read `SLOT.audio` in the diagnostics report on the Pico for the real number. Shape-event sounds are timed inside the shadow slot.
+- `npm run check` covers the logic. `scripts/audio-probe.mjs` covers the browser: the context is created lazily and runs after a click, a rustle at the left is louder in the left ear (and the right), muting a bus silences it, events make sounds, pausing suspends. It proves left and right level only, not HRTF, height or front and back: judge the 3D sound by ear on a headset. Equal-power panning would pass it too.
+- IWSDK's own audio system stays registered, so the page has two audio contexts (ours and three.js's, which IWSDK resumes and suspends around sessions). A second output stream is cheap but not free; sharing one (`contextFactory: () => THREE.AudioContext.getContext()`) would also mean IWSDK suspending ours at session end. Left as it is until a device shows a problem.
+- Not done: loading real files into the engine, per-sound reverb, a limiter on the master output (several loud sounds at once can sum above full scale), captions for sounds, a settings screen for the mixer (the mixer has the controls), and checking that a Pico or Quest lets the context start.

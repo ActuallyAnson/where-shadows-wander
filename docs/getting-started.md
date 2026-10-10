@@ -193,3 +193,13 @@ Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one wi
 | Hand Lab recording isn't in `recordings/` | The dev server must be running (`npm run dev`) with the new vite.config.ts: restart it once after pulling. Without it the page falls back to a browser download. |
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |
+
+## 14. Sound
+
+Sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)), in `src/engine/services/audio`. Browsers keep audio locked until the first click, key press or tap, so the first sound after loading waits for that. Starting a VR session and pinching inside one also try to unlock it, but **whether the Pico or Quest browser allows that is not confirmed**: after entering VR, check `__wsw.audio.state` is `running`. The four sounds (paper rustle, thump, chime, flame crackle) are placeholders made in code ([CREDITS.md](../CREDITS.md)).
+
+- **Events.** A recognised shape rustles, a committed shape thumps, both from where that hand's shadow is on the wall; the lit flame crackles from the flame. For a solved puzzle call `gameAudio.puzzleSolved(stage)` (`gameAudio` is on `__wsw` in dev).
+- **Volumes.** `audio.mixer.setMaster(0..1)`, `setVolume(Bus.Music | Bus.Effects | Bus.Ambience, 0..1)`, `setMuted(bus, true)` and `setAllMuted(true)`. In the dev console: `__wsw.audio.mixer.setVolume(1, 0.5)`.
+- **A real sound.** Put the file in `src/assets/audio/sfx/` named after the sound (`rustle`, `thump`, `chime`, `crackle`), decode it, and `audio.setBuffer(Sound.Rustle, buffer)`. Add its licence to `CREDITS.md`.
+- **Check it in a browser.** `npx vite --port 8095 --strictPort`, then `node scripts/audio-probe.mjs https://localhost:8095` checks the unlock, the left and right panning, the buses, the events and the cost with no headset.
+

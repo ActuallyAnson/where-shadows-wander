@@ -14,7 +14,7 @@ Pure code               src/engine/hands, src/engine/sim, src/engine/stage, src/
                         (plain TypeScript; no IWSDK, three.js or browser globals)
 ```
 
-- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session, the emulator and possibly spatial audio, and nothing else (v1 is a virtual room, so no scene understanding, planes or anchors). Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
+- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session and the emulator, and nothing else: v1 is a virtual room, so no scene understanding, planes or anchors, and sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)); IWSDK's own audio system is still registered and makes its own audio context, so the page has two. Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
 - **Engine-facing code** talks to IWSDK, three.js, WebXR and the DOM. It turns the outside world into plain data, and plain data into things on screen.
 - **Pure code** holds the logic: hand maths and the classifier, the simulation, stage geometry and gameplay. It's unit-tested in Node and can't see the engine, which ESLint enforces. This is also why the plain three.js fallback stays cheap ([ADR 0002](adr/0002-plain-threejs-fallback.md)).
 
