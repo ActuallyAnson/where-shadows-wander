@@ -39,7 +39,6 @@ import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { GameDebugView } from './game-debug-view';
-import chapter1 from '../../public/scenes/chapter-1.iwsdk.scene.json';
 import { Game, SIM_HZ } from '../game/game';
 import { CHAPTER_1_ID, createChapter1 } from '../game/puzzles/index';
 import { newSave } from '../game/save-state';
@@ -186,6 +185,11 @@ async function start(): Promise<void> {
   const save = newSave(CHAPTER_1_ID);
   const startPuzzle = Number(params.get('puzzle'));
   if (Number.isInteger(startPuzzle) && startPuzzle >= 1 && startPuzzle <= 6) save.puzzle = startPuzzle - 1;
+  // The chapter's layouts come from the editor's scene file, served from public/ (Vite won't bundle it).
+  const chapterUrl = `${import.meta.env.BASE_URL}scenes/chapter-1.iwsdk.scene.json`;
+  const chapterResponse = await fetch(chapterUrl);
+  if (!chapterResponse.ok) throw new Error(`${chapterUrl}: ${chapterResponse.status}`);
+  const chapter1: unknown = await chapterResponse.json();
   const game = new Game({ chapter: chapter1, puzzles: createChapter1(), chapterId: CHAPTER_1_ID, save });
   if (params.get('gameview') !== '0') {
     gameView = new GameDebugView(game);
