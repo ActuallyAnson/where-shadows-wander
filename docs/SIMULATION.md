@@ -202,7 +202,7 @@ It also implements `GameContext` (`src/game/context.ts`), the view of the world 
 ### Input and output
 
 ```ts
-const game = new Game({ chapter: chapterDoc, puzzles: CHAPTER_1, save: readSave(stored) });
+const game = new Game({ chapter: chapterDoc, puzzles: createChapter1(), save: readSave(stored) });
 // every display frame:
 const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right, shapeEvents: shapes.events });
 // then read game.events, game.store (+ alpha), game.fixtures, game.traveller.state, game.save
@@ -372,8 +372,8 @@ Creature hints: the rabbit's appears in puzzle 3 and the fox's in puzzle 4, each
    - any `marker-gap` holes, `marker-plate` plates and pieces
 
    Keep positions inside the 1.6 × 1.0 m stage around the group's origin.
-2. **Code.** Write a `PuzzleDef` in `src/game/puzzles/`. Keep per-puzzle state in a module-level object reset in `setup`, as the existing puzzles do (one puzzle plays at a time). Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
-3. **Register it.** List it in `src/game/puzzles/index.ts`.
+2. **Code.** Write a factory, `createXPuzzle(): PuzzleDef`, in `src/game/puzzles/`. Keep the puzzle's state inside it (each `Game` gets its own, so a replay beside the live game can't disturb it) and reset that state in `setup`. Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
+3. **Register it.** Add it to `createChapter1()` in `src/game/puzzles/index.ts`.
 4. **Test it.** Add a headless test to `chapter-1.test.ts` that solves it every way it should be solvable, and checks the recorded solution.
 
 ## Discovery and saves: `src/game/discovery.ts`, `src/game/save-state.ts`
@@ -417,6 +417,41 @@ Puzzle objects that aren't entities, for the renderer. Each has a `kind`, centre
 - `saw(type, id)` checks the event log
 
 A stand-in classifier commits a shape after the GDD hold times (0.4 s, or 1 s for companions) and releases it on exit or switch. Shadows come from `shadow-shapes.ts`. Every puzzle test uses it, and it is handy for trying a puzzle idea before building it in the editor.
+
+## Debug tools: `src/game/debug-snapshot.ts`, `src/game/replay.ts`
+
+Drawing belongs to Teammate B's `src/debug`. These modules provide the data, and they are pure.
+
+### Snapshot
+
+- `fillSnapshot(game, snap)` copies the game's state into a reused `DebugSnapshot` without building anything, so it is safe to call every frame:
+  - the puzzle and its phase
+  - the traveller's state and position, and how long it has been stuck
+  - each hand's role, water and fireflies
+  - entity counts per kind
+  - solution credit
+  - contacts, overflow, and dropped time and events
+- `describe(snap, game)` turns it into lines of text for a panel or a bug report. It allocates, so call it only while the panel is open.
+
+### Replay
+
+- `InputRecorder` records exactly what `game.frame()` was given each frame:
+  - `dt` and `paused`
+  - both shadows' capsules and bounds
+  - the shape events
+
+  It is allocated once (about 0.6 KB a frame; 60 s at 72 Hz is about 2.5 MB), and it stops when full.
+- `replay(recording, freshGame)` plays it back. The sim is deterministic, so the fresh game reaches the same state bit for bit, across puzzle loads (`debug.test.ts`).
+- Uses: turning a bug seen in the headset into a test, and checking a fix. `Headless` takes a `recorder` too.
+
+### Commands
+
+- `game.restart()` reloads the current puzzle.
+- `game.goto(i)` jumps to puzzle `i`.
+
+### Several games at once
+
+Puzzles are factories (`createChapter1()`), so each `Game` has its own puzzle state. A replay can run beside the live game without disturbing it (`game.test.ts`).
 
 ## Cost of a game frame
 
