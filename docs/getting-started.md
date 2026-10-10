@@ -196,7 +196,7 @@ Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one wi
 
 ## 13. Add models, textures and sounds
 
-Put the file in `src/assets` and it is in the game ([ADR 0007](adr/0007-asset-pipeline.md)); there is no list to edit. The first folder under `src/assets` sets how it loads:
+Put the file in `src/assets` and it is in the game ([ADR 0009](adr/0009-asset-pipeline.md)); there is no list to edit. The first folder under `src/assets` sets how it loads:
 
 | Folder | Loads | Use for |
 |---|---|---|

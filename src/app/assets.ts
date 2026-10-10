@@ -6,7 +6,7 @@ import { Kind } from '../engine/sim/entity-kinds';
 // the asset a node uses says what it is to the game (docs/adr/0006-editor-authored-layouts.md):
 //   piece-<kind>  an entity of that kind: a unit sphere, so the node's scale is its radius in metres
 //   marker-<tag>  a named spot for puzzle code: a flat unit box, so the node's scale is its width and height
-// Files dropped into src/assets are added too (docs/adr/0007-asset-pipeline.md): critical/ blocks startup,
+// Files dropped into src/assets are added too (docs/adr/0009-asset-pipeline.md): critical/ blocks startup,
 // audio/ loads in the background, everything else loads when first used, and each shows in the editor's
 // Assets panel under its id (the file name in lower case with hyphens).
 // Each Kind has a piece asset (src/app/scene-files.test.ts checks), so a new kind shows up in the editor.

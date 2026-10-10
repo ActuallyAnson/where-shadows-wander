@@ -1,4 +1,4 @@
-# ADR 0007: Asset pipeline: folders set priority, budgets fail the build
+# ADR 0009: Asset pipeline: folders set priority, budgets fail the build
 
 | | |
 |---|---|
