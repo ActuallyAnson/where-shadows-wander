@@ -2,6 +2,7 @@
 // working once IWSDK's hand models are hidden. Plain three.js, one draw call.
 import { Color, InstancedMesh, Matrix4, MeshBasicMaterial, SphereGeometry } from '@iwsdk/core';
 import { JOINT_COUNT, type HandFrame } from '../hands/hand';
+import { litAmount } from './candle-tint';
 
 export class JointDots {
   readonly mesh: InstancedMesh;
@@ -42,13 +43,9 @@ export class JointDots {
         let s = Math.max(r * 0.4, 0.006);
 
         if (hasFlame) {
-          const dx = x - fx;
-          const dy = y - fy;
-          const dz = z - fz;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 0.22) {
+          const t = litAmount(x, y, z, fx, fy, fz);
+          if (t > 0) {
             // Joint is near candlelight: brighten and warm up!
-            const t = Math.max(0, 1.0 - dist / 0.22);
             this.scratchColor.copy(baseColor).lerp(this.litColor, t * 0.9);
             s *= 1.0 + t * 0.35;
             this.mesh.setColorAt(n, this.scratchColor);
