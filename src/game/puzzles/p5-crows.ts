@@ -35,64 +35,67 @@ function anyLured(ctx: GameContext): boolean {
   return false;
 }
 
-export const P5_CROWS: PuzzleDef = {
-  id: 'p5-crows',
-  layoutId: 'puzzle-5',
-  title: 'Crows',
-  solutions: ['fox', 'fireflies'],
-  hintShape: 'fox',
+/** A fresh puzzle with its own state: one per Game, so two games never share it. */
+export function createCrowsPuzzle(): PuzzleDef {
+  return {
+    id: 'p5-crows',
+    layoutId: 'puzzle-5',
+    title: 'Crows',
+    solutions: ['fox', 'fireflies'],
+    hintShape: 'fox',
 
-  step(ctx) {
-    const { store } = ctx;
-    const fox = ctx.companions.slotOf(ctx.companions.fox, ctx);
-    const cup = lantern(ctx);
-    let scared = false;
-    // Crows flock: once one follows the light, they all do.
-    let lured = cup >= 0 && anyLured(ctx);
-    for (let s = store.kindStart[Kind.Crow]; s < store.kindEnd[Kind.Crow]; s++) {
-      if (!store.alive[s] || store.flags[s] & GameFlag.Scared) continue;
-      if (fox >= 0) {
-        const dx = store.x[fox] - store.x[s],
-          dy = store.y[fox] - store.y[s];
-        if (dx * dx + dy * dy <= FOX_SCARE * FOX_SCARE) {
-          store.flags[s] = (store.flags[s] & ~GameFlag.Lured) | GameFlag.Scared;
-          scared = true;
-          continue;
+    step(ctx) {
+      const { store } = ctx;
+      const fox = ctx.companions.slotOf(ctx.companions.fox, ctx);
+      const cup = lantern(ctx);
+      let scared = false;
+      // Crows flock: once one follows the light, they all do.
+      let lured = cup >= 0 && anyLured(ctx);
+      for (let s = store.kindStart[Kind.Crow]; s < store.kindEnd[Kind.Crow]; s++) {
+        if (!store.alive[s] || store.flags[s] & GameFlag.Scared) continue;
+        if (fox >= 0) {
+          const dx = store.x[fox] - store.x[s],
+            dy = store.y[fox] - store.y[s];
+          if (dx * dx + dy * dy <= FOX_SCARE * FOX_SCARE) {
+            store.flags[s] = (store.flags[s] & ~GameFlag.Lured) | GameFlag.Scared;
+            scared = true;
+            continue;
+          }
+        }
+        if (cup >= 0) {
+          const a = ctx.abilities.hands[cup];
+          const dx = a.cx - store.x[s],
+            dy = a.cy - store.y[s];
+          if (lured || store.flags[s] & GameFlag.Lured || dx * dx + dy * dy <= LURE_REACH * LURE_REACH) {
+            store.flags[s] |= GameFlag.Lured;
+            lured = true;
+          }
+        } else {
+          store.flags[s] &= ~GameFlag.Lured;
         }
       }
       if (cup >= 0) {
-        const a = ctx.abilities.hands[cup];
-        const dx = a.cx - store.x[s],
-          dy = a.cy - store.y[s];
-        if (lured || store.flags[s] & GameFlag.Lured || dx * dx + dy * dy <= LURE_REACH * LURE_REACH) {
-          store.flags[s] |= GameFlag.Lured;
-          lured = true;
-        }
-      } else {
-        store.flags[s] &= ~GameFlag.Lured;
+        ctx.creatures.lureX = ctx.abilities.hands[cup].cx;
+        ctx.creatures.lureY = ctx.abilities.hands[cup].cy;
       }
-    }
-    if (cup >= 0) {
-      ctx.creatures.lureX = ctx.abilities.hands[cup].cx;
-      ctx.creatures.lureY = ctx.abilities.hands[cup].cy;
-    }
-    if (scared) {
-      ctx.events.push('puzzle-event', 'crows-flee', ctx.time);
-      ctx.credit('fox', 1);
-    }
-    if (lured) ctx.credit('fireflies', ctx.dt);
+      if (scared) {
+        ctx.events.push('puzzle-event', 'crows-flee', ctx.time);
+        ctx.credit('fox', 1);
+      }
+      if (lured) ctx.credit('fireflies', ctx.dt);
 
-    // The traveller waits while a crow is on the path just ahead.
-    const t = ctx.traveller;
-    const ts = t.slot(ctx);
-    if (ts < 0) return;
-    for (let s = store.kindStart[Kind.Crow]; s < store.kindEnd[Kind.Crow]; s++) {
-      if (!store.alive[s] || store.flags[s] & GameFlag.Scared) continue;
-      const ahead = (store.x[s] - store.x[ts]) * t.dir;
-      if (ahead > -0.02 && ahead < WARY && store.y[s] - ctx.groundY < ON_PATH) {
-        t.hold('crows');
-        return;
+      // The traveller waits while a crow is on the path just ahead.
+      const t = ctx.traveller;
+      const ts = t.slot(ctx);
+      if (ts < 0) return;
+      for (let s = store.kindStart[Kind.Crow]; s < store.kindEnd[Kind.Crow]; s++) {
+        if (!store.alive[s] || store.flags[s] & GameFlag.Scared) continue;
+        const ahead = (store.x[s] - store.x[ts]) * t.dir;
+        if (ahead > -0.02 && ahead < WARY && store.y[s] - ctx.groundY < ON_PATH) {
+          t.hold('crows');
+          return;
+        }
       }
-    }
-  },
-};
+    },
+  };
+}

@@ -7,10 +7,10 @@ import { flatShadow } from '../engine/sim/shadow-shapes';
 import { Role } from './abilities';
 import { Game, MAX_STEPS_PER_FRAME, type GameInput } from './game';
 import { Headless } from './headless';
-import { CHAPTER_1 } from './puzzles/index';
+import { createChapter1 } from './puzzles/index';
 import { newSave } from './save-state';
 
-const opts = () => ({ chapter: chapter1, puzzles: CHAPTER_1 });
+const opts = () => ({ chapter: chapter1, puzzles: createChapter1() });
 
 function input(dt = 1 / 72, paused = false): GameInput {
   return { dt, paused, left: null, right: null, shapeEvents: null };
@@ -135,5 +135,23 @@ describe('Game', () => {
     const h = new Headless(opts());
     h.run(12);
     expect(h.game.traveller.state).toBe('look-back');
+  });
+
+  it('keeps two games apart (each has its own puzzle state)', () => {
+    const play = (other: boolean) => {
+      const save = newSave();
+      save.puzzle = 1;
+      const a = new Game({ ...opts(), save, seed: 5 });
+      const b = other ? new Game({ ...opts(), save: { ...save }, seed: 9 }) : null;
+      for (let i = 0; i < 600; i++) {
+        a.frame(input());
+        b?.frame(input(1 / 90));
+      }
+      return a;
+    };
+    const alone = play(false),
+      together = play(true);
+    expect(new Uint8Array(together.store.y.buffer)).toEqual(new Uint8Array(alone.store.y.buffer));
+    expect(together.traveller.state).toBe(alone.traveller.state);
   });
 });

@@ -25,7 +25,7 @@ const RECENT_S = 0.5;
 /** Landings remembered (a ring of positions and times). */
 const RING = 32;
 
-/** The rain's state for the puzzle being played (one puzzle plays at a time). */
+/** One game's rain: drops owed, recent landings, and when the traveller was last hit. */
 class RainState {
   acc = 0;
   readonly landX = new Float64Array(RING);
@@ -56,8 +56,6 @@ class RainState {
   }
 }
 
-const rain = new RainState();
-
 /** Credits the cover (cup or roof) over the traveller while it is under the cloud. */
 function creditCover(ctx: GameContext, s: number): void {
   const x = ctx.store.x[s];
@@ -70,57 +68,61 @@ function creditCover(ctx: GameContext, s: number): void {
   }
 }
 
-export const P2_RAIN: PuzzleDef = {
-  id: 'p2-rain',
-  layoutId: 'puzzle-2',
-  title: 'Rain',
-  solutions: ['cup', 'roof'],
-  hintShape: 'cup',
+/** A fresh puzzle with its own state: one per Game, so two games never share it. */
+export function createRainPuzzle(): PuzzleDef {
+  const rain = new RainState();
+  return {
+    id: 'p2-rain',
+    layoutId: 'puzzle-2',
+    title: 'Rain',
+    solutions: ['cup', 'roof'],
+    hintShape: 'cup',
 
-  setup(ctx) {
-    rain.reset();
-    ctx.fixtures.add('cloud', (CLOUD_LEFT + CLOUD_RIGHT) / 2, CLOUD_Y + 0.04, CLOUD_RIGHT - CLOUD_LEFT + 0.06, 0.1);
-  },
+    setup(ctx) {
+      rain.reset();
+      ctx.fixtures.add('cloud', (CLOUD_LEFT + CLOUD_RIGHT) / 2, CLOUD_Y + 0.04, CLOUD_RIGHT - CLOUD_LEFT + 0.06, 0.1);
+    },
 
-  step(ctx) {
-    rain.acc += RAIN_RATE * ctx.dt;
-    while (rain.acc >= 1) {
-      rain.acc -= 1;
-      const x = ctx.rng.range(CLOUD_LEFT + DROP_R, CLOUD_RIGHT - DROP_R);
-      ctx.store.create(Kind.Raindrop, x, CLOUD_Y, DROP_R, 0, DROP_VY);
-    }
-    const t = ctx.traveller;
-    const s = t.slot(ctx);
-    if (s < 0) return;
-    if (ctx.time - rain.lastHitT[0] <= RECENT_S || rain.wetNear(ctx.time, ctx.store.x[s], t.dir)) t.hold('rain');
-    creditCover(ctx, s);
-  },
-
-  afterStep(ctx) {
-    const { store, solver } = ctx;
-    const trav = ctx.traveller.slot(ctx);
-    for (let i = 0; i < solver.contactCount; i++) {
-      const s = solver.contactSlot[i];
-      const type = solver.contactType[i];
-      const other = solver.contactId[i];
-      if (type === Touch.Terrain && store.alive[s] && store.kind[s] === Kind.Raindrop) {
-        rain.land(store.x[s], ctx.time);
-        ctx.events.push('splash', 'ground', ctx.time, 0, store.x[s], store.y[s]);
-        store.destroy(store.handleAt(s));
-      } else if (type === Touch.Entity && s === trav && store.alive[other] && store.kind[other] === Kind.Raindrop) {
-        rain.lastHitT[0] = ctx.time;
-        ctx.events.push('splash', 'traveller', ctx.time, 0, store.x[other], store.y[other]);
-        store.destroy(store.handleAt(other));
+    step(ctx) {
+      rain.acc += RAIN_RATE * ctx.dt;
+      while (rain.acc >= 1) {
+        rain.acc -= 1;
+        const x = ctx.rng.range(CLOUD_LEFT + DROP_R, CLOUD_RIGHT - DROP_R);
+        ctx.store.create(Kind.Raindrop, x, CLOUD_Y, DROP_R, 0, DROP_VY);
       }
-    }
-    // Drops that missed everything (through a gap, off the stage).
-    for (let s = store.kindStart[Kind.Raindrop]; s < store.kindEnd[Kind.Raindrop]; s++) {
-      if (store.alive[s] && store.y[s] < ctx.groundY - 0.3) store.destroy(store.handleAt(s));
-    }
-  },
+      const t = ctx.traveller;
+      const s = t.slot(ctx);
+      if (s < 0) return;
+      if (ctx.time - rain.lastHitT[0] <= RECENT_S || rain.wetNear(ctx.time, ctx.store.x[s], t.dir)) t.hold('rain');
+      creditCover(ctx, s);
+    },
 
-  hintAt(ctx, out) {
-    out[0] = CLOUD_LEFT - 0.05;
-    out[1] = ctx.groundY + 0.2;
-  },
-};
+    afterStep(ctx) {
+      const { store, solver } = ctx;
+      const trav = ctx.traveller.slot(ctx);
+      for (let i = 0; i < solver.contactCount; i++) {
+        const s = solver.contactSlot[i];
+        const type = solver.contactType[i];
+        const other = solver.contactId[i];
+        if (type === Touch.Terrain && store.alive[s] && store.kind[s] === Kind.Raindrop) {
+          rain.land(store.x[s], ctx.time);
+          ctx.events.push('splash', 'ground', ctx.time, 0, store.x[s], store.y[s]);
+          store.destroy(store.handleAt(s));
+        } else if (type === Touch.Entity && s === trav && store.alive[other] && store.kind[other] === Kind.Raindrop) {
+          rain.lastHitT[0] = ctx.time;
+          ctx.events.push('splash', 'traveller', ctx.time, 0, store.x[other], store.y[other]);
+          store.destroy(store.handleAt(other));
+        }
+      }
+      // Drops that missed everything (through a gap, off the stage).
+      for (let s = store.kindStart[Kind.Raindrop]; s < store.kindEnd[Kind.Raindrop]; s++) {
+        if (store.alive[s] && store.y[s] < ctx.groundY - 0.3) store.destroy(store.handleAt(s));
+      }
+    },
+
+    hintAt(ctx, out) {
+      out[0] = CLOUD_LEFT - 0.05;
+      out[1] = ctx.groundY + 0.2;
+    },
+  };
+}
