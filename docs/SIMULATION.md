@@ -141,6 +141,44 @@ Call `solver.step(store, dt)` after `store.beginStep()` and after gameplay has s
 - About 5 B of number boxing a step, and no objects (`solver.alloc.test.ts`).
 - The hot paths pass values through typed-array scratch instead of number arguments, because V8 boxes doubles across calls it doesn't inline. Keep that pattern when editing them.
 
+## Puzzle layouts: `src/game/level.ts`
+
+Layouts are authored in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). `public/scenes/chapter-1.iwsdk.scene.json` holds one group per puzzle, `puzzle-1` to `puzzle-6`.
+
+### Coordinates
+
+- **Inside a group,** positions are stage metres relative to the group's own position. That position is the centre of the 1.6 × 1.0 m wall, so x runs from −0.8 to 0.8 and y from −0.5 to 0.5.
+- **Groups sit 2 m apart in the editor** so they don't overlap.
+- **The loader adds a group's translation,** and `loadLayout` subtracts it again. A puzzle comes out in stage space wherever it sits in the file.
+
+### The ground
+
+- Every puzzle has a ground line with its top at `GROUND_Y` (−0.3 m, 0.2 m above the bottom of the wall). It runs 0.3 m past each side of the wall.
+- **Each `marker-gap` cuts a hole** as wide as the marker. The marker's height and y are only for the editor's view.
+- The ground is a capsule 0.1 m thick, so its ends are rounded: the walkable top slopes away over the last few centimetres before a hole.
+- Terrain capsules carry a `TerrainTag`: Ground, Gate, Rope, SoftGround or Wall. Gameplay uses it to tell what something stood on.
+
+### What lives where
+
+- **The scene file** holds the pieces (the traveller's start, crows, fireflies) and the markers (`gap`, `goal`, `plate`).
+- **Puzzle code** in `src/game/puzzles/` holds everything that moves or reacts: rain, wind, gates and ropes.
+- **`content/levels` stays unused,** per ADR 0006.
+- **Adding a marker tag or a `Kind`** needs a stand-in asset in `src/app/assets.ts`. That file is Anson's, and a test enforces it.
+
+### Loading
+
+`loadPuzzle(doc, 'puzzle-N', store, solver)` does it all in one call:
+1. Clears the store and the solver's terrain.
+2. Loads the layout in stage space.
+3. Builds the ground.
+4. Spawns the pieces.
+
+It runs on puzzle load, never per frame. `markerOf` and `markersOf` find markers by tag.
+
+### Tests
+
+`src/engine/sim/scene-layout.test.ts` now reads a small fixed fixture, `src/engine/sim/fixtures/sample-chapter.scene.json` (the first editor trial's file), so re-authoring the real chapter doesn't break the loader's tests. `level.test.ts` checks that every chapter-1 puzzle loads cleanly and fits on the wall.
+
 ## Entity store, layouts, 2D maths
 
 These already exist; see the header comments in `entity-store.ts`, `entity-kinds.ts`, `scene-layout.ts` and `vec2.ts`, and [ADR 0006](adr/0006-editor-authored-layouts.md) for how layouts are authored.

@@ -12,32 +12,11 @@
           "name": "Traveller start",
           "transform": {
             "position": [
-              0.2,
-              0.05,
+              -0.7,
+              -0.26,
               0
             ],
-            "scale": 0.06
-          }
-        },
-        {
-          "components": {
-            "Piece": {
-              "isStatic": true
-            }
-          },
-          "content": {
-            "asset": "piece-rock",
-            "type": "asset"
-          },
-          "id": "p1-rock",
-          "name": "Rock",
-          "transform": {
-            "position": [
-              1.2,
-              0.3,
-              0
-            ],
-            "scale": 0.08
+            "scale": 0.04
           }
         },
         {
@@ -49,12 +28,12 @@
           "name": "Gap to bridge",
           "transform": {
             "position": [
-              2.5,
               0,
+              -0.4,
               0
             ],
             "scale": [
-              0.6,
+              0.22,
               0.2,
               1
             ]
@@ -69,12 +48,12 @@
           "name": "Goal",
           "transform": {
             "position": [
-              4.1,
-              0.05,
+              0.7,
+              -0.2,
               0
             ],
             "scale": [
-              0.2,
+              0.12,
               0.2,
               1
             ]
@@ -90,25 +69,39 @@
     {
       "children": [
         {
-          "components": {
-            "Piece": {
-              "vx": -0.3,
-              "vy": 0
-            }
-          },
           "content": {
-            "asset": "piece-crow",
+            "asset": "piece-traveller",
             "type": "asset"
           },
-          "id": "p2-crow",
-          "name": "Crow",
+          "id": "p2-traveller",
+          "name": "Traveller start",
           "transform": {
             "position": [
-              1,
-              0.5,
+              -0.7,
+              -0.26,
               0
             ],
-            "scale": 0.07
+            "scale": 0.04
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-goal",
+            "type": "asset"
+          },
+          "id": "p2-goal",
+          "name": "Goal",
+          "transform": {
+            "position": [
+              0.7,
+              -0.2,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.2,
+              1
+            ]
           }
         }
       ],
@@ -119,7 +112,444 @@
       "name": "Puzzle 2: rain",
       "transform": {
         "position": [
-          5,
+          2,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "children": [
+        {
+          "content": {
+            "asset": "piece-traveller",
+            "type": "asset"
+          },
+          "id": "p3-traveller",
+          "name": "Traveller start",
+          "transform": {
+            "position": [
+              -0.7,
+              -0.26,
+              0
+            ],
+            "scale": 0.04
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-goal",
+            "type": "asset"
+          },
+          "id": "p3-goal",
+          "name": "Goal",
+          "transform": {
+            "position": [
+              0.7,
+              -0.2,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.2,
+              1
+            ]
+          }
+        }
+      ],
+      "content": {
+        "type": "group"
+      },
+      "id": "puzzle-3",
+      "name": "Puzzle 3: wind",
+      "transform": {
+        "position": [
+          4,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "children": [
+        {
+          "content": {
+            "asset": "piece-traveller",
+            "type": "asset"
+          },
+          "id": "p4-traveller",
+          "name": "Traveller start",
+          "transform": {
+            "position": [
+              -0.7,
+              -0.26,
+              0
+            ],
+            "scale": 0.04
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-gap",
+            "type": "asset"
+          },
+          "id": "p4-gap",
+          "name": "Chasm",
+          "transform": {
+            "position": [
+              0.05,
+              -0.4,
+              0
+            ],
+            "scale": [
+              0.5,
+              0.2,
+              1
+            ]
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-goal",
+            "type": "asset"
+          },
+          "id": "p4-goal",
+          "name": "Goal",
+          "transform": {
+            "position": [
+              0.7,
+              -0.2,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.2,
+              1
+            ]
+          }
+        }
+      ],
+      "content": {
+        "type": "group"
+      },
+      "id": "puzzle-4",
+      "name": "Puzzle 4: the chasm",
+      "transform": {
+        "position": [
+          6,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "children": [
+        {
+          "content": {
+            "asset": "piece-traveller",
+            "type": "asset"
+          },
+          "id": "p5-traveller",
+          "name": "Traveller start",
+          "transform": {
+            "position": [
+              -0.7,
+              -0.26,
+              0
+            ],
+            "scale": 0.04
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-crow",
+            "type": "asset"
+          },
+          "id": "p5-crow-1",
+          "name": "Crow 1",
+          "transform": {
+            "position": [
+              0.08,
+              -0.255,
+              0
+            ],
+            "scale": 0.035
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-crow",
+            "type": "asset"
+          },
+          "id": "p5-crow-2",
+          "name": "Crow 2",
+          "transform": {
+            "position": [
+              0.17,
+              -0.255,
+              0
+            ],
+            "scale": 0.035
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-crow",
+            "type": "asset"
+          },
+          "id": "p5-crow-3",
+          "name": "Crow 3",
+          "transform": {
+            "position": [
+              0.26,
+              -0.255,
+              0
+            ],
+            "scale": 0.035
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-1",
+          "name": "Firefly 1",
+          "transform": {
+            "position": [
+              -0.45,
+              0.15,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-2",
+          "name": "Firefly 2",
+          "transform": {
+            "position": [
+              -0.41000000000000003,
+              0.16999999999999998,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-3",
+          "name": "Firefly 3",
+          "transform": {
+            "position": [
+              -0.48,
+              0.19,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-4",
+          "name": "Firefly 4",
+          "transform": {
+            "position": [
+              -0.43,
+              0.12,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-5",
+          "name": "Firefly 5",
+          "transform": {
+            "position": [
+              -0.5,
+              0.13999999999999999,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "components": {
+            "Piece": {
+              "isSensor": true
+            }
+          },
+          "content": {
+            "asset": "piece-firefly",
+            "type": "asset"
+          },
+          "id": "p5-firefly-6",
+          "name": "Firefly 6",
+          "transform": {
+            "position": [
+              -0.4,
+              0.2,
+              0
+            ],
+            "scale": 0.012
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-goal",
+            "type": "asset"
+          },
+          "id": "p5-goal",
+          "name": "Goal",
+          "transform": {
+            "position": [
+              0.7,
+              -0.2,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.2,
+              1
+            ]
+          }
+        }
+      ],
+      "content": {
+        "type": "group"
+      },
+      "id": "puzzle-5",
+      "name": "Puzzle 5: crows",
+      "transform": {
+        "position": [
+          8,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "children": [
+        {
+          "content": {
+            "asset": "piece-traveller",
+            "type": "asset"
+          },
+          "id": "p6-traveller",
+          "name": "Traveller start",
+          "transform": {
+            "position": [
+              -0.7,
+              -0.26,
+              0
+            ],
+            "scale": 0.04
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-plate",
+            "type": "asset"
+          },
+          "id": "p6-plate",
+          "name": "Weight plate",
+          "transform": {
+            "position": [
+              -0.1,
+              -0.29,
+              0
+            ],
+            "scale": [
+              0.14,
+              0.03,
+              1
+            ]
+          }
+        },
+        {
+          "content": {
+            "asset": "marker-goal",
+            "type": "asset"
+          },
+          "id": "p6-goal",
+          "name": "Goal",
+          "transform": {
+            "position": [
+              0.7,
+              -0.2,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.2,
+              1
+            ]
+          }
+        }
+      ],
+      "content": {
+        "type": "group"
+      },
+      "id": "puzzle-6",
+      "name": "Puzzle 6: the gate",
+      "transform": {
+        "position": [
+          10,
           0,
           0
         ]
