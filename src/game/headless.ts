@@ -8,7 +8,8 @@ import { createHandShadow, type HandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
 import { COMPANION_SHAPES, type Shape } from '../engine/hands/shapes';
 import { hideShadow, shapeShadow } from '../engine/sim/shadow-shapes';
-import { Game, type GameOptions } from './game';
+import { Game, type GameInput, type GameOptions } from './game';
+import type { InputRecorder } from './replay';
 
 /** Classifier hold times (GDD): a shape commits after 0.4 s, a companion shape after about 1 s. */
 export const HOLD_S = 0.4;
@@ -40,6 +41,8 @@ export class Headless {
     right: { shape: null, x: 0, y: 0, committed: null, holding: null, heldS: 0 },
   };
   paused = false;
+  /** When set, every frame's input is recorded (for replay tests and bug reports). */
+  recorder: InputRecorder | null = null;
 
   constructor(
     opts: GameOptions,
@@ -102,13 +105,15 @@ export class Headless {
     const dt = 1 / this.displayHz;
     this.queue.clear();
     for (const hand of ['left', 'right'] as const) this.classify(hand, dt);
-    this.game.frame({
+    const input: GameInput = {
       dt,
       paused: this.paused,
       left: this.shadows.left,
       right: this.shadows.right,
       shapeEvents: this.queue,
-    });
+    };
+    this.recorder?.record(input);
+    this.game.frame(input);
     this.t += dt;
     this.record();
   }
