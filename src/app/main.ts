@@ -17,7 +17,7 @@ import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
-import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { StageFrame } from '../engine/stage/stage-frame';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
 import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
@@ -38,8 +38,12 @@ import { mountEnterArButtonIfNeeded } from './enter-ar-button';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
+import { GameDebugView } from './game-debug-view';
+import chapter1 from '../../public/scenes/chapter-1.iwsdk.scene.json';
+import { Game, SIM_HZ } from '../game/game';
+import { CHAPTER_1_ID, createChapter1 } from '../game/puzzles/index';
+import { newSave } from '../game/save-state';
 
-const SIM_HZ = 60;
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
@@ -87,13 +91,26 @@ async function start(): Promise<void> {
   gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
   let clock = 0;
 
-  // Hand shadows, on a stand-in stage and lantern until StageFrame (A) and the lantern (B) exist:
-  // ?stage=table (the tabletop theatre, default) or ?stage=wall. ?debug=shadow shows the capsules.
+  // Hand shadows on the game's stage: StageFrame's paper wall (1.6 x 1.0 m, 2 m ahead), the lantern
+  // still a stand-in until Teammate B's exists. ?stage=table or ?stage=wall bring back the old
+  // stand-in stages for shadow testing (the puzzles don't fit on them). ?debug=shadow shows the capsules.
   const params = new URLSearchParams(location.search);
-  const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
-  const stage = createStagePlane();
+  const stageParam = params.get('stage');
+  const stageMode: StageMode = stageParam === 'table' ? 'table' : 'wall';
+  const standIn = stageParam === 'table' || stageParam === 'wall';
+  const rigStage = createStagePlane();
+  const stage = new StageFrame();
   const lantern = new Float64Array(3);
-  const projector = new ShadowProjector({ blend: 0.0 });
+  // On the 2 m wall, a pure perspective shadow from a candle beside the player is about 5x the hand,
+  // too big for the puzzles; the GDD's blend of 0.9 keeps it near hand size. The stand-in stages
+  // keep pure perspective. ?blend=0..1 overrides it, and ?shadowsize= scales the shadows (1 =
+  // natural), to tune them against the puzzles' sizes.
+  const blendParam = Number(params.get('blend'));
+  const sizeParam = Number(params.get('shadowsize'));
+  const projector = new ShadowProjector({
+    blend: params.has('blend') && blendParam >= 0 && blendParam <= 1 ? blendParam : standIn ? 0.0 : 0.9,
+    size: params.has('shadowsize') && sizeParam > 0 ? sizeParam : 1,
+  });
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
@@ -121,13 +138,18 @@ async function start(): Promise<void> {
   const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
   world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
   if (shadowDebug) world.scene.add(shadowDebug.group);
+  // Stand-in drawing of the game until Teammate B's renderer exists; ?gameview=0 hides it.
+  let gameView: GameDebugView | null = null;
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
   const timings = new FrameTimings();
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
-    placeTestRig(stageMode, head, yaw, stage, lantern);
+    placeTestRig(stageMode, head, yaw, rigStage, lantern);
+    if (standIn) stage.setWall(rigStage.origin, rigStage.normal, rigStage.up, rigStage.width, rigStage.height);
+    else stage.placeInFront(head, yaw);
     stageView.place(stage, lantern);
+    gameView?.place(stage);
     candleView.place(lantern);
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
@@ -159,9 +181,17 @@ async function start(): Promise<void> {
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
-  const sim = new FixedStepLoop(SIM_HZ, () => {
-    // Game simulation steps go here (week 2+).
-  });
+  // The game (Teammate A, ADR 0008): one call a frame. ?puzzle=1..6 starts at a puzzle.
+  // No saves yet (Teammate B's save service), so every load starts fresh.
+  const save = newSave(CHAPTER_1_ID);
+  const startPuzzle = Number(params.get('puzzle'));
+  if (Number.isInteger(startPuzzle) && startPuzzle >= 1 && startPuzzle <= 6) save.puzzle = startPuzzle - 1;
+  const game = new Game({ chapter: chapter1, puzzles: createChapter1(), chapterId: CHAPTER_1_ID, save });
+  if (params.get('gameview') !== '0') {
+    gameView = new GameDebugView(game);
+    world.scene.add(gameView.group);
+    if (rigPlaced) gameView.place(stage);
+  }
   const dots = new JointDots();
   world.scene.add(dots.mesh);
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
@@ -175,11 +205,17 @@ async function start(): Promise<void> {
   diagnostics.addSource(() => ({
     ...reportSource({
       simHz: SIM_HZ,
-      simSteps: sim.steps,
+      simSteps: game.loop.steps,
       handReadMethod: hands.method,
       mockSource: mock ? mock.source.name : null,
       capabilities,
     }),
+    game: {
+      puzzle: game.puzzle.id,
+      droppedS: game.loop.droppedS,
+      overflow: game.store.overflowCount,
+      eventsDropped: game.events.dropped,
+    },
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
@@ -384,7 +420,15 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      if (!paused) sim.advance(delta);
+      const alpha = game.frame({
+        dt: delta,
+        paused,
+        left: rigPlaced ? projector.shadows.left : null,
+        right: rigPlaced ? projector.shadows.right : null,
+        shapeEvents: shapes.events,
+        gestureEvents: gestures.events,
+      });
+      gameView?.update(alpha);
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
       world.camera.getWorldQuaternion(cameraQuat);
@@ -408,6 +452,7 @@ async function start(): Promise<void> {
     Object.assign(window, {
       __wsw: {
         world,
+        game,
         hands,
         diagnostics,
         recorder,
