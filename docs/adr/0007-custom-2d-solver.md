@@ -42,7 +42,7 @@ Write our own solver, `src/engine/sim/solver.ts`, of about 450 lines.
 
 ## Consequences
 
-- **Measured on a desktop** (`npm run perf`): one step with about 200 entities (a full rain shower, 64 fireflies, rocks, crows), two solid hands and terrain costs 0.15 ms mean. The budget is about 0.5 ms for all sim and gameplay. `solver.alloc.test.ts` measures about 40 B a step, which is the engine boxing numbers. No objects or arrays are built.
+- **Measured on a desktop** (`npm run perf`): one step with about 200 entities (a full rain shower, 64 fireflies, rocks, crows), two solid hands and terrain costs 0.15 ms mean. The budget is about 0.5 ms for all sim and gameplay. `solver.alloc.test.ts` measures about 5 B a step, which is the engine boxing numbers. No objects or arrays are built.
 - **Allocation-aware code.** The hot paths pass circles, normals and depths through small typed arrays rather than number arguments. Otherwise V8 boxes a double at every call it doesn't inline; that cost 340–700 B a step before the change.
 - **Known limits:**
   - Circles only, so rocks don't tumble.

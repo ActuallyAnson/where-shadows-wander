@@ -138,7 +138,7 @@ Call `solver.step(store, dt)` after `store.beginStep()` and after gameplay has s
 ### Cost
 
 - 0.15 ms a step on a desktop with about 200 entities and two solid hands (`solver.perf.ts`).
-- About 40 B of number boxing a step, and no objects (`solver.alloc.test.ts`).
+- About 5 B of number boxing a step, and no objects (`solver.alloc.test.ts`).
 - The hot paths pass values through typed-array scratch instead of number arguments, because V8 boxes doubles across calls it doesn't inline. Keep that pattern when editing them.
 
 ## Entity store, layouts, 2D maths

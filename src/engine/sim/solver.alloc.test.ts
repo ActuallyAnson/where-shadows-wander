@@ -1,7 +1,7 @@
 // The solver steps every frame: a busy step (rain on terrain, both hands solid, contacts, support
 // queries) must build no objects or arrays. Same method as entity-store.alloc.test.ts. Needs
-// `--expose-gc`. What remains (about 40 B a step, measured) is the engine boxing numbers across
-// calls it didn't inline, mostly in this test's own scripted shadows; see the note in solver.ts.
+// `--expose-gc`. What remains (a few bytes a step, measured) is the engine boxing numbers across
+// calls it didn't inline; see the note in solver.ts.
 import { describe, expect, it } from 'vitest';
 import { bytesPerFrame, gc, inCI } from './alloc-measure';
 import { createHandShadow } from '../hands/hand-shadow';
@@ -14,6 +14,8 @@ import { LEFT, RIGHT, Solver, Touch, type Support } from './solver';
 const FRAMES = 2_000;
 const TIMEOUT_MS = 60_000;
 const BUDGET_BYTES_PER_FRAME = 64;
+/** The left hand sways through this many prebuilt poses, so the solver sees a moving hand. */
+const LEFT_POSES = 64;
 
 function makeStep(extra?: () => void) {
   const store = new EntityStore(DEFAULT_CAPACITIES);
@@ -23,13 +25,19 @@ function makeStep(extra?: () => void) {
   const acc = new Float64Array(1);
   solver.terrain.add(-0.8, -0.35, -0.15, -0.35, 0.05);
   solver.terrain.add(0.15, -0.35, 0.8, -0.35, 0.05);
-  const left = createHandShadow('left');
+  // The scripted shadows are built up front, so only the solver is measured: unoptimised, the
+  // shadow helpers box hundreds of bytes a call, and on a slow CI runner they are optimised late.
+  const lefts = Array.from({ length: LEFT_POSES }, (_, k) => {
+    const sh = createHandShadow('left');
+    flatShadow(sh, Math.sin((k / LEFT_POSES) * Math.PI * 2) * 0.05, -0.32);
+    return sh;
+  });
   const right = createHandShadow('right');
+  cupShadow(right, 0.3, 0.1);
   store.create(Kind.Traveller, -0.6, -0.25, 0.04);
   let frame = 0;
   return () => {
-    flatShadow(left, Math.sin(frame * 0.01) * 0.05, -0.32);
-    cupShadow(right, 0.3, 0.1);
+    const left = lefts[frame % LEFT_POSES];
     solver.hands[LEFT].copyFrom(true, left.capsules, left.bounds);
     solver.hands[RIGHT].copyFrom(true, right.capsules, right.bounds);
     solver.hands[LEFT].mask = solver.hands[RIGHT].mask = 0xffff;
