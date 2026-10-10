@@ -29,6 +29,10 @@ Status: accepted 7 Oct 2026 (Anson; Damon agreed to the loader approach in chat)
 
 Moving a piece, resizing it, changing its asset, adding the `Piece` component, adding a new piece from the Assets panel (named `piece-crow-1` and so on), undo and redo, and resizing a marker all work, and the editor saves automatically. The saved file passes IWSDK's validator and our loader reads it: the rock came out at the edited position, with radius 0.1 from its scale, `vx` and `vy` 0.5 and the `isStatic` flag from the `Piece` component, and the gap marker's width from its scale. The editor sorts keys alphabetically and writes every `Piece` field (`hidden`, `isSensor`, `isStatic`, `vx`, `vy`) and a `rotationDeg` on every node it touches, which the loader accepts (it reports a non-zero rotation on a piece or marker as ignored). The editor's Validation panel shows "No validation result yet" until something is validated; it is not an error.
 
+## Update (11 Oct 2026): prefabs and patterns
+
+The editor draws prefab instances and repeated patterns (a row, grid or circle of copies) from a scene file, but has no controls to make them, so they would have to be written by hand. The loader does not expand them. It reports an `instance` or `pattern` node in `problems` (and the scene-file test fails on it) rather than letting the pieces in it silently never spawn. Expanding patterns is possible later, in the pure loader, if a puzzle needs a repeated prop. The editor's full feature list, checked against a running editor, is in `docs/getting-started.md` section 12.
+
 ## Not yet verified
 
 - **Switching a node off.** The editor's Visible toggle in the inspector worked by eye, but the file saved afterwards had it switched back on, so a saved `"visible": false` has not been seen. IWSDK's scene patch code writes that key and the loader reads it. The scene-graph hide (`set-preview-visibility`) is preview-only and is not saved.
