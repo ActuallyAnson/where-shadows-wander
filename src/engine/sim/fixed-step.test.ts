@@ -21,3 +21,37 @@ describe('FixedStepLoop', () => {
     expect(loop.steps).toBe(15);
   });
 });
+
+describe('FixedStepLoop caps and reset', () => {
+  it('drops whole steps past maxStepsPerFrame and counts them', () => {
+    const loop = new FixedStepLoop(60, () => {}, 4);
+    loop.advance(0.1); // 6 steps' worth
+    expect(loop.steps).toBe(4);
+    expect(loop.droppedS).toBeCloseTo(2 / 60, 9);
+  });
+
+  it('counts time beyond the frame clamp as dropped', () => {
+    const loop = new FixedStepLoop(60, () => {});
+    loop.advance(1);
+    expect(loop.droppedS).toBeCloseTo(0.75, 9);
+  });
+
+  it('remembers the last alpha', () => {
+    const loop = new FixedStepLoop(50, () => {});
+    const a = loop.advance(0.03);
+    expect(loop.alpha).toBe(a);
+  });
+
+  it('reset clears the remainder so a resumed frame starts clean', () => {
+    const loop = new FixedStepLoop(60, () => {});
+    loop.advance(0.015); // just under one step pending
+    loop.reset();
+    loop.advance(0.005);
+    expect(loop.steps).toBe(0);
+    expect(loop.alpha).toBeCloseTo(0.3, 9);
+  });
+
+  it('rejects a cap below one step', () => {
+    expect(() => new FixedStepLoop(60, () => {}, 0)).toThrow(RangeError);
+  });
+});

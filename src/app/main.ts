@@ -17,12 +17,16 @@ import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
+import { GameAudio } from '../engine/services/audio/game-audio';
+import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
+import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
 import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
@@ -70,6 +74,8 @@ async function start(): Promise<void> {
     const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
     if (emulated) emulated.primaryInputMode = 'hand';
   }
+  // The critical assets have loaded; from here IWSDK gives up on any one request after 8 s, not 30 s.
+  shortenAssetTimeout();
   diagnostics.mark('worldCreated');
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   if (!mockOptions) void mountEnterArButtonIfNeeded(world);
@@ -139,6 +145,17 @@ async function start(): Promise<void> {
   let rigCalibratedFromHead = false;
   let everPlaced = false;
   const timings = new FrameTimings();
+  // Sound: plain Web Audio (docs/adr/0008-audio.md). It unlocks on the first gesture on the page, or when a
+  // headset session starts (which a button press or the browser's enter prompt began).
+  const audio = new AudioEngine();
+  audio.attachGestureUnlock(document);
+  const gameAudio = new GameAudio(audio);
+  // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
+  const audioPose = new Float64Array(9);
+  // Sound holds still with the game: the system menu, the headset off, or the page hidden.
+  const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
+  visibility.subscribe(syncAudioPause);
+  document.addEventListener('visibilitychange', syncAudioPause);
   const placeRig = (head: ArrayLike<number>, yaw: number) => {
     placeTestRig(stageMode, head, yaw, stage, lantern);
     stageView.place(stage, lantern);
@@ -176,7 +193,14 @@ async function start(): Promise<void> {
   const sim = new FixedStepLoop(SIM_HZ, () => {
     // Game simulation steps go here (week 2+).
   });
+  // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
+  // mock mode; over passthrough the real hands are visible, so it hides itself.
+  const handVisual: HandVisual = new CapsuleHandVisual();
+  let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
+  world.scene.add(handVisual.object);
+  // The joint dots are a debug view: ?debug=joints.
   const dots = new JointDots();
+  dots.mesh.visible = params.get('debug') === 'joints';
   world.scene.add(dots.mesh);
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
   // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
@@ -248,8 +272,12 @@ async function start(): Promise<void> {
   };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
+    audio.unlock();
+    // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
+    if (session) audio.attachSessionUnlock(session as unknown as SessionEvents);
     if (session) {
       occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
+      passthrough = session.environmentBlendMode !== undefined && session.environmentBlendMode !== 'opaque';
       const clear = clearFor(session.environmentBlendMode, xrMode);
       world.scene.background = clear.background === null ? null : new Color(clear.background);
       world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
@@ -266,6 +294,7 @@ async function start(): Promise<void> {
     world.scene.background = null;
     world.renderer.setClearColor(0x000000, 0);
     occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
+    passthrough = false;
     if (!mock) {
       rigCalibratedFromHead = false;
       placeRig([0, 1.2, 0], 0);
@@ -371,6 +400,7 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         projector.update(hands.hands, stage, candleView.flamePosition);
+        if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
         shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
         shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
         timings.end(SLOT.shadow);
@@ -407,8 +437,27 @@ async function start(): Promise<void> {
       stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
       candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
+      timings.begin(SLOT.audio);
+      world.camera.updateWorldMatrix(true, false);
+      const m = world.camera.matrixWorld.elements;
+      audioPose[0] = m[12];
+      audioPose[1] = m[13];
+      audioPose[2] = m[14];
+      audioPose[3] = -m[8];
+      audioPose[4] = -m[9];
+      audioPose[5] = -m[10];
+      audioPose[6] = m[4];
+      audioPose[7] = m[5];
+      audioPose[8] = m[6];
+      gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
+      audio.update(audioPose);
+      timings.end(SLOT.audio);
       occluder.update(handList);
-      dots.update(handList, rigPlaced ? candleView.flamePosition : null);
+      timings.begin(SLOT.handVisual);
+      handVisual.object.visible = !passthrough;
+      handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
+      timings.end(SLOT.handVisual);
+      if (dots.mesh.visible) dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       timings.begin(SLOT.lab);
       lab?.frame();
       timings.end(SLOT.lab);
@@ -441,7 +490,10 @@ async function start(): Promise<void> {
         sharpen,
         lanternLight,
         candleView,
+        audio,
+        gameAudio,
         dots,
+        handVisual,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
       },

@@ -14,7 +14,7 @@ Pure code               src/engine/hands, src/engine/sim, src/engine/stage, src/
                         (plain TypeScript; no IWSDK, three.js or browser globals)
 ```
 
-- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session, the emulator and possibly spatial audio, and nothing else (v1 is a virtual room, so no scene understanding, planes or anchors). Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
+- **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session and the emulator, and nothing else: v1 is a virtual room, so no scene understanding, planes or anchors, and sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)); IWSDK's own audio system is still registered and makes its own audio context, so the page has two. Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
 - **Engine-facing code** talks to IWSDK, three.js, WebXR and the DOM. It turns the outside world into plain data, and plain data into things on screen.
 - **Pure code** holds the logic: hand maths and the classifier, the simulation, stage geometry and gameplay. It's unit-tested in Node and can't see the engine, which ESLint enforces. This is also why the plain three.js fallback stays cheap ([ADR 0002](adr/0002-plain-threejs-fallback.md)).
 
@@ -59,7 +59,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
 | `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
-| `src/engine/services` | B | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets, audio |
+| `src/engine/services` | B | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
 | `src/ui` | B | No | Onboarding, lantern flow, placement, chapter flow, settings |
 | `src/debug` | B | No | Diagnostics report, anchor probe, profiler, Copy report panel |
 
@@ -75,11 +75,12 @@ At 72 fps a frame has **13.9 ms**. Judges require at least 60 fps (16.7 ms), so 
 | Read hands, capabilities | Anson | 0.4 ms |
 | Features, classifier, gestures | Anson | 0.7 ms |
 | Shadow projection and capsules | Anson | 0.9 ms |
+| Hand visual | Anson | 0.2 ms |
 | Simulation and gameplay (all fixed steps in the frame) | A | 2.0 ms |
 | Stage renderer and animation | B | 2.3 ms |
 | Services (audio, saves, asset streaming) | B | 0.5 ms |
 | Diagnostics and profiler | B | 0.3 ms |
-| **Headroom** | | **2.8 ms** |
+| **Headroom** | | **2.6 ms** |
 | **Total** | | **13.9 ms** |
 
 These are starting estimates. Desktop measurements so far: our whole frame was about 0.06 ms, and 500 instanced quads about 0.08 ms. Expect a headset to be 3–5× slower. Teammate B's profiler (`src/debug`) will measure each module against this table on the Pico, and the table should be updated from real numbers.
@@ -103,7 +104,7 @@ The game runs in an `immersive-vr` session, seated (`local-floor`), and, beyond 
 |---|---|---|
 | The room | A small scene: table, lantern, the paper wall, a shelf for the creature gallery, lit by the lantern. Opaque geometry; scenery near the shadows stays light and low-contrast | B |
 | The stage | The paper wall is a known `StagePlane` (position, size, orientation fixed when the room is built). No plane detection and no fallback. The shadow renderer lifts the shadow 2 mm off the wall as before | A (frame), B (look) |
-| The hands | The player cannot see their real hands, so `HandVisual` (`engine/xr`, to build) draws one simple hand model per tracked hand from the 25 joints, and fades it out when tracking is lost. The shadow comes from the joints, not from the model | Anson (rig and mapping), B (art) |
+| The hands | The player cannot see their real hands, so `HandVisual` (`engine/xr/hand-visual.ts`) draws them from the 25 joints. `CapsuleHandVisual` is the first look: a flat dark glove from the shadow's own capsule pairs (`CAPSULE_JOINTS`), 2 instanced draw calls, about 0.01 ms a frame on a desktop, and under 64 bytes a frame in its allocation test. It draws after the paper and before the shadow without writing depth, so the shadow always draws over a hand that overlaps it. Each hand fades in over 0.15 s and out over 0.4 s when tracking is lost or the game is paused, drawn from its last fully tracked pose (the reader leaves stale joints in a partly tracked hand), (`hand-fade.ts`; an ordered dither, not blending, so overlapping joints do not show as blobs), and warms near the flame like the debug dots do (`candle-tint.ts`). It hides itself when the session's blend mode is not opaque (passthrough), whatever `?occlude` says. Known limit: it writes no depth, so the candle's flame shows through a hand held in front of it. A different look (a model, a paper-cut glove) implements `HandVisual` and replaces the one line in `main.ts` that makes it; the shadow comes from the joints, never from the model. The joint dots are a debug view: `?debug=joints` | Anson (rig and mapping), B (art) |
 | No-hands cue | `HandsStatus` (`engine/xr/hands-status.ts`) turns the hand reader's output into `tracking`, `lost` or `unavailable`. With no tracked hand for 3 s, or no hand input source at all for 5 s (hand tracking off, controllers held, a browser that does not pass joints), a panel in front of the wearer says "Show me your hands" (`PromptPanel`, a second instance) and goes away the moment a hand is tracked. A frame step is counted up to 0.1 s, so the first frame after the headset was off does not read as a long dropout. This assumes a runtime keeps a hand's input source while the hand is out of view; if one drops it, a player resting their hands for 5 s would see the unavailable text. Check on a Pico by dropping the hands out of view and looking for `-(…:hand)` in `xrInput.readerEvents` in the diagnostics report. The thresholds and the two short texts are constants at the top of the file | Anson (signal), B (text) |
 | Pause | `SessionVisibility` (`engine/xr/session-visibility.ts`) follows `session.visibilityState` (IWSDK also keeps `world.visibilityState`; this copy is Node-testable and survives the plain three.js fallback). `paused` is true for `hidden` and `visible-blurred` (the system menu has focus and no hand data arrives); `subscribe(fn)` is called on each change, for saves. The driver system skips hand reading, classification and `sim.advance` while `paused`, so nothing runs ahead of a game that is not being played. A reads `paused` (or subscribes); the sim loop itself has no pause switch | Anson (signal), A, B |
 
@@ -117,7 +118,7 @@ The stage and shadows are drawn into the same frame as the room camera image (`i
 |---|---|
 | The frame clears to transparent black and the scene has no background | IWSDK sets this itself in an AR session (the report's `render.clearAlpha` shows it); three clears to transparent in an `alpha-blend` session anyway |
 | Stage materials are `transparent`, `premultipliedAlpha: false` and `toneMapped: false` | Blending `src-alpha` over a transparent clear stores premultiplied colour, which is what the compositor expects. Black stays black whatever tone mapping a scene environment adds |
-| Draw order: hand occluder -1, paper 1, shadow 2, debug and stage sprites 3, joint dots 4 | Opaque things draw first, then the transparent paper and shadow, then overlays |
+| Draw order: hand occluder -1, paper 1, hand visual 1.5, shadow 2, debug and stage sprites 3, joint dots 4 (debug only) | Opaque things draw first, then the transparent paper and shadow, then overlays |
 | `HandOccluder` draws each hand into the depth buffer only (no colour) | The paper and shadow cover the camera image, so without it a real hand held in front of the stage would be hidden behind them. Fragments behind the occluder fail the depth test and the camera image shows through. On whenever the session is passthrough, off in VR; `?occlude=0` turns it off to compare |
 | Any colour shader we add includes `colorspace_fragment` | The XR target is sRGB. Only black-only shaders (the shadow) may skip it |
 
