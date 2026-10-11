@@ -43,6 +43,8 @@ From 5 Oct our entry is a virtual room (see [ADR 0005](adr/0005-virtual-room.md)
 ## Requirements that shape the game
 
 - **Hands-first:** "fully usable with hands, end-to-end"; a controller is optional. The test is whether someone can finish the whole experience without pairing a controller.
+- **Seated and stationary (a guideline, not a rule):** Meta's [announcement](https://developers.meta.com/blog/meta-connect-2026-vr-start-developer-competition/) (read 10 Oct 2026) suggests the experience be "seated-optimized" and "designed for seated, stationary use; limit roomscale and avoid large physical movement". Breaking it does not disqualify an entry, but judges will expect it: keep play in front of the player, within an easy head turn, and never ask them to stand, walk or turn around. Some news articles call this a requirement; Meta's own wording says "suggested". **Unconfirmed** whether the Devpost Rules make it binding.
+- **Short sessions (a guideline):** the same announcement suggests a "fast cold start, clean pause/resume and something satisfying in 10 minutes or less". Our 5–8 minute chapter fits.
 - Do not require a third-party device (the judges all use Meta VR devices).
 - **Original:** the entry must be the entrant's own, or public domain, or provided by Meta. Third-party tools, code and assets are allowed only if you are authorised by their licence. **Unconfirmed** how strictly "original" is read for licensed free art: use CC0 where possible, record every asset in `CREDITS.md`, and ask before relying on anything else.
 - Follow Meta's developer policies, Community Standards and content guidelines (age rating 10+, 13+ or 18+).
