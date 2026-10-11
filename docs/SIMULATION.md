@@ -70,6 +70,27 @@ The problem:
 
 Hand *shadows* (`HandShadow`) need no latch. They describe the hand's current state, not a one-off event, and every step in a frame sees the same, latest shadow.
 
+## Stage frame: `src/engine/stage/stage-frame.ts`
+
+`StageFrame` is the 2D coordinate system the game lives in, laid on the paper wall of the virtual room ([ADR 0005](adr/0005-virtual-room.md)).
+
+- **Spaces.**
+  - The origin is the wall's centre.
+  - Stage +x runs along `right`, and stage +y along `up` the wall, so gravity is -y.
+  - `normal` points out of the wall, toward the player and the lantern.
+  - The basis is orthonormal and right-handed (`right × up = normal`), with the same axes as the stand-in `placeTestRig('wall', ...)`.
+- **Placing it.**
+  - `placeInFront(head, yaw)` places the wall once when the room is built. It sits `WALL_DISTANCE_M` (2 m) ahead and `WALL_CENTRE_BELOW_EYES_M` (0.2 m) below the eyes, upright, at `WALL_WIDTH_M × WALL_HEIGHT_M` (1.6 × 1.0 m). These are constants to tune in the headset.
+  - `setWall(centre, normal, upHint, w, h)` takes any plane. It is there for a possible real-surface mode later.
+  - Every change bumps `version`.
+- **Converting.**
+  - `toStage(x, y, z, out)` projects a scene point straight onto the wall. It returns the point's distance in front of the wall.
+  - `toScene(sx, sy, out, offset)` goes the other way, `offset` metres in front of the paper.
+  - `contains(sx, sy, margin)` tests whether a stage point is on the wall.
+  - None of these allocate.
+- **With the shadow projector.** `StageFrame` has exactly the fields of `StagePlane`/`MutableStagePlane` in `src/engine/shadow/pure/stage-plane.ts`, so it can be passed straight to the projector in place of the test rig's plane. Pure code may not import `shadow/`, so the match is structural. It was checked with a one-off typecheck, and `main.ts`'s typecheck enforces it once it uses a `StageFrame`.
+- **Dropped by ADR 0005:** choosing a table or wall, snapping to detected planes, and a placement fallback.
+
 ## Entity store, layouts, 2D maths
 
 These already exist; see the header comments in `entity-store.ts`, `entity-kinds.ts`, `scene-layout.ts` and `vec2.ts`, and [ADR 0006](adr/0006-editor-authored-layouts.md) for how layouts are authored.
