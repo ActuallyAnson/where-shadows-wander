@@ -21,6 +21,7 @@ import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
+import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
 import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
@@ -165,7 +166,14 @@ async function start(): Promise<void> {
   const sim = new FixedStepLoop(SIM_HZ, () => {
     // Game simulation steps go here (week 2+).
   });
+  // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
+  // mock mode; over passthrough the real hands are visible, so it hides itself.
+  const handVisual: HandVisual = new CapsuleHandVisual();
+  let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
+  world.scene.add(handVisual.object);
+  // The joint dots are a debug view: ?debug=joints.
   const dots = new JointDots();
+  dots.mesh.visible = params.get('debug') === 'joints';
   world.scene.add(dots.mesh);
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
   // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
@@ -238,6 +246,7 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     if (session) {
       occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
+      passthrough = session.environmentBlendMode !== undefined && session.environmentBlendMode !== 'opaque';
       const clear = clearFor(session.environmentBlendMode, xrMode);
       world.scene.background = clear.background === null ? null : new Color(clear.background);
       world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
@@ -254,6 +263,7 @@ async function start(): Promise<void> {
     world.scene.background = null;
     world.renderer.setClearColor(0x000000, 0);
     occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
+    passthrough = false;
     if (!mock) {
       rigCalibratedFromHead = false;
       placeRig([0, 1.2, 0], 0);
@@ -395,7 +405,11 @@ async function start(): Promise<void> {
       candleView.update(lanternLight.light, cameraQuat);
       lab?.applyLight(lanternLight.light, cameraQuat);
       occluder.update(handList);
-      dots.update(handList, rigPlaced ? candleView.flamePosition : null);
+      timings.begin(SLOT.handVisual);
+      handVisual.object.visible = !passthrough;
+      handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
+      timings.end(SLOT.handVisual);
+      if (dots.mesh.visible) dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       timings.begin(SLOT.lab);
       lab?.frame();
       timings.end(SLOT.lab);
@@ -428,6 +442,7 @@ async function start(): Promise<void> {
         lanternLight,
         candleView,
         dots,
+        handVisual,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
       },

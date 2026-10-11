@@ -38,6 +38,7 @@ for (const occlude of ['1', '0']) {
   const r = await page.evaluate(() => {
     const w = window.__wsw;
     w.dots.mesh.visible = false; // the debug joint dots draw over everything
+    w.handVisual.object.visible = false; // the glove draws over the paper, which this probe reads bare
     const s = w.stage;
     const at = (x, y) => [0, 1, 2].map((i) => s.origin[i] + s.right[i] * x + s.up[i] * y);
     const sh = w.projector.shadows.right;

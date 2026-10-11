@@ -4,7 +4,7 @@
 // performance.now() on pages without cross-origin isolation (GitHub Pages), so
 // read single frames as rough and the averages as the number to trust.
 
-export const SLOT = { read: 0, classify: 1, gestures: 2, shadow: 3, lab: 4, total: 5 } as const;
+export const SLOT = { read: 0, classify: 1, gestures: 2, shadow: 3, handVisual: 4, lab: 5, total: 6 } as const;
 const NAMES = Object.keys(SLOT) as (keyof typeof SLOT)[];
 const COUNT = NAMES.length;
 

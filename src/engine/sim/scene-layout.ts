@@ -11,7 +11,8 @@
 //              flags `isStatic`, `isSensor` and `hidden`.
 //   Visible    a node switched off in the editor is skipped, and so is everything under it.
 //
-// Nodes with any other asset, or none (the room, groups, lights), are left alone. Groups may nest and their
+// Nodes with any other asset, or none (the room, groups, lights), are left alone. A prefab instance or pattern
+// is not expanded and is reported in `problems`, so a piece placed that way is never silently missing. Groups may nest and their
 // translations add up; a parent's rotation or scale is not applied (the loader says so in `problems`).
 //
 // Plain TypeScript: reads untrusted JSON as `unknown`, imports nothing from IWSDK or three.js, and builds
@@ -134,6 +135,12 @@ function visit(raw: unknown, px: number, py: number, collecting: boolean, walk: 
     const asset = content && content.type === 'asset' && typeof content.asset === 'string' ? content.asset : '';
     if (asset.startsWith(PIECE_PREFIX)) readPiece(id, asset.slice(PIECE_PREFIX.length), x, y, raw, out);
     else if (asset.startsWith(MARKER_PREFIX)) readMarker(id, asset.slice(MARKER_PREFIX.length), x, y, raw, out);
+    // The editor draws prefab instances and patterns (a row of copies), but this loader does not expand them.
+    // Say so instead of letting the pieces inside them silently never spawn.
+    else if (content && (content.type === 'instance' || content.type === 'pattern'))
+      out.problems.push(
+        `${id}: ${content.type === 'instance' ? 'an instance' : 'a pattern'} (a prefab) is not read; place pieces and markers as plain nodes`,
+      );
   }
   if (Array.isArray(raw.children)) {
     const foundBefore = walk.found;

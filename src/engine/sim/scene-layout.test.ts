@@ -85,6 +85,35 @@ describe('parseLayout', () => {
     expect(l.markers).toEqual([]);
   });
 
+  it('reports a prefab instance or pattern instead of silently dropping the pieces in it', () => {
+    const instance = {
+      id: 'one',
+      content: { type: 'instance', prefab: 'rock-prop' },
+      transform: { position: [1, 0, 0] },
+    };
+    const pattern = {
+      id: 'row',
+      content: { type: 'pattern', prefab: 'rock-prop', distribution: { type: 'linear', count: 4, step: [0.5, 0, 0] } },
+    };
+    const l = parseLayout(doc(node('r', 'piece-rock', [0, 0, 0], 0.08), instance, pattern));
+    expect(l.entities.map((e) => e.id)).toEqual(['r']);
+    expect(l.problems).toEqual([
+      'one: an instance (a prefab) is not read; place pieces and markers as plain nodes',
+      'row: a pattern (a prefab) is not read; place pieces and markers as plain nodes',
+    ]);
+  });
+
+  it('only reports a prefab inside the puzzle it was asked to read', () => {
+    const group = (id: string, ...children: unknown[]) => ({ id, content: { type: 'group' }, children });
+    const pattern = {
+      id: 'row',
+      content: { type: 'pattern', prefab: 'p', distribution: { type: 'linear', count: 2, step: [1, 0, 0] } },
+    };
+    const d = doc(group('puzzle-1', node('a', 'piece-rock')), group('puzzle-2', pattern));
+    expect(parseLayout(d, 'puzzle-1').problems).toEqual([]);
+    expect(parseLayout(d, 'puzzle-2').problems).toHaveLength(1);
+  });
+
   it('adds up the translations of nested groups', () => {
     const l = parseLayout(
       doc({
