@@ -1,0 +1,91 @@
+// The game's sounds as data: which bus each plays on, how loud, how it carries, and how often it may repeat.
+// The files come later from the team; until then placeholder-sounds.ts makes each one in code. Plain TypeScript.
+import type { ShapeEventType } from '../../hands/shape-events';
+import { Bus, type BusId } from './mixer';
+
+export const Sound = { Rustle: 0, Thump: 1, Chime: 2, Crackle: 3 } as const;
+export type SoundId = (typeof Sound)[keyof typeof Sound];
+export const SOUND_COUNT = 4;
+
+export interface SoundDef {
+  /** Also the asset id a real file will have in the manifest (src/assets/audio/sfx/<name>.ogg). */
+  readonly name: string;
+  readonly bus: BusId;
+  /** Linear gain on top of the bus. */
+  readonly gain: number;
+  readonly loop: boolean;
+  /** Higher wins when every voice is busy. */
+  readonly priority: number;
+  /** Shortest time between two plays, seconds, so a flickering shape does not machine-gun. */
+  readonly minGapS: number;
+  /** Panner distance model: full volume inside `refDistance` metres, rolling off to `maxDistance`. */
+  readonly refDistance: number;
+  readonly maxDistance: number;
+}
+
+export const SOUND_DEFS: readonly SoundDef[] = [
+  {
+    name: 'rustle',
+    bus: Bus.Effects,
+    gain: 0.5,
+    loop: false,
+    priority: 1,
+    minGapS: 0.25,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'thump',
+    bus: Bus.Effects,
+    gain: 0.9,
+    loop: false,
+    priority: 2,
+    minGapS: 0.15,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'chime',
+    bus: Bus.Effects,
+    gain: 0.8,
+    loop: false,
+    priority: 3,
+    minGapS: 0.5,
+    refDistance: 1,
+    maxDistance: 10,
+  },
+  {
+    name: 'crackle',
+    bus: Bus.Ambience,
+    gain: 0.35,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    refDistance: 0.3,
+    maxDistance: 4,
+  },
+];
+
+/** The sound a shape event makes, or null for none: a paper rustle when recognised, a thump when it commits. */
+export function soundForShapeEvent(type: ShapeEventType): SoundId | null {
+  if (type === 'candidate') return Sound.Rustle;
+  if (type === 'commit') return Sound.Thump;
+  return null;
+}
+
+/** Who made a sound, for the gap between plays: each hand has its own, so two hands acting together both sound. */
+export const KEY_COUNT = 2;
+
+/** When each sound last played for each key, to enforce `minGapS`. No allocation. */
+export class Cooldowns {
+  private readonly last = new Float64Array(SOUND_COUNT * KEY_COUNT).fill(-Infinity);
+
+  /** True if `id` for `key` (0 or 1) may play at `now` (seconds). Does not start the gap: call `mark` once it plays. */
+  ready(id: SoundId, key: number, now: number): boolean {
+    return now - this.last[id * KEY_COUNT + key] >= SOUND_DEFS[id].minGapS;
+  }
+
+  mark(id: SoundId, key: number, now: number): void {
+    this.last[id * KEY_COUNT + key] = now;
+  }
+}
