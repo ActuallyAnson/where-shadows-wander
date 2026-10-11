@@ -14,18 +14,15 @@ import {
   Group,
   InstancedBufferAttribute,
   InstancedMesh,
-  Matrix4,
   MeshBasicMaterial,
-  Quaternion,
   SphereGeometry,
-  Vector3,
   type BufferGeometry,
   type Object3D,
 } from '@iwsdk/core';
 import { JOINT_COUNT, type HandFrame } from '../hands/hand';
 import { CAPSULE_JOINTS } from '../shadow/pure/shadow-projector';
-import { litAmount } from './candle-tint';
-import { stepFade } from './hand-fade';
+import { LIT_RADIUS_M } from './candle-tint';
+import { FADE_IN_S, FADE_OUT_S } from './hand-fade';
 
 export interface HandVisual {
   /** Add this to the scene. */
@@ -42,7 +39,14 @@ export interface HandVisual {
 export const HAND_RENDER_ORDER = 1.5;
 const BONES = CAPSULE_JOINTS.length / 2;
 const MIN_RADIUS_M = 0.006;
-const UP = new Vector3(0, 1, 0);
+/** How far toward the warm colour a joint at the flame goes (the dots use the same 0.85-ish blend). */
+const LIT_MIX = 0.85;
+
+/** A colour as the linear red, green and blue the renderer mixes in (worked out once, not per frame). */
+function rgb(hex: number): [number, number, number] {
+  const c = new Color(hex);
+  return [c.r, c.g, c.b];
+}
 
 // The fade is a 4 x 4 ordered dither (fragments are kept or discarded, never blended), because blending
 // would show every joint sphere and bone overlap as a darker blob while a hand fades.
@@ -74,16 +78,9 @@ export class CapsuleHandVisual implements HandVisual {
   private readonly seen = new Uint8Array(2);
   private readonly lastPositions = [new Float32Array(JOINT_COUNT * 3), new Float32Array(JOINT_COUNT * 3)];
   private readonly lastRadii = [new Float32Array(JOINT_COUNT), new Float32Array(JOINT_COUNT)];
-  private readonly base = new Color(0x2b2733);
-  private readonly lit = new Color(0xb8793a);
-  private readonly tint = new Color();
-  private readonly m = new Matrix4();
-  private readonly q = new Quaternion();
-  private readonly a = new Vector3();
-  private readonly b = new Vector3();
-  private readonly d = new Vector3();
-  private readonly mid = new Vector3();
-  private readonly scale = new Vector3();
+  // The glove's colour and the colour it warms toward, as rgb in typed arrays (plain numbers, no Color objects, so update allocates nothing).
+  private readonly baseRgb = Float64Array.from(rgb(0x2b2733));
+  private readonly litRgb = Float64Array.from(rgb(0xb8793a));
 
   constructor() {
     const material = new MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false });
@@ -112,7 +109,7 @@ export class CapsuleHandVisual implements HandVisual {
       mesh.frustumCulled = false;
       mesh.renderOrder = HAND_RENDER_ORDER;
       mesh.count = 0;
-      mesh.setColorAt(0, this.base); // makes the colour buffer now, not on the first frame
+      mesh.setColorAt(0, new Color(0x2b2733)); // makes the colour buffer now, not on the first frame
       this.object.add(mesh);
     }
   }
@@ -124,10 +121,19 @@ export class CapsuleHandVisual implements HandVisual {
   }
 
   update(hands: readonly HandFrame[], dt: number, flame?: ArrayLike<number> | null, shown = true): void {
+    // Everything below is plain arithmetic on local numbers written straight into the typed arrays. Calling a
+    // helper with several decimal arguments allocates on some JavaScript engines (the Node version CI pins did,
+    // about 5 KB a frame), so the matrices, colours, fade and flame tint are all worked out here.
     const hasFlame = flame !== null && flame !== undefined;
     const fx = hasFlame ? flame[0] : 0;
     const fy = hasFlame ? flame[1] : 0;
     const fz = hasFlame ? flame[2] : 0;
+    const jm = this.joints.instanceMatrix.array as Float32Array;
+    const bm = this.bones.instanceMatrix.array as Float32Array;
+    const jc = (this.joints.instanceColor as InstancedBufferAttribute).array as Float32Array;
+    const bc = (this.bones.instanceColor as InstancedBufferAttribute).array as Float32Array;
+    const base = this.baseRgb;
+    const lit = this.litRgb;
     let nj = 0;
     let nb = 0;
     for (const hand of hands) {
@@ -137,7 +143,10 @@ export class CapsuleHandVisual implements HandVisual {
         this.lastRadii[side].set(hand.radii);
         this.seen[side] = 1;
       }
-      const fade = (this.fade[side] = stepFade(this.fade[side], hand.tracked && shown, dt));
+      // Quick in, slower out (see hand-fade.ts), and out while the game is paused.
+      const was = this.fade[side];
+      const fade = hand.tracked && shown ? Math.min(1, was + dt / FADE_IN_S) : Math.max(0, was - dt / FADE_OUT_S);
+      this.fade[side] = fade;
       // A lost or paused hand fades out where it was last fully tracked; one never seen draws nothing.
       if (fade <= 0 || this.seen[side] === 0) continue;
       const p = this.lastPositions[side];
@@ -146,27 +155,110 @@ export class CapsuleHandVisual implements HandVisual {
         const x = p[j * 3];
         const y = p[j * 3 + 1];
         const z = p[j * 3 + 2];
-        const s = Math.max(r[j] || 0, MIN_RADIUS_M);
-        this.paint(this.joints, nj, hasFlame ? litAmount(x, y, z, fx, fy, fz) : 0);
-        this.m.makeScale(s, s, s).setPosition(x, y, z);
-        this.joints.setMatrixAt(nj, this.m);
+        const rj = r[j];
+        const s = rj > MIN_RADIUS_M ? rj : MIN_RADIUS_M; // also catches a missing radius (NaN)
+        const o = nj * 16;
+        jm[o] = s;
+        jm[o + 1] = 0;
+        jm[o + 2] = 0;
+        jm[o + 3] = 0;
+        jm[o + 4] = 0;
+        jm[o + 5] = s;
+        jm[o + 6] = 0;
+        jm[o + 7] = 0;
+        jm[o + 8] = 0;
+        jm[o + 9] = 0;
+        jm[o + 10] = s;
+        jm[o + 11] = 0;
+        jm[o + 12] = x;
+        jm[o + 13] = y;
+        jm[o + 14] = z;
+        jm[o + 15] = 1;
+        // Warmed toward candlelight by how close the joint is to the flame (the same tint as candle-tint.ts).
+        const dx = x - fx;
+        const dy = y - fy;
+        const dz = z - fz;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const t = hasFlame && d < LIT_RADIUS_M ? (1 - d / LIT_RADIUS_M) * LIT_MIX : 0;
+        jc[nj * 3] = base[0] + (lit[0] - base[0]) * t;
+        jc[nj * 3 + 1] = base[1] + (lit[1] - base[1]) * t;
+        jc[nj * 3 + 2] = base[2] + (lit[2] - base[2]) * t;
         this.jointFade[nj++] = fade;
       }
       for (let k = 0; k < BONES; k++) {
-        const i = CAPSULE_JOINTS[k * 2];
-        const j = CAPSULE_JOINTS[k * 2 + 1];
-        this.a.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
-        this.b.set(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
-        this.d.subVectors(this.b, this.a);
-        const len = this.d.length();
+        const i = CAPSULE_JOINTS[k * 2] * 3;
+        const j = CAPSULE_JOINTS[k * 2 + 1] * 3;
+        const ax = p[i];
+        const ay = p[i + 1];
+        const az = p[i + 2];
+        const dx = p[j] - ax;
+        const dy = p[j + 1] - ay;
+        const dz = p[j + 2] - az;
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (len < 1e-6) continue;
-        this.q.setFromUnitVectors(UP, this.d.multiplyScalar(1 / len));
-        this.mid.addVectors(this.a, this.b).multiplyScalar(0.5);
-        const s = Math.max(Math.min(r[i], r[j]) || 0, MIN_RADIUS_M);
-        this.scale.set(s, len, s);
-        this.m.compose(this.mid, this.q, this.scale);
-        this.paint(this.bones, nb, hasFlame ? litAmount(this.mid.x, this.mid.y, this.mid.z, fx, fy, fz) : 0);
-        this.bones.setMatrixAt(nb, this.m);
+        // The rotation taking +Y to the bone's direction, as a quaternion (qx, qy, qz, qw), then the matrix
+        // for rotation, scale (radius, length, radius) and the bone's midpoint, as three.js's compose does.
+        const nx = dx / len;
+        const ny = dy / len;
+        const nz = dz / len;
+        let qx = nz;
+        let qy = 0;
+        let qz = -nx;
+        let qw = 1 + ny;
+        if (qw < 1e-6) {
+          qx = 1; // pointing straight down: a half turn about X
+          qz = 0;
+          qw = 0;
+        }
+        const ql = Math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
+        qx /= ql;
+        qy /= ql;
+        qz /= ql;
+        qw /= ql;
+        const r0 = r[i / 3];
+        const r1 = r[j / 3];
+        const rm = r0 < r1 ? r0 : r1;
+        const s = rm > MIN_RADIUS_M ? rm : MIN_RADIUS_M;
+        const x2 = qx + qx;
+        const y2 = qy + qy;
+        const z2 = qz + qz;
+        const xx = qx * x2;
+        const xy = qx * y2;
+        const xz = qx * z2;
+        const yy = qy * y2;
+        const yz = qy * z2;
+        const zz = qz * z2;
+        const wx = qw * x2;
+        const wy = qw * y2;
+        const wz = qw * z2;
+        const o = nb * 16;
+        bm[o] = (1 - (yy + zz)) * s;
+        bm[o + 1] = (xy + wz) * s;
+        bm[o + 2] = (xz - wy) * s;
+        bm[o + 3] = 0;
+        bm[o + 4] = (xy - wz) * len;
+        bm[o + 5] = (1 - (xx + zz)) * len;
+        bm[o + 6] = (yz + wx) * len;
+        bm[o + 7] = 0;
+        bm[o + 8] = (xz + wy) * s;
+        bm[o + 9] = (yz - wx) * s;
+        bm[o + 10] = (1 - (xx + yy)) * s;
+        bm[o + 11] = 0;
+        const mx = ax + dx * 0.5;
+        const my = ay + dy * 0.5;
+        const mz = az + dz * 0.5;
+        bm[o + 12] = mx;
+        bm[o + 13] = my;
+        bm[o + 14] = mz;
+        bm[o + 15] = 1;
+        const ex = mx - fx;
+        const ey = my - fy;
+        const ez = mz - fz;
+        const e = Math.sqrt(ex * ex + ey * ey + ez * ez);
+        const tb = hasFlame && e < LIT_RADIUS_M ? (1 - e / LIT_RADIUS_M) * LIT_MIX : 0;
+        bc[nb * 3] = base[0] + (lit[0] - base[0]) * tb;
+        bc[nb * 3 + 1] = base[1] + (lit[1] - base[1]) * tb;
+        bc[nb * 3 + 2] = base[2] + (lit[2] - base[2]) * tb;
         this.boneFade[nb++] = fade;
       }
     }
@@ -176,13 +268,8 @@ export class CapsuleHandVisual implements HandVisual {
     this.bones.instanceMatrix.needsUpdate = true;
     this.jointFadeAttr.needsUpdate = true;
     this.boneFadeAttr.needsUpdate = true;
-    if (this.joints.instanceColor) this.joints.instanceColor.needsUpdate = true;
-    if (this.bones.instanceColor) this.bones.instanceColor.needsUpdate = true;
-  }
-
-  /** Warms an instance's colour toward candlelight by `lit` (0 to 1). */
-  private paint(mesh: InstancedMesh, index: number, lit: number): void {
-    mesh.setColorAt(index, lit > 0 ? this.tint.copy(this.base).lerp(this.lit, lit * 0.85) : this.base);
+    this.joints.instanceColor!.needsUpdate = true;
+    this.bones.instanceColor!.needsUpdate = true;
   }
 
   dispose(): void {
