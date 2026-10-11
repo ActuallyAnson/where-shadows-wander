@@ -172,6 +172,23 @@ Everything the game needs is set with the inspector's own fields, so you never e
 | **Add Component, `Piece`** (optional) | Starting speed `vx`, `vy` and the flags `isStatic`, `isSensor`, `hidden` |
 | **Visible** off | The node, and everything under it, is left out |
 
+### What the editor offers, and what it does not
+
+Checked on 11 Oct 2026 by driving a running editor (reading its panels, opening files, selecting nodes, `scene render-stats` and a screenshot), not from memory. The editor is IWSDK 1.0.0's.
+
+| Part | What is there |
+|---|---|
+| Toolbar | Move, Rotate and Scale, Snap, Local and World space, Undo and Redo, a Runtime and Editor switch |
+| Panels | Scene Graph (with Add Entity), Inspector, and at the bottom Assets, Console and Validation |
+| Inspector | Node name, Asset (a dropdown of the manifest), Visible, Position, Rotation and Scale with a reset for each, and Components |
+| Built-in nodes | Player Space, Camera, Head, the two target rays and the two grips, and Level Root, which a scene node can be placed under |
+| Add Component (37 built in) | AmbientLight, DirectionalLight, HemisphereLight, PointLight, RectAreaLight, SpotLight, IBLGradient, IBLTexture, DomeGradient, DomeTexture, AudioSource, CameraSource, PhysicsBody, PhysicsShape, PhysicsManipulation, OneHandGrabbable, TwoHandsGrabbable, DistanceGrabbable, PokeInteractable, RayInteractable, ScreenSpace, Follower, LocomotionEnvironment, EnvironmentRaycastTarget, DepthOccludable, LevelRoot, LevelTag, XRAnchor, XRMesh, XRPlane, XRCylinderLayer, XRQuadLayer, and runtime-state tags (Grabbed, Handle, Hovered, Pressed, XRLayerState); **plus our own `Piece`** |
+| Prefabs, instances, patterns | The scene file format has them (`resources.prefabs`, an `instance` node, and a `pattern` node that repeats a prefab in a line, grid, circle, along a path, scattered, or at listed transforms), and the editor **draws them**: a file with one instance and a linear pattern of four showed five rocks, with no validation problems. **The editor has no controls for making them**: a pattern or instance node shows the same Inspector as any other node, with no count, step or prefab field. They can only be written into the file by hand |
+| Not found | Animation clips or a timeline, particles, materials or shaders, scripts, a mixer, a profiler, play controls, terrain, light baking |
+| Scene settings | The file format has fog, tone mapping, exposure and shadow type (`environment`); no control for them was seen in the editor |
+
+Not checked by hand: dragging nodes in the Scene Graph, how Snap behaves, copy and paste or duplicate, selecting several nodes, editing a built-in node, saving a prefab, and how the Runtime tab looks with hands. **Our loader (`parseLayout`) reads only plain `asset` nodes. It does not expand an `instance` or `pattern` node; it lists it in `problems` (and the scene-file test fails on it)**, so place pieces and markers as plain nodes.
+
 Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one with `parseLayout(doc, 'puzzle-1')` and `spawnLayout` (nothing calls them yet; Teammate A's puzzle code will). The editor's scene-graph hide is preview-only and is not saved; use the inspector's **Visible** toggle to leave a node out. Groups can nest and their positions add up; rotation and scale on a parent are ignored and reported. `npm test` checks every scene file against IWSDK's validator and our loader.
 
 ## Troubleshooting
@@ -181,12 +198,12 @@ Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one wi
 | "Your connection is not private" | Expected with the dev server. Click **Advanced → Proceed**. |
 | Port 8081 already in use | `npm run dev:down`, then `npm run dev` again. |
 | No **Enter XR** button in desktop Chrome | Use the dev server (`npm run dev`), which adds the emulator. The hosted build only offers XR on a headset. |
-| No hand dots in the emulator | Switch the emulator's input to **Hands**. |
-| No hand dots on a headset | Turn on hand tracking in the headset settings, and put the controllers down. |
+| No hands in the emulator | Switch the emulator's input to **Hands**. |
+| No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. Add `?debug=joints` to see a dot on every tracked joint. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
 | No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always adds its own **Enter VR** buttons (and **Enter AR** when the browser supports it) at the bottom centre, so use those. If you don't see them, update to the latest `main`. |
-| On the Pico, hands show as a pointer and a click but no joint dots ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the launcher's **Enter VR** button), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
+| On the Pico, hands show as a pointer and a click but no hands drawn ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the launcher's **Enter VR** button), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
 | Hand Lab opens as the plain game | The address lost `?mock=1` (the window `npm run dev` opens drops it on reload). Use a normal Chrome tab. |
@@ -194,12 +211,27 @@ Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one wi
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |
 
+## 13. Add models, textures and sounds
+
+Put the file in `src/assets` and it is in the game ([ADR 0009](adr/0009-asset-pipeline.md)); there is no list to edit. The first folder under `src/assets` sets how it loads:
+
+| Folder | Loads | Use for |
+|---|---|---|
+| `src/assets/critical/` | Before the world starts (the page waits, and a missing file leaves a blank page) | Almost nothing. Keep it empty or tiny, all of it under 1 MB. Prefer loading the paper's texture later with the loader and drawing the procedural paper until then |
+| `src/assets/audio/` (`sfx/`, `music/`) | In the background after the critical files | Sounds. Music goes in a folder named `music` |
+| anywhere else, for example `src/assets/models/` | When first used | Models and textures |
+
+The id is the file name in lower case with hyphens (`Paper Crow.glb` is `paper-crow`). Models must be single-file `.glb`; extensions must be lower case (`npm run check` says so if not). A `.glb` dropped in while `npm run dev` is running appears in the scene editor's **Assets** panel within seconds, ready to add to a scene. In code, `new AssetLoader({ load: iwsdkLoad, fallback })` (`src/engine/services/assets`) gets a lazy or background one by id: it times out after 8 s, tries twice, shares a load between callers, and gives a stand-in rather than failing (it tries again after 10 s, or call `retry(id)`). It is not for critical files, and a loaded model is one shared object, so take copies with `AssetManager.getGLTF(id)`.
+
+**Size limits** (`src/engine/services/assets/budgets.mjs`): a texture 512 KB, a model 500 KB, a sound effect 300 KB, a music file 1.5 MB, the critical files together 1 MB, and the first-load JavaScript 800 KB gzipped. `npm run check` checks the files in the repository and `npm run build` checks the first-load bundle, so an over-budget file turns CI red (it blocks merging only if the repository requires the check), and on `main` it stops the Pages deploy. Use WebP or KTX2 for textures, Ogg or MP3 for sound, and keep textures to 2048 pixels or less: the limits are file sizes, not memory.
+
+**Cold start.** `npm run build`, then `npm run cold-start` loads the build with an empty cache, the CPU four times slower (`-- --cpu 6` for six) and fast 4G, and prints when the first frame's update began (the lantern is already in the scene). It needs Playwright's Chromium (`npx playwright install chromium`) and does not include tapping Enter VR. `-- --budget 5000` makes it fail if the median is later than 5 s. Headless Chromium draws in software and runs vary by a few hundred milliseconds, so use the numbers to compare changes, and confirm the real figure on a headset.
+
 ## 14. Sound
 
 Sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)), in `src/engine/services/audio`. Browsers keep audio locked until the first click, key press or tap, so the first sound after loading waits for that. Starting a VR session and pinching inside one also try to unlock it, but **whether the Pico or Quest browser allows that is not confirmed**: after entering VR, check `__wsw.audio.state` is `running`. The four sounds (paper rustle, thump, chime, flame crackle) are placeholders made in code ([CREDITS.md](../CREDITS.md)).
 
 - **Events.** A recognised shape rustles, a committed shape thumps, both from where that hand's shadow is on the wall; the lit flame crackles from the flame. For a solved puzzle call `gameAudio.puzzleSolved(stage)` (`gameAudio` is on `__wsw` in dev).
 - **Volumes.** `audio.mixer.setMaster(0..1)`, `setVolume(Bus.Music | Bus.Effects | Bus.Ambience, 0..1)`, `setMuted(bus, true)` and `setAllMuted(true)`. In the dev console: `__wsw.audio.mixer.setVolume(1, 0.5)`.
-- **A real sound.** Put the file in `src/assets/audio/sfx/` named after the sound (`rustle`, `thump`, `chime`, `crackle`), decode it, and `audio.setBuffer(Sound.Rustle, buffer)`. Add its licence to `CREDITS.md`.
+- **A real sound.** Put the file in `src/assets/audio/sfx/` named after the sound (`rustle`, `thump`, `chime`, `crackle`): the asset pipeline (section 13) loads it in the background under that id. Handing it to the engine is not automatic yet: once it has loaded, call `audio.setBuffer(Sound.Rustle, AssetManager.getAudio('rustle'))`. Add its licence to `CREDITS.md`.
 - **Check it in a browser.** `npx vite --port 8095 --strictPort`, then `node scripts/audio-probe.mjs https://localhost:8095` checks the unlock, the left and right panning, the buses, the events and the cost with no headset.
-
