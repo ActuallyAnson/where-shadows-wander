@@ -1,6 +1,6 @@
 // The surface shadows land on, as the shadow projector needs it. Teammate A's
-// StageFrame provides this shape (structurally; no import needed). Until it
-// exists, test-rig.ts places one. Plain TypeScript.
+// StageFrame provides this shape (structurally; no import needed) and is what a headset uses;
+// test-rig.ts places a stand-in one for the Hand Lab and tests. Plain TypeScript.
 
 type V3 = Readonly<ArrayLike<number>>;
 

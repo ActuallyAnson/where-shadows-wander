@@ -1,6 +1,6 @@
-// What the stand-in rig looks like (src/engine/shadow/pure/test-rig.ts): a
-// sheet of paper for the stage, with a thin border, and a small flame for the
-// lantern. Teammate B's stage renderer and lantern replace it.
+// What the stage looks like until Teammate B's room and lantern replace it: a sheet of paper on whatever stage
+// it is placed on (the real wall in a headset, the stand-in theatre in the Hand Lab), with a thin border, and a
+// small flame for the Hand Lab's lantern.
 import {
   BufferAttribute,
   BufferGeometry,
@@ -20,6 +20,14 @@ import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 
 const PAPER = new Color(0xf2e6c9);
+
+/**
+ * How much of the paper's own colour it gives off, on top of what the candle's point light gives it. The point light
+ * falls off with distance squared, so the real wall 1.85 m away got about a seventh of the light the 75 cm tabletop
+ * paper did (a dark brown, with the black shadows at about 2:1 contrast instead of 5:1). Close to the candle this
+ * adds little, since the paper is already bright.
+ */
+const PAPER_GLOW = 0.35;
 
 /** The paper draws before the shadows (SHADOW_RENDER_ORDER = 2). */
 const PAPER_RENDER_ORDER = 1;
@@ -93,6 +101,8 @@ export class TestStageView {
     this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.15 + 0.85 * light.intensity)) : 0.04;
     this.paperMaterial.color.copy(PAPER).lerp(this.lit, 0.12).multiplyScalar(brightness);
+    // A glow that follows the same flicker and dimming (and cover-the-flame), so a far wall stays readable.
+    this.paperMaterial.emissive.copy(this.paperMaterial.color).multiplyScalar(PAPER_GLOW);
     this.flame.update(light, cameraQuaternion);
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { distanceToPlane, createStagePlane } from './stage-plane';
-import { MOCK_HEAD, placeTestRig, yawOf } from './test-rig';
+import { MOCK_HEAD, placeLantern, placeTestRig, yawOf } from './test-rig';
 
 describe('test rig', () => {
   it.each(['table', 'wall'] as const)('%s: the stage faces the player, with the lantern between them', (mode) => {
@@ -12,6 +12,25 @@ describe('test rig', () => {
     expect(light).toBeGreaterThan(0);
     expect(head).toBeGreaterThan(light);
     expect(lantern[1]).toBeLessThan(MOCK_HEAD[1]);
+  });
+
+  it('placeLantern puts the flame 15 cm ahead and 35 cm below the eyes, and turns with the player', () => {
+    const l = new Float64Array(3);
+    placeLantern([0, 1.2, 0], 0, l);
+    expect(l[0]).toBeCloseTo(0, 12);
+    expect(l[1]).toBeCloseTo(1.2 - 0.45 + 0.1, 12);
+    expect(l[2]).toBeCloseTo(-0.15, 12);
+    placeLantern([1, 1.2, 2], Math.PI / 2, l); // facing -X
+    expect(l[0]).toBeCloseTo(0.85);
+    expect(l[2]).toBeCloseTo(2);
+  });
+
+  it('gives placeTestRig the same lantern as placeLantern', () => {
+    const a = new Float64Array(3);
+    const b = new Float64Array(3);
+    placeTestRig('wall', [0.2, 1.1, -0.3], 0.7, createStagePlane(), a);
+    placeLantern([0.2, 1.1, -0.3], 0.7, b);
+    for (let i = 0; i < 3; i++) expect(a[i]).toBeCloseTo(b[i], 12);
   });
 
   it('turns with the player', () => {
