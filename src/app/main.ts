@@ -18,6 +18,7 @@ import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
 import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
@@ -68,6 +69,8 @@ async function start(): Promise<void> {
     const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
     if (emulated) emulated.primaryInputMode = 'hand';
   }
+  // The critical assets have loaded; from here IWSDK gives up on any one request after 8 s, not 30 s.
+  shortenAssetTimeout();
   diagnostics.mark('worldCreated');
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   if (!mockOptions) void mountEnterArButtonIfNeeded(world);
