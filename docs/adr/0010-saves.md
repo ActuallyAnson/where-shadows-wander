@@ -1,4 +1,4 @@
-# ADR 0009: Saves are two checksummed slots, written only on events
+# ADR 0010: Saves are two checksummed slots, written only on events
 
 | | |
 |---|---|
