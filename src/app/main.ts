@@ -12,8 +12,9 @@ import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
-import { createStagePlane } from '../engine/shadow/pure/stage-plane';
-import { MOCK_HEAD, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
+import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
+import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
@@ -23,6 +24,7 @@ import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
+import { StageFrame } from '../engine/stage/stage-frame';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -107,13 +109,20 @@ async function start(): Promise<void> {
   gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
   let clock = 0;
 
-  // Hand shadows, on a stand-in stage and lantern until StageFrame (A) and the lantern (B) exist:
-  // ?stage=table (the tabletop theatre, default) or ?stage=wall. ?debug=shadow shows the capsules.
+  // Hand shadows land on the stage. In a headset it is Teammate A's StageFrame: the virtual room's paper wall,
+  // 2 m ahead and 1.6 x 1.0 m (ADR 0005). The Hand Lab (?mock=1) keeps the stand-in tabletop theatre by default;
+  // ?stage=wall is a bigger stand-in and ?stage=real the real wall, to look at it on a desktop.
+  // ?debug=shadow shows the capsules. The lantern is placed by the same stand-in rule in both until the lantern flow exists.
   const params = new URLSearchParams(location.search);
-  const stageMode: StageMode = params.get('stage') === 'wall' ? 'wall' : 'table';
-  const stage = createStagePlane();
+  const stageChoice: 'real' | StageMode =
+    !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
+  const stageFrame = new StageFrame();
+  const standInStage = createStagePlane();
+  const stage: StagePlane = stageChoice === 'real' ? stageFrame : standInStage;
   const lantern = new Float64Array(3);
-  const projector = new ShadowProjector({ blend: 0.0 });
+  // On the real wall the shadow settings are in real-wall.ts (blend 0.65, a low edge blur); the near, small
+  // tabletop theatre was tuned with full perspective (blend 0).
+  const projector = new ShadowProjector(stageChoice === 'real' ? REAL_WALL_SHADOW_SETTINGS : { blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
@@ -156,8 +165,23 @@ async function start(): Promise<void> {
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
-  const placeRig = (head: ArrayLike<number>, yaw: number) => {
-    placeTestRig(stageMode, head, yaw, stage, lantern);
+  let badPoseReported = false;
+  /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
+  const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
+    // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop ends the session.
+    if (!(Number.isFinite(yaw) && Number.isFinite(head[0]) && Number.isFinite(head[1]) && Number.isFinite(head[2]))) {
+      if (!badPoseReported) {
+        badPoseReported = true;
+        diagnostics.error(
+          `placeRig: ignoring a head pose that is not finite (${head[0]}, ${head[1]}, ${head[2]}, yaw ${yaw})`,
+        );
+      }
+      return false;
+    }
+    if (stageChoice === 'real') {
+      stageFrame.placeInFront(head, yaw);
+      placeLantern(head, yaw, lantern);
+    } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
     stageView.place(stage, lantern);
     candleView.place(lantern);
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
@@ -165,6 +189,7 @@ async function start(): Promise<void> {
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
     rigPlaced = true;
     everPlaced = true;
+    return true;
   };
   const headMatrix = new Matrix4();
   const headPos = new Vector3();
@@ -224,9 +249,14 @@ async function start(): Promise<void> {
     perf: timings.toJSON(),
     render: renderReport(),
     shadow: {
-      stage: stageMode,
+      stage: stageChoice,
       placed: rigPlaced,
       everPlaced,
+      // Where the real wall landed, to read from a headset report.
+      wall: {
+        origin: [stage.origin[0], stage.origin[1], stage.origin[2]],
+        version: stageChoice === 'real' ? stageFrame.version : null,
+      },
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
     },
     candle: {
@@ -386,8 +416,8 @@ async function start(): Promise<void> {
         if (pose) {
           headMatrix.fromArray(pose.transform.matrix).premultiply(this.world.player.matrixWorld);
           headMatrix.decompose(headPos, headRot, headScale);
-          placeRig([headPos.x, headPos.y, headPos.z], yawOf(headRot.x, headRot.y, headRot.z, headRot.w));
-          if (!pose.emulatedPosition) rigCalibratedFromHead = true;
+          const placed = placeRig([headPos.x, headPos.y, headPos.z], yawOf(headRot.x, headRot.y, headRot.z, headRot.w));
+          if (placed && !pose.emulatedPosition) rigCalibratedFromHead = true;
         }
       }
       if (rigPlaced) {
@@ -486,6 +516,7 @@ async function start(): Promise<void> {
         gestures,
         projector,
         stage,
+        stageFrame,
         occluder,
         sharpen,
         lanternLight,

@@ -21,7 +21,10 @@ export class ShapeRecognizer {
   readonly valid: Record<Handedness, boolean> = { left: false, right: false };
   /** Commits per shape since start, for diagnostics. */
   readonly commits = Object.fromEntries(SHAPES.map((s) => [s, 0])) as Record<Shape, number>;
-  /** The stage's normal; up for the tabletop theatre. StageFrame sets it for the wall stage. */
+  /**
+   * What a palm's direction is compared against (the palm-to-stage feature): up for the tabletop theatre, so flat
+   * means palm down. Nothing feeds the real wall's normal in yet, so flat still means palm down there too.
+   */
   readonly stageNormal: Vec3 = [...WORLD_UP];
   /** Each hand's baseline finger curl (hand-calibration.ts); zeros until calibrated. */
   readonly calibration: Record<Handedness, CurlBias> = { left: createCurlBias(), right: createCurlBias() };

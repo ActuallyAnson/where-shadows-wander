@@ -1,5 +1,6 @@
-// A stand-in stage and lantern, until Teammate A's StageFrame and Teammate B's
-// lantern exist: placed once from where the player sits and faces. Plain TypeScript.
+// A stand-in stage and lantern, placed once from where the player sits and faces. The headset now uses
+// Teammate A's StageFrame (src/engine/stage); this stage stays for the Hand Lab's tabletop theatre
+// (?mock=1) and tests, and its lantern placement is shared. Plain TypeScript.
 //
 // table: the tabletop theatre (GDD): a 50 × 42 cm paper screen standing on the
 //   table about 75 cm ahead, tall enough for hands turned up toward it, the
@@ -17,6 +18,19 @@ export const MOCK_HEAD: Readonly<Vec3> = [0, 1, 0.5];
 const TABLE_BELOW_EYES_M = 0.45;
 
 /**
+ * Puts the lantern's flame on the near edge of the table, 15 cm in front of a player whose eyes are at `head`
+ * facing `yawRad` (0 = looking down -Z), 10 cm above the table top. Used by the real wall too, until the
+ * lantern flow places it. Writes into `lantern`.
+ */
+export function placeLantern(head: V3, yawRad: number, lantern: Float64Array | Vec3): void {
+  const fx = -Math.sin(yawRad),
+    fz = -Math.cos(yawRad);
+  lantern[0] = head[0] + fx * 0.15;
+  lantern[1] = head[1] - TABLE_BELOW_EYES_M + 0.1;
+  lantern[2] = head[2] + fz * 0.15;
+}
+
+/**
  * Places the stage and lantern for a player whose eyes are at `head`, facing
  * `yawRad` (0 = looking down -Z). Writes into `stage` and `lantern`.
  */
@@ -30,10 +44,7 @@ export function placeTestRig(
   const fx = -Math.sin(yawRad),
     fz = -Math.cos(yawRad); // forward, level
   const table = head[1] - TABLE_BELOW_EYES_M;
-  // The lantern's flame: on the near edge of the table, 10 cm up.
-  lantern[0] = head[0] + fx * 0.15;
-  lantern[1] = table + 0.1;
-  lantern[2] = head[2] + fz * 0.15;
+  placeLantern(head, yawRad, lantern);
   const [ahead, width, height, centreY] =
     mode === 'table' ? [0.75, 0.5, 0.42, table + 0.24] : [1.5, 0.9, 0.7, head[1] - 0.2];
   stage.origin[0] = head[0] + fx * ahead;
