@@ -1,18 +1,12 @@
 // The loop, the input latch and the RNG run every frame: together they must build nothing.
 // Same method as entity-store.alloc.test.ts. Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
+import { bytesPerFrame, gc, inCI } from './alloc-measure';
 import { GestureEventQueue } from '../hands/gesture-events';
 import { ShapeEventQueue } from '../hands/shape-events';
 import { FixedStepLoop } from './fixed-step';
 import { InputLatch } from './input-latch';
 import { Rng } from './rng';
-
-// The project's TypeScript config has no Node types: reach the Node globals we need through globalThis.
-const node = globalThis as unknown as {
-  gc?: () => void;
-  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
-};
-const gc = node.gc;
 
 const FRAMES = 3_000;
 const BUDGET_BYTES_PER_FRAME = 64;
@@ -49,40 +43,22 @@ function makeFrame(extra?: () => void) {
   };
 }
 
-/** Heap growth over `frames` frames; fails if a collection ran in the window, which would hide the garbage. */
-function measure(frameFn: () => void, frames: number): number {
-  for (let i = 0; i < 60000; i++) frameFn();
-  gc!();
-  const before = node.process.memoryUsage().heapUsed;
-  let last = before;
-  for (let i = 0; i < frames; i++) {
-    frameFn();
-    if (i % 100 === 99) {
-      const now = node.process.memoryUsage().heapUsed;
-      if (now < last)
-        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
-      last = now;
-    }
-  }
-  return node.process.memoryUsage().heapUsed - before;
-}
-
 it('has garbage collection exposed when running in CI', () => {
-  expect(gc !== undefined || !node.process.env.CI).toBe(true);
+  expect(gc !== undefined || !inCI).toBe(true);
 });
 
 describe.skipIf(!gc)('loop, latch and rng allocation', () => {
   it('a frame of latching and stepping stays under the allocation budget', () => {
-    const bytes = measure(makeFrame(), FRAMES);
-    console.info(`loop + latch + rng allocate ${(bytes / FRAMES).toFixed(1)} B a frame`);
-    expect(bytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
+    const bytes = bytesPerFrame(makeFrame(), { frames: FRAMES, warmup: 60000, goodBelow: BUDGET_BYTES_PER_FRAME / 2 });
+    console.info(`loop + latch + rng allocate ${bytes.toFixed(1)} B a frame`);
+    expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
   });
 
   it('catches a step that allocates (a control for the test itself)', () => {
-    const bytes = measure(
+    const bytes = bytesPerFrame(
       makeFrame(() => void new Array(64).fill(0.5)),
-      FRAMES,
+      { frames: FRAMES, attempts: 1 },
     );
-    expect(bytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
+    expect(bytes).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
   });
 });
