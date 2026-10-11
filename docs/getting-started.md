@@ -172,6 +172,23 @@ Everything the game needs is set with the inspector's own fields, so you never e
 | **Add Component, `Piece`** (optional) | Starting speed `vx`, `vy` and the flags `isStatic`, `isSensor`, `hidden` |
 | **Visible** off | The node, and everything under it, is left out |
 
+### What the editor offers, and what it does not
+
+Checked on 11 Oct 2026 by driving a running editor (reading its panels, opening files, selecting nodes, `scene render-stats` and a screenshot), not from memory. The editor is IWSDK 1.0.0's.
+
+| Part | What is there |
+|---|---|
+| Toolbar | Move, Rotate and Scale, Snap, Local and World space, Undo and Redo, a Runtime and Editor switch |
+| Panels | Scene Graph (with Add Entity), Inspector, and at the bottom Assets, Console and Validation |
+| Inspector | Node name, Asset (a dropdown of the manifest), Visible, Position, Rotation and Scale with a reset for each, and Components |
+| Built-in nodes | Player Space, Camera, Head, the two target rays and the two grips, and Level Root, which a scene node can be placed under |
+| Add Component (37 built in) | AmbientLight, DirectionalLight, HemisphereLight, PointLight, RectAreaLight, SpotLight, IBLGradient, IBLTexture, DomeGradient, DomeTexture, AudioSource, CameraSource, PhysicsBody, PhysicsShape, PhysicsManipulation, OneHandGrabbable, TwoHandsGrabbable, DistanceGrabbable, PokeInteractable, RayInteractable, ScreenSpace, Follower, LocomotionEnvironment, EnvironmentRaycastTarget, DepthOccludable, LevelRoot, LevelTag, XRAnchor, XRMesh, XRPlane, XRCylinderLayer, XRQuadLayer, and runtime-state tags (Grabbed, Handle, Hovered, Pressed, XRLayerState); **plus our own `Piece`** |
+| Prefabs, instances, patterns | The scene file format has them (`resources.prefabs`, an `instance` node, and a `pattern` node that repeats a prefab in a line, grid, circle, along a path, scattered, or at listed transforms), and the editor **draws them**: a file with one instance and a linear pattern of four showed five rocks, with no validation problems. **The editor has no controls for making them**: a pattern or instance node shows the same Inspector as any other node, with no count, step or prefab field. They can only be written into the file by hand |
+| Not found | Animation clips or a timeline, particles, materials or shaders, scripts, a mixer, a profiler, play controls, terrain, light baking |
+| Scene settings | The file format has fog, tone mapping, exposure and shadow type (`environment`); no control for them was seen in the editor |
+
+Not checked by hand: dragging nodes in the Scene Graph, how Snap behaves, copy and paste or duplicate, selecting several nodes, editing a built-in node, saving a prefab, and how the Runtime tab looks with hands. **Our loader (`parseLayout`) reads only plain `asset` nodes. It does not expand an `instance` or `pattern` node; it lists it in `problems` (and the scene-file test fails on it)**, so place pieces and markers as plain nodes.
+
 Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one with `parseLayout(doc, 'puzzle-1')` and `spawnLayout` (nothing calls them yet; Teammate A's puzzle code will). The editor's scene-graph hide is preview-only and is not saved; use the inspector's **Visible** toggle to leave a node out. Groups can nest and their positions add up; rotation and scale on a parent are ignored and reported. `npm test` checks every scene file against IWSDK's validator and our loader.
 
 ## Troubleshooting
