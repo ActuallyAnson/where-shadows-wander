@@ -59,7 +59,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
 | `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
-| `src/engine/services` | B | Adapters no | Saves (versioned, with migrations), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
+| `src/engine/services` | B | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
 | `src/ui` | B | No | Onboarding, lantern flow, placement, chapter flow, settings |
 | `src/debug` | B | No | Diagnostics report, anchor probe, profiler, Copy report panel |
 

@@ -19,6 +19,9 @@ import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
+import { attachSaveHooks } from '../engine/services/saves/save-hooks';
+import { SaveManager } from '../engine/services/saves/save-manager';
+import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
@@ -85,6 +88,17 @@ async function start(): Promise<void> {
   const handsStatus = new HandsStatus();
   // The session's visibility: the simulation pauses on it (Teammate A) and saves can listen to it (Teammate B).
   const visibility = new SessionVisibility();
+  // The save (progress, the creature gallery, solutions found): read once now, written only on events (headset
+  // off, page hidden, a puzzle ending), never per frame. Teammate A's puzzle code calls saves.puzzleEnded.
+  // The Hand Lab (?mock=1) keeps its own save, so a development session never touches a real one.
+  const saves = new SaveManager({
+    store: browserStore() ?? new MemoryStore(),
+    prefix: mockOptions ? 'wsw.save.mock' : 'wsw.save',
+    onError: (message) => diagnostics.error(`save: ${message}`),
+  });
+  saves.load();
+  saves.touchDay(); // saves.previousDay is the night before, to tell a new night from a return the same evening
+  attachSaveHooks(saves, visibility, { window, document });
 
   // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
   const shapes = new ShapeRecognizer();
@@ -204,6 +218,7 @@ async function start(): Promise<void> {
       mockSource: mock ? mock.source.name : null,
       capabilities,
     }),
+    saves: { ...saves.status },
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
@@ -288,6 +303,7 @@ async function start(): Promise<void> {
     capabilities.sessionEnded();
     handsStatus.stop();
     visibility.detach();
+    saves.flush(); // leaving VR does not hide the page, so no page event would save it
     handsPanel?.hide();
     recorder?.finish();
   });
@@ -465,6 +481,7 @@ async function start(): Promise<void> {
         capabilities,
         handsStatus,
         visibility,
+        saves,
         shapes,
         gestures,
         projector,
