@@ -2,14 +2,14 @@
 
 A seated, hands-only virtual reality puzzle game: light a lantern in a small cosy room, and your hands' shadows help a little traveller cross the wall.
 
-**Status:** week 1, XR shell. Built for the Meta VR Start Developer Competition 2026.
+**Status:** hands, shadows, the virtual-room wall, sound, saves and the asset pipeline are built; puzzles, art and headset tuning are next. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, emulator, webcam, headset testing, troubleshooting.
 - [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
 - [Competition reference](docs/COMPETITION.md): rules, dates, judging criteria and useful links
 - [Game design document](docs/GDD.md) (original: [docs/gdd.docx](docs/gdd.docx))
 - [IWSDK spike results](docs/spikes/iwsdk-spike.md)
-- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md), [ADR 0005: a virtual room instead of the real one](docs/adr/0005-virtual-room.md), [ADR 0006: room and puzzle layouts in IWSDK's scene editor](docs/adr/0006-editor-authored-layouts.md), [ADR 0008: audio is plain Web Audio](docs/adr/0008-audio.md), [ADR 0009: asset pipeline and size budgets](docs/adr/0009-asset-pipeline.md), [ADR 0010: saves](docs/adr/0010-saves.md)
+- Architecture decisions: [ADR 0001: IWSDK as XR and view layer](docs/adr/0001-iwsdk-as-xr-and-view-layer.md), [ADR 0002: plain three.js fallback](docs/adr/0002-plain-threejs-fallback.md), [ADR 0003: Pico as stand-in test device](docs/adr/0003-pico-as-stand-in-test-device.md), [ADR 0004: webcam hand bench and hand recordings](docs/adr/0004-webcam-bench-and-hand-recordings.md), [ADR 0005: a virtual room instead of the real one](docs/adr/0005-virtual-room.md), [ADR 0006: room and puzzle layouts in IWSDK's scene editor](docs/adr/0006-editor-authored-layouts.md), [ADR 0007: custom 2D collision solver](docs/adr/0007-custom-2d-solver.md), [ADR 0008: audio is plain Web Audio](docs/adr/0008-audio.md), [ADR 0009: asset pipeline and size budgets](docs/adr/0009-asset-pipeline.md), [ADR 0010: saves](docs/adr/0010-saves.md)
 
 ## Develop
 
@@ -18,7 +18,7 @@ Node `>=20.19 <21`, `>=22.12 <23` or `>=24` (see `.nvmrc`).
 ```sh
 npm install
 npm run dev          # IWSDK dev server (HTTPS, port 8081) with the IWER Quest 3 emulator
-npm run check        # typecheck, import boundaries, single three.js, unit tests
+npm run check        # typecheck, lint, formatting, single three.js, asset budgets, unit tests
 npm run build        # production build in dist/
 ```
 
@@ -52,9 +52,9 @@ We have a Pico now and no Quest yet. Develop on the Pico; confirm on a Quest bef
 Steps on the headset (Pico or Quest):
 
 1. Open the link in the headset browser. Make sure the headset's room or space setup is done.
-2. Press **Enter XR** and allow hand tracking and spatial data. Put the controllers down.
-3. Look around the room for about 30 seconds and move your hands in front of you. Dots should follow your finger joints (orange for the right hand, blue for the left).
+2. Press **Enter VR** (on the Pico: **Enter VR (Direct Hands)**) and allow hand tracking. Put the controllers down.
+3. Look around the room for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle on the table, and your hands as dark gloves with their shadows on the wall. (To see a dot on every joint instead, add `?debug=joints` to the link.)
 4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
-5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This tests anchor persistence.
+5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This checks that your progress is saved between sessions (the report's `saves` section).
 
 To record hand data, add `?record=20` to the link (`?record=20&note=fist then flat hand` to label it). After leaving XR, press **Download recording**, then open the file in the Hand Recording Player.

@@ -129,19 +129,17 @@ async function start(): Promise<void> {
   const shadowRenderer = new ShadowRenderer();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
+  // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
+  const handStates = { left: shapes.left.state, right: shapes.right.state };
   // The lantern's flicker: ?flicker=0..1 sets how much (0 is steady); the default is gentler under reduced motion.
-  const flickerParam = Number(params.get('flicker'));
+  const flickerRaw = params.get('flicker');
+  const flickerParam = flickerRaw === null || flickerRaw.trim() === '' ? NaN : Number(flickerRaw); // ?flicker with no value is ignored, not 0
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lanternLight = new LanternLightModel({
-    amplitude:
-      params.has('flicker') && Number.isFinite(flickerParam)
-        ? Math.min(Math.max(flickerParam, 0), 1)
-        : reduceMotion
-          ? 0.3
-          : 1,
+    amplitude: Number.isFinite(flickerParam) ? Math.min(Math.max(flickerParam, 0), 1) : reduceMotion ? 0.3 : 1,
   });
   // Follow the OS reduced-motion setting while the page is open, unless ?flicker= was given.
-  if (!params.has('flicker') && typeof matchMedia === 'function')
+  if (!Number.isFinite(flickerParam) && typeof matchMedia === 'function')
     matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
       lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
     });
@@ -150,7 +148,9 @@ async function start(): Promise<void> {
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
   const candleView = new CandleView();
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
-  const shadowDebug = params.get('debug') === 'shadow' ? new ShadowDebug() : null;
+  // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
+  const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
+  const shadowDebug = debugViews.has('shadow') ? new ShadowDebug() : null;
   world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
   if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
@@ -218,6 +218,7 @@ async function start(): Promise<void> {
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
+  let simWasPaused = false;
   const sim = new FixedStepLoop(SIM_HZ, () => {
     // Game simulation steps go here (week 2+).
   });
@@ -228,7 +229,7 @@ async function start(): Promise<void> {
   world.scene.add(handVisual.object);
   // The joint dots are a debug view: ?debug=joints.
   const dots = new JointDots();
-  dots.mesh.visible = params.get('debug') === 'joints';
+  dots.mesh.visible = debugViews.has('joints');
   world.scene.add(dots.mesh);
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
   // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
@@ -352,6 +353,14 @@ async function start(): Promise<void> {
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
     guard('sessionend: hands status', () => handsStatus.stop());
+    // Hands are only read inside a session, so without this they would keep their last pose on the 2D page.
+    if (!mock)
+      guard('sessionend: hands', () => {
+        for (const h of handList) {
+          h.tracked = false;
+          h.validJoints = 0;
+        }
+      });
     guard('sessionend: visibility', () => visibility.detach());
     guard('sessionend: saves', () => saves.flush()); // leaving VR does not hide the page, so no page event would save it
     guard('sessionend: hands panel', () => handsPanel?.hide());
@@ -416,7 +425,7 @@ async function start(): Promise<void> {
         timings.begin(SLOT.gestures);
         gestures.update(hands.hands, handsT, shapes);
         timings.end(SLOT.gestures);
-        sharpen.update({ left: shapes.left.state, right: shapes.right.state }, shapes.events, step);
+        sharpen.update(handStates, shapes.events, step);
       }
       if (handsPanel && handsStatus.version !== handsPanelVersion) {
         if (!handsStatus.showMessage) {
@@ -499,8 +508,15 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      if (!paused) {
+      if (paused) simWasPaused = true;
+      else {
         try {
+          // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
+          // replay it (docs/SIMULATION.md).
+          if (simWasPaused) {
+            simWasPaused = false;
+            sim.reset();
+          }
           sim.advance(delta);
         } catch (e) {
           failures.report('simulation', e);

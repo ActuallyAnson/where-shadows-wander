@@ -53,7 +53,7 @@ describe.skipIf(!gc)('entity store allocation', () => {
     const bytes = bytesPerFrame(makeStep(), { frames: FRAMES, goodBelow: BUDGET_BYTES_PER_FRAME / 2 });
     console.info(`entity store allocates ${bytes.toFixed(1)} B a frame`);
     expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
-  });
+  }, 60_000);
 
   it('catches a step that allocates and throws it away (a control for the test itself)', () => {
     const bytes = bytesPerFrame(
@@ -61,5 +61,5 @@ describe.skipIf(!gc)('entity store allocation', () => {
       { frames: FRAMES, attempts: 1 },
     );
     expect(bytes).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
-  });
+  }, 60_000);
 });

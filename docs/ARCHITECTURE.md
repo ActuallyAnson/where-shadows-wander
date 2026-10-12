@@ -37,7 +37,7 @@ flowchart LR
 
 1. **Read hands and capabilities** (`engine/xr`): raw WebXR joints into `HandFrame`, 25 joints per hand in scene space ([ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md)). In mock mode the webcam or a recording fills the same `HandFrame`. `CapabilityDetector` keeps one `Capabilities` object up to date (hands, passthrough, planes, meshes, anchors) and the detected planes as `DetectedPlane` records in scene space, normals toward the viewer, for StageFrame.
 2. **Classify** (`engine/hands`): features, then the shape classifier with hold-to-commit and hysteresis, which emits shape events (`ShapeRecognizer`). Then the lantern gestures on the same features (`GestureDetector`): pinch-and-release to place or relight, a closed hand over the flame to pause.
-3. **Shadows** (`engine/shadow`): `ShadowProjector` (pure, in `shadow/pure`) projects each hand onto the stage from the lantern with one matrix blended toward orthographic (k = 0.9), filling `HandShadow` (in `engine/hands`, for the solver): 28 capsules per hand in 2D stage space, an outline and an edge blur. `ShadowRenderer` draws both hands from those capsules in one draw call, soft-edged and clipped to the stage. Until StageFrame and the lantern exist, a stand-in rig (`shadow/pure/test-rig.ts`) places a paper screen and lantern in front of the player.
+3. **Shadows** (`engine/shadow`): `ShadowProjector` (pure, in `shadow/pure`) projects each hand onto the stage from the lantern with one matrix blended toward orthographic (k = 0.9), filling `HandShadow` (in `engine/hands`, for the solver): 28 capsules per hand in 2D stage space, an outline and an edge blur. `ShadowRenderer` draws both hands from those capsules in one draw call, soft-edged and clipped to the stage. In a headset the stage is A's `StageFrame` and the lantern is placed by `placeLantern` (`shadow/pure/test-rig.ts`) until the lantern flow exists; the Hand Lab's default tabletop theatre is the stand-in rig (`?stage=real` shows the real wall).
 4. **Simulate** (`engine/sim`, `game`): the fixed-step loop advances the 2D simulation at a constant rate, whatever the display rate (72, 90 or 120 Hz). It returns an interpolation factor for rendering.
 5. **Present** (`engine/render`, `engine/anim`): draw entity state (interpolated) as instanced sprites with animation poses.
 6. **Services** (`engine/services`): audio and saves react to game events and never block a frame.
@@ -50,7 +50,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | Folder | Owner | Pure | Responsibility |
 |---|---|---|---|
 | `src/app` | Anson | No | Entry point: `World.create`, the driver system, wiring, the no-AR notice, IWSDK manifests |
-| `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder, hand visuals (to build) |
+| `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder, the hand visual (glove) |
 | `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
 | `src/engine/shadow` | Anson | No (`pure/` yes) | Projected-shadow renderer; `pure/`: projection maths, capsules, stand-in rig |
 | `src/input-mock` | Anson | No | Hand Lab (`?mock=1`) and its hand sources, webcam bench, MediaPipe conversion and worker |
@@ -59,7 +59,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
 | `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
-| `src/engine/services` | B | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
+| `src/engine/services` | Anson (B owns the content: sounds, gallery) | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
 | `src/ui` | B | No | Onboarding, lantern flow, placement, chapter flow, settings |
 | `src/debug` | B | No | Diagnostics report, anchor probe, profiler, Copy report panel |
 
@@ -89,7 +89,7 @@ These are starting estimates. Desktop measurements so far: our whole frame was a
 
 | What | How | What it tells you |
 |---|---|---|
-| Our stages on a headset | `perf` in the diagnostics report (Copy report): `msAvg` and `msWorst` per stage (`read`, `classify`, `gestures`, `shadow`, `lab`, `total`) over the last 300 frames | Compare each stage with the table above. Browsers coarsen timers on Pages, so trust averages, not single frames |
+| Our stages on a headset | `perf` in the diagnostics report (Copy report): `msAvg` and `msWorst` per stage (`read`, `classify`, `gestures`, `shadow`, `handVisual`, `audio`, `lab`, `total`; the shape-event sounds are timed inside `shadow`; `frameErrors` counts any part of the frame that threw) over the last 300 frames | Compare each stage with the table above. Browsers coarsen timers on Pages, so trust averages, not single frames |
 | Our stages on a desktop | `npm run perf` | Per-stage time per frame. Headset budget divided by 4 is the desktop guide: read 0.1 ms, classify and gestures 0.175 ms, shadow 0.225 ms. Measured 3 Oct 2026: recognizer 3.4 µs, shadow 4.3 µs per frame |
 | Allocation | `frame-pipeline.alloc.test.ts`, part of `npm test` | Runs recognizer, gestures and projector for 3,000 frames with no garbage collection inside the window (it fails if one runs) and fails above 700 B a frame. The stages build no objects or arrays. Measured about 530 B a frame (recognizer, gestures, projector, sharpen and lantern light), which is the engine boxing numbers returned by small helpers; it was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths |
 | GPU time | Pico or Quest performance overlay | Not visible from JavaScript. Check with both shadows covering the stage and `?debug=shadow` |
