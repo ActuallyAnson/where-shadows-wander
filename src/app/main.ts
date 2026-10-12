@@ -42,6 +42,7 @@ import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { probePixels } from './composite-probe';
+import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded } from './enter-ar-button';
 import { mountLabLink } from './lab-link';
@@ -55,6 +56,8 @@ const mockOptions = mockOptionsFromUrl(location.search);
 // The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
 const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
+// One part of the frame throwing must not stop the rest, or the next frame (failure-reporter.ts).
+const failures = new FailureReporter((message) => diagnostics.error(message));
 mountReportPanel(diagnostics);
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
 if (!mockOptions) void showNoXrNoticeIfNeeded();
@@ -168,7 +171,7 @@ async function start(): Promise<void> {
   let badPoseReported = false;
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
-    // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop ends the session.
+    // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
     if (!(Number.isFinite(yaw) && Number.isFinite(head[0]) && Number.isFinite(head[1]) && Number.isFinite(head[2]))) {
       if (!badPoseReported) {
         badPoseReported = true;
@@ -244,6 +247,7 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    frameErrors: failures.toJSON(),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
@@ -300,42 +304,58 @@ async function start(): Promise<void> {
       urlMode: sessionModeOf(xrMode),
     };
   };
+  // Each step of a session start or end is guarded on its own: a throw in one (say the diagnostics) must not skip
+  // the others (the pause signal, the hands cue).
+  const guard = (label: string, fn: () => void): void => {
+    try {
+      fn();
+    } catch (e) {
+      failures.report(label, e);
+    }
+  };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
-    audio.unlock();
+    guard('sessionstart: audio', () => audio.unlock());
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
-    if (session) audio.attachSessionUnlock(session as unknown as SessionEvents);
+    if (session)
+      guard('sessionstart: audio session unlock', () => audio.attachSessionUnlock(session as unknown as SessionEvents));
     if (session) {
-      occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
-      passthrough = session.environmentBlendMode !== undefined && session.environmentBlendMode !== 'opaque';
-      const clear = clearFor(session.environmentBlendMode, xrMode);
-      world.scene.background = clear.background === null ? null : new Color(clear.background);
-      world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
-      diagnostics.sessionStarted(session, world.renderer);
+      guard('sessionstart: display', () => {
+        occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
+        passthrough = session.environmentBlendMode !== undefined && session.environmentBlendMode !== 'opaque';
+        const clear = clearFor(session.environmentBlendMode, xrMode);
+        world.scene.background = clear.background === null ? null : new Color(clear.background);
+        world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
+      });
+      guard('sessionstart: diagnostics', () => diagnostics.sessionStarted(session, world.renderer));
     }
     // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
     if (session && !mock) {
-      capabilities.sessionStarted(session);
-      handsStatus.start();
+      guard('sessionstart: capabilities', () => capabilities.sessionStarted(session));
+      guard('sessionstart: hands status', () => handsStatus.start());
     }
-    if (session) visibility.attach(session);
+    if (session) guard('sessionstart: visibility', () => visibility.attach(session));
   });
   world.renderer.xr.addEventListener('sessionend', () => {
-    world.scene.background = null;
-    world.renderer.setClearColor(0x000000, 0);
-    occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
-    passthrough = false;
+    guard('sessionend: display', () => {
+      world.scene.background = null;
+      world.renderer.setClearColor(0x000000, 0);
+      occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
+      passthrough = false;
+    });
     if (!mock) {
-      rigCalibratedFromHead = false;
-      placeRig([0, 1.2, 0], 0);
+      guard('sessionend: wall', () => {
+        rigCalibratedFromHead = false;
+        placeRig([0, 1.2, 0], 0);
+      });
     }
-    diagnostics.sessionEnded();
-    capabilities.sessionEnded();
-    handsStatus.stop();
-    visibility.detach();
-    saves.flush(); // leaving VR does not hide the page, so no page event would save it
-    handsPanel?.hide();
-    recorder?.finish();
+    guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
+    guard('sessionend: capabilities', () => capabilities.sessionEnded());
+    guard('sessionend: hands status', () => handsStatus.stop());
+    guard('sessionend: visibility', () => visibility.detach());
+    guard('sessionend: saves', () => saves.flush()); // leaving VR does not hide the page, so no page event would save it
+    guard('sessionend: hands panel', () => handsPanel?.hide());
+    guard('sessionend: recorder', () => recorder?.finish());
   });
 
   const recorder = HandRecorder.fromUrl(!mock);
@@ -357,6 +377,17 @@ async function start(): Promise<void> {
   // and scene understanding (-1) systems and before render.
   class FrameDriverSystem extends createSystem({}) {
     update(delta: number) {
+      // Nothing in the frame may throw out of here: the browser and IWSDK do not catch it, and the next frame
+      // would never be scheduled (the headset freezes). Parts that can fail on their own are also guarded below,
+      // so one failing part does not skip the others.
+      try {
+        this.frame(delta);
+      } catch (e) {
+        failures.report('frame', e);
+      }
+    }
+
+    private frame(delta: number) {
       const t0 = performance.now();
       timings.begin(SLOT.total);
       diagnostics.mark('firstFrame');
@@ -421,18 +452,26 @@ async function start(): Promise<void> {
         }
       }
       if (rigPlaced) {
-        const tableY = headPos.y - 0.45;
-        const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
-        if (candleAction.state === 'held' || candleAction.justPlaced) {
-          lantern[0] = candleView.group.position.x;
-          lantern[1] = candleView.group.position.y;
-          lantern[2] = candleView.group.position.z;
+        try {
+          const tableY = headPos.y - 0.45;
+          const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
+          if (candleAction.state === 'held' || candleAction.justPlaced) {
+            lantern[0] = candleView.group.position.x;
+            lantern[1] = candleView.group.position.y;
+            lantern[2] = candleView.group.position.z;
+          }
+        } catch (e) {
+          failures.report('candle pickup', e);
         }
         timings.begin(SLOT.shadow);
-        projector.update(hands.hands, stage, candleView.flamePosition);
-        if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-        shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
-        shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
+        try {
+          projector.update(hands.hands, stage, candleView.flamePosition);
+          if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
+          shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
+          shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
+        } catch (e) {
+          failures.report('shadows', e);
+        }
         timings.end(SLOT.shadow);
       }
       if (recorder) {
@@ -460,36 +499,58 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      if (!paused) sim.advance(delta);
+      if (!paused) {
+        try {
+          sim.advance(delta);
+        } catch (e) {
+          failures.report('simulation', e);
+        }
+      }
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
-      lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
-      world.camera.getWorldQuaternion(cameraQuat);
-      stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
-      candleView.update(lanternLight.light, cameraQuat);
-      lab?.applyLight(lanternLight.light, cameraQuat);
+      try {
+        lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
+        world.camera.getWorldQuaternion(cameraQuat);
+        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
+        candleView.update(lanternLight.light, cameraQuat);
+        lab?.applyLight(lanternLight.light, cameraQuat);
+      } catch (e) {
+        failures.report('lighting', e);
+      }
       timings.begin(SLOT.audio);
-      world.camera.updateWorldMatrix(true, false);
-      const m = world.camera.matrixWorld.elements;
-      audioPose[0] = m[12];
-      audioPose[1] = m[13];
-      audioPose[2] = m[14];
-      audioPose[3] = -m[8];
-      audioPose[4] = -m[9];
-      audioPose[5] = -m[10];
-      audioPose[6] = m[4];
-      audioPose[7] = m[5];
-      audioPose[8] = m[6];
-      gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
-      audio.update(audioPose);
+      try {
+        world.camera.updateWorldMatrix(true, false);
+        const m = world.camera.matrixWorld.elements;
+        audioPose[0] = m[12];
+        audioPose[1] = m[13];
+        audioPose[2] = m[14];
+        audioPose[3] = -m[8];
+        audioPose[4] = -m[9];
+        audioPose[5] = -m[10];
+        audioPose[6] = m[4];
+        audioPose[7] = m[5];
+        audioPose[8] = m[6];
+        gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
+        audio.update(audioPose);
+      } catch (e) {
+        failures.report('audio', e);
+      }
       timings.end(SLOT.audio);
-      occluder.update(handList);
-      timings.begin(SLOT.handVisual);
-      handVisual.object.visible = !passthrough;
-      handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
-      timings.end(SLOT.handVisual);
-      if (dots.mesh.visible) dots.update(handList, rigPlaced ? candleView.flamePosition : null);
+      try {
+        occluder.update(handList);
+        timings.begin(SLOT.handVisual);
+        handVisual.object.visible = !passthrough;
+        handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
+        timings.end(SLOT.handVisual);
+        if (dots.mesh.visible) dots.update(handList, rigPlaced ? candleView.flamePosition : null);
+      } catch (e) {
+        failures.report('hands drawing', e);
+      }
       timings.begin(SLOT.lab);
-      lab?.frame();
+      try {
+        lab?.frame();
+      } catch (e) {
+        failures.report('hand lab', e);
+      }
       timings.end(SLOT.lab);
       timings.end(SLOT.total);
       timings.endFrame();

@@ -224,6 +224,39 @@ describe('playing', () => {
   });
 });
 
+describe('positions that are not finite numbers', () => {
+  it('drops a sound whose position is NaN or infinite instead of throwing, and counts it', () => {
+    const { engine } = make();
+    engine.unlock();
+    expect(engine.playAt(Sound.Rustle, NaN, 1, 0)).toBe(false);
+    expect(engine.playAt(Sound.Rustle, 0, Infinity, 0)).toBe(false);
+    expect(engine.playAt(Sound.Rustle, 0, 1, -Infinity)).toBe(false);
+    expect(engine.stats.badPosition).toBe(3);
+    expect(engine.stats.played).toBe(0);
+    expect(engine.playAt(Sound.Rustle, 0, 1, 0)).toBe(true); // and carries on normally
+  });
+
+  it('ignores a bad loop position and a bad loop move', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    engine.setLoop(Sound.Crackle, true, NaN, 1, 0);
+    expect(ctx.sources.some((s) => s.loop)).toBe(false);
+    engine.setLoop(Sound.Crackle, true, 0, 1, 0);
+    expect(() => engine.moveLoop(Sound.Crackle, 0, NaN, 0)).not.toThrow();
+    expect(ctx.panners.some((p) => Number.isNaN(p.positionY.value))).toBe(false);
+  });
+
+  it('keeps the last good listener when the head pose is not finite', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    engine.update([0, 1.2, 0, 0, 0, -1, 0, 1, 0]);
+    expect(() => engine.update([NaN, 1.2, 0, 0, 0, -1, 0, 1, 0])).not.toThrow();
+    expect(() => engine.update([0, 1.2, 0, 0, 0, Infinity, 0, 1, 0])).not.toThrow();
+    expect(ctx.listener.positionX.value).toBe(0);
+    expect(ctx.listener.forwardZ.value).toBe(-1);
+  });
+});
+
 describe('the crackle loop', () => {
   it('starts looping at the flame, follows it only when it moves, and fades out on stop', () => {
     const { engine, ctx } = make();

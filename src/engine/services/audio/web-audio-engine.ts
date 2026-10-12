@@ -50,7 +50,7 @@ export class AudioEngine {
   master: GainNode | null = null;
   context: AudioContext | null = null;
   /** Sounds started, and dropped because audio was locked, they came too soon after the last of their kind, or no voice was free. */
-  readonly stats = { played: 0, tooSoon: 0, noVoice: 0, beforeUnlock: 0 };
+  readonly stats = { played: 0, tooSoon: 0, noVoice: 0, beforeUnlock: 0, badPosition: 0 };
 
   private readonly pool: VoicePool;
   private readonly cooldowns = new Cooldowns();
@@ -156,6 +156,12 @@ export class AudioEngine {
       this.stats.beforeUnlock++;
       return false;
     }
+    // A position that is not a finite number would make the panner's parameters throw (and a throw in the frame
+    // loop is costly), so the sound is dropped instead.
+    if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) {
+      this.stats.badPosition++;
+      return false;
+    }
     const now = ctx.currentTime;
     if (!this.cooldowns.ready(id, key, now)) {
       this.stats.tooSoon++;
@@ -191,6 +197,7 @@ export class AudioEngine {
    * audio is unlocked is kept and starts as soon as it is, so a flame that was lit during loading is heard.
    */
   setLoop(id: SoundId, on: boolean, x: number, y: number, z: number): void {
+    if (on && !(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) return; // see playAt
     this.loopWanted[id] = on ? 1 : 0;
     if (on) {
       this.loopPos[id * 3] = x;
@@ -234,6 +241,7 @@ export class AudioEngine {
 
   /** Moves a playing loop. Cheap enough to call every frame: it writes only when the sound moved. */
   moveLoop(id: SoundId, x: number, y: number, z: number): void {
+    if (!(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z))) return; // see playAt
     const voice = this.loops[id];
     const p = this.loopPos;
     const i = id * 3;
@@ -264,6 +272,7 @@ export class AudioEngine {
   update(pose: ArrayLike<number>): void {
     const ctx = this.context;
     if (!ctx) return;
+    for (let i = 0; i < 9; i++) if (!Number.isFinite(pose[i])) return; // keep the last good listener (see playAt)
     if (ctx.state !== 'running') {
       if (!this.pausedNow && ++this.framesLocked % RETRY_FRAMES === 0) this.start(ctx);
     } else {
