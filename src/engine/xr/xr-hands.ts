@@ -35,6 +35,9 @@ export interface XRHandReaderDebug {
   lastError: string | null;
 }
 
+/** How many input-source change events the diagnostics keep. */
+const MAX_SOURCE_EVENTS = 50;
+
 export class XRHandReader {
   readonly hands: Record<Handedness, HandFrame> = {
     left: createHandFrame('left'),
@@ -54,6 +57,12 @@ export class XRHandReader {
   private readonly poses = new Float32Array(16 * JOINT_COUNT);
   private readonly spaces: (XRJointSpace | undefined)[] = new Array(JOINT_COUNT);
   private readonly m = new Matrix4();
+  /** The input sources this frame, reused (read by index: no new array each frame). */
+  private readonly sourceList: XRInputSource[] = [];
+  /** A hand's 25 joint spaces never change for the life of its XRHand, so they are looked up once. */
+  private readonly spaceCache = new WeakMap<object, (XRJointSpace | undefined)[]>();
+  /** Joint radii read alongside the poses on the getJointPose path, so each joint is asked for once. */
+  private readonly fallbackRadii = new Float32Array(JOINT_COUNT);
   private lastWatchedSession: XRSession | null = null;
 
   /**
@@ -77,22 +86,31 @@ export class XRHandReader {
           .map((s: XRInputSource) => `${s.handedness}:${s.targetRayMode}:${s.hand ? 'hand' : 'ctl'}`)
           .join(',');
         this.debug.inputSourceEvents.push(`+(${added}) -(${removed})`);
+        // Only the latest few are kept, or the diagnostics report would grow with every controller on and off.
+        if (this.debug.inputSourceEvents.length > MAX_SOURCE_EVENTS) this.debug.inputSourceEvents.shift();
       });
     }
 
     // Inspect session.inputSources AND session.trackedSources (some runtimes place bare hands there).
     const session = frame.session as XRSession & { trackedSources?: Iterable<XRInputSource> };
-    const sources: XRInputSource[] = Array.from(session.inputSources);
+    // A reused array written by index: setting `length = 0` and pushing again re-allocates its storage each frame.
+    const sources = this.sourceList;
+    let nSources = 0;
+    const inputs = session.inputSources;
+    for (let i = 0; i < inputs.length; i++) sources[nSources++] = inputs[i];
     if (session.trackedSources) {
       for (const ts of session.trackedSources) {
-        if (!sources.includes(ts)) sources.push(ts);
+        let known = false;
+        for (let i = 0; i < nSources; i++) if (sources[i] === ts) known = true;
+        if (!known) sources[nSources++] = ts;
       }
     }
-    this.debug.sourcesSeen = sources.length;
+    this.debug.sourcesSeen = nSources;
 
     // Capture first frame sources info for telemetry if empty
-    if (this.debug.sources.length === 0 && sources.length > 0) {
-      for (const s of sources) {
+    if (this.debug.sources.length === 0 && nSources > 0) {
+      for (let i = 0; i < nSources; i++) {
+        const s = sources[i];
         this.debug.sources.push({
           targetRayMode: s.targetRayMode,
           handedness: s.handedness,
@@ -104,7 +122,7 @@ export class XRHandReader {
       }
     }
 
-    for (let s = 0; s < sources.length; s++) {
+    for (let s = 0; s < nSources; s++) {
       const source = sources[s];
       const xrHand = source.hand;
       if (!xrHand) continue;
@@ -122,55 +140,59 @@ export class XRHandReader {
 
       // Reset spaces array for this hand
       this.spaces.fill(undefined);
+      const cachedSpaces = this.spaceCache.get(xrHand);
+      if (cachedSpaces) for (let i = 0; i < JOINT_COUNT; i++) this.spaces[i] = cachedSpaces[i];
 
-      // Path 1: xrHand.get(jointName) or index
-      for (let i = 0; i < JOINT_COUNT; i++) {
-        const space = xrHand.get?.(JOINT_NAMES[i]) ?? (xrHand as unknown as Record<number, XRJointSpace>)[i];
-        if (space) this.spaces[i] = space;
-      }
+      if (!cachedSpaces) {
+        // Path 1: xrHand.get(jointName) or index
+        for (let i = 0; i < JOINT_COUNT; i++) {
+          const space = xrHand.get?.(JOINT_NAMES[i]) ?? (xrHand as unknown as Record<number, XRJointSpace>)[i];
+          if (space) this.spaces[i] = space;
+        }
 
-      // Path 2: Map iterator / entries if spaces[0] missing
-      if (!this.spaces[0]) {
-        try {
-          const iter =
-            typeof (xrHand as unknown as { entries?: () => Iterable<[string, XRJointSpace]> }).entries === 'function'
-              ? (xrHand as unknown as { entries: () => Iterable<[string, XRJointSpace]> }).entries()
-              : typeof (xrHand as unknown as Iterable<unknown>)[Symbol.iterator] === 'function'
-                ? (xrHand as unknown as Iterable<unknown>)
-                : null;
-          if (iter) {
-            for (const item of iter) {
-              if (Array.isArray(item)) {
-                const [key, js] = item as [unknown, XRJointSpace];
-                if (typeof key === 'string' && (key as JointName) in JOINT && js) {
-                  this.spaces[JOINT[key as JointName]] = js;
+        // Path 2: Map iterator / entries if spaces[0] missing
+        if (!this.spaces[0]) {
+          try {
+            const iter =
+              typeof (xrHand as unknown as { entries?: () => Iterable<[string, XRJointSpace]> }).entries === 'function'
+                ? (xrHand as unknown as { entries: () => Iterable<[string, XRJointSpace]> }).entries()
+                : typeof (xrHand as unknown as Iterable<unknown>)[Symbol.iterator] === 'function'
+                  ? (xrHand as unknown as Iterable<unknown>)
+                  : null;
+            if (iter) {
+              for (const item of iter) {
+                if (Array.isArray(item)) {
+                  const [key, js] = item as [unknown, XRJointSpace];
+                  if (typeof key === 'string' && (key as JointName) in JOINT && js) {
+                    this.spaces[JOINT[key as JointName]] = js;
+                  }
                 }
               }
             }
+          } catch (e) {
+            this.debug.lastError = `iter: ${String(e)}`;
           }
-        } catch (e) {
-          this.debug.lastError = `iter: ${String(e)}`;
         }
-      }
 
-      // Path 3: forEach
-      if (!this.spaces[0] && typeof xrHand.forEach === 'function') {
-        try {
-          xrHand.forEach((val: unknown, key: unknown) => {
-            const name =
-              (typeof key === 'string' && (key as JointName) in JOINT ? (key as JointName) : null) ??
-              (typeof val === 'string' && (val as JointName) in JOINT ? (val as JointName) : null) ??
-              ((val as { jointName?: string })?.jointName as JointName | undefined);
-            const js =
-              val && typeof val === 'object' && !('jointName' in val && typeof key === 'string')
-                ? (val as XRJointSpace)
-                : (key as XRJointSpace);
-            if (name && name in JOINT && js) {
-              this.spaces[JOINT[name]] = js;
-            }
-          });
-        } catch (e) {
-          this.debug.lastError = `forEach: ${String(e)}`;
+        // Path 3: forEach
+        if (!this.spaces[0] && typeof xrHand.forEach === 'function') {
+          try {
+            xrHand.forEach((val: unknown, key: unknown) => {
+              const name =
+                (typeof key === 'string' && (key as JointName) in JOINT ? (key as JointName) : null) ??
+                (typeof val === 'string' && (val as JointName) in JOINT ? (val as JointName) : null) ??
+                ((val as { jointName?: string })?.jointName as JointName | undefined);
+              const js =
+                val && typeof val === 'object' && !('jointName' in val && typeof key === 'string')
+                  ? (val as XRJointSpace)
+                  : (key as XRJointSpace);
+              if (name && name in JOINT && js) {
+                this.spaces[JOINT[name]] = js;
+              }
+            });
+          } catch (e) {
+            this.debug.lastError = `forEach: ${String(e)}`;
+          }
         }
       }
 
@@ -181,6 +203,8 @@ export class XRHandReader {
       if (this.debug.sources[s]) {
         this.debug.sources[s].spacesFound = spacesCount;
       }
+      // A complete set is kept for the life of this XRHand; an incomplete one is looked up again next frame.
+      if (!cachedSpaces && spacesCount === JOINT_COUNT) this.spaceCache.set(xrHand, this.spaces.slice());
 
       let valid = 0;
       let filled = false;
@@ -198,6 +222,7 @@ export class XRHandReader {
       }
 
       if (!filled) {
+        this.fallbackRadii.fill(0.01);
         for (let i = 0; i < JOINT_COUNT; i++) {
           const space = this.spaces[i];
           if (!space) continue;
@@ -205,6 +230,7 @@ export class XRHandReader {
             const pose = frame.getJointPose?.(space, refSpace);
             if (!pose) continue;
             this.poses.set(pose.transform.matrix, i * 16);
+            this.fallbackRadii[i] = pose.radius ?? 0.01;
             valid++;
           } catch (e) {
             this.debug.lastError = `getJointPose: ${String(e)}`;
@@ -235,16 +261,7 @@ export class XRHandReader {
           hand.radii.fill(0.01);
         }
       } else {
-        for (let i = 0; i < JOINT_COUNT; i++) {
-          const space = this.spaces[i];
-          if (!space) continue;
-          try {
-            const pose = frame.getJointPose?.(space, refSpace);
-            hand.radii[i] = pose?.radius ?? 0.01;
-          } catch {
-            hand.radii[i] = 0.01;
-          }
-        }
+        hand.radii.set(this.fallbackRadii);
       }
 
       // Reference space to scene space; keep translation only.

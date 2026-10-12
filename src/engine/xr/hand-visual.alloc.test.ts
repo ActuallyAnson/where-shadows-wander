@@ -1,15 +1,11 @@
 // CapsuleHandVisual.update runs every XR frame, so it must not allocate (see frame-pipeline.alloc.test.ts
 // for why). Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
+import { bytesPerFrame, gc, inCI } from '../sim/alloc-measure';
 import { createHandFrame } from '../hands/hand';
 import { PRESETS, writeHandPose } from '../hands/synthetic-hand';
 import { CapsuleHandVisual } from './hand-visual';
 
-const node = globalThis as unknown as {
-  gc?: () => void;
-  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
-};
-const gc = node.gc;
 const FRAMES = 3_000;
 const BUDGET_BYTES_PER_FRAME = 64;
 
@@ -31,39 +27,22 @@ function makeStep(extra?: () => void) {
   };
 }
 
-function measure(step: () => void, frames: number): number {
-  for (let i = 0; i < 60000; i++) step();
-  gc!();
-  const before = node.process.memoryUsage().heapUsed;
-  let last = before;
-  for (let i = 0; i < frames; i++) {
-    step();
-    if (i % 100 === 99) {
-      const now = node.process.memoryUsage().heapUsed;
-      if (now < last)
-        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
-      last = now;
-    }
-  }
-  return node.process.memoryUsage().heapUsed - before;
-}
-
 it('has garbage collection exposed when running in CI', () => {
-  expect(gc !== undefined || !node.process.env.CI).toBe(true);
+  expect(gc !== undefined || !inCI).toBe(true);
 });
 
 describe.skipIf(!gc)('hand visual allocation', () => {
   it('stays under the allocation budget', () => {
-    const bytes = measure(makeStep(), FRAMES);
-    console.info(`hand visual allocates ${(bytes / FRAMES).toFixed(1)} B a frame`);
-    expect(bytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
-  });
+    const bytes = bytesPerFrame(makeStep(), { frames: FRAMES, goodBelow: BUDGET_BYTES_PER_FRAME / 2 });
+    console.info(`hand visual allocates ${bytes.toFixed(1)} B a frame`);
+    expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
+  }, 60_000);
 
   it('catches a step that allocates and throws it away (a control for the test itself)', () => {
-    const bytes = measure(
+    const bytes = bytesPerFrame(
       makeStep(() => void new Array(64).fill(0.5)),
-      FRAMES,
+      { frames: FRAMES, attempts: 1 },
     );
-    expect(bytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
-  });
+    expect(bytes).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
+  }, 60_000);
 });

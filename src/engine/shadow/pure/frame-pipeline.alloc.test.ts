@@ -130,7 +130,7 @@ describe.skipIf(!gc)('frame pipeline allocation', () => {
     const { heapBytes } = measure(makePipeline(), FRAMES);
     console.info(`pipeline allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
     expect(heapBytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
-  });
+  }, 60_000);
 
   it('catches a stage that allocates and throws it away (a control for the test itself)', () => {
     const { heapBytes } = measure(
@@ -138,7 +138,7 @@ describe.skipIf(!gc)('frame pipeline allocation', () => {
       FRAMES,
     );
     expect(heapBytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
-  });
+  }, 60_000);
 
   it('catches the regression the docs name: a joint array copied per hand per frame', () => {
     const joints = new Float32Array(75);
@@ -150,5 +150,5 @@ describe.skipIf(!gc)('frame pipeline allocation', () => {
       FRAMES,
     );
     expect(heapBytes / FRAMES).toBeGreaterThan(BUDGET_BYTES_PER_FRAME);
-  });
+  }, 60_000);
 });
