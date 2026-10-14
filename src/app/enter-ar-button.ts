@@ -1,5 +1,6 @@
 import type { World } from '@iwsdk/core';
 import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+import { DEBUG_TOOLS } from '../debug/debug-flag';
 
 export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   const xr = navigator.xr;
@@ -196,6 +197,17 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   });
   buttonRow.append(copyBtn);
 
+  // Testing: the address switches (?debug=joints, ?flicker=0, ?record ...) as buttons, for headsets with no easy address
+  // bar. A debug tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
+  let testingElement: HTMLElement | null = null;
+  if (DEBUG_TOOLS) {
+    const { createTestingPanel } = await import('./testing-panel');
+    const testing = createTestingPanel();
+    testingElement = testing.element;
+    buttonRow.append(makeBtn('🧪 Testing', '#2b2410', '#e3b341', '#9e6a03', testing.toggle));
+  }
+
+  if (testingElement) uiContainer.append(testingElement);
   uiContainer.append(logBox, buttonRow);
   document.body.append(uiContainer);
 

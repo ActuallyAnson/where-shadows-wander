@@ -59,9 +59,9 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 | `src/game` | A | Yes | Traveller, shape abilities, puzzles, companions, discovery |
 | `src/engine/render` | B | Adapters no | Stage renderer: instanced sprites, draw order, materials |
 | `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
-| `src/engine/services` | Anson (B owns the content: sounds, gallery) | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
-| `src/ui` | B | No | Onboarding, lantern flow, placement, chapter flow, settings |
-| `src/debug` | B | No | Diagnostics report, anchor probe, profiler, Copy report panel |
+| `src/engine/services` | Anson (B owns the content: sounds, gallery) | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), settings (`settings/`: the accessibility settings table and the store that applies them live, ADR 0011), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
+| `src/ui` | B (settings panel: Anson) | No | Onboarding, lantern flow, placement, chapter flow, the settings panel (`settings-panel/`, ADR 0011) |
+| `src/debug` | B (debug tools: Anson) | No | Diagnostics report, anchor probe, profiler, Copy report panel; the debug tools (time control, overlays, system switches, replay, keys, menu pages), dev and tester builds only ([ADR 0012](adr/0012-debug-tools.md)) |
 
 "Adapters no" means only the thin layer that talks to IWSDK or three.js may import them; the logic behind it stays pure.
 
@@ -137,6 +137,7 @@ The diagnostics report has a `render` section (`clearAlpha`, `toneMapping`, `out
 | One driver system; our own fixed-step loop | Simulation is deterministic and independent of display rate; IWSDK's private loop stays untouched ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)) |
 | Raw WebXR, every feature optional and feature-detected | Works on Pico, Quest and the emulator alike ([ADR 0003](adr/0003-pico-as-stand-in-test-device.md)) |
 | Exact version pins; one three.js | IWSDK is young and pins its own three.js fork ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)) |
+| Debug code is reached only through `if (DEBUG_TOOLS)` and a dynamic import | The judges' build must not contain it; `scripts/check-debug-free.mjs` builds both ways and looks ([ADR 0012](adr/0012-debug-tools.md)) |
 | Lucide icon set aliased out | First load 0.7 MB instead of 1.7 MB ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)) |
 | No top-level `await` in entry files | Deadlocks IWSDK's lazy chunk in production builds |
 | IWSDK's hand meshes hidden every frame, its rays turned off | Players see their real hands in passthrough and never point at anything; IWSDK's own hand toggle doesn't work |

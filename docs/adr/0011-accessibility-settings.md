@@ -27,7 +27,7 @@ The GDD promises tolerance and hold-time settings, a shadow size, high contrast,
 
 ## Consequences
 
-- Opening the panel: the Hand Lab's Settings button on a desktop, and `__wsw.openSettings()` in dev; in a headset and in play, nothing opens it yet. Teammate B's lantern flow should call `openSettings` (a palm-up gesture or a gear by the lantern were considered).
+- Opening the panel: the Hand Lab's Settings button on a desktop, the launcher's Testing button ("Settings panel opens when VR starts", a debug tool, [ADR 0012](0012-debug-tools.md)) in a headset for now, and `__wsw.openSettings()` in dev; in play, nothing opens it yet. Teammate B's lantern flow should call `openSettings` (a palm-up gesture or a gear by the lantern were considered).
 - A new setting is a table entry, a page slot and, if it steers an engine object, one case in `SettingsStore.apply`; a new field also needs a save version bump.
 - Settings are per browser, like the save.
 - Starting over (`SaveManager.reset()`) keeps the settings: they are the player's access needs, not progress.
