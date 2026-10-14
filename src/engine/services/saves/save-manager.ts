@@ -30,6 +30,7 @@ import {
   type Sanitized,
   type SaveData,
 } from './schema';
+import { repairSettings, settingsEqual, type Settings } from '../settings/settings';
 import type { KeyValueStore } from './storage';
 
 /** Sequence numbers above this are refused as damage, so `seq + 1` can never stop changing the number. */
@@ -196,6 +197,15 @@ export class SaveManager {
     if (done.includes(chapter)) return true;
     done.push(chapter);
     done.sort((a, b) => a - b);
+    return this.touch();
+  }
+
+  /** Stores the player's settings (each value repaired into range). Returns false if nothing changed. */
+  setSettings(next: Readonly<Settings>): boolean {
+    const fixed = repairSettings(next).settings;
+    if (settingsEqual(fixed, this.current.settings)) return false;
+    this.current.settings = fixed;
+    this.current.settingsAt = this.now();
     return this.touch();
   }
 

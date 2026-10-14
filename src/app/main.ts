@@ -16,7 +16,7 @@ import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
-import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
@@ -25,6 +25,7 @@ import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { StageFrame } from '../engine/stage/stage-frame';
+import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -41,6 +42,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { SettingsPanel } from '../ui/settings-panel/settings-panel';
 import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
@@ -168,6 +170,34 @@ async function start(): Promise<void> {
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
+  // The accessibility settings (docs/adr/0010-saves.md): loaded from the save, applied live to the recognizer,
+  // shadows, lantern and mixer, and saved on change. The lantern flicker follows the device's reduced-motion
+  // default until the player moves its slider, and ?flicker= overrides the setting for testing.
+  const settings = new SettingsStore(
+    { recognizer: shapes, projector, sharpen, lantern: lanternLight, mixer: audio.mixer },
+    { applyOnlyWhenChosen: ['flicker'], neverApply: Number.isFinite(flickerParam) ? ['flicker'] : [] },
+    saves.data.settings,
+  );
+  settings.subscribe(() => saves.setSettings(settings.value));
+  // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
+  const applyContrast = () => {
+    stageView.highContrast = settings.value.highContrast;
+    shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
+  };
+  settings.subscribe((key) => {
+    if (key === null || key === 'highContrast') applyContrast();
+  });
+  applyContrast();
+  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the lantern flow
+  // will open it (nothing does yet; `__wsw.openSettings()` in dev).
+  const settingsPanel = new SettingsPanel(world, settings);
+  const settingsHead = new Vector3();
+  const settingsLook = new Vector3();
+  const openSettings = () => {
+    world.camera.getWorldPosition(settingsHead);
+    world.camera.getWorldDirection(settingsLook);
+    return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+  };
   let badPoseReported = false;
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
@@ -215,6 +245,10 @@ async function start(): Promise<void> {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
+      settings: {
+        toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
+        isOpen: () => settingsPanel.isOpen,
+      },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -248,6 +282,7 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
@@ -589,6 +624,11 @@ async function start(): Promise<void> {
         handsStatus,
         visibility,
         saves,
+        settings,
+        settingsPanel,
+        stageView,
+        shadowRenderer,
+        openSettings,
         shapes,
         gestures,
         projector,

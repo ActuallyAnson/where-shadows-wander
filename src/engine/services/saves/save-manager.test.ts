@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { checksum } from './checksum';
 import { blockedError, FakeStore, quotaError } from './fake-store';
 import { MAX_SEQ, SaveManager, saveKeys, type SaveManagerOptions } from './save-manager';
-import { defaultData, LIMITS, type SaveData } from './schema';
+import { defaultData, CURRENT_VERSION, LIMITS, type SaveData } from './schema';
 import { sanitize } from './schema';
 import { MemoryStore } from './storage';
 
@@ -24,7 +24,7 @@ const open = (store: FakeStore | MemoryStore, extra: Partial<SaveManagerOptions>
 };
 
 /** An envelope exactly as the manager writes one, for planting in a store. */
-function envelope(data: Partial<SaveData> | object, seq: number, v = 1): string {
+function envelope(data: Partial<SaveData> | object, seq: number, v = CURRENT_VERSION): string {
   const text = JSON.stringify({ ...defaultData(1000), ...data });
   return JSON.stringify({ format: 'wsw-save', v, seq, sum: checksum(`${v}|${seq}|${text}`), data: text });
 }
@@ -94,8 +94,8 @@ describe('loading', () => {
     ['an empty object', () => '{}'],
     ['not an object', () => '42'],
     ['a different format', (e: string) => e.replace('wsw-save', 'other')],
-    ['a version of 0', (e: string) => e.replace('"v":1', '"v":0')],
-    ['a fractional version', (e: string) => e.replace('"v":1', '"v":1.5')],
+    ['a version of 0', (e: string) => e.replace('"v":2', '"v":0')],
+    ['a fractional version', (e: string) => e.replace('"v":2', '"v":1.5')],
     ['a negative sequence number', (e: string) => e.replace('"seq":5', '"seq":-5')],
     ['text for the data', (e: string) => e.replace(/"data":".*"\}$/, '"data":5}')],
   ])('treats %s as damaged, recovers from the other slot and keeps the damaged text', (_name, damage) => {
@@ -149,7 +149,11 @@ describe('loading', () => {
 
 describe('a save from a newer version', () => {
   const future = () =>
-    envelope({ progress: { chapter: 9, puzzle: 0, chaptersCompleted: [], lastPlayedDay: '', at: 0 } }, 8, 2);
+    envelope(
+      { progress: { chapter: 9, puzzle: 0, chaptersCompleted: [], lastPlayedDay: '', at: 0 } },
+      8,
+      CURRENT_VERSION + 1,
+    );
 
   it('is left exactly as it is: the session plays from defaults and is not saved, and says so', () => {
     const store = new FakeStore();
@@ -225,7 +229,7 @@ describe('a save from a newer version', () => {
     const good = defaultData(1000);
     good.progress.chapter = 3;
     store.map.set(SLOT_KEYS[0], envelope(good, 4));
-    store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), 5).replace('"v":1', '"v":7'));
+    store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), 5).replace('"v":2', '"v":7'));
     const m = open(store);
     expect(m.status).toMatchObject({ newerVersion: false, recovered: 'other-slot' });
     expect(m.data.progress.chapter).toBe(3);
@@ -888,7 +892,7 @@ describe('keys and types', () => {
 
   it('a field the version does not know is dropped and counted as a repair', () => {
     const store = new FakeStore();
-    store.map.set(SLOT_KEYS[0], envelope({ ...defaultData(1000), settings: { volume: 1 } }, 2));
+    store.map.set(SLOT_KEYS[0], envelope({ ...defaultData(1000), futureField: 1 }, 2));
     const m = open(store);
     expect(m.status.repairs).toBe(1);
   });
