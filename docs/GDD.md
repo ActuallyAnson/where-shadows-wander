@@ -2,7 +2,7 @@
 
 ## Overview
 
-Where Shadows Wander is a seated, hands-only virtual reality puzzle game: sit in a small, cosy, lantern-lit room, light the lantern on the table in front of you, and your hands' shadows help a little traveller cross the wall, one short chapter a night.
+Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid who can't sleep sits up in bed, lights a little lantern, and plays with the shadows on the bedroom wall, where their hands' shadows help a little traveller wander across a landscape of shadows, until the kid drifts off to sleep.
 
 | Item | Detail |
 |----|----|
@@ -13,18 +13,26 @@ Where Shadows Wander is a seated, hands-only virtual reality puzzle game: sit in
 | Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
 | Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
 | Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
-| Session length | 5–8 minutes per chapter |
+| Session length | 5–8 minutes: one night, one level |
 | Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
 
 ### Direction (5 Oct 2026)
 
 The game is set in a **virtual room**, not the player's real one. A lantern on a table lights a wall, the player's hands cast shadows on it, and a traveller walks across it. We chose this because the art and lighting are then the same for every player, nothing depends on finding a table or wall in the real room, and testing is predictable. The costs are that passthrough is not used (the judging criteria reward passthrough that is purposeful, and scene understanding and anchoring, for entries that use them) and that the player's hands, which they can no longer see, must be drawn. The earlier real-room plan (a tabletop theatre or a real wall, in passthrough) is out of v1 and could return as a second mode: the stage code takes any surface, so it would only swap the surface. The passthrough compositing, hand occluder and plane detection already written stay in the repository, switched off for v1.
 
+### Direction (17 Oct 2026): a bedroom at night, and shadows of things that aren't there
+
+The virtual room is a **kid's bedroom at night**. The kid is a little restless and can't fall asleep, so he sits up in bed and plays with shadows on the wall until he drifts off. The tone is cozy and calm, never scary. The game is **one small level, one night**: there are no further nights or chapters to come back for.
+
+The landscape the traveller walks on (hills, ledges, gaps) is made of **shadows cast by invisible props**. Each prop is a simple 3D shape placed in the scene editor (a stack of books, a toy block, a castle) that is never drawn: only its shadow appears on the wall, as if the lantern were lighting things that aren't in the room. Nothing visible stands between the player and the wall, so the shadows are never blocked, and since nobody sees the props, they can change between scenes without anything in the room visibly moving. The hands still cast their shadows from the same lantern, so props and hands share one light and one look.
+
+We chose invisible props over visible ones (proposal in PR #47) because visible props would have to be rearranged between scenes, which breaks the room's realism, and would sit in the way of the wall. We chose them over shapes drawn straight onto the wall because a prop's shadow comes from the same light as the hands, so it has the same perspective, softness and flicker.
+
 ### Design pillars
 
 1.  **Your hands are the toolkit.** Every action is a hand shape. Nothing on screen needs to be pointed at or pressed.
 
-2.  **One room, one light, one wall.** A small room built so nothing competes with the shadows: a lantern on a table lights a wall, and the wall is the stage.
+2.  **One room, one light, one wall.** A small bedroom built so nothing competes with the shadows: a lantern in front of the kid lights the wall, and the wall is the stage.
 
 3.  **Readable at a glance.** Silhouettes, one light source, one surface. A first-time player understands the scene within seconds.
 
@@ -32,11 +40,11 @@ The game is set in a **virtual room**, not the player's real one. A lantern on a
 
 ## Core experience and setup
 
-The player sits at a table in a small virtual room, places a lantern on it, reaches into its beam, and their hand shadows land on the wall in front of them.
+The player is the kid, sitting up in bed with a bed tray across their lap. They place a lantern on the tray, reach into its beam, and their hand shadows land on the bedroom wall in front of them.
 
 ### The lantern
 
-The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it on the table is the first action of every session; covering the flame pauses the session.
+The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it on the bed tray is the first action of every session; covering the flame pauses the session.
 
 Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with recordings):
 
@@ -46,11 +54,11 @@ Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with r
 
 ### The stage
 
-The stage is a large cream paper screen on the wall of the virtual room, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The lantern stands on the table close to the player, the hands are between the lantern and the wall, and the shadows land on the wall.
+The stage is a plain, pale patch of the bedroom wall at the foot of the bed, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The lantern stands on the bed tray close to the player, the hands are between the lantern and the wall, and the shadows land on the wall. The invisible props that cast the level stand between the lantern and the wall too, but are never drawn.
 
 ### The room and the hands
 
-- **The room:** small, warm and mostly dark, lit only by the lantern. A table with the lantern, the paper wall ahead, a few quiet objects (a window, a shelf where the creature gallery sits, a rug). Nothing moves except the flame, a few dust motes and the story. Anything near the shadow area stays light and low-contrast so the black shadows stay readable. The art style is open: flat paper-cut layers, or a richer lit diorama in the manner of Octopath Traveler (without real-time bloom or depth-of-field, which are too costly on a headset).
+- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the lantern. The bed with its tray and the lantern, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf where the creature gallery sits, a rug, a few toys). Nothing moves except the flame, a few dust motes and the story. Anything near the shadow area stays light and low-contrast so the black shadows stay readable. The art style is open: flat paper-cut layers, or a richer lit diorama in the manner of Octopath Traveler (without real-time bloom or depth-of-field, which are too costly on a headset).
 
 - **The hands:** in VR the player cannot see their real hands, so the game draws a hand for each tracked hand, following the 25 joints. The look is open (a dark paper-cut glove or a simple stylised hand). Rules: always visible while tracked, simple and low-detail rather than realistic, never covering the shadow area, fading out when tracking is lost with a gentle "show me your hands" cue. The shadow is cast from the tracked joints, not from the hand model, so the model can look any way without changing the game.
 
@@ -58,7 +66,7 @@ The stage is a large cream paper screen on the wall of the virtual room, about 2
 
 ### Light geometry
 
-A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The lantern flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably.
+A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The lantern flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably. The invisible props are projected the same way, so their shadows match the hands'.
 
 ## Gameplay
 
@@ -66,7 +74,17 @@ The player helps a shadow traveller walk from one side of the stage to the other
 
 ### The traveller
 
-A small silhouette figure with a lantern-lit cloak. It walks on its own and stops at obstacles, then waits and looks back at the player. The player never controls it directly; they change the world around it.
+A small silhouette figure with a lantern-lit cloak. It walks on its own and stops at obstacles, then waits and looks back at the player. The player never controls it directly; they change the world around it. (Who the traveller is in the story is still open: one of the kid's toys, his dream self, or a little creature that lives in the wall's shadows.)
+
+### The landscape: shadows of invisible props
+
+The ground the traveller walks on is the shadow of props that are never drawn.
+
+- **Props are simple 3D shapes** placed in the scene editor between the lantern and the wall, in the shapes of bedroom things: books, toy blocks, a toy castle, a teacup. Their shadows read as a landscape: a stack of books becomes a ledge, two blocks with space between them a gap.
+- **Only the shadow is shown.** A prop's shadow is projected from the lantern onto the wall like a hand's, drawn black, and turned into collision terrain for the traveller when a scene starts. A prop that doesn't move costs nothing per frame.
+- **Props can change without breaking the room.** Between scenes the set of props changes, and the wall shows the next part of the landscape. Because the props are invisible, nothing in the room is seen moving. A prop may also move during a scene (a shadow that sways or slides) when a puzzle needs it.
+- **The hands stay the only thing the player changes.** The player never moves a prop.
+- **Level design works backwards:** sketch the shadow landscape the puzzle needs, then place props whose shadows make it. Block-like props (books, blocks, boxes) make most of it; odd shapes are landmarks. Where a shadow is almost right, a scene may add a little invisible terrain.
 
 ### Shape vocabulary (v1)
 
@@ -106,7 +124,7 @@ New creatures are discovered, not unlocked from a menu: a faint hint appears in 
 
 ### Puzzles (NOT FIXED – JUST IDEAS)
 
-Each puzzle is a single screen of the stage with one obstacle. Every puzzle accepts at least two solutions.
+The puzzles will be finalised later, around the bedroom and its invisible props; the table below is the earlier list of ideas. Each puzzle is a single scene of the stage with one obstacle. Every puzzle accepts at least two solutions.
 
 | \# | Obstacle | Intended solution | Alternative |
 |----|----|----|----|
@@ -117,9 +135,9 @@ Each puzzle is a single screen of the stage with one obstacle. Every puzzle acce
 | 5 | Crows block the path | Fox scares them away | Cup fireflies to distract them |
 | 6 | Locked gate with a weight plate | Fist rock on the plate | Fox digs under the gate |
 
-### Chapter structure
+### The night
 
-One chapter is one night: 5–6 puzzles, about 5–8 minutes. It ends with the traveller reaching a lit window, the lantern dimming, and the chapter's final scene staying painted on the stage. v1 ships one fully polished chapter.
+The whole game is one small level: one night, a short run of puzzles (how many is decided with the puzzles), about 5–8 minutes. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the lantern dims, and the last scene stays on the wall. There are no further nights or chapters.
 
 ## Player journey
 
@@ -127,9 +145,9 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 ### First five minutes
 
-1.  **0–10 s:** The headset fades in on the cosy room. An unlit lantern sits on the table in front of the player, with a bare paper wall ahead.
+1.  **0–10 s:** The headset fades in on the kid's bedroom at night. The player sits up in bed; an unlit lantern sits on the bed tray in front of them, with a bare wall ahead.
 
-2.  **10–20 s:** The player picks the lantern up and sets it down with a pinch-and-release (it settles on the table). It lights, and the paper wall glows warm.
+2.  **10–20 s:** The player picks the lantern up and sets it down with a pinch-and-release (it settles on the tray). It lights, the wall glows warm, and the first shadow landscape appears on it.
 
 3.  **20–40 s:** The player's hand shadows appear on the wall. They wave and see their shadow move. No prompt is needed.
 
@@ -147,11 +165,11 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 - **Resume:** Relight with a pinch. The scene fades back in at the same puzzle.
 
-- **End:** The chapter finishes on a painted final scene and a creature added to the gallery.
+- **End:** The kid falls asleep: the night finishes on its last scene and a creature added to the gallery.
 
 ### Reason to come back
 
-- A new chapter unlocks each real night (v1 can ship with a teaser for chapter 2).
+The game is one short night, so coming back is about doing it differently, not about new content:
 
 - The room keeps a gallery of the creatures the player has discovered, shown as paper figures on a shelf and saved in the browser.
 
@@ -159,7 +177,7 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 ## Art and audio direction
 
-The whole game is black silhouettes on warm, lantern-lit paper, a style that looks finished with a small team and few assets.
+The whole game is black silhouettes on a warm, lantern-lit wall, a style that looks finished with a small team and few assets.
 
 ### Visual style
 
@@ -181,7 +199,7 @@ The whole game is black silhouettes on warm, lantern-lit paper, a style that loo
 
 - **Feedback:** A paper rustle when a shape is recognised; a soft thump when it commits; a chime when a puzzle is solved.
 
-- **Music:** Sparse plucked strings or music box, a short motif per chapter that resolves at the ending.
+- **Music:** Sparse plucked strings or music box, a short lullaby-like motif that resolves as the kid falls asleep.
 
 - **Spatial:** Sounds originate from where they happen on the stage, so the player can hear the traveller arrive before seeing it.
 
@@ -229,15 +247,19 @@ We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pi
 
 3.  Each frame, project every hand joint from the lantern position onto the plane, giving 2D points.
 
-4.  Run all gameplay (traveller, obstacles, companions, collisions) in this 2D space.
+4.  When a scene starts, project each invisible prop from the lantern onto the plane the same way, and turn its shadow outline into terrain (re-projected only for a prop that moves).
 
-5.  Render 2D game objects as flat quads placed on the plane.
+5.  Run all gameplay (traveller, obstacles, companions, collisions) in this 2D space.
+
+6.  Render 2D game objects as flat quads placed on the plane.
 
 Because the wall is fixed there is no detection step and no fallback. A real table or wall (a possible later mode) would only supply a different plane frame; all gameplay code is identical.
 
 ### Shadow rendering
 
 - A copy of each hand mesh is flattened onto the stage plane with a planar projection matrix and drawn solid black.
+
+- The invisible props are flattened the same way, with the same projection, and drawn solid black; the props themselves are never drawn. A prop that doesn't move can be flattened once when its scene starts.
 
 - The projection blends between perspective (from the lantern) and orthographic to keep shadow size stable.
 
@@ -281,7 +303,7 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 ### Persistence
 
-- Chapter progress, discovered creatures and solutions found are saved in browser storage.
+- Progress through the night, discovered creatures and solutions found are saved in browser storage.
 
 - The room needs no spatial anchors: it is the same every session.
 
@@ -294,6 +316,12 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 - [ ] Confirm hand tracking in an immersive-vr session on the Quest Browser, and why the Pico delivers hands to the WebXR sample but not to our page.
 
 - [ ] Decide the hand look (paper glove or a simple stylised hand) and the room art style.
+
+- [ ] Decide who the traveller is in the bedroom story (one of the kid's toys, his dream self, or a creature of the wall's shadows).
+
+- [ ] Finalise the night's puzzles and how many there are, around the invisible props.
+
+- [ ] Decide how the editor shows a prop's shadow while it is placed, so levels can be designed by eye.
 
 - [ ] Ask the organisers how a VR-only entry (no passthrough, no scene understanding) is scored under Technical implementation, since that criterion names them for entries that use them.
 
@@ -323,7 +351,7 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 
 - **Comfort:** No artificial locomotion, no camera movement, nothing that requires standing or turning around.
 
-- **Arm fatigue:** Puzzles are designed so hands rest on or near the table between actions.
+- **Arm fatigue:** Puzzles are designed so hands rest on or near the bed tray between actions.
 
 ## Competition fit
 
@@ -334,9 +362,9 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 | Rule | How Where Shadows Wander meets it |
 |----|----|
 | Hands-first, completable without a controller | Hands are the only input; no controller code path is needed |
-| Seated-optimised (airplane seat test) | All play happens seated at a table in a virtual room, with the wall in view and the hands within reach |
+| Seated-optimised (airplane seat test) | All play happens seated (the kid sitting up in bed in a virtual bedroom), with the wall in view and the hands within reach |
 | Passthrough (judged for purpose if used) | Not used. The entry leans on hands-first design, the first five minutes, accessibility and polish instead |
-| Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, 5–8 minute chapters |
+| Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, a 5–8 minute night |
 | Original, not a wrapper (take it away test) | All gameplay is built in-house; no third-party service |
 | New Experience division | Codebase started on or after 24 Sep 2026 |
 
@@ -347,7 +375,7 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 | Boldest Original Concept | Your own hands' shadows as the only controls, in a lantern-lit shadow theatre. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
 | Best First Five Minutes | No instructions; the first puzzle is solved by instinct |
 | Best Accessibility Forward Experience | One-handed play, tolerance and hold-time settings, high-contrast mode |
-| Best Reason to Come Back | Nightly chapters and a persistent creature gallery |
+| Best Reason to Come Back | A persistent creature gallery and alternative solutions to find. (A weaker fit now that the game is one night with no further chapters.) |
 
 ### Submission checklist
 
@@ -371,15 +399,15 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 ## Scope, milestones and risks
 
-v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage modes, with features frozen at the start of week 7.
+v1 is one polished night: a short run of puzzles (to be finalised), 4 verb shapes, 2 companions, with features frozen at the start of week 7.
 
 ### In scope / out of scope
 
 | In v1                           | Later                               |
 |---------------------------------|-------------------------------------|
-| Chapter 1 (6 puzzles)           | Chapters 2+ and nightly unlocks     |
+| One night (puzzles to be finalised) | More levels                     |
 | 4 verb shapes, 2 companions     | Two-handed shapes (bird, butterfly) |
-| Virtual room with a wall stage  | Multiplayer shadow duets            |
+| Bedroom with a wall stage and invisible-prop landscape | Multiplayer shadow duets |
 | —                               | Real-room mode (table or wall in passthrough) |
 | Creature gallery                | Player-made shadow stories          |
 | Accessibility settings          | Localisation                        |
@@ -392,11 +420,11 @@ v1 is one polished chapter: 6 puzzles, 4 verb shapes, 2 companions, both stage m
 
 3.  **Week 3 (to 22 Oct):** Pose classifier for the 4 verb shapes with hold-to-commit and hysteresis. Develop on the webcam hand bench, check against Pico recordings, and test with at least 3 other people (the bench works on any laptop).
 
-4.  **Week 4 (to 29 Oct):** Traveller and puzzles 1–3, including the wordless tutorial.
+4.  **Week 4 (to 29 Oct):** Traveller, invisible-prop shadows as terrain, and the first puzzles of the night, including the wordless tutorial.
 
-5.  **Week 5 (to 5 Nov):** Puzzles 4–6, rabbit and fox companions, chapter ending, saved gallery.
+5.  **Week 5 (to 5 Nov):** The remaining puzzles, rabbit and fox companions, the ending (the kid falls asleep), saved gallery.
 
-6.  **Week 6 (to 12 Nov):** The room and hand models, art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
+6.  **Week 6 (to 12 Nov):** The bedroom and hand models, art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
 
 7.  **Week 7 (to 19 Nov):** Testing on the Pico and Quest in different lighting (hand tracking depends on it), performance, demo video, submission form.
 
@@ -410,14 +438,15 @@ Everything in the IWSDK spike ran in the emulator only. The rows marked *Device*
 | Judging favours passthrough, scene understanding and anchors, which a VR-only entry does not use | High | Lead with hands-first design, accessibility, polish and the first five minutes; ask the organisers; keep the real-room mode as a possible later addition |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
 | Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |
-| Slow cold start in Quest Browser | Medium | Small initial bundle; stream chapter assets after the lantern appears |
+| Slow cold start in Quest Browser | Medium | Small initial bundle; stream the rest of the assets after the lantern appears |
 | Hand models look wrong or hide the shadows | Medium | Keep them simple, dark and low-detail; the shadow comes from the joints, not the model; check on the headset |
-| Scope creep | Medium | One chapter only; feature freeze end of week 6 |
+| Scope creep | Medium | One night only; feature freeze end of week 6 |
+| Designing levels from prop shadows is slow | Medium | Design backwards from the shadow landscape; mostly block-like props; see each prop's shadow while placing it; allow a little invisible terrain where a shadow is almost right; prototype one puzzle first |
 | *Device:* cold start in the headset browser over Wi-Fi | Medium | Report records time to first XR frame; 717 KB first load (0.5 s at 4× CPU throttle on desktop) |
 | *Device:* frame time with shadow and 500 quads at 72/90 Hz | Medium | Report logs frame intervals, frame rate and whether multiview is active (IWSDK requests it; the emulator lacks the extension); re-measure with OVR Metrics once the shadow lands |
 | *Device:* hand joint jitter, occlusion and tracking dropouts | High | Report counts partial frames and tracking losses per hand; tune classifier hysteresis from real data |
 | *Device:* hand joints depend on the browser: on the Pico only Wolvic Chromium (sideloaded) delivers them, and only when the session asks for little | Medium | The session asks for just the three features (in the launcher); Quest Browser is documented to support hand input; confirm on a Quest |
-| The virtual room and hand models are more art work than flat paper | Medium | A small room, few assets, free CC0 assets where licensing allows, flat silhouettes for everything near the shadows |
+| The bedroom and hand models are more art work than flat paper | Medium | A small room, few assets, free CC0 assets where licensing allows, flat silhouettes for everything near the shadows |
 | *Device:* self-signed LAN dev cert click-through | Low | Test builds go through GitHub Pages (real HTTPS); ADB port-forward to `localhost` as backup |
 | Works on Pico but not on Quest (different browser, tracker and chip) | High | Standard WebXR only, everything feature-detected; Quest check at each milestone and before submission; compare Pico and Quest reports |
 | No Quest available before submission | High | Line up a remote Quest tester (or borrow a headset) by week 4 at the latest; the submission checklist requires a fresh Quest 3S test |
