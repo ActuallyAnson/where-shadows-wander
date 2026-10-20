@@ -2,13 +2,27 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { AmbientLight, Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
+import {
+  AmbientLight,
+  Color,
+  Group,
+  Matrix4,
+  Quaternion,
+  SessionMode,
+  Vector3,
+  World,
+  createSystem,
+} from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { CandleView } from '../engine/render/candle-view';
+import { GhostTargetView } from '../engine/render/ghost-target-view';
+import { StageRenderer } from '../engine/render/stage-renderer';
+import { DEFAULT_CAPACITIES, Kind } from '../engine/sim/entity-kinds';
+import { EntityStore } from '../engine/sim/entity-store';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
@@ -152,7 +166,17 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
+  const stageGroup = new Group();
+  stageGroup.matrixAutoUpdate = false;
+  const stageRenderer = new StageRenderer(stageGroup);
+  const ghostTarget = new GhostTargetView(stageGroup, {
+    targetId: 'tutorial_bridge_hint',
+    x: 0.0,
+    y: -0.2,
+    requiredShape: 'flat',
+  });
+  const entityStore = new EntityStore(DEFAULT_CAPACITIES);
+  world.scene.add(stageView.group, stageGroup, shadowRenderer.mesh, candleView.group, ambientLight);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -216,6 +240,21 @@ async function start(): Promise<void> {
     } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
     stageView.place(stage, lantern);
     candleView.place(lantern);
+    const r = stage.right,
+      u = stage.up,
+      n = stage.normal,
+      o = stage.origin;
+    // prettier-ignore
+    stageGroup.matrix.set(
+      r[0], u[0], n[0], o[0],
+      r[1], u[1], n[1], o[1],
+      r[2], u[2], n[2], o[2],
+      0, 0, 0, 1,
+    );
+    stageGroup.matrixWorldNeedsUpdate = true;
+    if (entityStore.count === 0) {
+      entityStore.create(Kind.Traveller, -0.4, -0.2, 0.06);
+    }
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -252,9 +291,13 @@ async function start(): Promise<void> {
   }
   const handList = [hands.hands.left, hands.hands.right];
   let simWasPaused = false;
-  const sim = new FixedStepLoop(SIM_HZ, () => {
-    // Game simulation steps go here (week 2+).
-  });
+  const sim = Object.assign(
+    new FixedStepLoop(SIM_HZ, () => {
+      entityStore.beginStep();
+      // Game simulation steps go here (week 2+).
+    }),
+    { store: entityStore },
+  );
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -312,6 +355,11 @@ async function start(): Promise<void> {
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
     render: renderReport(),
+    stageRenderer: {
+      liveCount: stageRenderer.liveCount,
+      drawCalls: 1,
+      ghostTargetActive: ghostTarget.active,
+    },
     shadow: {
       stage: stageChoice,
       placed: rigPlaced,
@@ -621,6 +669,12 @@ async function start(): Promise<void> {
           failures.report('simulation', e);
         }
       }
+      try {
+        stageRenderer.update(sim.store, sim.alpha);
+        ghostTarget.update(delta, projector.shadows, shapes);
+      } catch (e) {
+        failures.report('stage renderer', e);
+      }
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       try {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
@@ -701,6 +755,10 @@ async function start(): Promise<void> {
         sharpen,
         lanternLight,
         candleView,
+        stageGroup,
+        stageRenderer,
+        ghostTarget,
+        entityStore,
         audio,
         gameAudio,
         debug,
