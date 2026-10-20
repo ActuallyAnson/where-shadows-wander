@@ -72,6 +72,12 @@ export class HandRecorder {
     this.onFinished?.(this.recording);
   }
 
+  /** A recorder with no address: 20 s of free hands, or the guided shape script (84 s, with prompts on a panel). */
+  static make(shapes: boolean, seconds = 20): HandRecorder {
+    const script = shapes ? new ShapeScript(SCRIPTS.shapes) : null;
+    return new HandRecorder(seconds, script ? 'guided: shapes' : 'testing', script);
+  }
+
   /**
    * Reads ?record=N (and &script=<name>, &note=...) from the URL; null if recording is off.
    * Pass allowScript = false where there's no headset to show prompts on (mock mode).

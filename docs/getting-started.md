@@ -90,6 +90,8 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
+**The Testing button (no address to type; dev server and tester builds only, section 17).** The launcher at the bottom of the page has a **Testing** button next to Enter VR. It opens big on/off buttons: joint dots, shadow capsules, open the settings panel when VR starts, and record your hands (20 s of free hands, or the guided shapes). Each press applies at once and is remembered in the browser, so there is nothing to apply and nothing to reload; the settings panel and the recording begin when you press Enter VR. **Clear all switches** turns everything off. The lantern flicker is a setting in the settings panel. `?mock`, `?src`, `?file` and `?stage` are only for the desktop Hand Lab, and `?xr=ar` is the launcher's Enter AR button. `node scripts/testing-probe.mjs <url>` checks it in a browser.
+
 **From the hosted build:** once GitHub Pages is set up (section 11), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
 
 **To record hand data on a headset,** add `?record=20` to the address, for example `https://192.168.1.95:8081/?record=20&note=fist then flat hand`. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR the page sends the file to the dev server, which saves it into `recordings/` on the computer running `npm run dev` (the button at the bottom right says where). If the page was not served by a dev server (a built page), press **Download recording** instead.
@@ -226,7 +228,49 @@ Progress, the creature gallery and the solutions found per puzzle are saved in t
 - **Start over** in the browser: `__wsw.saves.reset()` (it overwrites both slots; a save from a newer version is moved aside first), or delete the `wsw.save.*` keys.
 - **Check it in a browser:** `npx vite --port 8097 --strictPort`, then `node scripts/saves-probe.mjs https://localhost:8097`.
 
-## 16. Troubleshooting
+## 16. Settings
+
+The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are one table in `src/engine/services/settings/settings.ts`: tolerance, hold time, shadow size, recognition glow, lantern flicker, the four volumes, high contrast, captions (a stub until story beats exist) and the main hand. Each has a range, a default and a one-line explanation, and the panel, the saves and the tests all read that table.
+
+- **Open the panel:** on the desktop, press **Settings** in the Hand Lab (`?mock=1`, or **Open Hand Lab** on the game page). In a headset, press **Testing** in the launcher, turn on **Settings panel opens when VR starts**, then press Enter VR: it opens a second after the session starts, in front of you and a little toward your main hand. Nothing opens it in play yet: the lantern flow (Teammate B) should call `__wsw.openSettings()`.
+- **Use it:** poke a button with a fingertip. There are two pages (**More settings >** and **< Back**), **Reset to defaults** and **Close**. A change applies at once and is saved with the next save event.
+- **Use a setting in game code:** read `settings.value` (on `__wsw.settings` in dev) and `settings.subscribe(fn)` to hear changes. `highContrast`, `captions` and `hand` are only read by listeners; the other settings are already pushed to the recognizer, shadow projector, sharpen, lantern and mixer by the store.
+- **Add a setting:** add its field to `Settings`, an entry to `SETTING_SPECS` (with the one-line help) and a page slot in `PAGES` (`src/ui/settings-panel/markup.ts`), and, if it steers an engine object, a case in `SettingsStore.apply`. A new field needs a save version bump (section 15).
+- **Check it in a browser:** `npx vite --port 8097 --strictPort`, then `node scripts/settings-probe.mjs https://localhost:8097 [screenshot-prefix]` (presses the Hand Lab's Settings button, then presses things, checks the engine, the saves and high contrast, and saves screenshots). It presses with a click event on the element, not a real fingertip: **poke on a headset is not verified** (see the ADR).
+
+## 17. Debug tools
+
+Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the dev server and in a **tester build**; the judges' build (`npm run build`) does not contain them. `npm run build -- --mode tester` makes a tester build (for the Pico over GitHub Pages or a tunnel). The launcher's **Testing** button (section 6) and the `?debug=` views are part of the same gate. `node scripts/check-debug-free.mjs` builds both ways and fails if the normal build has any debug code in it; run it before a release.
+
+**Keyboard** (Alt plus the key, so none of it clashes with the Hand Lab's keys; a small line at the bottom left of the page shows what is not normal):
+
+| Keys | What it does |
+|---|---|
+| Alt+P | Pause or resume the simulation (hands and shadows stay live) |
+| Alt+. | Run exactly one fixed step (pauses first); press again for the next |
+| Alt+[ and Alt+] | Slower and faster: 1x, 1/2x, 1/4x, 1/10x |
+| Alt+0 | Normal speed, running |
+| Alt+K | Show the shadow capsules, outline and projected joints (what the solver gets from your hands) |
+| Alt+C | Show a circle for each entity collider (needs an `EntityStore`; see below) |
+| Alt+J | Show the joint dots |
+| Alt+R | Start or stop replaying the demo recording into the game, in place of your hands |
+| Alt+1 to Alt+5 | Switch off or on: shadow, sharpen, flicker, candle light, hand visual |
+
+**Hands-only menu.** The settings panel (section 16) has more pages after the two settings pages when the debug tools are on: **Debug: time and views** (pause, step, speed, capsules, colliders, joint dots) and **Debug: systems and replay** (the five systems, replay), then one page per group of registered actions. Poke a button; its text shows the state, and a key press updates it too. In a headset: Testing (launcher) > Settings panel opens when VR starts, press Enter VR, then the **Next page >** button.
+
+**Slow motion and stepping** wrap the call to `FixedStepLoop.advance` from outside (`TimeControl`); the simulation still only sees whole fixed steps, so a paused or slowed run stays deterministic. Hands, shadows, audio and the lantern keep running in real time: it is the simulation (Teammate A's) that slows.
+
+**Switching a system off** is an override that sits on top of the settings: changing a setting while a system is off does not turn it back on, and a page reload clears it. Sharpen restores to the setting's value; flicker to what the flame was doing before (the device's default or the player's choice).
+
+**Replay.** Alt+R plays `recordings/emulator-demo.handrec.json` (served by the dev server; `recordings/` is not in the repository or in a build) in a loop, and the hands cue and everything downstream see tracked hands. To replay another file from the console: `__wsw.debug.replay.load(json, 'name')`, then it is active until stopped (`__wsw.debug.replay.stop()`). The Hand Lab's own **Replay...** button still works at a desk.
+
+**Entity colliders.** Nothing makes an `EntityStore` in `main.ts` yet (the simulation step is empty). When Teammate A adds one, call `debug?.setEntityStore(store)` right after it, and Alt+C draws a circle per live entity (radius and position from the store, coloured by kind, up to 192).
+
+**Skip to a puzzle (not built).** It plugs in through `debug.controller.actions.register({ id, group: 'Puzzles', label, run })` (`src/debug/debug-actions.ts`): when the puzzle code and framework exist, register one action per puzzle at start and the menu lists them, six to a page. Register before the settings panel is first opened (it builds its pages once).
+
+**Adding a debug tool:** put it under `src/debug`, reach it only with `if (DEBUG_TOOLS) { const { ... } = await import(...) }` (never a static import from code that ships), add a marker string to `scripts/check-debug-free.mjs`, an item to `DebugController.pages()` and a key to `debug-keys.ts`. **Check it in a browser:** `npx vite --port 8097 --strictPort`, then `node scripts/debug-probe.mjs https://localhost:8097`.
+
+## 18. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -234,7 +278,7 @@ Progress, the creature gallery and the solutions found per puzzle are saved in t
 | Port 8081 already in use | `npm run dev:down`, then `npm run dev` again. |
 | No **Enter XR** button in desktop Chrome | Use the dev server (`npm run dev`), which adds the emulator. The hosted build only offers XR on a headset. |
 | No hands in the emulator | Switch the emulator's input to **Hands**. |
-| No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. Add `?debug=joints` to see a dot on every tracked joint. |
+| No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. Press **Testing** in the launcher and turn on **Joint dots** to see a dot on every tracked joint. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
 | No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always adds its own **Enter VR** buttons (and **Enter AR** when the browser supports it) at the bottom centre, so use those. If you don't see them, update to the latest `main`. |
