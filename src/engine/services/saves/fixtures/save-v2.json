@@ -1,0 +1,7 @@
+{
+  "format": "wsw-save",
+  "v": 2,
+  "seq": 9,
+  "sum": "e4f890dd",
+  "data": "{\"createdAt\":1760000000000,\"updatedAt\":1760001234567,\"progress\":{\"chapter\":1,\"puzzle\":3,\"chaptersCompleted\":[],\"lastPlayedDay\":\"2026-10-11\",\"at\":1760001200000},\"puzzles\":{\"c1-p1\":{\"solved\":true,\"solutions\":[\"flat-bridge\"]},\"c1-p2\":{\"solved\":true,\"solutions\":[\"cup\",\"roof\"]}},\"creatures\":{\"rabbit\":{\"discoveredAt\":1760000999000}},\"resetCount\":0,\"settings\":{\"tolerance\":2,\"holdTime\":0.6,\"shadowSize\":1.4,\"sharpen\":0.5,\"flicker\":0,\"volumeMaster\":0.8,\"volumeMusic\":0.3,\"volumeEffects\":1,\"volumeAmbience\":0.6,\"highContrast\":true,\"captions\":true,\"hand\":\"left\"},\"settingsAt\":1760001300000}"
+}

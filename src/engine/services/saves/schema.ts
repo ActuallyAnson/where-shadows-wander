@@ -1,11 +1,13 @@
-// What a save holds (version 1) and how to repair what was read back. Plain TypeScript, no browser.
+// What a save holds (version 2) and how to repair what was read back. Plain TypeScript, no browser.
 //
 // Ids are plain strings the game chooses (a puzzle "c1-p2", a solution "cup", a creature "rabbit"), so adding a
 // puzzle, solution or creature never needs a new version. A new FIELD does: bump CURRENT_VERSION, add a step
 // to migrations.ts and a frozen fixture (fixtures/save-v<N>.json), and a test fails if any of those is missing.
 
+import { DEFAULT_SETTINGS, repairSettings, type Settings } from '../settings/settings';
+
 export const SAVE_FORMAT = 'wsw-save';
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 
 export interface SaveProgress {
   /** The chapter to resume (1 is the first). */
@@ -39,6 +41,10 @@ export interface SaveData {
   creatures: Record<string, CreatureRecord>;
   /** How many times the player has started over. A copy with a higher count replaces one with a lower, so a reset is not undone by a stale copy (a merge would bring it back). */
   resetCount: number;
+  /** The accessibility settings (version 2). */
+  settings: Settings;
+  /** When the settings last changed, ms since 1970 (0 if never): the latest change wins when two copies merge. */
+  settingsAt: number;
 }
 
 /** Everything in T, read-only all the way down: callers change the save only through SaveManager's methods. */
@@ -71,6 +77,8 @@ export function defaultData(now: number): SaveData {
     puzzles: emptyRecord(),
     creatures: emptyRecord(),
     resetCount: 0,
+    settings: { ...DEFAULT_SETTINGS },
+    settingsAt: 0,
   };
 }
 
@@ -161,6 +169,10 @@ export function sanitize(raw: unknown, fallbackNow: number): Sanitized | null {
     }
   } else if (raw.creatures !== undefined) bad();
 
+  // Settings: a save with none (an older one, migrated) gets the defaults without a repair.
+  const fixed = repairSettings(raw.settings);
+  repairs += fixed.repairs;
+
   return {
     data: {
       createdAt,
@@ -175,17 +187,19 @@ export function sanitize(raw: unknown, fallbackNow: number): Sanitized | null {
       puzzles,
       creatures,
       resetCount: int(raw.resetCount, 0, 0),
+      settings: fixed.settings,
+      settingsAt: raw.settingsAt === undefined ? 0 : num(raw.settingsAt, 0),
     },
     repairs,
   };
 }
 
-const TOP_KEYS = ['createdAt', 'updatedAt', 'progress', 'puzzles', 'creatures', 'resetCount'];
+const TOP_KEYS = ['createdAt', 'updatedAt', 'progress', 'puzzles', 'creatures', 'resetCount', 'settings', 'settingsAt'];
 const PROGRESS_KEYS = ['chapter', 'puzzle', 'chaptersCompleted', 'lastPlayedDay', 'at'];
 
 /** Reads a version's data into valid SaveData, by version. A schema change adds its version's reader here. */
 export const SANITIZERS: Readonly<Record<number, (raw: unknown, fallbackNow: number) => Sanitized | null>> = {
-  1: sanitize,
+  2: sanitize,
 };
 
 type Obj = Record<string, unknown>;

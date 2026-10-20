@@ -1,6 +1,6 @@
 // Steps that bring an older save's data up to the current version, one version at a time. Plain TypeScript.
 //
-// MIGRATIONS[n] turns version-n data into version n + 1. Version 1 is the first, so the table is empty. A step
+// MIGRATIONS[n] turns version-n data into version n + 1. Version 1 is the first. A step
 // receives the data as it was stored, before any cleaning, and MUST BE TOTAL: it must never throw on odd data
 // (a throw makes that slot count as damaged). When the schema changes: raise CURRENT_VERSION, add
 // MIGRATIONS[old], a reader for the new version in SANITIZERS (schema.ts), a frozen fixtures/save-v<new>.json,
@@ -9,7 +9,11 @@ import { CURRENT_VERSION } from './schema';
 
 export type Migration = (data: unknown) => unknown;
 
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  // 1 to 2: accessibility settings. An old save has none, so it gets an empty block (the reader fills in the defaults).
+  1: (data) =>
+    typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data, settings: {}, settingsAt: 0 } : data,
+};
 
 export type MigrateResult = { ok: true; data: unknown } | { ok: false; reason: string };
 

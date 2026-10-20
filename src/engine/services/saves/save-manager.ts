@@ -30,6 +30,7 @@ import {
   type Sanitized,
   type SaveData,
 } from './schema';
+import { repairSettings, settingsEqual, type Settings } from '../settings/settings';
 import type { KeyValueStore } from './storage';
 
 /** Sequence numbers above this are refused as damage, so `seq + 1` can never stop changing the number. */
@@ -199,6 +200,15 @@ export class SaveManager {
     return this.touch();
   }
 
+  /** Stores the player's settings (each value repaired into range). Returns false if nothing changed. */
+  setSettings(next: Readonly<Settings>): boolean {
+    const fixed = repairSettings(next).settings;
+    if (settingsEqual(fixed, this.current.settings)) return false;
+    this.current.settings = fixed;
+    this.current.settingsAt = this.now();
+    return this.touch();
+  }
+
   /**
    * Records today as the day last played, and returns the day before ('' for a first visit), so the game can
    * tell a new night from a return the same evening. Call once at start.
@@ -317,7 +327,9 @@ export class SaveManager {
       }
     }
     const resetCount = Math.max(this.current.resetCount, scan.maxReset) + 1;
-    this.current = { ...defaultData(this.now()), resetCount };
+    // Starting over is about progress; the player's accessibility settings are theirs and stay.
+    const { settings, settingsAt } = this.current;
+    this.current = { ...defaultData(this.now()), resetCount, settings, settingsAt };
     this.readOnly = false;
     this.status.newerVersion = false;
     this.dirty = true;

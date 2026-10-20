@@ -20,6 +20,8 @@ import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 
 const PAPER = new Color(0xf2e6c9);
+const PAPER_OPACITY = 0.95;
+const BORDER = 0x8a6d3b;
 
 /**
  * How much of the paper's own colour it gives off, on top of what the candle's point light gives it. The point light
@@ -40,6 +42,7 @@ export class TestStageView {
   private readonly flame = new LanternGlow();
   private readonly lit = new Color();
   private readonly m = new Matrix4();
+  private _highContrast = false;
 
   constructor() {
     this.paperMaterial = new MeshStandardMaterial({
@@ -49,7 +52,7 @@ export class TestStageView {
       transparent: true,
       premultipliedAlpha: false,
       toneMapped: false,
-      opacity: 0.95,
+      opacity: PAPER_OPACITY,
       depthWrite: false,
       side: DoubleSide,
     });
@@ -58,7 +61,7 @@ export class TestStageView {
     const corners = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
     const g = new BufferGeometry();
     g.setAttribute('position', new BufferAttribute(corners, 3));
-    this.border = new LineLoop(g, new LineBasicMaterial({ color: 0x8a6d3b }));
+    this.border = new LineLoop(g, new LineBasicMaterial({ color: BORDER }));
     for (const o of [this.paper, this.border]) {
       o.matrixAutoUpdate = false;
       o.frustumCulled = false;
@@ -87,6 +90,26 @@ export class TestStageView {
     this.group.visible = true;
   }
 
+  /**
+   * High contrast (an accessibility setting): the paper is pure bright white, fully lit and fully opaque whatever
+   * the flame does, with a black border, so black shadows read as strongly as they can. It has no texture, so the
+   * "no paper texture" half of the setting is for the room art to honour when it replaces this stand-in.
+   */
+  set highContrast(on: boolean) {
+    this._highContrast = on;
+    this.paperMaterial.opacity = on ? 1 : PAPER_OPACITY;
+    // At once, not on the next frame's applyLight (which keeps it white while the mode is on).
+    if (on) {
+      this.paperMaterial.color.setRGB(1, 1, 1);
+      this.paperMaterial.emissive.setRGB(1, 1, 1);
+    }
+    (this.border.material as LineBasicMaterial).color.setHex(on ? 0x000000 : BORDER);
+  }
+
+  get highContrast(): boolean {
+    return this._highContrast;
+  }
+
   /** The stand-in flame (hidden where another lantern view is shown, e.g. the Hand Lab's). */
   set flameVisible(v: boolean) {
     this.flame.mesh.visible = v;
@@ -97,6 +120,12 @@ export class TestStageView {
    * `occlusion` (0..1) dims the paper down to ambient level when hands cup/smother the flame.
    */
   applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>, occlusion = 1.0): void {
+    if (this._highContrast) {
+      this.paperMaterial.color.setRGB(1, 1, 1);
+      this.paperMaterial.emissive.setRGB(1, 1, 1);
+      this.flame.update(light, cameraQuaternion);
+      return;
+    }
     // Tint toward the flame's colour so the paper warms with the flame.
     this.lit.setRGB(light.color[0], light.color[1], light.color[2]);
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.15 + 0.85 * light.intensity)) : 0.04;

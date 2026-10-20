@@ -5,8 +5,12 @@
 import { Sound, type SoundId } from './sounds';
 
 const TAU = Math.PI * 2;
+/** The candle loop's length, seconds: long enough that the repeat is not noticed. */
+export const CRACKLE_S = 6;
+/** How loud the candle is rendered (the others peak at 0.8): it is a quiet bed, not an event. */
+const CRACKLE_PEAK = 0.35;
 
-/** The samples for `id` at `sampleRate`, peaking at 0.8, mono. */
+/** The samples for `id` at `sampleRate`, mono, peaking at 0.8 (the candle loop at CRACKLE_PEAK). */
 export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array<ArrayBuffer> {
   const out =
     id === Sound.Rustle
@@ -16,7 +20,7 @@ export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array
         : id === Sound.Chime
           ? chime(sampleRate)
           : crackle(sampleRate);
-  normalise(out, 0.8);
+  normalise(out, id === Sound.Crackle ? CRACKLE_PEAK : 0.8);
   if (id !== Sound.Crackle) release(out, Math.floor(sampleRate * 0.008)); // end at zero, so there is no click
   return out;
 }
@@ -71,25 +75,39 @@ function chime(sr: number): Float32Array<ArrayBuffer> {
   return out;
 }
 
-/** A two-second loop of a small fire: random pops of different sizes over a faint hiss, silent at both ends. */
+/**
+ * A six-second loop of a candle: a quiet, soft hiss that slowly swells and settles, with a few tiny ticks. Nothing
+ * sharp, so it sits under the room like a small flame and does not draw the ear. Silent at both ends.
+ */
 function crackle(sr: number): Float32Array<ArrayBuffer> {
-  const n = Math.floor(sr * 2);
+  const n = Math.floor(sr * CRACKLE_S);
   const out = new Float32Array(n);
   const rnd = seeded(37);
-  let hiss = 0;
+  let a = 0;
+  let b = 0;
+  let swell = 0;
   for (let i = 0; i < n; i++) {
-    hiss += (rnd() * 2 - 1 - hiss) * 0.2; // low-passed noise
-    out[i] = hiss * 0.04;
+    // Noise through two low-pass stages: a soft, airy hiss with no bright edge.
+    a += (rnd() * 2 - 1 - a) * 0.08;
+    b += (a - b) * 0.15;
+    // A slow wander of the level (a flame breathing), a fraction of a second to a few seconds long.
+    swell += (rnd() * 2 - 1 - swell) * (2 / sr);
+    out[i] = b * (0.6 + 0.4 * Math.tanh(swell * 12));
   }
-  const pops = 46;
-  for (let k = 0; k < pops; k++) {
-    const at = Math.floor((0.03 + 0.92 * rnd()) * n);
-    const size = 0.2 + 0.8 * rnd() * rnd();
-    const len = Math.floor(sr * (0.004 + 0.012 * rnd()));
-    for (let j = 0; j < len && at + j < n; j++) out[at + j] += (rnd() * 2 - 1) * size * Math.exp((-5 * j) / len);
+  const ticks = 9;
+  for (let k = 0; k < ticks; k++) {
+    const at = Math.floor((0.05 + 0.9 * rnd()) * n);
+    const size = 0.08 + 0.1 * rnd();
+    const len = Math.floor(sr * (0.006 + 0.008 * rnd()));
+    let lp = 0;
+    for (let j = 0; j < len && at + j < n; j++) {
+      lp += (rnd() * 2 - 1 - lp) * 0.15; // soft: no hard noise burst
+      const attack = Math.min(1, j / (sr * 0.001)); // a 1 ms rise, so it ticks and does not click
+      out[at + j] += lp * size * attack * Math.exp((-5 * j) / len);
+    }
   }
-  // Fade the first and last few milliseconds so the loop joins without a click.
-  const edge = Math.floor(sr * 0.01);
+  // Fade the first and last 50 ms so the loop joins without a click or a jolt.
+  const edge = Math.floor(sr * 0.05);
   for (let i = 0; i < edge; i++) {
     const f = i / edge;
     out[i] *= f;

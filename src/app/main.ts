@@ -4,6 +4,8 @@
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 import { AmbientLight, Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
+import { DEBUG_TOOLS } from '../debug/debug-flag';
+import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { CandleView } from '../engine/render/candle-view';
@@ -15,8 +17,7 @@ import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
-import { ShadowDebug } from '../engine/shadow/shadow-debug';
-import { ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
@@ -25,6 +26,7 @@ import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { StageFrame } from '../engine/stage/stage-frame';
+import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -32,7 +34,6 @@ import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
 import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
-import { JointDots } from '../engine/xr/joint-dots';
 import { PromptPanel } from '../engine/xr/prompt-panel';
 import { clearFor, occluderDefault, sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { SessionVisibility } from '../engine/xr/session-visibility';
@@ -41,6 +42,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { SettingsPanel } from '../ui/settings-panel/settings-panel';
 import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
@@ -150,9 +152,7 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  const shadowDebug = debugViews.has('shadow') ? new ShadowDebug() : null;
   world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
-  if (shadowDebug) world.scene.add(shadowDebug.group);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -168,6 +168,35 @@ async function start(): Promise<void> {
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
+  // The accessibility settings (docs/adr/0010-saves.md): loaded from the save, applied live to the recognizer,
+  // shadows, lantern and mixer, and saved on change. The lantern flicker follows the device's reduced-motion
+  // default until the player moves its slider, and ?flicker= overrides the setting for testing.
+  const settings = new SettingsStore(
+    { recognizer: shapes, projector, sharpen, lantern: lanternLight, mixer: audio.mixer },
+    { applyOnlyWhenChosen: ['flicker'], neverApply: Number.isFinite(flickerParam) ? ['flicker'] : [] },
+    saves.data.settings,
+  );
+  settings.subscribe(() => saves.setSettings(settings.value));
+  // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
+  const applyContrast = () => {
+    stageView.highContrast = settings.value.highContrast;
+    shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
+  };
+  settings.subscribe((key) => {
+    if (key === null || key === 'highContrast') applyContrast();
+  });
+  applyContrast();
+  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it
+  // (the lantern flow will).
+  // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
+  const settingsPanel = new SettingsPanel(world, settings, () => debug?.controller.pages() ?? []);
+  const settingsHead = new Vector3();
+  const settingsLook = new Vector3();
+  const openSettings = () => {
+    world.camera.getWorldPosition(settingsHead);
+    world.camera.getWorldDirection(settingsLook);
+    return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+  };
   let badPoseReported = false;
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
@@ -215,6 +244,10 @@ async function start(): Promise<void> {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
+      settings: {
+        toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
+        isOpen: () => settingsPanel.isOpen,
+      },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -227,10 +260,35 @@ async function start(): Promise<void> {
   const handVisual: HandVisual = new CapsuleHandVisual();
   let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
   world.scene.add(handVisual.object);
-  // The joint dots are a debug view: ?debug=joints.
-  const dots = new JointDots();
-  dots.mesh.visible = debugViews.has('joints');
-  world.scene.add(dots.mesh);
+  // Debug tools (src/debug, ADR 0012, getting-started section 17): only when DEBUG_TOOLS is on (the dev server, or a build made with
+  // `vite build --mode tester`), and loaded on demand, so a normal build does not contain them. `debug` is null otherwise.
+  // ?debug=shadow,joints,colliders still turns the overlays on at start.
+  const handFlags = { handVisual: true };
+  let debug: DebugTools | null = null;
+  if (DEBUG_TOOLS) {
+    const { DebugTools } = await import('../debug/debug-tools');
+    debug = new DebugTools({
+      scene: world.scene,
+      handFrames: hands.hands,
+      handList,
+      projector,
+      stage,
+      shadowMesh: shadowRenderer.mesh,
+      sharpen,
+      lantern: lanternLight,
+      candleLight: candleView.pointLight,
+      settings,
+      flags: handFlags,
+      flame: () => (rigPlaced ? candleView.flamePosition : null),
+    });
+    debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
+    for (const [view, overlay] of [
+      ['shadow', 'capsules'],
+      ['colliders', 'colliders'],
+      ['joints', 'joints'],
+    ] as const)
+      if (debugViews.has(view)) debug.showOverlay(overlay);
+  }
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
   // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
   const occluder = new HandOccluder();
@@ -248,6 +306,7 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
@@ -364,19 +423,54 @@ async function start(): Promise<void> {
     guard('sessionend: visibility', () => visibility.detach());
     guard('sessionend: saves', () => saves.flush()); // leaving VR does not hide the page, so no page event would save it
     guard('sessionend: hands panel', () => handsPanel?.hide());
-    guard('sessionend: recorder', () => recorder?.finish());
+    guard('sessionend: recorder', () => {
+      recorder?.finish();
+      recorder = null; // the next session starts a new one if recording is armed (Testing)
+      if (panel) world.player.remove(panel.mesh);
+      panel = null;
+    });
   });
 
-  const recorder = HandRecorder.fromUrl(!mock);
+  let recorder: HandRecorder | null = HandRecorder.fromUrl(!mock);
   if (recorder) recorder.onFinished = offerDownload;
   const head: [number, number, number] = [0, 0, 0];
   const headTurn = { x: 0, y: 0, z: 0, w: 1 };
   // Guided recording on a headset: prompts on a panel in front of the wearer,
   // placed on the first XR frame and again when recording starts.
-  const panel = recorder?.script ? new PromptPanel() : null;
+  let panel: PromptPanel | null = recorder?.script ? new PromptPanel() : null;
   // The head pose is in reference space, which is the XR origin's space.
   if (panel) world.player.add(panel.mesh);
   let panelAtStart = false;
+  /** Starts a hand recording for the session that is starting (armed by the launcher's Testing panel, no address needed). */
+  const armRecording = (choice: 'off' | 'free' | 'shapes') => {
+    if (recorder || choice === 'off') return;
+    recorder = HandRecorder.make(choice === 'shapes');
+    recorder.onFinished = offerDownload;
+    if (recorder.script) {
+      panel = new PromptPanel();
+      world.player.add(panel.mesh);
+      panelAtStart = false;
+    }
+  };
+  // The Testing switches (debug tools only): the overlays change live as a switch is pressed, and the settings panel and
+  // the recording begin when VR starts. All remembered in the browser, so no address is ever typed.
+  if (DEBUG_TOOLS && debug) {
+    const tools = debug;
+    const { loadTesting, TESTING_EVENT } = await import('./testing-options');
+    const applyOverlays = (t: { joints: boolean; shadow: boolean }) => {
+      tools.showOverlay('capsules', t.shadow || debugViews.has('shadow'));
+      tools.showOverlay('joints', t.joints || debugViews.has('joints'));
+    };
+    applyOverlays(loadTesting());
+    window.addEventListener(TESTING_EVENT, (e) =>
+      applyOverlays((e as CustomEvent<ReturnType<typeof loadTesting>>).detail),
+    );
+    world.renderer.xr.addEventListener('sessionstart', () => {
+      const t = loadTesting();
+      if (t.settings) setTimeout(() => void openSettings(), 1000);
+      armRecording(t.record);
+    });
+  }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
   const handsPanel = mock ? null : new PromptPanel();
   if (handsPanel) world.player.add(handsPanel.mesh);
@@ -407,7 +501,11 @@ async function start(): Promise<void> {
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
       timings.begin(SLOT.read);
-      if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
+      if (debug?.replay.active) {
+        // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
+        debug.replay.fill(step, hands.hands.left, hands.hands.right);
+        handsStatus.update(step, true, 1);
+      } else if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
       else if (frame && refSpace && !paused) {
         hands.update(frame, refSpace, this.world.player.matrixWorld);
         capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
@@ -477,7 +575,7 @@ async function start(): Promise<void> {
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
-          shadowDebug?.update(projector.shadows, hands.hands, stage, projector.matrix);
+          debug?.frame(rigPlaced);
         } catch (e) {
           failures.report('shadows', e);
         }
@@ -517,7 +615,8 @@ async function start(): Promise<void> {
             simWasPaused = false;
             sim.reset();
           }
-          sim.advance(delta);
+          if (debug) debug.time.advance(sim, delta);
+          else sim.advance(delta);
         } catch (e) {
           failures.report('simulation', e);
         }
@@ -554,10 +653,9 @@ async function start(): Promise<void> {
       try {
         occluder.update(handList);
         timings.begin(SLOT.handVisual);
-        handVisual.object.visible = !passthrough;
+        handVisual.object.visible = !passthrough && handFlags.handVisual;
         handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
         timings.end(SLOT.handVisual);
-        if (dots.mesh.visible) dots.update(handList, rigPlaced ? candleView.flamePosition : null);
       } catch (e) {
         failures.report('hands drawing', e);
       }
@@ -589,6 +687,11 @@ async function start(): Promise<void> {
         handsStatus,
         visibility,
         saves,
+        settings,
+        settingsPanel,
+        stageView,
+        shadowRenderer,
+        openSettings,
         shapes,
         gestures,
         projector,
@@ -600,7 +703,9 @@ async function start(): Promise<void> {
         candleView,
         audio,
         gameAudio,
-        dots,
+        debug,
+        sim,
+        getRecorder: () => recorder,
         handVisual,
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
