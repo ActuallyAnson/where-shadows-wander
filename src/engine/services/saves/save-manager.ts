@@ -327,7 +327,9 @@ export class SaveManager {
       }
     }
     const resetCount = Math.max(this.current.resetCount, scan.maxReset) + 1;
-    this.current = { ...defaultData(this.now()), resetCount };
+    // Starting over is about progress; the player's accessibility settings are theirs and stay.
+    const { settings, settingsAt } = this.current;
+    this.current = { ...defaultData(this.now()), resetCount, settings, settingsAt };
     this.readOnly = false;
     this.status.newerVersion = false;
     this.dirty = true;

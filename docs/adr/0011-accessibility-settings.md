@@ -27,8 +27,9 @@ The GDD promises tolerance and hold-time settings, a shadow size, high contrast,
 
 ## Consequences
 
-- Opening the panel: the Hand Lab's Settings button on a desktop, the launcher's Testing button ("Settings panel opens when VR starts", a debug tool, [ADR 0012](0012-debug-tools.md)) in a headset for now (and `__wsw.openSettings()`); in play, nothing opens it yet. Teammate B's lantern flow should call `openSettings` (a palm-up gesture or a gear by the lantern were considered).
+- Opening the panel: the Hand Lab's Settings button on a desktop, and `__wsw.openSettings()` in dev; in a headset and in play, nothing opens it yet. Teammate B's lantern flow should call `openSettings` (a palm-up gesture or a gear by the lantern were considered).
 - A new setting is a table entry, a page slot and, if it steers an engine object, one case in `SettingsStore.apply`; a new field also needs a save version bump.
 - Settings are per browser, like the save.
+- Starting over (`SaveManager.reset()`) keeps the settings: they are the player's access needs, not progress.
 - **Verified:** the whole flow in headless Chromium (`scripts/settings-probe.mjs`: opens, both pages, every kind of control, values reach the recognizer, projector and mixer, high contrast, a reload keeps them, reset, close), the saves migration and merge, `npm run check`.
 - **Not verified:** that a fingertip poke presses these buttons in a headset (the probe sends a click event, as a desktop mouse does), on the Pico (Wolvic Chromium) or a Quest; the touch pointer's distances (`TOUCH_DEFAULTS`) against 64 px (4 cm) buttons; that the panel reads well at 0.5 m in a headset. If a poke does nothing, or IWSDK's panels behave differently on a device, stop and decide between tuning the touch pointer and our own fingertip hit test.

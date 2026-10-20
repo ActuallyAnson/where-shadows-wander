@@ -38,13 +38,6 @@ describe('settings in the save', () => {
     expect(m.setSettings({ ...DEFAULT_SETTINGS, tolerance: 50 })).toBe(true);
     expect(m.data.settings.tolerance).toBe(3);
   });
-
-  it('survives a reset as the defaults, like the rest of the save', () => {
-    const m = open(new MemoryStore());
-    m.setSettings({ ...DEFAULT_SETTINGS, captions: true });
-    m.reset();
-    expect(m.data.settings).toEqual(DEFAULT_SETTINGS);
-  });
 });
 
 describe('migrating version 1', () => {
@@ -70,5 +63,16 @@ describe('merging settings from two copies', () => {
     expect(mergeData(a, b).settings).toEqual(b.settings);
     expect(mergeData(b, a).settings).toEqual(b.settings);
     expect(mergeData(a, b).settingsAt).toBe(200);
+  });
+
+  it('keeps the settings when the player starts over', () => {
+    const store = new MemoryStore();
+    const m = open(store);
+    m.setSettings({ ...DEFAULT_SETTINGS, tolerance: 2.5, highContrast: true });
+    expect(m.reset()).toBe(true);
+    expect(m.data.settings.tolerance).toBe(2.5);
+    const again = open(store);
+    expect(again.data.settings.highContrast).toBe(true);
+    expect(again.data.settings.tolerance).toBe(2.5);
   });
 });
