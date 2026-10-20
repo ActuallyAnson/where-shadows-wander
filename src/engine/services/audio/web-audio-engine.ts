@@ -41,6 +41,9 @@ const GESTURES = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
 const SESSION_GESTURES = ['selectstart', 'select', 'squeezestart'] as const;
 /** Listener and moving-sound positions closer than this (metres) to the last written are not written again. */
 const MOVE_EPS_M = 0.002;
+/** Time constants, seconds: a loop fades in over about three times the first, and a moving sound or the listener glides over a few of the second, so a head-tracked HRTF source never steps. */
+const LOOP_FADE_IN_S = 0.5;
+const GLIDE_S = 0.03;
 /** While locked (or after an interruption), try to start the context again this often, in frames (about 2.5 s at 72 Hz). */
 const RETRY_FRAMES = 180;
 
@@ -236,6 +239,9 @@ export class AudioEngine {
     source.loop = true;
     source.connect(voice.gain);
     voice.source = source;
+    // Fade in rather than start at full level: a loop that begins with the headset session is heard as a burst.
+    voice.gain.gain.value = 0;
+    voice.gain.gain.setTargetAtTime(def.gain, ctx.currentTime, LOOP_FADE_IN_S);
     source.start();
   }
 
@@ -258,9 +264,10 @@ export class AudioEngine {
     p[i] = x;
     p[i + 1] = y;
     p[i + 2] = z;
-    voice.panner.positionX.value = x;
-    voice.panner.positionY.value = y;
-    voice.panner.positionZ.value = z;
+    const t = this.context!.currentTime;
+    voice.panner.positionX.setTargetAtTime(x, t, GLIDE_S);
+    voice.panner.positionY.setTargetAtTime(y, t, GLIDE_S);
+    voice.panner.positionZ.setTargetAtTime(z, t, GLIDE_S);
   }
 
   /**
@@ -296,15 +303,16 @@ export class AudioEngine {
       for (let i = 0; i < 9; i++) l[i] = pose[i];
       const L = ctx.listener;
       if (L.positionX) {
-        L.positionX.value = l[0];
-        L.positionY.value = l[1];
-        L.positionZ.value = l[2];
-        L.forwardX.value = l[3];
-        L.forwardY.value = l[4];
-        L.forwardZ.value = l[5];
-        L.upX.value = l[6];
-        L.upY.value = l[7];
-        L.upZ.value = l[8];
+        const t = ctx.currentTime;
+        L.positionX.setTargetAtTime(l[0], t, GLIDE_S);
+        L.positionY.setTargetAtTime(l[1], t, GLIDE_S);
+        L.positionZ.setTargetAtTime(l[2], t, GLIDE_S);
+        L.forwardX.setTargetAtTime(l[3], t, GLIDE_S);
+        L.forwardY.setTargetAtTime(l[4], t, GLIDE_S);
+        L.forwardZ.setTargetAtTime(l[5], t, GLIDE_S);
+        L.upX.setTargetAtTime(l[6], t, GLIDE_S);
+        L.upY.setTargetAtTime(l[7], t, GLIDE_S);
+        L.upZ.setTargetAtTime(l[8], t, GLIDE_S);
       } else {
         L.setPosition(l[0], l[1], l[2]); // browsers without listener parameters (older Firefox and Gecko)
         L.setOrientation(l[3], l[4], l[5], l[6], l[7], l[8]);

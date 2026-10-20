@@ -6,20 +6,35 @@ const SR = 48000;
 const all = Array.from({ length: SOUND_COUNT }, (_, i) => i as SoundId);
 
 describe('renderPlaceholder', () => {
-  it.each(all)('sound %i has finite samples peaking at 0.8, and is the same every time', (id) => {
-    const a = renderPlaceholder(id, SR);
-    const b = renderPlaceholder(id, SR);
-    expect(a.length).toBeGreaterThan(SR * 0.1);
-    expect(a.every((x) => Number.isFinite(x))).toBe(true);
-    expect(Math.max(...a.map(Math.abs))).toBeCloseTo(0.8, 5);
-    expect(Array.from(a)).toEqual(Array.from(b));
-  });
+  it.each(all)(
+    'sound %i has finite samples peaking at its level (0.8, the candle 0.35), and is the same every time',
+    (id) => {
+      const a = renderPlaceholder(id, SR);
+      const b = renderPlaceholder(id, SR);
+      expect(a.length).toBeGreaterThan(SR * 0.1);
+      expect(a.every((x) => Number.isFinite(x))).toBe(true);
+      expect(a.reduce((m, v) => Math.max(m, Math.abs(v)), 0)).toBeCloseTo(id === Sound.Crackle ? 0.35 : 0.8, 5);
+      expect(Array.from(a)).toEqual(Array.from(b));
+    },
+  );
 
-  it('keeps each sound short enough for a one-shot, and the loop at two seconds', () => {
+  it('keeps each sound short enough for a one-shot, and the candle loop at six seconds', () => {
     expect(renderPlaceholder(Sound.Rustle, SR).length / SR).toBeLessThan(0.5);
     expect(renderPlaceholder(Sound.Thump, SR).length / SR).toBeLessThan(0.5);
     expect(renderPlaceholder(Sound.Chime, SR).length / SR).toBeLessThan(2);
-    expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(2);
+    expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(6);
+  });
+
+  it('keeps the candle soft: quiet, and no sharp jump from one sample to the next', () => {
+    const c = renderPlaceholder(Sound.Crackle, SR);
+    let jump = 0;
+    let sq = 0;
+    for (let i = 1; i < c.length; i++) {
+      jump = Math.max(jump, Math.abs(c[i] - c[i - 1]));
+      sq += c[i] * c[i];
+    }
+    expect(jump).toBeLessThan(0.04);
+    expect(Math.sqrt(sq / c.length)).toBeLessThan(0.1);
   });
 
   it('ends each one-shot at exactly zero, so it does not click', () => {
