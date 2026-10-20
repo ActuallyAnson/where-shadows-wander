@@ -46,6 +46,6 @@ The GDD promises that returning players resume where they left off, that a galle
 
 ## Consequences
 
-- One save per browser (no player profiles); settings (volumes, tolerance, shadow size) are not in it yet and would arrive as a version 2 migration.
+- One save per browser (no player profiles). Version 2 (13 Oct 2026) added the accessibility settings (`settings`, and `settingsAt`, when they last changed): the 1 to 2 step adds an empty block that reads as the defaults with no repair, a value out of range is repaired one value at a time, and two copies merge by taking the whole set that changed last (mixing values from two copies would give a combination nobody chose). See [ADR 0011](0011-accessibility-settings.md).
 - `localStorage` is shared per origin, so the dev server and the Pages build do not share a save, and a player who clears site data loses it. Nothing here can prevent that.
 - Verified in a real browser (`scripts/saves-probe.mjs`, with a synthetic `pagehide` event): a save survives a reload, is written when the page is hidden and when a puzzle ends but not while idle, a damaged newest slot recovers from the other, blocked storage and a full disk do not stop the game. Not verified on a headset: that Pico and Quest browsers keep `localStorage` between sessions and fire `pagehide` or the visibility events when the headset comes off.

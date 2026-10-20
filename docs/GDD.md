@@ -305,17 +305,21 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 
 - **One-handed play:** All v1 shapes are one-handed; the player can switch which hand they use at any time.
 
+- **Settings screen:** One panel in the room, pressed with a fingertip (poke), no controller path, two pages, every setting explained in one line, changes apply live and are saved ([ADR 0011](adr/0011-accessibility-settings.md)).
+
 - **Shape tolerance slider:** Widens recognition ranges for players with limited finger mobility.
 
 - **Hand calibration:** The player holds each hand flat for 2 seconds and finger curl is measured from their own straight, for fingers that don't fully straighten (`src/engine/hands/hand-calibration.ts`; onboarding can run it).
 
-- **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s.
+- **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s (default 0.4 s; companions take 2.5 times as long, so 1 s by default).
 
 - **Shadow size slider:** Makes shadows larger for low-vision players.
 
-- **High-contrast mode:** Pure black on bright white stage, no paper texture.
+- **High-contrast mode:** Pure black on bright white stage, no paper texture. Built: the wall is pure white, fully lit and opaque, the shadows fully solid, and the settings panel itself is black on white; the room art must read `settings.value.highContrast` and drop its paper texture.
 
-- **Captions:** The traveller's sounds and story beats have optional text captions.
+- **Captions:** The traveller's sounds and story beats have optional text captions. The setting exists and is saved; nothing shows captions until story beats exist.
+
+- **Main hand:** The panel opens beside the chosen hand. Both hands always work, so a one-handed player is never locked out by the choice.
 
 - **Comfort:** No artificial locomotion, no camera movement, nothing that requires standing or turning around.
 

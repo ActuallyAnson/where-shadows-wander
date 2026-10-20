@@ -35,7 +35,7 @@
       "physics": false,
       "sceneUnderstanding": true,
       "environmentRaycast": false,
-      "spatialUI": false
+      "spatialUI": true
     }
   },
   "dev": {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS } from '../settings/settings';
 import { defaultData, emptyRecord, isValidId, LIMITS, sanitize } from './schema';
 
 const NOW = 1_760_000_000_000;
@@ -9,6 +10,8 @@ const good = () => ({
   puzzles: { 'c1-p1': { solved: true, solutions: ['cup', 'roof'] } },
   creatures: { rabbit: { discoveredAt: 1500 } },
   resetCount: 0,
+  settings: { ...DEFAULT_SETTINGS, tolerance: 2, hand: 'left' },
+  settingsAt: 1800,
 });
 
 describe('defaultData', () => {
@@ -21,6 +24,8 @@ describe('defaultData', () => {
       puzzles: {},
       creatures: {},
       resetCount: 0,
+      settings: DEFAULT_SETTINGS,
+      settingsAt: 0,
     });
   });
 });

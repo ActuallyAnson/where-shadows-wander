@@ -23,5 +23,20 @@
       "discoveredAt": 1760000999000
     }
   },
-  "resetCount": 0
+  "resetCount": 0,
+  "settings": {
+    "tolerance": 1,
+    "holdTime": 0.4,
+    "shadowSize": 1,
+    "sharpen": 1,
+    "flicker": 1,
+    "volumeMaster": 1,
+    "volumeMusic": 0.7,
+    "volumeEffects": 1,
+    "volumeAmbience": 0.6,
+    "highContrast": false,
+    "captions": false,
+    "hand": "right"
+  },
+  "settingsAt": 0
 }

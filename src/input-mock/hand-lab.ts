@@ -35,6 +35,8 @@ export interface LabView {
   scene: Scene;
   camera: PerspectiveCamera;
   canvas: HTMLCanvasElement;
+  /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
+  settings?: { toggle(): void; isOpen(): boolean };
 }
 
 export class HandLab {
@@ -280,6 +282,7 @@ export class HandLab {
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
+      else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -338,6 +341,7 @@ export class HandLab {
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
+        ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>

@@ -43,6 +43,9 @@ export function mergeData(a: SaveData, b: SaveData): SaveData {
     puzzles,
     creatures,
     resetCount: a.resetCount,
+    // The settings changed last win, whole (mixing two copies' values would give a combination nobody chose).
+    settings: a.settingsAt >= b.settingsAt ? a.settings : b.settings,
+    settingsAt: Math.max(a.settingsAt, b.settingsAt),
   };
 }
 

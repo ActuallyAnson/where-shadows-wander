@@ -15,6 +15,9 @@ export const SHADOW_RENDER_ORDER = 2;
 /** Lifted this far off the stage, toward the player, so it never fights the paper for depth. */
 const LIFT_M = 0.002;
 
+/** How solid a shadow is drawn (1 is fully black). High contrast uses 1. */
+export const DEFAULT_SHADOW_OPACITY = 0.88;
+
 export class ShadowRenderer {
   readonly mesh: Mesh;
   private readonly material: ShaderMaterial;
@@ -27,7 +30,8 @@ export class ShadowRenderer {
   };
   private readonly m = new Matrix4();
 
-  constructor(private readonly baseOpacity = 0.88) {
+  /** `baseOpacity` can change while running: high contrast makes the shadows fully solid. */
+  constructor(public baseOpacity = DEFAULT_SHADOW_OPACITY) {
     this.uniforms.opacity.fill(baseOpacity);
     this.material = new ShaderMaterial({
       uniforms: {
