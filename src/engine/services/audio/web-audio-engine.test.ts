@@ -132,6 +132,19 @@ describe('unlocking', () => {
   });
 });
 
+describe('a loop starting', () => {
+  it('fades in to its level rather than starting at full, and glides when the sound moves', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    engine.setLoop(Sound.Crackle, true, 0, 1, 0);
+    const voice = ctx.gains[ctx.gains.length - 1];
+    expect(voice.gain.targets).toEqual([SOUND_DEFS[Sound.Crackle].gain]);
+    const panner = ctx.panners[ctx.panners.length - 1];
+    engine.moveLoop(Sound.Crackle, 0.1, 1, 0);
+    expect(panner.positionX.targets).toEqual([0.1]);
+  });
+});
+
 describe('playing', () => {
   it('puts the sound where asked, on its bus, with its own range', () => {
     const { engine, ctx } = make();
