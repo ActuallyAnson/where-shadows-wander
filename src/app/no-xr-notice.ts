@@ -1,16 +1,26 @@
-// On a browser that can't start an AR session (a laptop, a phone), the game
-// page is otherwise blank: the canvas is transparent for passthrough and IWSDK
-// shows no Enter XR button. This explains what the page is and where to go.
-// The emulator in `npm run dev` reports AR support, so it never shows there.
+// On a browser that can't start the session the game asks for (a laptop, a phone), the game
+// page is otherwise blank and IWSDK shows no Enter XR button. This explains what the page is
+// and where to go. It checks the session the page will really request: VR by default, AR for
+// ?xr=ar (ADR 0005). The emulator in `npm run dev` supports both, so it never shows there.
 
-export async function showNoXrNoticeIfNeeded(): Promise<void> {
-  let supported: boolean;
+import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+
+/** The part of `navigator.xr` this reads. */
+export interface XrSupport {
+  isSessionSupported(mode: 'immersive-vr' | 'immersive-ar'): Promise<boolean>;
+}
+
+/** Whether the browser can start the session `search` asks for. False when WebXR is missing or the check throws. */
+export async function xrSessionSupported(xr: XrSupport | undefined, search: string): Promise<boolean> {
   try {
-    supported = (await navigator.xr?.isSessionSupported('immersive-ar')) ?? false;
+    return (await xr?.isSessionSupported(sessionModeOf(xrModeFromUrl(search)))) ?? false;
   } catch {
-    supported = false;
+    return false;
   }
-  if (supported) return;
+}
+
+export async function showNoXrNoticeIfNeeded(search: string = location.search): Promise<void> {
+  if (await xrSessionSupported(navigator.xr, search)) return;
 
   const box = document.createElement('section');
   box.setAttribute('role', 'status');
@@ -20,10 +30,8 @@ export async function showNoXrNoticeIfNeeded(): Promise<void> {
   box.innerHTML = `
     <div style="max-width:30rem;display:grid;gap:14px">
       <h1 style="margin:0;font-size:28px;font-weight:650;letter-spacing:-0.01em">Where Shadows Wander</h1>
-      <p style="margin:0">A seated, hands-only mixed reality game. This browser can't start an AR session,
-      so open this page in the browser on a <b>Meta Quest</b> or <b>Pico</b> headset.</p>
-      <p style="margin:0;color:#a8a294;font-size:14px">In development: the headset build has hand tracking and room
-      detection, but no gameplay yet.</p>
+      <p style="margin:0">A seated, hands-only VR game about shadows made with your hands. This browser can't
+      start a VR session, so open this page in the browser on a <b>Meta Quest</b> or <b>Pico</b> headset.</p>
       <p style="margin:0;font-size:14px">No headset? Open the
       <a href="./?mock=1" style="color:#f0a24a">Hand Lab</a> to try the hand shapes with mock or webcam hands.</p>
     </div>`;

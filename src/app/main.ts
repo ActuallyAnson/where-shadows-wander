@@ -63,7 +63,7 @@ const diagnostics = new Diagnostics();
 const failures = new FailureReporter((message) => diagnostics.error(message));
 mountReportPanel(diagnostics);
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
-if (!mockOptions) void showNoXrNoticeIfNeeded();
+if (!mockOptions) void showNoXrNoticeIfNeeded(location.search);
 if (!mockOptions && import.meta.env.DEV) mountLabLink();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
