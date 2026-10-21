@@ -50,6 +50,7 @@ import { mountEnterArButtonIfNeeded } from './enter-ar-button';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
+import { showStartFailure } from './start-failure';
 
 const SIM_HZ = 60;
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -67,7 +68,10 @@ if (!mockOptions && import.meta.env.DEV) mountLabLink();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.
-start().catch((e) => diagnostics.error(`start failed: ${String(e)}`));
+start().catch((e) => {
+  diagnostics.error(`start failed: ${String(e)}`);
+  showStartFailure(e);
+});
 
 async function start(): Promise<void> {
   // iwsdk.config.json says VR; ?xr=ar overrides the session mode before the world (and its enter offer) is made.
