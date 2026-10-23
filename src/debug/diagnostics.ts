@@ -112,6 +112,8 @@ export class Diagnostics {
       frameRate: s.frameRate ?? null,
       supportedFrameRates: s.supportedFrameRates ? [...s.supportedFrameRates] : null,
       multiview: (renderer.xr as { isMultiview?: boolean }).isMultiview ?? null,
+      // 0 to 1 (three.js default 1 on a headset that supports it): how much the eye buffer's edges are rendered at lower resolution.
+      foveation: renderer.xr.getFoveation?.() ?? null,
       layerSize: layerSize(renderer.xr.getBaseLayer() as unknown as Record<string, number> | null),
     };
     this.save();
