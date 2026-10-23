@@ -37,7 +37,7 @@ function fakeFrame(session: XRSession, planes?: { size: number }): XRFrame {
   return { session, detectedPlanes: planes, getViewerPose: () => null } as unknown as XRFrame;
 }
 
-const renderer = { xr: { getBaseLayer: () => null } } as never;
+const renderer = { xr: { getBaseLayer: () => null, getFoveation: () => 0.5 } } as never;
 const hands = { left: createHandFrame('left'), right: createHandFrame('right') };
 const refSpace = {} as XRReferenceSpace;
 
@@ -113,6 +113,14 @@ suite('Diagnostics', () => {
     expect(d.snapshot().planes).toBeUndefined();
     d.sessionEnded();
     expect(writes).toBe(atStart + 1);
+  });
+
+  it('reports the frame rate and foveation of the session', () => {
+    const d = new Diagnostics({ live: false });
+    d.sessionStarted(fakeSession(), renderer);
+    const session = d.snapshot().session as { frameRate: number; foveation: number };
+    expect(session.frameRate).toBe(72);
+    expect(session.foveation).toBe(0.5);
   });
 
   it('still counts frames and hand tracking when not live', () => {
