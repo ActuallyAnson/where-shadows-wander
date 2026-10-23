@@ -14,8 +14,10 @@ import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
+import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
@@ -133,6 +135,8 @@ async function start(): Promise<void> {
   // tabletop theatre was tuned with full perspective (blend 0).
   const projector = new ShadowProjector(stageChoice === 'real' ? REAL_WALL_SHADOW_SETTINGS : { blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
+  // The shadows of the invisible props (the game's level calls propShadows.setProps when a puzzle loads).
+  const propShadows = new PropShadowView();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
@@ -156,7 +160,7 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  world.scene.add(stageView.group, shadowRenderer.mesh, candleView.group, ambientLight);
+  world.scene.add(stageView.group, shadowRenderer.mesh, propShadows.mesh, candleView.group, ambientLight);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -255,6 +259,10 @@ async function start(): Promise<void> {
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
+  // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
+  let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
+  const demoKey = new Float64Array(6).fill(NaN);
+  if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
   const sim = new FixedStepLoop(SIM_HZ, () => {
     // Game simulation steps go here (week 2+).
@@ -579,6 +587,23 @@ async function start(): Promise<void> {
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
+          if (demoProps) {
+            // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
+            const o = stage.origin,
+              f = candleView.flamePosition;
+            if (
+              o[0] !== demoKey[0] ||
+              o[1] !== demoKey[1] ||
+              o[2] !== demoKey[2] ||
+              f[0] !== demoKey[3] ||
+              f[1] !== demoKey[4] ||
+              f[2] !== demoKey[5]
+            ) {
+              propShadows.setProps(demoProps(stage), f, stage, projector.settings.blend);
+              demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
+            }
+          }
+          propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
           debug?.frame(rigPlaced);
         } catch (e) {
           failures.report('shadows', e);
