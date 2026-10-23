@@ -206,6 +206,7 @@ async function start(): Promise<void> {
     return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
   let badPoseReported = false;
+  let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
@@ -218,6 +219,7 @@ async function start(): Promise<void> {
       }
       return false;
     }
+    headY = head[1];
     if (stageChoice === 'real') {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
@@ -572,8 +574,7 @@ async function start(): Promise<void> {
       }
       if (rigPlaced) {
         try {
-          const tableY = headPos.y - 0.45;
-          const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
+          const candleAction = candleView.updateInteraction(hands.hands, step, headY - 0.45);
           if (candleAction.state === 'held' || candleAction.justPlaced) {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
