@@ -29,8 +29,18 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
 
   const statusLine = document.createElement('div');
   statusLine.style.cssText = 'font-weight:700;color:#58a6ff;margin-bottom:6px;font-size:12px;';
-  statusLine.textContent = '● WebXR Launcher Ready';
+  statusLine.textContent = DEBUG_TOOLS ? '● WebXR Launcher Ready' : '';
   logBox.append(statusLine);
+
+  // What a player sees when something goes wrong: the log box above is a debug tool and is not shown in the judges' build.
+  const note = document.createElement('div');
+  note.style.cssText =
+    'display:none;max-width:30rem;padding:10px 14px;border-radius:10px;background:rgba(20,22,28,0.92);' +
+    'color:#ece6d8;font:14px/1.45 system-ui,-apple-system,sans-serif;text-align:center;pointer-events:auto;';
+  const showNote = (text: string): void => {
+    note.textContent = text;
+    note.style.display = 'block';
+  };
 
   const logList = document.createElement('div');
   logBox.append(logList);
@@ -140,6 +150,8 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
+      showNote("Couldn't start VR. Try again, or use one of the other ways in below.");
+      openOtherWays();
     }
   };
 
@@ -150,52 +162,95 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
 
   appendLog(`XR Support: immersive-vr=${vrSupported}, immersive-ar=${arSupported}`);
 
+  // The judges' build shows one Enter VR button; the other ways in (a Pico browser sometimes needs them) are behind
+  // "Trouble starting?". Dev and tester builds show them all, with their technical names.
+  const otherWays = document.createElement('div');
+  otherWays.style.cssText =
+    'display:none;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;pointer-events:auto;';
+  const openOtherWays = (): void => {
+    otherWays.style.display = 'flex';
+  };
+  const waysTarget = DEBUG_TOOLS ? buttonRow : otherWays;
+  if (DEBUG_TOOLS) openOtherWays();
+
   if (vrSupported) {
-    const vrDirectBtn = makeBtn('▶ Enter VR (Direct Hands)', '#163824', '#3fb950', '#2ea043', () => {
-      void launchDirect('immersive-vr', false);
-    });
+    const vrDirectBtn = makeBtn(
+      DEBUG_TOOLS ? '▶ Enter VR (Direct Hands)' : 'Enter VR',
+      '#163824',
+      '#3fb950',
+      '#2ea043',
+      () => {
+        void launchDirect('immersive-vr', false);
+      },
+    );
     buttonRow.append(vrDirectBtn);
 
-    const vrSafeBtn = makeBtn('🛡️ Enter VR (Safe WebGL)', '#1c2d42', '#58a6ff', '#388bfd', () => {
-      void launchDirect('immersive-vr', true);
-    });
-    buttonRow.append(vrSafeBtn);
+    const vrSafeBtn = makeBtn(
+      DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
+      '#1c2d42',
+      '#58a6ff',
+      '#388bfd',
+      () => {
+        void launchDirect('immersive-vr', true);
+      },
+    );
+    waysTarget.append(vrSafeBtn);
   }
 
-  if (arSupported) {
+  // The older passthrough mode is for testing; the game is a VR room (ADR 0005).
+  if (arSupported && (DEBUG_TOOLS || xrModeFromUrl(location.search) === 'ar')) {
     const arDirectBtn = makeBtn('👁️ Enter AR (Passthrough)', '#3b2300', '#f0883e', '#d29922', () => {
       void launchDirect('immersive-ar', false);
     });
     buttonRow.append(arDirectBtn);
   }
 
-  const iwsdkBtn = makeBtn('⚡ Enter via IWSDK', '#2d1840', '#bc8cff', '#a371f7', () => {
-    statusLine.textContent = '● Launching via IWSDK...';
-    statusLine.style.color = '#bc8cff';
-    const mode = sessionModeOf(xrModeFromUrl(location.search));
-    appendLog(`Calling world.launchXR({ sessionMode: "${mode}", features: { handTracking: true } })...`);
-    try {
-      world.launchXR({
-        sessionMode: mode as unknown as import('@iwsdk/core').SessionMode,
-        features: { handTracking: true },
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      appendLog(`IWSDK launch threw: ${msg}`, '#ff7b72');
-    }
-  });
-  buttonRow.append(iwsdkBtn);
+  const iwsdkBtn = makeBtn(
+    DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)',
+    '#2d1840',
+    '#bc8cff',
+    '#a371f7',
+    () => {
+      statusLine.textContent = '● Launching via IWSDK...';
+      statusLine.style.color = '#bc8cff';
+      const mode = sessionModeOf(xrModeFromUrl(location.search));
+      appendLog(`Calling world.launchXR({ sessionMode: "${mode}", features: { handTracking: true } })...`);
+      try {
+        world.launchXR({
+          sessionMode: mode as unknown as import('@iwsdk/core').SessionMode,
+          features: { handTracking: true },
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        appendLog(`IWSDK launch threw: ${msg}`, '#ff7b72');
+      }
+    },
+  );
+  waysTarget.append(iwsdkBtn);
 
-  // Copy logs button
-  const copyBtn = makeBtn('📋 Copy Logs', '#21262d', '#c9d1d9', '#30363d', async () => {
-    try {
-      await navigator.clipboard.writeText(logs.join('\n'));
-      appendLog('Logs copied to clipboard!', '#7ee787');
-    } catch {
-      appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
-    }
-  });
-  buttonRow.append(copyBtn);
+  // Copy logs button: a debug tool, not in the judges' build.
+  if (DEBUG_TOOLS) {
+    const copyBtn = makeBtn('📋 Copy Logs', '#21262d', '#c9d1d9', '#30363d', async () => {
+      try {
+        await navigator.clipboard.writeText(logs.join('\n'));
+        appendLog('Logs copied to clipboard!', '#7ee787');
+      } catch {
+        appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
+      }
+    });
+    buttonRow.append(copyBtn);
+  }
+
+  if (!DEBUG_TOOLS) {
+    const trouble = document.createElement('button');
+    trouble.type = 'button';
+    trouble.textContent = 'Trouble starting?';
+    trouble.style.cssText =
+      'background:none;border:0;color:#a8a294;font:13px system-ui,-apple-system,sans-serif;text-decoration:underline;' +
+      'cursor:pointer;pointer-events:auto;';
+    trouble.onclick = openOtherWays;
+    buttonRow.append(trouble);
+  }
 
   // Testing: the address switches (?debug=joints, ?flicker=0, ?record ...) as buttons, for headsets with no easy address
   // bar. A debug tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
@@ -208,7 +263,8 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   }
 
   if (testingElement) uiContainer.append(testingElement);
-  uiContainer.append(logBox, buttonRow);
+  if (DEBUG_TOOLS) uiContainer.append(logBox);
+  uiContainer.append(note, buttonRow, otherWays);
   document.body.append(uiContainer);
 
   world.renderer.xr.addEventListener('sessionstart', () => {

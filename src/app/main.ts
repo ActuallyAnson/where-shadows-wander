@@ -7,7 +7,6 @@ import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
-import { mountReportPanel } from '../debug/report-panel';
 import { CandleView } from '../engine/render/candle-view';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
@@ -61,7 +60,8 @@ const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
 // One part of the frame throwing must not stop the rest, or the next frame (failure-reporter.ts).
 const failures = new FailureReporter((message) => diagnostics.error(message));
-mountReportPanel(diagnostics);
+// The "Copy report" panel is a debug tool: only in dev and tester builds (src/debug/debug-flag.ts).
+if (DEBUG_TOOLS) void import('../debug/report-panel').then((m) => m.mountReportPanel(diagnostics));
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
 if (!mockOptions) void showNoXrNoticeIfNeeded(location.search);
 if (!mockOptions && import.meta.env.DEV) mountLabLink();
