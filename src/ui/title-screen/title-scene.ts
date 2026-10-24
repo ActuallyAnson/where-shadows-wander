@@ -36,8 +36,8 @@ export const SCENE_SVG = `<svg class="wsw-scene" viewBox="0 0 1000 620" preserve
 </g>
 <g class="wsw-par wsw-par-near">
   <ellipse cx="200" cy="470" rx="300" ry="260" fill="url(#wsw-candle)" class="wsw-candle-glow"/>
-  <path d="M0 548H430V640H0Z" fill="#0b0807"/><path d="M0 548H430" stroke="#5a4130" stroke-width="3"/>
-  <rect x="70" y="528" width="96" height="14" rx="2" fill="#2a1d19"/><rect x="82" y="514" width="74" height="14" rx="2" fill="#3a2a22"/>
+  <path d="M0 548H372V640H0Z" fill="#0b0807"/><path d="M0 548H372" stroke="#5a4130" stroke-width="3"/>
+  <path d="M22 548L26 520H52L56 548Z" fill="#3a2a22"/><g fill="#1f3a2c"><path d="M39 520C26 500 22 486 30 470C40 486 42 500 39 520Z"/><path d="M39 520C48 502 62 494 74 496C66 510 54 518 39 520Z"/><path d="M39 520C30 508 14 506 6 512C16 520 28 522 39 520Z"/></g><rect x="70" y="528" width="96" height="14" rx="2" fill="#2a1d19"/><rect x="82" y="514" width="74" height="14" rx="2" fill="#3a2a22"/>
   <rect x="192" y="486" width="22" height="62" rx="3" fill="#ead9b8"/><path d="M192 498Q203 506 214 498V490H192Z" fill="#cdb98f"/>
   <g transform="translate(203 478)"><path class="wsw-flame" d="${FLAME}" fill="#ffb340"/><path class="wsw-flame" d="${FLAME}" fill="#ffe27a" transform="scale(.55 .6) translate(0 8)"/></g>
   <path d="M296 520H334V548H296Z" fill="#4a3226"/><path d="M334 526Q352 528 350 538Q348 546 334 544" fill="none" stroke="#4a3226" stroke-width="5"/>

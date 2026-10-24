@@ -56,6 +56,7 @@ export function fontFaceCss(url400: string, url700: string): string {
 export const TITLE_CSS = `
 .wsw-screen{position:fixed;inset:0;z-index:9998;overflow:hidden;background:#0a0707;color:#f2f5f9;font-family:${SERIF};display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6vmin 4vmin max(5vmin,96px);box-sizing:border-box}
 .wsw-head{display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;z-index:1}
+.wsw-head::before{content:'';position:absolute;left:50%;top:40%;width:90vmin;height:30vmin;transform:translate(-50%,-50%);background:radial-gradient(ellipse at center,rgba(255,190,110,.14),rgba(255,190,110,0) 70%);z-index:-1;pointer-events:none}
 .wsw-emblem{width:clamp(44px,9vmin,72px);height:auto}
 .wsw-kicker{margin:2vmin 0 0;font-size:clamp(13px,2.6vmin,22px);letter-spacing:.7em;padding-left:.7em;color:#c8b9a2}
 .wsw-title{margin:.4vmin 0 0;font-weight:700;font-size:clamp(24px,6.6vmin,60px);letter-spacing:.08em;padding-left:.08em;color:#fbf3e4;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 34px rgba(255,200,130,.28)}
@@ -98,5 +99,6 @@ export const TITLE_CSS = `
 @keyframes wsw-drift{0%,100%{transform:translateX(-5%)}50%{transform:translateX(5%)}}
 @keyframes wsw-rise{0%{transform:translateY(0);opacity:0}15%{opacity:.7}100%{transform:translateY(-70vh);opacity:0}}
 @keyframes wsw-flicker{0%,100%{opacity:1}22%{opacity:.82}41%{opacity:.96}63%{opacity:.78}80%{opacity:.94}}
+@media (max-aspect-ratio:4/5){.wsw-scene{top:auto;bottom:0;height:auto;-webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%)}}
 @media (prefers-reduced-motion:reduce){.wsw-fog,.wsw-dust,.wsw-glow,.wsw-flame,.wsw-candle-glow,.wsw-wing,.wsw-bird,.wsw-steam{animation:none}.wsw-steam{opacity:.4}.wsw-par{transition:none;transform:none}.wsw-dust{display:none}.wsw-item,.wsw-mark{transition-duration:.01s}}
 `;
