@@ -39,6 +39,8 @@ export interface LabView {
   settings?: { toggle(): void; isOpen(): boolean };
   /** The test cutscene (a bird crossing the wall): the Cutscene button plays it. */
   cutscene?: { play(): void };
+  /** The kindred (a shadow bird that flies about the wall): the Kindred button shows and hides it. */
+  kindred?: { toggle(): void; isOn(): boolean };
 }
 
 export class HandLab {
@@ -286,6 +288,7 @@ export class HandLab {
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'cutscene') this.view.cutscene?.play();
+      else if (act === 'kindred') this.view.kindred?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -344,6 +347,7 @@ export class HandLab {
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
+        ${this.view.kindred ? btn('kindred', '', 'Kindred', this.view.kindred.isOn(), 'A shadow bird that flies about the wall and circles the light') : ''}
         ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the test cutscene: a bird crosses the wall') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}

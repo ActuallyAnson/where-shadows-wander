@@ -19,6 +19,8 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
+import { Kindred } from '../engine/shadow/pure/kindred';
+import { KindredView } from '../engine/shadow/kindred-view';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -180,11 +182,20 @@ async function start(): Promise<void> {
   const cutsceneView = new CutsceneView();
   const cutscenes = new CutsceneHost(cutsceneView);
   const cutsceneTips = new Float32Array(6);
+  // The kindred (a shadow bird that flies about the wall): the Hand Lab's Kindred button, or the Testing panel's switch.
+  const kindred = new Kindred();
+  const kindredView = new KindredView();
+  let kindredOn = false;
+  const setKindred = (on: boolean) => {
+    kindredOn = on;
+    if (!on) kindredView.hide();
+  };
   world.scene.add(
     stageView.group,
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
+    kindredView.group,
     candleView.group,
     ambientLight,
   );
@@ -290,6 +301,7 @@ async function start(): Promise<void> {
         isOpen: () => settingsPanel.isOpen,
       },
       cutscene: { play: () => void playTestCutscene() },
+      kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -518,13 +530,17 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
-    window.addEventListener(TESTING_EVENT, (e) =>
-      applyOverlays((e as CustomEvent<ReturnType<typeof loadTesting>>).detail),
-    );
+    setKindred(loadTesting().kindred);
+    window.addEventListener(TESTING_EVENT, (e) => {
+      const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
+      applyOverlays(t);
+      setKindred(t.kindred);
+    });
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       if (t.cutscene) setTimeout(() => void playTestCutscene(), 1000);
+      setKindred(t.kindred);
       armRecording(t.record);
     });
   }
@@ -651,6 +667,22 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (kindredOn && rigPlaced) {
+            // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
+            const f = candleView.flamePosition,
+              o = stage.origin,
+              r = stage.right,
+              up = stage.up;
+            const dx = f[0] - o[0],
+              dy = f[1] - o[1],
+              dz = f[2] - o[2];
+            const hw = stage.width / 2,
+              hh = stage.height / 2;
+            const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
+            const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
+            kindred.update(step, hw, hh, fx, fy, true);
+            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          }
           if (cutscenes.playing) {
             // The fingertips that can poke Skip: each tracked hand's index tip.
             let tips = 0;
@@ -781,6 +813,8 @@ async function start(): Promise<void> {
         stageView,
         shadowRenderer,
         cutscenes,
+        kindred,
+        kindredView,
         openSettings,
         shapes,
         gestures,

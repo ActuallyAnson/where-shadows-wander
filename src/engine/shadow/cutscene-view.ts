@@ -8,6 +8,7 @@ import { hasPuppet, PUPPETS } from './pure/puppets';
 import { skipCentre, SKIP_RADIUS_M } from './pure/skip-touch';
 import type { StagePlane } from './pure/stage-plane';
 import { DEFAULT_SHADOW_OPACITY } from './shadow-renderer';
+import { placeOnStage } from './stage-quad';
 
 /** Beats showing at once; more than this are dropped (the data is checked at load). */
 const SLOTS = 4;
@@ -156,7 +157,7 @@ export class CutsceneView {
       const w = stage.width * (puppet ? PUPPET_WIDTH : CAPTION_WIDTH);
       const x = puppet ? s.x : 0;
       const y = puppet ? s.y : stage.height * CAPTION_Y;
-      this.place(q, stage, x, y, w, w / art.aspect, LIFT_M);
+      placeOnStage(this.m, q, stage, x, y, w, w / art.aspect, LIFT_M);
       const mat = this.mats[i];
       if (mat.map !== art.tex) {
         mat.map = art.tex;
@@ -167,23 +168,7 @@ export class CutsceneView {
     skipCentre(stage, this.c);
     this.skip.visible = true;
     const d = SKIP_RADIUS_M * 2;
-    this.place(this.skip, stage, this.c[0], this.c[1], d, d, SKIP_LIFT_M);
+    placeOnStage(this.m, this.skip, stage, this.c[0], this.c[1], d, d, SKIP_LIFT_M);
     this.skipMat.opacity = (0.45 + 0.55 * skipProgress) * opacity;
-  }
-
-  private place(q: Mesh, stage: StagePlane, x: number, y: number, w: number, h: number, lift: number): void {
-    const r = stage.right,
-      u = stage.up,
-      nn = stage.normal,
-      o = stage.origin;
-    // prettier-ignore
-    this.m.set(
-      r[0] * w, u[0] * h, nn[0], o[0] + r[0] * x + u[0] * y + nn[0] * lift,
-      r[1] * w, u[1] * h, nn[1], o[1] + r[1] * x + u[1] * y + nn[1] * lift,
-      r[2] * w, u[2] * h, nn[2], o[2] + r[2] * x + u[2] * y + nn[2] * lift,
-      0, 0, 0, 1,
-    );
-    q.matrix.copy(this.m);
-    q.matrixWorldNeedsUpdate = true;
   }
 }
