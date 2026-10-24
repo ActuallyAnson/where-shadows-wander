@@ -16,7 +16,8 @@ import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
-import type { MenuScreenId } from '../ui/menu-panel/markup';
+import type { MenuScreenId } from '../ui/menu-panel/screens';
+import { JOINT } from '../engine/hands/hand';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
@@ -98,11 +99,8 @@ async function start(): Promise<void> {
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   // The title screen's sounds play through the audio engine, which is made further down.
   let uiAudio: AudioEngine | null = null;
-  if (!mockOptions)
-    void mountEnterArButtonIfNeeded(
-      world,
-      createUiSound(() => uiAudio),
-    );
+  const uiSound = createUiSound(() => uiAudio);
+  if (!mockOptions) void mountEnterArButtonIfNeeded(world, uiSound);
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -226,8 +224,12 @@ async function start(): Promise<void> {
   };
   // The pause, solved and end screens. The game flow calls menu.show('pause' | 'solved' | 'end') and reads the
   // presses from menu.onPress; here a press on Settings opens the settings panel and Resume closes the screen.
-  const menu = new MenuPanel(world, settings);
+  const menu = new MenuPanel(settings);
+  world.scene.add(menu.group);
+  const menuTips = new Float32Array(6);
+  menu.onReach = () => uiSound.hover();
   menu.onPress = (screen, button) => {
+    uiSound.press();
     if (button === 'settings') {
       menu.hide();
       void openSettings();
@@ -238,6 +240,16 @@ async function start(): Promise<void> {
     world.camera.getWorldDirection(settingsLook);
     return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
+  // ?debug=menu, menu-solved or menu-end shows that screen a couple of seconds after the page loads (dev and tester builds).
+  if (DEBUG_TOOLS) {
+    for (const [flag, id] of [
+      ['menu', 'pause'],
+      ['menu-solved', 'solved'],
+      ['menu-end', 'end'],
+    ] as const) {
+      if (debugViews.has(flag)) setTimeout(() => void showMenu(id), 2500);
+    }
+  }
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
@@ -645,6 +657,19 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (menu.group.visible) {
+            // The fingertips that can reach the menu: each tracked hand's index tip.
+            let tips = 0;
+            for (const h of handList) {
+              if (!h.tracked) continue;
+              const o = JOINT['index-finger-tip'] * 3;
+              menuTips[tips * 3] = h.positions[o];
+              menuTips[tips * 3 + 1] = h.positions[o + 1];
+              menuTips[tips * 3 + 2] = h.positions[o + 2];
+              tips++;
+            }
+            menu.update(step, menuTips, tips);
+          }
           debug?.frame(rigPlaced);
         } catch (e) {
           failures.report('shadows', e);

@@ -21,7 +21,7 @@ Night, pale and one candle colour. Nothing else on UI.
 | Glow | `#ffc46e` at 30% | the light that follows the fingertip |
 
 The settings panel (`src/ui/settings-panel/markup.ts`) and the pause, solved and end screens
-(`src/ui/menu-panel`) use this palette. The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
+(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
 and reads presses from `menu.onPress`. High contrast stays pure black on pure white
 with black outlines (`PALETTE.high`), and every new screen needs a high-contrast version.
 

@@ -1,53 +1,96 @@
-// The pause, solved and end screens in the room: IWSDK UIKit panels pressed with a fingertip (poke), like the settings
-// panel. Each screen is built the first time it is shown and only shown and hidden after that. Which button does what is
-// the game flow's business: a press is reported through `onPress(screen, buttonId)`.
-import { Euler, PanelDocument, PanelUI, PokeInteractable, RayInteractable } from '@iwsdk/core';
-import type { Entity, World } from '@iwsdk/core';
+// The pause, solved and end screens in the room. No panel: the text and a misty backdrop are drawn as artwork (menu-art.ts)
+// on quads in front of the player, and a fingertip reaches and presses the items by position (menu-layout.ts), not through
+// UIKit. A press is reported through `onPress(screen, buttonId)`; which button does what is the game flow's business.
+// A texture is redrawn only when the reached item changes. Nothing is built per frame.
+import {
+  CanvasTexture,
+  DoubleSide,
+  Euler,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  RepeatWrapping,
+  SRGBColorSpace,
+} from '@iwsdk/core';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
-import { placeSettingsPanel } from '../settings-panel/placement';
-import type { PanelPose } from '../settings-panel/placement';
-import { MENU_METRES_PER_PX, MENU_PALETTE, MENU_SCREENS, menuIds, menuMarkup, type MenuScreenId } from './markup';
+import { placeSettingsPanel, type PanelPose } from '../settings-panel/placement';
+import { createMenuPlane, MENU_SIZE_M, MenuInput } from './menu-layout';
+import { makeCanvas, MENU_CANVAS_PX, MENU_FONT, paintBackdrop, paintDust, paintMenu } from './menu-art';
+import { MENU_SCREENS, type MenuScreenId } from './screens';
+import fontUrl from './fonts/cinzel-latin-400-normal.woff2?url';
 
-const UIKIT_PIXEL_M = 0.01;
-const LOAD_TIMEOUT_MS = 8000;
-const PANEL_RENDER_ORDER = 1.2;
+/** After the paper wall (1) and the hands' shadows (2), so nothing washes over the screen. */
+const RENDER_ORDER = 2.5;
+const FADE_S = 0.45;
+const BACKDROP_W = 1.7;
+const BACKDROP_H = 1.06;
+const BACKDROP_Z = -0.14;
+const DUST_Z = -0.07;
+const DUST_SIZE = 1.5;
 
-interface UiElement {
-  setProperties(props: Record<string, unknown>): void;
-  addEventListener(type: string, fn: (e: unknown) => void): void;
-  removeEventListener(type: string, fn: (e: unknown) => void): void;
-}
-interface UiDocument {
-  getElementById(id: string): UiElement | null;
-  getElementsByClassName(className: string): UiElement[];
-}
-
-interface Built {
-  entity: Entity;
-  doc: UiDocument;
-  url: string;
+function texture(c: HTMLCanvasElement): CanvasTexture {
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
 }
 
 export class MenuPanel {
-  private readonly built = new Map<MenuScreenId, Built>();
-  private readonly loading = new Map<MenuScreenId, Promise<Built | null>>();
-  private shown: MenuScreenId | null = null;
+  readonly group = new Group();
+  private readonly menuMat: MeshBasicMaterial;
+  private readonly backdropMat: MeshBasicMaterial;
+  private readonly dustMat: MeshBasicMaterial;
+  private readonly menuCanvas: [HTMLCanvasElement, CanvasRenderingContext2D];
+  private readonly menuTex: CanvasTexture;
+  private readonly backdropTex: CanvasTexture;
+  private readonly dustTex: CanvasTexture;
+  private readonly plane = createMenuPlane();
+  private readonly input = new MenuInput();
   private readonly pose: PanelPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
-  private readonly removers: (() => void)[] = [];
+  private fontReady: Promise<void> | null = null;
+  private shown: MenuScreenId | null = null;
+  private lit = -1;
+  private alpha = 0;
+  private time = 0;
+  private high = false;
   lastError: string | null = null;
   /** A button was pressed on a screen. */
   onPress: ((screen: MenuScreenId, button: string) => void) | null = null;
+  /** A fingertip reached an item (once as it arrives), for the sound. */
+  onReach: (() => void) | null = null;
 
-  constructor(
-    private readonly world: World,
-    private readonly store: SettingsStore,
-  ) {
-    this.removers.push(
-      this.store.subscribe((key) => {
-        if (key === null || key === 'highContrast') for (const b of this.built.values()) this.applyLook(b.doc);
-      }),
-    );
+  constructor(private readonly store: SettingsStore) {
+    const [mc, mg] = (this.menuCanvas = makeCanvas(MENU_CANVAS_PX, MENU_CANVAS_PX));
+    void mg;
+    this.menuTex = texture(mc);
+    const [bc, bg] = makeCanvas(1024, 640);
+    paintBackdrop(bg, 1024, 640);
+    this.backdropTex = texture(bc);
+    const [dc, dg] = makeCanvas(512, 512);
+    paintDust(dg, 512);
+    this.dustTex = texture(dc);
+    this.dustTex.wrapS = this.dustTex.wrapT = RepeatWrapping;
+
+    const mat = (map: CanvasTexture) =>
+      new MeshBasicMaterial({ map, transparent: true, depthWrite: false, side: DoubleSide, toneMapped: false });
+    this.menuMat = mat(this.menuTex);
+    this.backdropMat = mat(this.backdropTex);
+    this.dustMat = mat(this.dustTex);
+    const geo = new PlaneGeometry(1, 1);
+    const quad = (m: MeshBasicMaterial, w: number, h: number, z: number) => {
+      const mesh = new Mesh(geo, m);
+      mesh.scale.set(w, h, 1);
+      mesh.position.z = z;
+      mesh.renderOrder = RENDER_ORDER;
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+    };
+    quad(this.backdropMat, BACKDROP_W, BACKDROP_H, BACKDROP_Z);
+    quad(this.dustMat, DUST_SIZE, DUST_SIZE * 0.7, DUST_Z);
+    quad(this.menuMat, MENU_SIZE_M, MENU_SIZE_M, 0);
+    this.group.visible = false;
+    this.dustTex.repeat.set(1, 0.7);
   }
 
   /** The screen showing now, or null. */
@@ -55,103 +98,91 @@ export class MenuPanel {
     return this.shown;
   }
 
-  /** Shows a screen in front of the head (`head` is the eye position, (fx, fz) the way it looks), hiding any other. */
+  /** Shows a screen in front of the head (`head` is the eye position, (fx, fz) the way it looks), replacing any other. */
   async show(id: MenuScreenId, head: ArrayLike<number>, fx: number, fz: number): Promise<boolean> {
-    const b = await this.build(id);
-    if (!b) return false;
-    if (this.shown && this.shown !== id) this.hide();
+    try {
+      await this.loadFont();
+    } catch (e) {
+      this.lastError = e instanceof Error ? e.message : String(e);
+      // Draws with the fallback serif: still readable.
+    }
     placeSettingsPanel(head, fx, fz, this.store.value.hand, this.pose);
-    const o = b.entity.object3D!;
-    o.position.set(this.pose.x, this.pose.y, this.pose.z);
+    this.group.position.set(this.pose.x, this.pose.y, this.pose.z);
     this.euler.set(this.pose.pitch, this.pose.yaw, 0, 'YXZ');
-    o.rotation.copy(this.euler);
-    o.visible = true;
-    if (!b.entity.hasComponent(PokeInteractable)) b.entity.addComponent(PokeInteractable);
-    if (!b.entity.hasComponent(RayInteractable)) b.entity.addComponent(RayInteractable);
+    this.group.rotation.copy(this.euler);
+    this.group.updateMatrixWorld(true);
+    const e = this.group.matrixWorld.elements;
+    for (let i = 0; i < 3; i++) {
+      this.plane.right[i] = e[i];
+      this.plane.up[i] = e[4 + i];
+      this.plane.normal[i] = e[8 + i];
+      this.plane.origin[i] = e[12 + i];
+    }
+    if (this.shown !== id) this.alpha = 0;
     this.shown = id;
+    this.input.reset();
+    this.lit = -1;
+    this.high = this.store.value.highContrast;
+    this.repaint();
+    this.group.visible = true;
     return true;
   }
 
   hide(): void {
-    if (!this.shown) return;
-    const b = this.built.get(this.shown);
-    this.shown = null;
-    if (!b) return;
-    b.entity.object3D!.visible = false;
-    if (b.entity.hasComponent(PokeInteractable)) b.entity.removeComponent(PokeInteractable);
-    if (b.entity.hasComponent(RayInteractable)) b.entity.removeComponent(RayInteractable);
+    this.shown = null; // the fade-out finishes in update()
   }
 
   dispose(): void {
-    this.hide();
-    for (const r of this.removers.splice(0)) r();
-    for (const b of this.built.values()) {
-      b.entity.destroy();
-      URL.revokeObjectURL(b.url);
-    }
-    this.built.clear();
-    this.loading.clear();
+    this.shown = null;
+    this.group.visible = false;
+    for (const t of [this.menuTex, this.backdropTex, this.dustTex]) t.dispose();
   }
 
-  private build(id: MenuScreenId): Promise<Built | null> {
-    const have = this.built.get(id);
-    if (have) return Promise.resolve(have);
-    let p = this.loading.get(id);
-    if (!p) {
-      p = this.load(id).catch((e) => {
+  /**
+   * Once per frame while anything is showing. `tips` holds n fingertips as xyz triples in scene space. Fades the screen,
+   * drifts the dust, lights the item a fingertip reaches and reports presses.
+   */
+  update(dt: number, tips: ArrayLike<number>, n: number): void {
+    if (!this.group.visible) return;
+    this.time += dt;
+    const target = this.shown ? 1 : 0;
+    this.alpha += Math.sign(target - this.alpha) * Math.min(Math.abs(target - this.alpha), dt / FADE_S);
+    if (this.alpha <= 0 && !this.shown) {
+      this.group.visible = false;
+      return;
+    }
+    const a = this.alpha;
+    this.backdropMat.opacity = a;
+    this.menuMat.opacity = a;
+    this.dustMat.opacity = a * 0.8;
+    // Dust rises slowly and sways a little.
+    this.dustTex.offset.set(Math.sin(this.time * 0.17) * 0.02, (this.time * 0.012) % 1);
+    if (!this.shown || a < 0.7) return;
+    const screen = MENU_SCREENS[this.shown];
+    const s = this.input.update(screen, this.plane, tips, n);
+    if (s.hover !== this.lit) {
+      if (s.hover >= 0) this.onReach?.();
+      this.lit = s.hover;
+      this.repaint();
+    }
+    if (s.pressed >= 0) {
+      const id = this.shown;
+      try {
+        this.onPress?.(id, screen.buttons[s.pressed].id);
+      } catch (e) {
         this.lastError = e instanceof Error ? e.message : String(e);
-        this.loading.delete(id); // a later show tries again
-        return null;
-      });
-      this.loading.set(id, p);
+      }
     }
-    return p;
   }
 
-  private async load(id: MenuScreenId): Promise<Built> {
-    const screen = MENU_SCREENS[id];
-    const url = URL.createObjectURL(new Blob([menuMarkup(screen)], { type: 'text/plain' }));
-    const entity = this.world.createTransformEntity();
-    entity.object3D!.visible = false;
-    entity.object3D!.scale.setScalar(MENU_METRES_PER_PX / UIKIT_PIXEL_M);
-    entity.addComponent(PanelUI, { config: url });
-    const started = performance.now();
-    let doc: UiDocument | undefined;
-    while (!(doc = PanelDocument.data.document[entity.index] as UiDocument | undefined)) {
-      if (performance.now() - started > LOAD_TIMEOUT_MS) {
-        entity.destroy();
-        URL.revokeObjectURL(url);
-        throw new Error(`the ${id} screen did not load in time`);
-      }
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    // After the paper wall (1) so the wall never washes over it, before the hand visual (1.5).
-    (doc as unknown as { rootElement: UiElement }).rootElement.setProperties({ renderOrder: PANEL_RENDER_ORDER });
-    for (const b of screen.buttons) {
-      const el = doc.getElementById(menuIds.button(id, b.id));
-      if (!el) {
-        this.lastError = `menu: no element "${menuIds.button(id, b.id)}"`;
-        continue;
-      }
-      const handler = () => {
-        try {
-          this.onPress?.(id, b.id);
-        } catch (e) {
-          this.lastError = e instanceof Error ? e.message : String(e);
-        }
-      };
-      el.addEventListener('click', handler);
-      this.removers.push(() => el.removeEventListener('click', handler));
-    }
-    this.applyLook(doc);
-    const built = { entity, doc, url };
-    this.built.set(id, built);
-    return built;
+  private repaint(): void {
+    if (!this.shown) return;
+    paintMenu(this.menuCanvas[1], MENU_SCREENS[this.shown], this.lit, this.high);
+    this.menuTex.needsUpdate = true;
   }
 
-  private applyLook(doc: UiDocument): void {
-    const look = this.store.value.highContrast ? 'high' : 'normal';
-    for (const [cls, props] of Object.entries(MENU_PALETTE[look]))
-      for (const el of doc.getElementsByClassName(cls)) el.setProperties({ ...props });
+  private loadFont(): Promise<void> {
+    this.fontReady ??= new FontFace(MENU_FONT, `url(${fontUrl})`).load().then((f) => void document.fonts.add(f));
+    return this.fontReady;
   }
 }
