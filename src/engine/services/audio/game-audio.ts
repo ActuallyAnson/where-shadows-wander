@@ -28,7 +28,7 @@ export class GameAudio {
   onShapeEvents(events: ShapeEventQueue, shadows: Readonly<Record<Handedness, HandShadow>>, stage: StagePlane): void {
     for (let i = 0; i < events.count; i++) {
       const e = events.at(i);
-      const id = soundForShapeEvent(e.type);
+      const id = soundForShapeEvent(e.type, e.reason);
       if (id === null) continue;
       this.fromShadow(shadows[e.hand], e.hand, stage);
       this.player.playAt(id, this.at.x, this.at.y, this.at.z, e.hand === 'left' ? 0 : 1);
@@ -39,6 +39,18 @@ export class GameAudio {
   puzzleSolved(stage: StagePlane): void {
     stagePoint(stage, 0, stage.height * 0.35, WALL_LIFT_M, this.at);
     this.player.playAt(Sound.Chime, this.at.x, this.at.y, this.at.z);
+  }
+
+  /** The room tone and the music play under everything while `on` (a headset session is running). Where they sit does not matter: they are the room's. */
+  setRoom(on: boolean): void {
+    this.player.setLoop(Sound.Hum, on, 0, 1.5, 0);
+    this.player.setLoop(Sound.Music, on, 0, 1.5, 0);
+  }
+
+  /** The candle lifted or set down, from the flame (`flame` is its scene position). Call with the frame's two flags. */
+  candleMoved(pickedUp: boolean, placed: boolean, flame: ArrayLike<number>): void {
+    if (pickedUp) this.player.playAt(Sound.Lift, flame[0], flame[1], flame[2]);
+    if (placed) this.player.playAt(Sound.Set, flame[0], flame[1], flame[2]);
   }
 
   /** Call every frame: the crackle plays while the flame is lit, from the flame. `flame` is its scene position. */

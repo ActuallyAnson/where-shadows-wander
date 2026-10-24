@@ -1,11 +1,33 @@
 // The game's sounds as data: which bus each plays on, how loud, how it carries, and how often it may repeat.
 // The files come later from the team; until then placeholder-sounds.ts makes each one in code. Plain TypeScript.
-import type { ShapeEventType } from '../../hands/shape-events';
+import type { ReleaseReason, ShapeEventType } from '../../hands/shape-events';
 import { Bus, type BusId } from './mixer';
 
-export const Sound = { Rustle: 0, Thump: 1, Chime: 2, Crackle: 3 } as const;
+export const Sound = {
+  Rustle: 0,
+  Thump: 1,
+  Chime: 2,
+  Crackle: 3,
+  /** A fingertip reaches a menu item. */
+  Tick: 4,
+  /** A menu item is pressed. */
+  Press: 5,
+  /** BEGIN: a match is struck and the flame catches. */
+  Ignite: 6,
+  /** The room's low tone, a loop under everything. */
+  Hum: 7,
+  /** A shape is let go. */
+  Release: 8,
+  /** Tracking was lost for too long. */
+  Lost: 9,
+  /** The candle is picked up. */
+  Lift: 10,
+  /** The candle is set down. */
+  Set: 11,
+  /** The slow background music, a loop. */
+  Music: 12,
+} as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
-export const SOUND_COUNT = 4;
 
 export interface SoundDef {
   /** Also the asset id a real file will have in the manifest (src/assets/audio/sfx/<name>.ogg). */
@@ -64,12 +86,111 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     refDistance: 0.3,
     maxDistance: 4,
   },
+  {
+    name: 'tick',
+    bus: Bus.Effects,
+    gain: 0.35,
+    loop: false,
+    priority: 0,
+    minGapS: 0.06,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'press',
+    bus: Bus.Effects,
+    gain: 0.7,
+    loop: false,
+    priority: 2,
+    minGapS: 0.12,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'ignite',
+    bus: Bus.Effects,
+    gain: 0.8,
+    loop: false,
+    priority: 3,
+    minGapS: 1,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'hum',
+    bus: Bus.Ambience,
+    gain: 0.5,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    // Heard the same from anywhere in the room: it is the room, not a thing in it.
+    refDistance: 50,
+    maxDistance: 100,
+  },
+  {
+    name: 'release',
+    bus: Bus.Effects,
+    gain: 0.35,
+    loop: false,
+    priority: 1,
+    minGapS: 0.25,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'lost',
+    bus: Bus.Effects,
+    gain: 0.4,
+    loop: false,
+    priority: 2,
+    minGapS: 2,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'lift',
+    bus: Bus.Effects,
+    gain: 0.6,
+    loop: false,
+    priority: 2,
+    minGapS: 0.3,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'set',
+    bus: Bus.Effects,
+    gain: 0.7,
+    loop: false,
+    priority: 2,
+    minGapS: 0.3,
+    refDistance: 1,
+    maxDistance: 8,
+  },
+  {
+    name: 'music',
+    bus: Bus.Music,
+    gain: 0.6,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    // Like the hum, it is the room's, not a thing in it.
+    refDistance: 50,
+    maxDistance: 100,
+  },
 ];
+/** How many sounds there are: one definition each, in the order of `Sound`. */
+export const SOUND_COUNT = SOUND_DEFS.length;
 
-/** The sound a shape event makes, or null for none: a paper rustle when recognised, a thump when it commits. */
-export function soundForShapeEvent(type: ShapeEventType): SoundId | null {
+/**
+ * The sound a shape event makes, or null for none: a paper rustle when recognised, a thump when it commits, a soft
+ * letting-go when it is released, and a low falling pair when it was released because tracking was lost.
+ */
+export function soundForShapeEvent(type: ShapeEventType, reason: ReleaseReason | null = null): SoundId | null {
   if (type === 'candidate') return Sound.Rustle;
   if (type === 'commit') return Sound.Thump;
+  // Letting go because another shape just committed is part of that commit's thump, not a sound of its own.
+  if (type === 'release') return reason === 'lost' ? Sound.Lost : reason === 'switch' ? null : Sound.Release;
   return null;
 }
 
