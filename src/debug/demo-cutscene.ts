@@ -1,4 +1,4 @@
-// A short test cutscene for ?debug=cutscene: a bird crosses the wall under one caption. Dev and tester builds only.
+// A short test cutscene for the Hand Lab Cutscene button and the Testing switch: a bird crosses the wall under one caption. Dev and tester builds only.
 import type { CutsceneData } from '../engine/sim/cutscene';
 
 export const DEMO_CUTSCENE: CutsceneData = {

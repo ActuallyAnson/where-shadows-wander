@@ -17,7 +17,6 @@ import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { JOINT } from '../engine/hands/hand';
-import type { CutsceneData } from '../engine/sim/cutscene';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
@@ -290,14 +289,18 @@ async function start(): Promise<void> {
         toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
         isOpen: () => settingsPanel.isOpen,
       },
+      cutscene: { play: () => void playTestCutscene() },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
   // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
   let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
-  // ?debug=cutscene plays a short test cutscene once the stage is placed.
-  let demoCutscene: CutsceneData | null = null;
-  if (DEBUG_TOOLS && debugViews.has('cutscene')) demoCutscene = (await import('../debug/demo-cutscene')).DEMO_CUTSCENE;
+  // The test cutscene (a bird crosses the wall): the Hand Lab's Cutscene button, or the Testing panel's switch when VR starts.
+  const playTestCutscene = async () => {
+    if (!DEBUG_TOOLS) return;
+    const problems = cutscenes.play((await import('../debug/demo-cutscene')).DEMO_CUTSCENE);
+    if (problems.length > 0) failures.report('test cutscene', new Error(problems.join('; ')));
+  };
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
@@ -521,6 +524,7 @@ async function start(): Promise<void> {
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
+      if (t.cutscene) setTimeout(() => void playTestCutscene(), 1000);
       armRecording(t.record);
     });
   }
@@ -647,11 +651,6 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
-          if (demoCutscene && rigPlaced) {
-            const problems = cutscenes.play(demoCutscene);
-            if (problems.length > 0) failures.report('demo cutscene', new Error(problems.join('; ')));
-            demoCutscene = null;
-          }
           if (cutscenes.playing) {
             // The fingertips that can poke Skip: each tracked hand's index tip.
             let tips = 0;

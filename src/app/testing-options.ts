@@ -12,6 +12,8 @@ export interface TestingOptions {
   shadow: boolean;
   /** The settings panel opens a second after the headset session starts (?settings). */
   settings: boolean;
+  /** The test cutscene plays a second after the headset session starts (set in the Testing panel; no address form). */
+  cutscene: boolean;
   /** Hand recording: 20 s of free hands (?record=20), or the guided shape script, 84 s (?record&script=shapes). */
   record: RecordChoice;
 }
@@ -20,6 +22,7 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   joints: false,
   shadow: false,
   settings: false,
+  cutscene: false,
   record: 'off',
 };
 
@@ -34,6 +37,7 @@ export function parseTesting(search: string): TestingOptions {
     joints: debug.has('joints'),
     shadow: debug.has('shadow'),
     settings: p.has('settings'),
+    cutscene: false,
     record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
   };
 }
@@ -69,6 +73,7 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.joints) on.push('joint dots');
   if (o.shadow) on.push('shadow capsules');
   if (o.settings) on.push('settings panel on entry');
+  if (o.cutscene) on.push('test cutscene on entry');
   if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
   return on;
@@ -106,6 +111,7 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       joints: raw.joints === true,
       shadow: raw.shadow === true,
       settings: raw.settings === true,
+      cutscene: raw.cutscene === true,
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
     };
   } catch {
