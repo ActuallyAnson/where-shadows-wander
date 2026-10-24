@@ -7,6 +7,7 @@ import {
   describeTesting,
   FREE_RECORD_SECONDS,
   loadTesting,
+  MENU_CHOICES,
   nextChoice,
   RECORD_CHOICES,
   saveTesting,
@@ -67,11 +68,13 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     shadow.textContent = `Shadow capsules: ${options.shadow ? 'ON' : 'off'}`;
     settings.textContent = `Settings panel opens when VR starts: ${options.settings ? 'ON' : 'off'}`;
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
+    menu.textContent = `Menu screen showing: ${options.menu}`;
     for (const [b, isOn] of [
       [joints, options.joints],
       [shadow, options.shadow],
       [settings, options.settings],
       [record, options.record !== 'off'],
+      [menu, options.menu !== 'off'],
     ] as const) {
       b.style.background = isOn ? '#163824' : '#21262d';
       b.style.borderColor = isOn ? '#2ea043' : '#30363d';
@@ -83,11 +86,12 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   const shadow = button(() => set({ ...options, shadow: !options.shadow }));
   const settings = button(() => set({ ...options, settings: !options.settings }));
   const record = button(() => set({ ...options, record: nextChoice(RECORD_CHOICES, options.record) }));
+  const menu = button(() => set({ ...options, menu: nextChoice(MENU_CHOICES, options.menu) }));
   const clear = button(() => set({ ...DEFAULT_TESTING }));
   clear.textContent = 'Clear all switches';
   clear.style.cssText += 'background:#2d1b1b;color:#ff7b72;border-color:#6e2f2f;';
 
-  element.append(title, active, joints, shadow, settings, record, hint, clear);
+  element.append(title, active, joints, shadow, settings, record, menu, hint, clear);
   refresh();
   return {
     element,

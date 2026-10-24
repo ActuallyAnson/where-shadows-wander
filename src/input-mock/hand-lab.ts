@@ -37,6 +37,8 @@ export interface LabView {
   canvas: HTMLCanvasElement;
   /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
   settings?: { toggle(): void; isOpen(): boolean };
+  /** The pause, solved and end screens: the Menu button steps through them (and off), and says which is showing. */
+  menu?: { cycle(): void; label(): string };
 }
 
 export class HandLab {
@@ -283,6 +285,7 @@ export class HandLab {
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
+      else if (act === 'menu') this.view.menu?.cycle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -341,6 +344,7 @@ export class HandLab {
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
+        ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show the pause, solved and end screens, one after the other') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}

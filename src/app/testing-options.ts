@@ -4,6 +4,9 @@
 // scripts that drive the page. Plain TypeScript.
 
 export type RecordChoice = 'off' | 'free' | 'shapes';
+/** Which menu screen to show in the room (menu-panel), or none. */
+export type MenuChoice = 'off' | 'pause' | 'solved' | 'end';
+export const MENU_CHOICES: readonly MenuChoice[] = ['off', 'pause', 'solved', 'end'];
 
 export interface TestingOptions {
   /** A dot on every tracked hand joint (?debug=joints). */
@@ -14,6 +17,8 @@ export interface TestingOptions {
   settings: boolean;
   /** Hand recording: 20 s of free hands (?record=20), or the guided shape script, 84 s (?record&script=shapes). */
   record: RecordChoice;
+  /** A menu screen showing in the room, to look at it (set in the Testing panel; there is no address form). */
+  menu: MenuChoice;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
@@ -21,6 +26,7 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   shadow: false,
   settings: false,
   record: 'off',
+  menu: 'off',
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
@@ -35,6 +41,7 @@ export function parseTesting(search: string): TestingOptions {
     shadow: debug.has('shadow'),
     settings: p.has('settings'),
     record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
+    menu: 'off',
   };
 }
 
@@ -71,6 +78,7 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.settings) on.push('settings panel on entry');
   if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
+  if (o.menu !== 'off') on.push(`${o.menu} screen`);
   return on;
 }
 
@@ -107,6 +115,7 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       shadow: raw.shadow === true,
       settings: raw.settings === true,
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
+      menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
     };
   } catch {
     return { ...DEFAULT_TESTING };

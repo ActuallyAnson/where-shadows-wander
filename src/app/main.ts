@@ -15,6 +15,7 @@ import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
+import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
 import { JOINT } from '../engine/hands/hand';
@@ -227,29 +228,30 @@ async function start(): Promise<void> {
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
   const menuTips = new Float32Array(6);
+  // The menu screen being looked at from the Hand Lab's Menu button or the launcher's Testing panel (never by the game).
+  let menuChoice: MenuChoice = 'off';
+  const showMenuChoice = (choice: MenuChoice) => {
+    menuChoice = choice;
+    if (choice === 'off') menu.hide();
+    else void showMenu(choice);
+  };
   menu.onReach = () => uiSound.hover();
   menu.onPress = (screen, button) => {
     uiSound.press();
     if (button === 'settings') {
       menu.hide();
+      menuChoice = 'off';
       void openSettings();
-    } else if (screen === 'pause' && button === 'resume') menu.hide();
+    } else if (screen === 'pause' && button === 'resume') {
+      menu.hide();
+      menuChoice = 'off';
+    }
   };
   const showMenu = (id: MenuScreenId) => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
     return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
-  // ?debug=menu, menu-solved or menu-end shows that screen a couple of seconds after the page loads (dev and tester builds).
-  if (DEBUG_TOOLS) {
-    for (const [flag, id] of [
-      ['menu', 'pause'],
-      ['menu-solved', 'solved'],
-      ['menu-end', 'end'],
-    ] as const) {
-      if (debugViews.has(flag)) setTimeout(() => void showMenu(id), 2500);
-    }
-  }
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
@@ -302,6 +304,10 @@ async function start(): Promise<void> {
       settings: {
         toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
         isOpen: () => settingsPanel.isOpen,
+      },
+      menu: {
+        cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
+        label: () => menuChoice,
       },
     });
   }
@@ -525,9 +531,12 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
-    window.addEventListener(TESTING_EVENT, (e) =>
-      applyOverlays((e as CustomEvent<ReturnType<typeof loadTesting>>).detail),
-    );
+    showMenuChoice(loadTesting().menu);
+    window.addEventListener(TESTING_EVENT, (e) => {
+      const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
+      applyOverlays(t);
+      showMenuChoice(t.menu);
+    });
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
