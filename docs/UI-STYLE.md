@@ -26,14 +26,14 @@ High contrast is pure black on pure white with black outlines (`PALETTE.high` in
   Corners may stay slightly rounded where `uikit` requires it.
 - One bold sans for everything, two sizes of emphasis: a title and a body. No thin weights.
 - One accent per screen. If everything is flame, nothing is.
-- Button targets are at least `BUTTON_PX` high so a fingertip pinch lands.
+- Button targets are at least `BUTTON_PX` high so a fingertip poke lands (panels are poked, not pinched: ADR 0011).
 
 ## Motion
 
 - Slide-and-snap: 150–250 ms ease-out into place, no bounce past the final position.
 - Nothing flashes more than 3 times a second. No full-screen flashes.
-- Panels are anchored in the world at about 1.2 m and move slowly if at all. Never lock UI to the head.
-- Respect the reduced-motion setting: replace slides with a short fade.
+- Panels are anchored in the world within arm's reach to poke (about 0.5 m; the reading distance is not verified on a headset yet) and move slowly if at all. Never lock UI to the head.
+- Motion can be cut down to a short fade if we add a reduced-motion setting (not in the settings table yet).
 
 ## Sound
 
@@ -43,9 +43,9 @@ High contrast is pure black on pure white with black outlines (`PALETTE.high` in
 
 ## Comfort rules
 
-- Text readable at 1.2 m with hands-tracked pointing, at least 40 px in a 1024 px panel.
+- Text at least 44 px on a poked panel (the settings title is 44 px). To be checked on the Pico.
 - No camera moves, no scaling of the whole world, no fast parallax.
-- Cutscenes are in-engine shadow-puppet sequences: they can be skipped with a pinch and last under 20 s.
+- Cutscenes are in-engine shadow-puppet sequences: they can be skipped with a poke on a Skip button and last under 20 s.
 
 ## Not doing
 
