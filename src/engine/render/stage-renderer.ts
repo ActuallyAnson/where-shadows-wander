@@ -140,12 +140,16 @@ export class StageRenderer {
       // Determine animation frame & tile
       let animFrame = 0;
       if (kind === Kind.Traveller) {
-        const speed = Math.hypot(vx, vy);
-        if (speed > 0.05) {
-          // Walk animation cadence based on stage position
-          animFrame = Math.floor(Math.abs(renderX) * 8) % 2 === 0 ? 1 : 2;
+        if ((store.flags[s] & Flag.WaitPose) !== 0) {
+          animFrame = 3; // wait pose: looking back toward player
         } else {
-          animFrame = 0; // idle
+          const speed = Math.hypot(vx, vy);
+          if (speed > 0.05) {
+            // Walk animation cadence based on stage position
+            animFrame = Math.floor(Math.abs(renderX) * 8) % 2 === 0 ? 1 : 2;
+          } else {
+            animFrame = 0; // idle
+          }
         }
       }
 

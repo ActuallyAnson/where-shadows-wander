@@ -20,9 +20,13 @@ import { Diagnostics } from '../debug/diagnostics';
 import { mountReportPanel } from '../debug/report-panel';
 import { CandleView } from '../engine/render/candle-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
+import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
+import { PropShadowView } from '../engine/render/props/prop-shadow-view';
 import { StageRenderer } from '../engine/render/stage-renderer';
-import { DEFAULT_CAPACITIES, Kind } from '../engine/sim/entity-kinds';
+import { DEFAULT_CAPACITIES } from '../engine/sim/entity-kinds';
 import { EntityStore } from '../engine/sim/entity-store';
+import { Solver } from '../engine/sim/solver';
+import { TutorialFlow } from '../game/tutorial-flow';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
@@ -172,10 +176,24 @@ async function start(): Promise<void> {
   const ghostTarget = new GhostTargetView(stageGroup, {
     targetId: 'tutorial_bridge_hint',
     x: 0.0,
-    y: -0.2,
+    y: -0.15,
     requiredShape: 'flat',
+    active: false,
   });
   const entityStore = new EntityStore(DEFAULT_CAPACITIES);
+  const solver = new Solver(entityStore.capacity);
+  const propProjector = new PropProjector();
+  const propShadowView = new PropShadowView(stageGroup);
+  const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
+  const bakePropTerrain = (): void => {
+    const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
+    solver.terrain.clear();
+    for (let i = 0; i < terrainCapsules.length; i++) {
+      const c = terrainCapsules[i];
+      solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
+    }
+    propShadowView.updatePolygons(polygons);
+  };
   world.scene.add(stageView.group, stageGroup, shadowRenderer.mesh, candleView.group, ambientLight);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
@@ -186,6 +204,7 @@ async function start(): Promise<void> {
   const audio = new AudioEngine();
   audio.attachGestureUnlock(document);
   const gameAudio = new GameAudio(audio);
+  const tutorial = new TutorialFlow(entityStore, solver, ghostTarget, gameAudio);
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
@@ -252,9 +271,8 @@ async function start(): Promise<void> {
       0, 0, 0, 1,
     );
     stageGroup.matrixWorldNeedsUpdate = true;
-    if (entityStore.count === 0) {
-      entityStore.create(Kind.Traveller, -0.4, -0.2, 0.06);
-    }
+    bakePropTerrain();
+    tutorial.start();
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -292,11 +310,11 @@ async function start(): Promise<void> {
   const handList = [hands.hands.left, hands.hands.right];
   let simWasPaused = false;
   const sim = Object.assign(
-    new FixedStepLoop(SIM_HZ, () => {
+    new FixedStepLoop(SIM_HZ, (dt) => {
       entityStore.beginStep();
-      // Game simulation steps go here (week 2+).
+      solver.step(entityStore, dt);
     }),
-    { store: entityStore },
+    { store: entityStore, solver },
   );
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
@@ -359,6 +377,17 @@ async function start(): Promise<void> {
       liveCount: stageRenderer.liveCount,
       drawCalls: 1,
       ghostTargetActive: ghostTarget.active,
+    },
+    propTerrain: {
+      propCount: props.length,
+      terrainCapsules: sim.solver.terrain.count,
+      baked: propShadowView.isBaked,
+    },
+    tutorial: {
+      state: tutorial.state,
+      travellerX: tutorial.travellerX,
+      travellerGrounded: tutorial.isGrounded,
+      bridgeActive: tutorial.isBridgeActive,
     },
     shadow: {
       stage: stageChoice,
@@ -614,6 +643,9 @@ async function start(): Promise<void> {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
+            if (candleAction.justPlaced) {
+              bakePropTerrain();
+            }
           }
         } catch (e) {
           failures.report('candle pickup', e);
@@ -657,6 +689,10 @@ async function start(): Promise<void> {
       if (paused) simWasPaused = true;
       else {
         try {
+          if (rigPlaced) {
+            ghostTarget.update(delta, projector.shadows, shapes);
+            tutorial.update(delta, projector.shadows, shapes);
+          }
           // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
           // replay it (docs/SIMULATION.md).
           if (simWasPaused) {
@@ -671,7 +707,6 @@ async function start(): Promise<void> {
       }
       try {
         stageRenderer.update(sim.store, sim.alpha);
-        ghostTarget.update(delta, projector.shadows, shapes);
       } catch (e) {
         failures.report('stage renderer', e);
       }
@@ -758,6 +793,11 @@ async function start(): Promise<void> {
         stageGroup,
         stageRenderer,
         ghostTarget,
+        propProjector,
+        propShadowView,
+        props,
+        solver,
+        tutorial,
         entityStore,
         audio,
         gameAudio,

@@ -60,6 +60,7 @@ export class GhostTargetView {
   active: boolean;
   triggered = false;
   holdTimer = 0;
+  matchedHand: Handedness | null = null;
   onTrigger: ((targetId: string) => void) | null = null;
 
   private time = 0;
@@ -114,6 +115,7 @@ export class GhostTargetView {
     this.requiredShape = requiredShape;
     this.triggered = false;
     this.holdTimer = 0;
+    this.matchedHand = null;
     this.active = true;
     this.mesh.position.set(x, y, 0);
     this.mesh.visible = true;
@@ -138,6 +140,7 @@ export class GhostTargetView {
 
     // Check both hands for overlap and committed gesture
     let matched = false;
+    let matchingHand: Handedness | null = null;
     const hands: readonly Handedness[] = ['left', 'right'];
 
     for (let i = 0; i < 2; i++) {
@@ -157,10 +160,12 @@ export class GhostTargetView {
 
         if (committedShape === this.requiredShape) {
           matched = true;
+          matchingHand = h;
           break;
         }
       }
     }
+    this.matchedHand = matchingHand;
 
     if (matched) {
       this.holdTimer += delta;

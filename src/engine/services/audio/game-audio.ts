@@ -36,9 +36,23 @@ export class GameAudio {
   }
 
   /** The chime for a solved puzzle, from the top middle of the wall. */
-  puzzleSolved(stage: StagePlane): void {
-    stagePoint(stage, 0, stage.height * 0.35, WALL_LIFT_M, this.at);
-    this.player.playAt(Sound.Chime, this.at.x, this.at.y, this.at.z);
+  puzzleSolved(stage?: StagePlane): void {
+    if (stage) {
+      stagePoint(stage, 0, stage.height * 0.35, WALL_LIFT_M, this.at);
+      this.player.playAt(Sound.Chime, this.at.x, this.at.y, this.at.z);
+    } else {
+      this.player.playAt(Sound.Chime, 0, 1.8, -2.0);
+    }
+  }
+
+  /** Plays a soft paper rustle when the hand bridge activates on the stage. */
+  bridgeActivated(stage?: StagePlane, x = 0, y = 0): void {
+    if (stage) {
+      stagePoint(stage, x, y, WALL_LIFT_M, this.at);
+      this.player.playAt(Sound.Rustle, this.at.x, this.at.y, this.at.z);
+    } else {
+      this.player.playAt(Sound.Rustle, x, 1.4 + y, -2.0);
+    }
   }
 
   /** Call every frame: the crackle plays while the flame is lit, from the flame. `flame` is its scene position. */
