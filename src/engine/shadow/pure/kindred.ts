@@ -1,4 +1,4 @@
-// The kindred: a small shadow bird that lives on the stage wall and flies about by itself. It drifts in slow loops, circles
+// The kindred: a small shadow creature (a spirit fox) that lives on the stage wall and flies about by itself. It drifts in slow loops, circles
 // the light (or whatever it is told to), can land on a spot, and shies away from a startle. It is a picture only: it never
 // touches the puzzle or the solver. Positions are stage coordinates in metres from the stage's centre (x right, y up).
 // Plain TypeScript; a fixed number of numbers and no allocation per update.
@@ -12,7 +12,7 @@ const PERCH_DAMP = 5;
 /** How far from the edge of the stage it stays, as a fraction of the half-size. */
 const MARGIN = 0.88;
 
-export type KindredFrame = 0 | 1 | 2; // wings up, level, down
+export type KindredFrame = 0 | 1 | 2; // three poses of the gait
 
 export class Kindred {
   x = 0;
@@ -21,7 +21,7 @@ export class Kindred {
   vy = 0;
   /** 1 when it faces right, -1 when it faces left. */
   facing: 1 | -1 = 1;
-  /** Wing phase in turns (0..1). */
+  /** Gait phase in turns (0..1): the tail and legs swing with it. */
   flap = 0;
   private t = 0;
   private startle = 0;
@@ -37,7 +37,7 @@ export class Kindred {
     return this.perched;
   }
 
-  /** Which of the three wing drawings to show now. */
+  /** Which of the three drawings (legs and tail swinging) to show now. */
   get frame(): KindredFrame {
     const s = Math.sin(this.flap * 2 * Math.PI);
     return s > 0.35 ? 0 : s < -0.35 ? 2 : 1;
@@ -132,7 +132,7 @@ export class Kindred {
     if (this.vx > 0.02) this.facing = 1;
     else if (this.vx < -0.02) this.facing = -1;
     const landed = this.perched && this.speed < 0.01;
-    const hz = landed ? 0.5 : 2.5 + 5 * Math.min(1, this.speed / MAX_SPEED);
+    const hz = landed ? 0.4 : 1.4 + 3 * Math.min(1, this.speed / MAX_SPEED);
     this.flap = (this.flap + hz * dt) % 1;
   }
 }
