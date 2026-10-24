@@ -51,33 +51,37 @@ export class HandOccluder {
   }
 
   update(hands: readonly HandFrame[]): void {
+    // Off (in VR): hidden, so nothing is drawn and no buffer is uploaded. It was still marking both for upload each frame.
+    this.joints.visible = this.bones.visible = this.enabled;
+    if (!this.enabled) {
+      this.joints.count = this.bones.count = 0;
+      return;
+    }
     let nj = 0;
     let nb = 0;
-    if (this.enabled) {
-      for (const hand of hands) {
-        if (!hand.tracked) continue;
-        const p = hand.positions;
-        const r = hand.radii;
-        for (let j = 0; j < JOINT_COUNT; j++) {
-          const s = Math.max((r[j] || 0) * PAD, MIN_RADIUS_M); // `|| 0`: a source with no radii (NaN) still gets an occluder
-          this.m.makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
-          this.joints.setMatrixAt(nj++, this.m);
-        }
-        for (let k = 0; k < BONES; k++) {
-          const i = CAPSULE_JOINTS[k * 2];
-          const j = CAPSULE_JOINTS[k * 2 + 1];
-          this.a.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
-          this.b.set(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
-          this.d.subVectors(this.b, this.a);
-          const len = this.d.length();
-          if (len < 1e-6) continue;
-          this.q.setFromUnitVectors(UP, this.d.multiplyScalar(1 / len));
-          this.mid.addVectors(this.a, this.b).multiplyScalar(0.5);
-          const s = Math.max((Math.min(r[i], r[j]) || 0) * PAD, MIN_RADIUS_M);
-          this.scale.set(s, len, s);
-          this.m.compose(this.mid, this.q, this.scale);
-          this.bones.setMatrixAt(nb++, this.m);
-        }
+    for (const hand of hands) {
+      if (!hand.tracked) continue;
+      const p = hand.positions;
+      const r = hand.radii;
+      for (let j = 0; j < JOINT_COUNT; j++) {
+        const s = Math.max((r[j] || 0) * PAD, MIN_RADIUS_M); // `|| 0`: a source with no radii (NaN) still gets an occluder
+        this.m.makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
+        this.joints.setMatrixAt(nj++, this.m);
+      }
+      for (let k = 0; k < BONES; k++) {
+        const i = CAPSULE_JOINTS[k * 2];
+        const j = CAPSULE_JOINTS[k * 2 + 1];
+        this.a.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
+        this.b.set(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
+        this.d.subVectors(this.b, this.a);
+        const len = this.d.length();
+        if (len < 1e-6) continue;
+        this.q.setFromUnitVectors(UP, this.d.multiplyScalar(1 / len));
+        this.mid.addVectors(this.a, this.b).multiplyScalar(0.5);
+        const s = Math.max((Math.min(r[i], r[j]) || 0) * PAD, MIN_RADIUS_M);
+        this.scale.set(s, len, s);
+        this.m.compose(this.mid, this.q, this.scale);
+        this.bones.setMatrixAt(nb++, this.m);
       }
     }
     this.joints.count = nj;

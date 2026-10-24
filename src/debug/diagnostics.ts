@@ -5,6 +5,7 @@
 import type { WebGLRenderer } from '@iwsdk/core';
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { AnchorProbe, localStorageHandleStore } from './anchor-probe';
+import { DEBUG_TOOLS } from './debug-flag';
 import { RingBuffer } from './ring-buffer';
 
 const STORAGE_KEY = 'wsw.diagnostics.v1';
@@ -13,6 +14,8 @@ const SAVE_EVERY_MS = 2000;
 const MAX_ERRORS = 20;
 const MAX_PLANES = 40;
 const WINDOW = 600; // frame samples kept for percentiles
+/** Longest error text kept, so one huge message cannot fill the report (or the browser's storage). */
+const MAX_MESSAGE_CHARS = 500;
 
 type Json = Record<string, unknown>;
 
@@ -26,7 +29,17 @@ interface HandStats {
   wasTracked: boolean;
 }
 
+export interface DiagnosticsOptions {
+  /**
+   * Save the report every few seconds and run the plane and anchor probes each frame. Only the debug menu and the
+   * "Copy report" panel read the report, so this is on in dev and tester builds and off in the release build, where
+   * it would be a stringify and a storage write every two seconds for nothing.
+   */
+  live?: boolean;
+}
+
 export class Diagnostics {
+  private readonly live: boolean;
   private readonly report: Json;
   private readonly errors: string[] = [];
   private readonly intervals = new RingBuffer(WINDOW);
@@ -42,7 +55,8 @@ export class Diagnostics {
   private sessionCount = 0;
   private extra: () => Json = () => ({});
 
-  constructor() {
+  constructor(options: DiagnosticsOptions = {}) {
+    this.live = options.live ?? DEBUG_TOOLS;
     this.report = {
       build: __BUILD_ID__,
       url: location.href,
@@ -55,7 +69,12 @@ export class Diagnostics {
     addEventListener('pagehide', () => this.save());
     const origError = console.error;
     console.error = (...args: unknown[]) => {
-      this.error(args.map((a) => (typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a))).join(' '));
+      // Recording must never throw into the caller: console.error is how other code reports its own failures.
+      try {
+        this.error(args.map(describe).join(' '));
+      } catch {
+        // ignore
+      }
       origError.apply(console, args);
     };
     void this.probeSupport();
@@ -69,7 +88,7 @@ export class Diagnostics {
   }
 
   error(message: string): void {
-    this.errors.push(`${Math.round(performance.now())}ms ${message}`);
+    this.errors.push(`${Math.round(performance.now())}ms ${message.slice(0, MAX_MESSAGE_CHARS)}`);
     if (this.errors.length > MAX_ERRORS) this.errors.shift();
   }
 
@@ -93,6 +112,8 @@ export class Diagnostics {
       frameRate: s.frameRate ?? null,
       supportedFrameRates: s.supportedFrameRates ? [...s.supportedFrameRates] : null,
       multiview: (renderer.xr as { isMultiview?: boolean }).isMultiview ?? null,
+      // 0 to 1 (three.js default 1 on a headset that supports it): how much the eye buffer's edges are rendered at lower resolution.
+      foveation: renderer.xr.getFoveation?.() ?? null,
       layerSize: layerSize(renderer.xr.getBaseLayer() as unknown as Record<string, number> | null),
     };
     this.save();
@@ -128,6 +149,7 @@ export class Diagnostics {
 
     trackHand(this.handStats.left, hands.left);
     trackHand(this.handStats.right, hands.right);
+    if (!this.live) return;
     this.snapshotPlanes(frame, refSpace);
     this.anchorProbe.step(frame, refSpace);
 
@@ -244,6 +266,17 @@ export class Diagnostics {
     }
     // Values are in the XR reference space, not scene space.
     this.report.planes = { count: planes.size, list };
+  }
+}
+
+/** A console.error argument as text. An Error gives its message; an object gives JSON, or its plain string if that throws (a circular object). */
+export function describe(a: unknown): string {
+  if (a instanceof Error) return `${a.name}: ${a.message}`;
+  if (typeof a !== 'object' || a === null) return String(a);
+  try {
+    return JSON.stringify(a) ?? String(a);
+  } catch {
+    return String(a);
   }
 }
 

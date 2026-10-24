@@ -12,6 +12,9 @@ const MARKERS = [
   'Alt+P pause', // the HUD line (debug-tools.ts)
   'Entity colliders', // the debug menu (debug-controller.ts)
   'Testing: switches', // the launcher's Testing panel (testing-panel.ts)
+  'Copy report', // the report panel (report-panel.ts)
+  'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
+  'Copy Logs', // the launcher's log button (enter-ar-button.ts)
 ];
 
 const jsIn = (dir) =>

@@ -17,11 +17,10 @@ import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
-import { mountReportPanel } from '../debug/report-panel';
 import { CandleView } from '../engine/render/candle-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
 import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
-import { PropShadowView } from '../engine/render/props/prop-shadow-view';
+import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
 import { StageRenderer } from '../engine/render/stage-renderer';
 import { DEFAULT_CAPACITIES } from '../engine/sim/entity-kinds';
 import { EntityStore } from '../engine/sim/entity-store';
@@ -33,11 +32,14 @@ import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
+import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
+import { prewarmMusic } from '../engine/services/audio/placeholder-sounds';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
@@ -65,9 +67,12 @@ import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded } from './enter-ar-button';
+import { captureFromUrl } from './capture-mode';
+import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
+import { showStartFailure } from './start-failure';
 
 const SIM_HZ = 60;
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -78,14 +83,18 @@ const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
 // One part of the frame throwing must not stop the rest, or the next frame (failure-reporter.ts).
 const failures = new FailureReporter((message) => diagnostics.error(message));
-mountReportPanel(diagnostics);
+// The "Copy report" panel is a debug tool: only in dev and tester builds (src/debug/debug-flag.ts).
+if (DEBUG_TOOLS) void import('../debug/report-panel').then((m) => m.mountReportPanel(diagnostics));
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
-if (!mockOptions) void showNoXrNoticeIfNeeded();
+if (!mockOptions) void showNoXrNoticeIfNeeded(location.search);
 if (!mockOptions && import.meta.env.DEV) mountLabLink();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.
-start().catch((e) => diagnostics.error(`start failed: ${String(e)}`));
+start().catch((e) => {
+  diagnostics.error(`start failed: ${String(e)}`);
+  showStartFailure(e);
+});
 
 async function start(): Promise<void> {
   // iwsdk.config.json says VR; ?xr=ar overrides the session mode before the world (and its enter offer) is made.
@@ -103,7 +112,13 @@ async function start(): Promise<void> {
   shortenAssetTimeout();
   diagnostics.mark('worldCreated');
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
-  if (!mockOptions) void mountEnterArButtonIfNeeded(world);
+  // The title screen's sounds play through the audio engine, which is made further down.
+  let uiAudio: AudioEngine | null = null;
+  if (!mockOptions)
+    void mountEnterArButtonIfNeeded(
+      world,
+      createUiSound(() => uiAudio),
+    );
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -137,6 +152,10 @@ async function start(): Promise<void> {
   // ?stage=wall is a bigger stand-in and ?stage=real the real wall, to look at it on a desktop.
   // ?debug=shadow shows the capsules. The lantern is placed by the same stand-in rule in both until the lantern flow exists.
   const params = new URLSearchParams(location.search);
+  // ?capture: a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
+  // before the session starts, so it is set here; the foveation is set when the session starts.
+  const capture = captureFromUrl(location.search);
+  if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
   const stageChoice: 'real' | StageMode =
     !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
   const stageFrame = new StageFrame();
@@ -147,6 +166,8 @@ async function start(): Promise<void> {
   // tabletop theatre was tuned with full perspective (blend 0).
   const projector = new ShadowProjector(stageChoice === 'real' ? REAL_WALL_SHADOW_SETTINGS : { blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
+  // The shadows of the invisible props (the game's level calls propShadows.setProps when a puzzle loads).
+  const propShadows = new PropShadowView();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
@@ -183,7 +204,7 @@ async function start(): Promise<void> {
   const entityStore = new EntityStore(DEFAULT_CAPACITIES);
   const solver = new Solver(entityStore.capacity);
   const propProjector = new PropProjector();
-  const propShadowView = new PropShadowView(stageGroup);
+  const propShadowView = new RenderPropShadowView(stageGroup);
   const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
   const bakePropTerrain = (): void => {
     const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
@@ -194,7 +215,7 @@ async function start(): Promise<void> {
     }
     propShadowView.updatePolygons(polygons);
   };
-  world.scene.add(stageView.group, stageGroup, shadowRenderer.mesh, candleView.group, ambientLight);
+  world.scene.add(stageView.group, stageGroup, shadowRenderer.mesh, propShadows.mesh, candleView.group, ambientLight);
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -203,6 +224,10 @@ async function start(): Promise<void> {
   // headset session starts (which a button press or the browser's enter prompt began).
   const audio = new AudioEngine();
   audio.attachGestureUnlock(document);
+  uiAudio = audio;
+  // The music is made while the title screen sits idle, so starting it with the session costs no frame.
+  const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
+  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
   const gameAudio = new GameAudio(audio);
   const tutorial = new TutorialFlow(entityStore, solver, ghostTarget, gameAudio);
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
@@ -241,6 +266,7 @@ async function start(): Promise<void> {
     return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
   let badPoseReported = false;
+  let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
@@ -253,6 +279,7 @@ async function start(): Promise<void> {
       }
       return false;
     }
+    headY = head[1];
     if (stageChoice === 'real') {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
@@ -308,6 +335,10 @@ async function start(): Promise<void> {
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
+  // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
+  let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
+  const demoKey = new Float64Array(6).fill(NaN);
+  if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
   const sim = Object.assign(
     new FixedStepLoop(SIM_HZ, (dt) => {
@@ -367,6 +398,7 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    capture: capture.enabled ? { foveation: capture.foveation, scale: capture.scale } : null,
     settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
@@ -453,6 +485,8 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
+    guard('sessionstart: room sound', () => gameAudio.setRoom(true));
+    if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
     if (session)
       guard('sessionstart: audio session unlock', () => audio.attachSessionUnlock(session as unknown as SessionEvents));
@@ -474,6 +508,7 @@ async function start(): Promise<void> {
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    guard('sessionend: room sound', () => gameAudio.setRoom(false));
     guard('sessionend: display', () => {
       world.scene.background = null;
       world.renderer.setClearColor(0x000000, 0);
@@ -549,7 +584,8 @@ async function start(): Promise<void> {
     });
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
-  const handsPanel = mock ? null : new PromptPanel();
+  // Capture mode (?capture) keeps this message out of a recording: it would show whenever tracking drops mid-take.
+  const handsPanel = mock || capture.enabled ? null : new PromptPanel();
   if (handsPanel) world.player.add(handsPanel.mesh);
   let handsPanelVersion = handsStatus.version;
 
@@ -637,8 +673,9 @@ async function start(): Promise<void> {
       }
       if (rigPlaced) {
         try {
-          const tableY = headPos.y - 0.45;
-          const candleAction = candleView.updateInteraction(hands.hands, delta, tableY);
+          const candleAction = candleView.updateInteraction(hands.hands, step, headY - 0.45);
+          if (candleAction.justPickedUp || candleAction.justPlaced)
+            gameAudio.candleMoved(candleAction.justPickedUp, candleAction.justPlaced, candleView.flamePosition);
           if (candleAction.state === 'held' || candleAction.justPlaced) {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
@@ -655,6 +692,23 @@ async function start(): Promise<void> {
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
+          if (demoProps) {
+            // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
+            const o = stage.origin,
+              f = candleView.flamePosition;
+            if (
+              o[0] !== demoKey[0] ||
+              o[1] !== demoKey[1] ||
+              o[2] !== demoKey[2] ||
+              f[0] !== demoKey[3] ||
+              f[1] !== demoKey[4] ||
+              f[2] !== demoKey[5]
+            ) {
+              propShadows.setProps(demoProps(stage), f, stage, projector.settings.blend);
+              demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
+            }
+          }
+          propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
           debug?.frame(rigPlaced);
         } catch (e) {
           failures.report('shadows', e);

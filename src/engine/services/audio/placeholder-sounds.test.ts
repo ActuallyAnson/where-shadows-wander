@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { renderPlaceholder } from './placeholder-sounds';
-import { Sound, SOUND_COUNT, type SoundId } from './sounds';
+import {
+  HUM_S,
+  MUSIC_RATE,
+  MUSIC_S,
+  prewarmMusic,
+  renderPlaceholder,
+  renderRateFor,
+  takeSamples,
+} from './placeholder-sounds';
+import { Sound, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
 const SR = 48000;
 const all = Array.from({ length: SOUND_COUNT }, (_, i) => i as SoundId);
 
 describe('renderPlaceholder', () => {
   it.each(all)(
-    'sound %i has finite samples peaking at its level (0.8, the candle 0.35), and is the same every time',
+    'sound %i has finite samples peaking at its level (0.8; the loops lower), and is the same every time',
     (id) => {
-      const a = renderPlaceholder(id, SR);
-      const b = renderPlaceholder(id, SR);
-      expect(a.length).toBeGreaterThan(SR * 0.1);
+      const rate = renderRateFor(id, SR);
+      const a = renderPlaceholder(id, rate);
+      const b = renderPlaceholder(id, rate);
+      const peak = id === Sound.Crackle ? 0.35 : id === Sound.Hum ? 0.3 : id === Sound.Music ? 0.5 : 0.8;
+      expect(a.length).toBeGreaterThan(rate * 0.05);
       expect(a.every((x) => Number.isFinite(x))).toBe(true);
-      expect(a.reduce((m, v) => Math.max(m, Math.abs(v)), 0)).toBeCloseTo(id === Sound.Crackle ? 0.35 : 0.8, 5);
+      expect(a.reduce((m, v) => Math.max(m, Math.abs(v)), 0)).toBeCloseTo(peak, 5);
       expect(Array.from(a)).toEqual(Array.from(b));
     },
   );
@@ -23,6 +33,16 @@ describe('renderPlaceholder', () => {
     expect(renderPlaceholder(Sound.Thump, SR).length / SR).toBeLessThan(0.5);
     expect(renderPlaceholder(Sound.Chime, SR).length / SR).toBeLessThan(2);
     expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(6);
+  });
+
+  it('keeps every one-shot under two seconds, and each loop at six seconds or less (the music, at its low rate, at 24)', () => {
+    for (let id = 0; id < SOUND_COUNT; id++) {
+      const rate = renderRateFor(id as SoundId, SR);
+      const s = renderPlaceholder(id as SoundId, rate).length / rate;
+      if (id === Sound.Music) expect(s).toBe(MUSIC_S);
+      else if (SOUND_DEFS[id].loop) expect(s).toBeLessThanOrEqual(6);
+      else expect(s).toBeLessThan(2);
+    }
   });
 
   it('keeps the candle soft: quiet, and no sharp jump from one sample to the next', () => {
@@ -38,10 +58,49 @@ describe('renderPlaceholder', () => {
   });
 
   it('ends each one-shot at exactly zero, so it does not click', () => {
-    for (const id of [Sound.Rustle, Sound.Thump, Sound.Chime] as const) {
-      const s = renderPlaceholder(id, SR);
+    for (let id = 0; id < SOUND_COUNT; id++) {
+      if (SOUND_DEFS[id].loop) continue;
+      const s = renderPlaceholder(id as SoundId, SR);
       expect(Math.abs(s[s.length - 1])).toBe(0);
     }
+  });
+
+  it('joins the room tone and the music at their loop point with no jump', () => {
+    for (const [id, rate, ceiling] of [
+      [Sound.Hum, SR, 0.01],
+      [Sound.Music, MUSIC_RATE, 0.02],
+    ] as const) {
+      const s = renderPlaceholder(id, rate);
+      // The step across the join must be no bigger than the biggest step anywhere else in the loop.
+      let worst = 0;
+      for (let i = 1; i < s.length; i++) worst = Math.max(worst, Math.abs(s[i] - s[i - 1]));
+      const seam = Math.abs(s[0] - s[s.length - 1]);
+      expect(seam).toBeLessThanOrEqual(Math.max(worst, ceiling));
+    }
+  });
+
+  it('has the room tone at six seconds and the music with no sample past 0.5', () => {
+    expect(renderPlaceholder(Sound.Hum, SR).length / SR).toBe(HUM_S);
+    const m = renderPlaceholder(Sound.Music, MUSIC_RATE);
+    expect(m.length).toBe(MUSIC_S * MUSIC_RATE);
+  });
+
+  it('renders the music ahead of time and hands that over once, at its own rate only', () => {
+    prewarmMusic();
+    prewarmMusic(); // twice is fine
+    const first = takeSamples(Sound.Music, MUSIC_RATE);
+    expect(first.length).toBe(MUSIC_S * MUSIC_RATE);
+    const second = takeSamples(Sound.Music, MUSIC_RATE); // rendered fresh: nothing was kept
+    expect(second).not.toBe(first);
+    expect(Array.from(second.slice(0, 200))).toEqual(Array.from(first.slice(0, 200)));
+    prewarmMusic();
+    expect(takeSamples(Sound.Music, 48000)).not.toHaveLength(0); // another rate is rendered for that rate, not handed the stored one
+  });
+
+  it('renders the music at a low rate however fast the context runs, and everything else at the context’s', () => {
+    expect(renderRateFor(Sound.Music, 48000)).toBe(MUSIC_RATE);
+    expect(renderRateFor(Sound.Music, 16000)).toBe(16000);
+    expect(renderRateFor(Sound.Chime, 48000)).toBe(48000);
   });
 
   it('starts and ends the loop silent, so it joins without a click', () => {
@@ -51,7 +110,15 @@ describe('renderPlaceholder', () => {
   });
 
   it('dies away: the last tenth of a one-shot is much quieter than the first', () => {
-    for (const id of [Sound.Rustle, Sound.Thump, Sound.Chime] as const) {
+    for (const id of [
+      Sound.Rustle,
+      Sound.Thump,
+      Sound.Chime,
+      Sound.Tick,
+      Sound.Press,
+      Sound.Lost,
+      Sound.Set,
+    ] as const) {
       const s = renderPlaceholder(id, SR);
       const tenth = Math.floor(s.length / 10);
       const rms = (from: number) => Math.sqrt(s.slice(from, from + tenth).reduce((t, x) => t + x * x, 0) / tenth);
