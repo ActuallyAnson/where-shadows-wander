@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest';
 import { GestureDetector } from '../../hands/gesture-detector';
 import { createHandFrame, type HandFrame, type Handedness } from '../../hands/hand';
 import { ShapeRecognizer } from '../../hands/shape-recognizer';
+import { GameAudio, type SoundPlayer } from '../../services/audio/game-audio';
+import { PropShadowView } from '../prop-shadow-view';
+import { ShadowRenderer } from '../shadow-renderer';
 import { LanternLightModel } from './lantern-light';
 import { ShadowSharpen } from './shadow-sharpen';
 import {
@@ -55,7 +58,15 @@ function bakeFrames(): { left: Float32Array; right: Float32Array }[] {
   return frames;
 }
 
-function makePipeline(extra?: () => void) {
+/** What a frame's later stages (the renderers, the audio) read from the hand pipeline. */
+interface PipelineParts {
+  shapes: ShapeRecognizer;
+  projector: ShadowProjector;
+  sharpen: ShadowSharpen;
+  stage: ReturnType<typeof createStagePlane>;
+}
+
+function makePipeline(extra?: (parts: PipelineParts) => void) {
   const baked = bakeFrames();
   const shapes = new ShapeRecognizer();
   const gestures = new GestureDetector();
@@ -83,7 +94,7 @@ function makePipeline(extra?: () => void) {
     sharpen.update(states, shapes.events, 1 / FPS);
     light.update(t, lantern, true);
     projector.update(hands, stage, lantern);
-    extra?.();
+    extra?.({ shapes, projector, sharpen, stage });
     frame++;
   };
 }
@@ -119,6 +130,8 @@ const FRAMES = 3_000;
  * stage that starts allocating real structures fails it (two copied 75-float joint arrays add about 380 B).
  */
 const BUDGET_BYTES_PER_FRAME = 700;
+/** The same with the shadow renderer, the prop shadows and the game audio added (about 600 B measured): 1.5 times that. */
+const WHOLE_FRAME_BUDGET_BYTES_PER_FRAME = 900;
 
 // Running without --expose-gc skips the checks below; in CI that must be an error, not a silent pass.
 it('has garbage collection exposed when running in CI', () => {
@@ -130,6 +143,26 @@ describe.skipIf(!gc)('frame pipeline allocation', () => {
     const { heapBytes } = measure(makePipeline(), FRAMES);
     console.info(`pipeline allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
     expect(heapBytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
+  }, 60_000);
+
+  it('the whole frame stays under the budget too: the shadow renderer, the prop shadows and the game audio included', () => {
+    const silent: SoundPlayer = { playAt: () => true, setLoop: () => undefined, moveLoop: () => undefined };
+    const audio = new GameAudio(silent);
+    const renderer = new ShadowRenderer();
+    const props = new PropShadowView();
+    const flame = [0, 0.65, -0.2];
+    let tick = 0;
+    const { heapBytes } = measure(
+      makePipeline((p) => {
+        audio.onShapeEvents(p.shapes.events, p.projector.shadows, p.stage);
+        audio.setFlame(true, flame);
+        renderer.update(p.projector.shadows, p.stage, p.sharpen.look, 1);
+        props.update(p.stage, 0.5 + (tick++ % 10) * 0.05);
+      }),
+      FRAMES,
+    );
+    console.info(`whole frame allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
+    expect(heapBytes / FRAMES).toBeLessThan(WHOLE_FRAME_BUDGET_BYTES_PER_FRAME);
   }, 60_000);
 
   it('catches a stage that allocates and throws it away (a control for the test itself)', () => {
