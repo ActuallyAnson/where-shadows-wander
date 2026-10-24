@@ -681,7 +681,7 @@ async function start(): Promise<void> {
             const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
             const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
             kindred.update(step, hw, hh, fx, fy, true);
-            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion);
+            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion, step);
           }
           if (cutscenes.playing) {
             // The fingertips that can poke Skip: each tracked hand's index tip.
