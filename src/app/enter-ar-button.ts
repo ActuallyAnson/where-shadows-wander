@@ -1,6 +1,10 @@
 import type { World } from '@iwsdk/core';
 import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
+import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
+
+/** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
+const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
 
 export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   const xr = navigator.xr;
@@ -37,7 +41,13 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   note.style.cssText =
     'display:none;max-width:30rem;padding:10px 14px;border-radius:10px;background:rgba(20,22,28,0.92);' +
     'color:#ece6d8;font:14px/1.45 system-ui,-apple-system,sans-serif;text-align:center;pointer-events:auto;';
+  // With the title screen up (a VR-capable browser), a message goes under its menu; otherwise in the box above.
+  let title: TitleScreen | null = null;
   const showNote = (text: string): void => {
+    if (title) {
+      title.setNote(text);
+      return;
+    }
     note.textContent = text;
     note.style.display = 'block';
   };
@@ -85,6 +95,12 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
       'font:700 14px system-ui,-apple-system,sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
     btn.onclick = onClick;
     return btn;
+  };
+
+  // An "other way in" button: its own colours in a dev or tester build, the dim title-screen ones in the judges' build.
+  const makeWayBtn = (text: string, debug: readonly [string, string, string], onClick: () => void) => {
+    const [bg, fg, border] = DEBUG_TOOLS ? debug : QUIET_BUTTON;
+    return makeBtn(text, bg, fg, border, onClick);
   };
 
   // Direct clean launch function
@@ -173,7 +189,22 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   const waysTarget = DEBUG_TOOLS ? buttonRow : otherWays;
   if (DEBUG_TOOLS) openOtherWays();
 
+  // The title screen is the way in: BEGIN starts VR. The judges' build has "Trouble starting?" under it; dev and tester
+  // builds keep the debug row at the bottom, on top of it. Without VR support the title is not shown, so the no-XR
+  // notice (no-xr-notice.ts) stays readable.
   if (vrSupported) {
+    title = createTitleScreen([
+      {
+        label: 'BEGIN',
+        onPress: () => {
+          void launchDirect('immersive-vr', false);
+        },
+      },
+      ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
+    ]);
+  }
+
+  if (vrSupported && (DEBUG_TOOLS || !title)) {
     const vrDirectBtn = makeBtn(
       DEBUG_TOOLS ? '▶ Enter VR (Direct Hands)' : 'Enter VR',
       '#163824',
@@ -185,11 +216,9 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
     );
     buttonRow.append(vrDirectBtn);
 
-    const vrSafeBtn = makeBtn(
+    const vrSafeBtn = makeWayBtn(
       DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
-      '#1c2d42',
-      '#58a6ff',
-      '#388bfd',
+      ['#1c2d42', '#58a6ff', '#388bfd'],
       () => {
         void launchDirect('immersive-vr', true);
       },
@@ -205,11 +234,9 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
     buttonRow.append(arDirectBtn);
   }
 
-  const iwsdkBtn = makeBtn(
+  const iwsdkBtn = makeWayBtn(
     DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)',
-    '#2d1840',
-    '#bc8cff',
-    '#a371f7',
+    ['#2d1840', '#bc8cff', '#a371f7'],
     () => {
       statusLine.textContent = '● Launching via IWSDK...';
       statusLine.style.color = '#bc8cff';
@@ -241,7 +268,7 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
     buttonRow.append(copyBtn);
   }
 
-  if (!DEBUG_TOOLS) {
+  if (!DEBUG_TOOLS && !title) {
     const trouble = document.createElement('button');
     trouble.type = 'button';
     trouble.textContent = 'Trouble starting?';
@@ -269,9 +296,11 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
 
   world.renderer.xr.addEventListener('sessionstart', () => {
     uiContainer.style.display = 'none';
+    title?.setVisible(false);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     uiContainer.style.display = 'flex';
+    title?.setVisible(true);
     statusLine.textContent = '● XR Session Ended';
     statusLine.style.color = '#8b949e';
     appendLog('XR session ended.', '#8b949e');

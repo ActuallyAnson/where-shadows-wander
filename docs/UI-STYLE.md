@@ -72,10 +72,9 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 - Debug is a separate small panel, never part of a title or pause screen, and exists only when
   `DEBUG_TOOLS` is true (dev and `--mode tester` builds). The release build has none of it
   (`check:debug-free`).
-- In a tester build the title screen shows one extra item, "Debug", at the bottom, dimmer than the
-  real items, so a tester build is never mistaken for the release.
-- The launcher's testing options (settings panel on VR start, props benchmark and so on) move into
-  that debug panel when the real panels are built.
+- In a dev or tester build the debug bar (log box, Testing, the other ways in) sits at the bottom
+  on top of the title screen, so a tester build is never mistaken for the release.
+- The judges' build shows only BEGIN and a dim "Trouble starting?" under the title.
 
 ## Not doing
 
