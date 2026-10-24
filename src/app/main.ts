@@ -49,6 +49,7 @@ import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded } from './enter-ar-button';
+import { captureFromUrl } from './capture-mode';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -133,6 +134,10 @@ async function start(): Promise<void> {
   // ?stage=wall is a bigger stand-in and ?stage=real the real wall, to look at it on a desktop.
   // ?debug=shadow shows the capsules. The lantern is placed by the same stand-in rule in both until the lantern flow exists.
   const params = new URLSearchParams(location.search);
+  // ?capture: a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
+  // before the session starts, so it is set here; the foveation is set when the session starts.
+  const capture = captureFromUrl(location.search);
+  if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
   const stageChoice: 'real' | StageMode =
     !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
   const stageFrame = new StageFrame();
@@ -332,6 +337,7 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    capture: capture.enabled ? { foveation: capture.foveation, scale: capture.scale } : null,
     settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
@@ -403,6 +409,7 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: room sound', () => gameAudio.setRoom(true));
+    if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
     if (session)
       guard('sessionstart: audio session unlock', () => audio.attachSessionUnlock(session as unknown as SessionEvents));
@@ -500,7 +507,8 @@ async function start(): Promise<void> {
     });
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
-  const handsPanel = mock ? null : new PromptPanel();
+  // Capture mode (?capture) keeps this message out of a recording: it would show whenever tracking drops mid-take.
+  const handsPanel = mock || capture.enabled ? null : new PromptPanel();
   if (handsPanel) world.player.add(handsPanel.mesh);
   let handsPanelVersion = handsStatus.version;
 
