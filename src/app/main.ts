@@ -16,7 +16,11 @@ import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
+import { JOINT } from '../engine/hands/hand';
+import type { CutsceneData } from '../engine/sim/cutscene';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { CutsceneHost } from './cutscene-host';
+import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
@@ -173,7 +177,18 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  world.scene.add(stageView.group, shadowRenderer.mesh, propShadows.mesh, candleView.group, ambientLight);
+  // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
+  const cutsceneView = new CutsceneView();
+  const cutscenes = new CutsceneHost(cutsceneView);
+  const cutsceneTips = new Float32Array(6);
+  world.scene.add(
+    stageView.group,
+    shadowRenderer.mesh,
+    propShadows.mesh,
+    cutsceneView.group,
+    candleView.group,
+    ambientLight,
+  );
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -280,6 +295,9 @@ async function start(): Promise<void> {
   const handList = [hands.hands.left, hands.hands.right];
   // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
   let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
+  // ?debug=cutscene plays a short test cutscene once the stage is placed.
+  let demoCutscene: CutsceneData | null = null;
+  if (DEBUG_TOOLS && debugViews.has('cutscene')) demoCutscene = (await import('../debug/demo-cutscene')).DEMO_CUTSCENE;
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
@@ -629,6 +647,24 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (demoCutscene && rigPlaced) {
+            const problems = cutscenes.play(demoCutscene);
+            if (problems.length > 0) failures.report('demo cutscene', new Error(problems.join('; ')));
+            demoCutscene = null;
+          }
+          if (cutscenes.playing) {
+            // The fingertips that can poke Skip: each tracked hand's index tip.
+            let tips = 0;
+            for (const h of handList) {
+              if (!h.tracked) continue;
+              const o = JOINT['index-finger-tip'] * 3;
+              cutsceneTips[tips * 3] = h.positions[o];
+              cutsceneTips[tips * 3 + 1] = h.positions[o + 1];
+              cutsceneTips[tips * 3 + 2] = h.positions[o + 2];
+              tips++;
+            }
+            cutscenes.update(step, stage, cutsceneTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
+          }
           debug?.frame(rigPlaced);
         } catch (e) {
           failures.report('shadows', e);
@@ -745,6 +781,7 @@ async function start(): Promise<void> {
         settingsPanel,
         stageView,
         shadowRenderer,
+        cutscenes,
         openSettings,
         shapes,
         gestures,
