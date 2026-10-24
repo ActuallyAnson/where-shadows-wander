@@ -30,6 +30,14 @@ describe('menuMarkup', () => {
     expect(px * MENU_METRES_PER_PX).toBeGreaterThanOrEqual(0.04);
   });
 
+  it('has the flame emblem and the divider with its diamond on every screen', () => {
+    for (const id of ids) {
+      const text = menuMarkup(MENU_SCREENS[id]);
+      expect(text).toContain('class="wsw-mflame"');
+      expect(text).toContain('◆');
+    }
+  });
+
   it('escapes text', () => {
     const text = menuMarkup({ id: 'end', title: '<b>&', line: '', buttons: [] });
     expect(text).toContain('&lt;b&gt;&amp;');

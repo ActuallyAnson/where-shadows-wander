@@ -61,13 +61,22 @@ export const MENU_PALETTE: Readonly<Record<Look, Readonly<Record<string, Readonl
       'wsw-menu': { backgroundColor: '#05070d', borderWidth: 2, borderColor: '#1b2233' },
       'wsw-mtitle': { color: '#f2f5f9' },
       'wsw-mline': { color: '#9aa5b8' },
-      'wsw-mbtn': { color: '#f2f5f9', backgroundColor: '#101728', borderWidth: 2, borderColor: '#ffd89a' },
+      // No box: plain pale text on the panel's own colour, like the menu this follows. The press target is still full size.
+      'wsw-mbtn': { color: '#d8dee9', backgroundColor: '#05070d', borderWidth: 0, borderColor: '#05070d' },
+      'wsw-mbar': { backgroundColor: '#2c3650' },
+      'wsw-mdiamond': { color: '#ffd89a' },
+      'wsw-mring': { backgroundColor: '#05070d', borderWidth: 2, borderColor: '#9aa5b8' },
+      'wsw-mflame': { backgroundColor: '#ffd89a' },
     },
     high: {
       'wsw-menu': { backgroundColor: WHITE, borderWidth: 6, borderColor: BLACK },
       'wsw-mtitle': { color: BLACK },
       'wsw-mline': { color: BLACK },
       'wsw-mbtn': { color: WHITE, backgroundColor: BLACK, borderWidth: 4, borderColor: BLACK },
+      'wsw-mbar': { backgroundColor: BLACK },
+      'wsw-mdiamond': { color: BLACK },
+      'wsw-mring': { backgroundColor: WHITE, borderWidth: 4, borderColor: BLACK },
+      'wsw-mflame': { backgroundColor: BLACK },
     },
   };
 
@@ -84,7 +93,12 @@ const STYLE = `
   .wsw-menu { width: ${MENU_WIDTH_PX}px; flex-direction: column; align-items: center; padding-top: 36px; padding-right: 32px; padding-bottom: 36px; padding-left: 32px; gap: 20px; border-radius: 28px; ${colours('wsw-menu')} }
   .wsw-mtitle { font-size: 56px; font-weight: bold; letter-spacing: 8px; ${colours('wsw-mtitle')} }
   .wsw-mline { font-size: 28px; margin-bottom: 8px; ${colours('wsw-mline')} }
-  .wsw-mbtn { width: 100%; height: ${BIG}px; font-size: 34px; font-weight: bold; border-radius: 16px; ${colours('wsw-mbtn')} }
+  .wsw-mring { width: 72px; height: 72px; border-radius: 36px; align-items: center; justify-content: center; ${colours('wsw-mring')} }
+  .wsw-mflame { width: 22px; height: 30px; border-radius: 11px; ${colours('wsw-mflame')} }
+  .wsw-mrule { flex-direction: row; align-items: center; gap: 14px; width: 80%; }
+  .wsw-mbar { height: 2px; flex-grow: 1; ${colours('wsw-mbar')} }
+  .wsw-mdiamond { font-size: 22px; ${colours('wsw-mdiamond')} }
+  .wsw-mbtn { width: 100%; height: ${BIG}px; font-size: 34px; letter-spacing: 4px; border-radius: 16px; ${colours('wsw-mbtn')} }
 </style>`;
 
 /** One screen as UIKitML. */
@@ -94,7 +108,9 @@ export function menuMarkup(screen: MenuScreen): string {
     .join('\n  ');
   return `${STYLE}
 <div class="wsw-menu">
+  <div class="wsw-mring"><div class="wsw-mflame"></div></div>
   <div class="wsw-mtitle">${escape(screen.title)}</div>
+  <div class="wsw-mrule"><div class="wsw-mbar"></div><div class="wsw-mdiamond">◆</div><div class="wsw-mbar"></div></div>
   <div class="wsw-mline">${escape(screen.line)}</div>
   ${buttons}
 </div>`;
