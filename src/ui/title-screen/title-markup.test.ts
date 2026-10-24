@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TITLE_CSS, titleMarkup } from './title-markup';
+import { fontFaceCss, TITLE_CSS, titleMarkup } from './title-markup';
 
 describe('titleMarkup', () => {
   it('has the title and one button per item, in order', () => {
@@ -28,7 +28,11 @@ describe('titleMarkup', () => {
 
   it('keeps the decoration out of the accessibility tree', () => {
     const html = titleMarkup([]);
-    expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(2);
+    expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(3);
+  });
+
+  it('puts the backdrop first, behind the text', () => {
+    expect(titleMarkup([]).startsWith('<svg class="wsw-scene"')).toBe(true);
   });
 });
 
@@ -43,5 +47,20 @@ describe('TITLE_CSS', () => {
 
   it('keeps the touch targets at least 56 px tall', () => {
     expect(TITLE_CSS).toContain('min-height:56px');
+  });
+});
+
+describe('fontFaceCss', () => {
+  it('declares both bundled weights from the given files, with a fallback while they load', () => {
+    const css = fontFaceCss('/a.woff2', '/b.woff2');
+    expect(css).toContain('font-weight:400');
+    expect(css).toContain('url("/a.woff2")');
+    expect(css).toContain('font-weight:700');
+    expect(css).toContain('url("/b.woff2")');
+    expect(css.match(/font-display:swap/g)).toHaveLength(2);
+  });
+
+  it('names the family the stylesheet asks for first', () => {
+    expect(TITLE_CSS).toContain("font-family:'Cinzel Decorative'");
   });
 });

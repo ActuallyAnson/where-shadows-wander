@@ -1,6 +1,8 @@
 // The page's title screen, shown before the player enters VR (docs/UI-STYLE.md). A full-page layer over the scene: the
 // title, a button per item, and a candle-coloured glow that follows the pointer. Its markup and style are title-markup.ts.
-import { TITLE_CSS, titleMarkup, type TitleItem } from './title-markup';
+import { fontFaceCss, TITLE_CSS, titleMarkup, type TitleItem } from './title-markup';
+import font400 from './fonts/cinzel-decorative-latin-400-normal.woff2?url';
+import font700 from './fonts/cinzel-decorative-latin-700-normal.woff2?url';
 
 const STYLE_ID = 'wsw-title-style';
 
@@ -20,7 +22,7 @@ export function createTitleScreen(items: readonly TitleScreenItem[], parent: HTM
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
-    style.textContent = TITLE_CSS;
+    style.textContent = fontFaceCss(font400, font700) + TITLE_CSS;
     document.head.append(style);
   }
 
@@ -38,6 +40,9 @@ export function createTitleScreen(items: readonly TitleScreenItem[], parent: HTM
     const r = element.getBoundingClientRect();
     element.style.setProperty('--gx', `${e.clientX - r.left}px`);
     element.style.setProperty('--gy', `${e.clientY - r.top}px`);
+    // The backdrop's layers lean the other way, a few pixels, by where the pointer is (-1 to 1).
+    element.style.setProperty('--px', String(((e.clientX - r.left) / r.width) * 2 - 1));
+    element.style.setProperty('--py', String(((e.clientY - r.top) / r.height) * 2 - 1));
   });
 
   const note = element.querySelector<HTMLElement>('.wsw-note')!;
