@@ -4,123 +4,7 @@
 // synthetic hands cycling through shapes and checks the heap and the GC log.
 // Needs `--expose-gc` (vitest.config.ts sets it); skipped without it.
 import { describe, expect, it } from 'vitest';
-import { GestureDetector } from '../../hands/gesture-detector';
-import { createHandFrame, type HandFrame, type Handedness } from '../../hands/hand';
-import { ShapeRecognizer } from '../../hands/shape-recognizer';
-import { GameAudio, type SoundPlayer } from '../../services/audio/game-audio';
-import { PropShadowView } from '../prop-shadow-view';
-import { ShadowRenderer } from '../shadow-renderer';
-import { LanternLightModel } from './lantern-light';
-import { ShadowSharpen } from './shadow-sharpen';
-import {
-  jitterHand,
-  lerpPose,
-  PRESETS,
-  writeHandPose,
-  type HandPose,
-  type PresetName,
-} from '../../hands/synthetic-hand';
-import { ShadowProjector } from './shadow-projector';
-import { createStagePlane } from './stage-plane';
-
-// The project's TypeScript config has no Node types: reach the two Node globals we need through globalThis.
-const node = globalThis as unknown as {
-  gc?: () => void;
-  process: { memoryUsage(): { heapUsed: number }; env: Record<string, string | undefined> };
-};
-const gc = node.gc;
-const FPS = 72;
-const CYCLE: readonly PresetName[] = ['relaxed', 'fist', 'flat', 'rabbit', 'cup', 'spread', 'fox'];
-const HOLD_FRAMES = FPS; // 1 s per shape: long enough to commit, release and switch
-
-/** A small seeded generator, so the run is the same every time. */
-function seeded(seed: number): () => number {
-  return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32 - 0.5) * 2;
-}
-
-/** Both hands' joints for every frame of the cycle, made once up front so the measured loop only copies them. */
-function bakeFrames(): { left: Float32Array; right: Float32Array }[] {
-  const random = seeded(7);
-  const pose: HandPose = { ...PRESETS.relaxed, fingers: PRESETS.relaxed.fingers.map((f) => ({ ...f })) as never };
-  const left = createHandFrame('left');
-  const right = createHandFrame('right');
-  const frames: { left: Float32Array; right: Float32Array }[] = [];
-  for (let frame = 0; frame < CYCLE.length * HOLD_FRAMES; frame++) {
-    const from = PRESETS[CYCLE[Math.floor(frame / HOLD_FRAMES)]];
-    const to = PRESETS[CYCLE[(Math.floor(frame / HOLD_FRAMES) + 1) % CYCLE.length]];
-    lerpPose(from, to, Math.min(1, (frame % HOLD_FRAMES) / 12), pose);
-    writeHandPose(pose, [0.1, 0.95, -0.4], right);
-    writeHandPose(pose, [-0.1, 0.95, -0.4], left);
-    jitterHand(right, 0.002, random);
-    jitterHand(left, 0.002, random);
-    frames.push({ left: Float32Array.from(left.positions), right: Float32Array.from(right.positions) });
-  }
-  return frames;
-}
-
-/** What a frame's later stages (the renderers, the audio) read from the hand pipeline. */
-interface PipelineParts {
-  shapes: ShapeRecognizer;
-  projector: ShadowProjector;
-  sharpen: ShadowSharpen;
-  stage: ReturnType<typeof createStagePlane>;
-}
-
-function makePipeline(extra?: (parts: PipelineParts) => void) {
-  const baked = bakeFrames();
-  const shapes = new ShapeRecognizer();
-  const gestures = new GestureDetector();
-  const sharpen = new ShadowSharpen();
-  const light = new LanternLightModel();
-  const states = { left: shapes.left.state, right: shapes.right.state };
-  const projector = new ShadowProjector();
-  const stage = createStagePlane();
-  stage.origin.set([0, 0.75, -0.75]);
-  const hands: Record<Handedness, HandFrame> = { left: createHandFrame('left'), right: createHandFrame('right') };
-  for (const h of [hands.left, hands.right]) {
-    h.tracked = true;
-    h.validJoints = h.positions.length / 3;
-  }
-  const lantern: [number, number, number] = [0, 0.65, -0.2];
-  gestures.setLantern(lantern);
-  let frame = 0;
-  return () => {
-    const src = baked[frame % baked.length];
-    hands.left.positions.set(src.left);
-    hands.right.positions.set(src.right);
-    const t = frame / FPS;
-    shapes.update(hands, t);
-    gestures.update(hands, t, shapes);
-    sharpen.update(states, shapes.events, 1 / FPS);
-    light.update(t, lantern, true);
-    projector.update(hands, stage, lantern);
-    extra?.({ shapes, projector, sharpen, stage });
-    frame++;
-  };
-}
-
-/**
- * Heap growth over `frames` steps, after a warm-up and a full collection. The young generation is sized
- * (vitest.config.ts) so no collection runs in the window; the heap is sampled as it goes and the test
- * fails if it ever shrinks, because a collection would then have freed exactly the short-lived garbage
- * this test exists to find.
- */
-function measure(step: () => void, frames: number): { heapBytes: number } {
-  for (let i = 0; i < 60000; i++) step(); // warm up: JIT, first-use buffers
-  gc!();
-  const before = node.process.memoryUsage().heapUsed;
-  let last = before;
-  for (let i = 0; i < frames; i++) {
-    step();
-    if (i % 100 === 99) {
-      const now = node.process.memoryUsage().heapUsed;
-      if (now < last)
-        throw new Error(`a collection ran at frame ${i}: the young generation is too small for this window`);
-      last = now;
-    }
-  }
-  return { heapBytes: node.process.memoryUsage().heapUsed - before };
-}
+import { gc, makePipeline, measure, node } from './frame-pipeline-fixture';
 
 const FRAMES = 3_000;
 /**
@@ -130,8 +14,6 @@ const FRAMES = 3_000;
  * stage that starts allocating real structures fails it (two copied 75-float joint arrays add about 380 B).
  */
 const BUDGET_BYTES_PER_FRAME = 700;
-/** The same with the shadow renderer, the prop shadows and the game audio added (about 600 B measured): 1.5 times that. */
-const WHOLE_FRAME_BUDGET_BYTES_PER_FRAME = 900;
 
 // Running without --expose-gc skips the checks below; in CI that must be an error, not a silent pass.
 it('has garbage collection exposed when running in CI', () => {
@@ -143,26 +25,6 @@ describe.skipIf(!gc)('frame pipeline allocation', () => {
     const { heapBytes } = measure(makePipeline(), FRAMES);
     console.info(`pipeline allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
     expect(heapBytes / FRAMES).toBeLessThan(BUDGET_BYTES_PER_FRAME);
-  }, 60_000);
-
-  it('the whole frame stays under the budget too: the shadow renderer, the prop shadows and the game audio included', () => {
-    const silent: SoundPlayer = { playAt: () => true, setLoop: () => undefined, moveLoop: () => undefined };
-    const audio = new GameAudio(silent);
-    const renderer = new ShadowRenderer();
-    const props = new PropShadowView();
-    const flame = [0, 0.65, -0.2];
-    let tick = 0;
-    const { heapBytes } = measure(
-      makePipeline((p) => {
-        audio.onShapeEvents(p.shapes.events, p.projector.shadows, p.stage);
-        audio.setFlame(true, flame);
-        renderer.update(p.projector.shadows, p.stage, p.sharpen.look, 1);
-        props.update(p.stage, 0.5 + (tick++ % 10) * 0.05);
-      }),
-      FRAMES,
-    );
-    console.info(`whole frame allocates ${(heapBytes / FRAMES).toFixed(0)} B a frame`);
-    expect(heapBytes / FRAMES).toBeLessThan(WHOLE_FRAME_BUDGET_BYTES_PER_FRAME);
   }, 60_000);
 
   it('catches a stage that allocates and throws it away (a control for the test itself)', () => {
