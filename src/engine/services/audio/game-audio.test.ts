@@ -35,11 +35,20 @@ function setup() {
 const push = (q: ShapeEventQueue, type: ShapeEventType, hand: 'left' | 'right') => q.push(type, hand, 'flat', 0, 0, 0);
 
 describe('GameAudio.onShapeEvents', () => {
-  it('rustles on candidate and thumps on commit, and ignores cancel and release', () => {
+  it('rustles on candidate, thumps on commit, lets go on release, and ignores cancel', () => {
     const { audio, queue, shadows, stage, rec } = setup();
     for (const t of ['candidate', 'cancel', 'commit', 'release'] as const) push(queue, t, 'right');
     audio.onShapeEvents(queue, shadows, stage);
-    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Rustle, Sound.Thump]);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Rustle, Sound.Thump, Sound.Release]);
+  });
+
+  it('falls low when tracking was lost, and stays silent when another shape took over', () => {
+    const { audio, queue, shadows, stage, rec } = setup();
+    queue.push('release', 'left', 'flat', 0, 0, 1, 'lost');
+    queue.push('release', 'right', 'flat', 0, 0, 1, 'switch');
+    queue.push('release', 'right', 'flat', 0, 0, 1, 'exit');
+    audio.onShapeEvents(queue, shadows, stage);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Lost, Sound.Release]);
   });
 
   it('plays from the middle of the hand’s shadow on the wall, a little in front of it', () => {
@@ -102,5 +111,31 @@ describe('GameAudio.puzzleSolved and setFlame', () => {
     expect(rec.loops.at(-1)).toEqual({ id: Sound.Crackle, on: false, x: 0.1 });
     audio.setFlame(false, [0.1, 0.9, 0.2]);
     expect(rec.loops).toHaveLength(2);
+  });
+});
+
+describe('GameAudio.setRoom and candleMoved', () => {
+  it('starts the room tone and the music together, and stops them together', () => {
+    const { audio, rec } = setup();
+    audio.setRoom(true);
+    audio.setRoom(false);
+    expect(rec.loops.map((l) => [l.id, l.on])).toEqual([
+      [Sound.Hum, true],
+      [Sound.Music, true],
+      [Sound.Hum, false],
+      [Sound.Music, false],
+    ]);
+  });
+
+  it('lifts and sets the candle down from the flame, and is silent on a frame where neither happened', () => {
+    const { audio, rec } = setup();
+    audio.candleMoved(false, false, [0.2, 1, -0.3]);
+    expect(rec.plays).toEqual([]);
+    audio.candleMoved(true, false, [0.2, 1, -0.3]);
+    audio.candleMoved(false, true, [0.4, 0.9, -0.1]);
+    expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([
+      [Sound.Lift, 0.2, 1, -0.3],
+      [Sound.Set, 0.4, 0.9, -0.1],
+    ]);
   });
 });

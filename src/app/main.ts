@@ -21,6 +21,7 @@ import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
+import { prewarmMusic } from '../engine/services/audio/placeholder-sounds';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
@@ -48,6 +49,7 @@ import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded } from './enter-ar-button';
+import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
@@ -91,7 +93,13 @@ async function start(): Promise<void> {
   shortenAssetTimeout();
   diagnostics.mark('worldCreated');
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
-  if (!mockOptions) void mountEnterArButtonIfNeeded(world);
+  // The title screen's sounds play through the audio engine, which is made further down.
+  let uiAudio: AudioEngine | null = null;
+  if (!mockOptions)
+    void mountEnterArButtonIfNeeded(
+      world,
+      createUiSound(() => uiAudio),
+    );
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -169,6 +177,10 @@ async function start(): Promise<void> {
   // headset session starts (which a button press or the browser's enter prompt began).
   const audio = new AudioEngine();
   audio.attachGestureUnlock(document);
+  uiAudio = audio;
+  // The music is made while the title screen sits idle, so starting it with the session costs no frame.
+  const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
+  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
   const gameAudio = new GameAudio(audio);
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
@@ -390,6 +402,7 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
+    guard('sessionstart: room sound', () => gameAudio.setRoom(true));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
     if (session)
       guard('sessionstart: audio session unlock', () => audio.attachSessionUnlock(session as unknown as SessionEvents));
@@ -411,6 +424,7 @@ async function start(): Promise<void> {
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    guard('sessionend: room sound', () => gameAudio.setRoom(false));
     guard('sessionend: display', () => {
       world.scene.background = null;
       world.renderer.setClearColor(0x000000, 0);
@@ -575,6 +589,8 @@ async function start(): Promise<void> {
       if (rigPlaced) {
         try {
           const candleAction = candleView.updateInteraction(hands.hands, step, headY - 0.45);
+          if (candleAction.justPickedUp || candleAction.justPlaced)
+            gameAudio.candleMoved(candleAction.justPickedUp, candleAction.justPlaced, candleView.flamePosition);
           if (candleAction.state === 'held' || candleAction.justPlaced) {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;

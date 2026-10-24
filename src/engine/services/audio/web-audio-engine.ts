@@ -8,7 +8,7 @@
 // frame and only writes numbers into audio parameters. No three.js and no IWSDK: the listener pose is passed
 // in. Placeholder sounds are rendered in code the first time each is needed; `setBuffer` swaps in a file.
 import { BUS_COUNT, Mixer, type BusId } from './mixer';
-import { renderPlaceholder } from './placeholder-sounds';
+import { renderRateFor, takeSamples } from './placeholder-sounds';
 import { Cooldowns, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 import { VoicePool } from './voice-pool';
 
@@ -196,6 +196,16 @@ export class AudioEngine {
   }
 
   /**
+   * Plays a one-shot menu sound as if from a metre in front of the listener, so it sits in the middle of the head's
+   * view whatever the head is doing. Before the first `update` the listener is at the origin looking down -z.
+   */
+  playUi(id: SoundId, key = 0): boolean {
+    const l = this.listenerPose;
+    if (Number.isNaN(l[0])) return this.playAt(id, 0, 0, -1, key);
+    return this.playAt(id, l[0] + l[3], l[1] + l[4], l[2] + l[5], key);
+  }
+
+  /**
    * Asks for a looping sound (the flame's crackle) to play at (x, y, z), or to stop. A request made before
    * audio is unlocked is kept and starts as soon as it is, so a flame that was lit during loading is heard.
    */
@@ -374,8 +384,9 @@ export class AudioEngine {
   private bufferFor(ctx: AudioContext, id: SoundId): AudioBuffer {
     let buffer = this.buffers[id];
     if (!buffer) {
-      const samples = renderPlaceholder(id, ctx.sampleRate);
-      buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      const rate = renderRateFor(id, ctx.sampleRate);
+      const samples = takeSamples(id, rate);
+      buffer = ctx.createBuffer(1, samples.length, rate);
       buffer.copyToChannel(samples, 0);
       this.buffers[id] = buffer;
     }

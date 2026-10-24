@@ -237,6 +237,30 @@ describe('playing', () => {
   });
 });
 
+describe('playUi', () => {
+  it('plays a metre in front of the listener, wherever and however it faces', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    engine.update([2, 1.5, -3, 1, 0, 0, 0, 1, 0]); // at (2, 1.5, -3), looking along +x
+    expect(engine.playUi(Sound.Tick)).toBe(true);
+    const p = ctx.panners.find((q) => q.positionX.value === 3)!;
+    expect([p.positionX.value, p.positionY.value, p.positionZ.value]).toEqual([3, 1.5, -3]);
+  });
+
+  it('plays a metre ahead of the origin before the first update, when the listener has no pose yet', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    expect(engine.playUi(Sound.Press)).toBe(true);
+    const p = ctx.panners.find((q) => q.positionZ.value === -1)!;
+    expect([p.positionX.value, p.positionY.value, p.positionZ.value]).toEqual([0, 0, -1]);
+  });
+
+  it('is dropped while audio is locked, like any sound', () => {
+    const { engine } = make();
+    expect(engine.playUi(Sound.Tick)).toBe(false);
+  });
+});
+
 describe('positions that are not finite numbers', () => {
   it('drops a sound whose position is NaN or infinite instead of throwing, and counts it', () => {
     const { engine } = make();

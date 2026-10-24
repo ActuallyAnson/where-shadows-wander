@@ -2,27 +2,80 @@
 // into samples (nothing here runs per frame), is the same every time (a seeded random source), and has no
 // third-party material in it (CREDITS.md). Replace one by putting a file named after it (rustle.ogg ...) in
 // src/assets/audio/sfx and giving the engine its buffer. Plain TypeScript.
-import { Sound, type SoundId } from './sounds';
+import { Sound, SOUND_DEFS, type SoundId } from './sounds';
 
 const TAU = Math.PI * 2;
 /** The candle loop's length, seconds: long enough that the repeat is not noticed. */
 export const CRACKLE_S = 6;
 /** How loud the candle is rendered (the others peak at 0.8): it is a quiet bed, not an event. */
 const CRACKLE_PEAK = 0.35;
+/** The room tone's length and level: a whole number of cycles of each low note fits in it, so it can loop. */
+export const HUM_S = 6;
+const HUM_PEAK = 0.3;
+/** The music is rendered at this rate whatever the context's (it is soft and low, with nothing above 10 kHz), to keep it small and quick to make. */
+export const MUSIC_RATE = 22050;
+/** Its length: four chords of six seconds. */
+export const MUSIC_S = 24;
+const MUSIC_PEAK = 0.5;
 
-/** The samples for `id` at `sampleRate`, mono, peaking at 0.8 (the candle loop at CRACKLE_PEAK). */
+/** How loud each sound is rendered (it peaks here). A loop is a quiet bed, not an event, so it is lower. */
+const PEAK: Readonly<Record<SoundId, number>> = {
+  [Sound.Rustle]: 0.8,
+  [Sound.Thump]: 0.8,
+  [Sound.Chime]: 0.8,
+  [Sound.Crackle]: CRACKLE_PEAK,
+  [Sound.Tick]: 0.8,
+  [Sound.Press]: 0.8,
+  [Sound.Ignite]: 0.8,
+  [Sound.Hum]: HUM_PEAK,
+  [Sound.Release]: 0.8,
+  [Sound.Lost]: 0.8,
+  [Sound.Lift]: 0.8,
+  [Sound.Set]: 0.8,
+  [Sound.Music]: MUSIC_PEAK,
+};
+
+/** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
 export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array<ArrayBuffer> {
-  const out =
-    id === Sound.Rustle
-      ? rustle(sampleRate)
-      : id === Sound.Thump
-        ? thump(sampleRate)
-        : id === Sound.Chime
-          ? chime(sampleRate)
-          : crackle(sampleRate);
-  normalise(out, id === Sound.Crackle ? CRACKLE_PEAK : 0.8);
-  if (id !== Sound.Crackle) release(out, Math.floor(sampleRate * 0.008)); // end at zero, so there is no click
+  const out = generate(id, sampleRate);
+  normalise(out, PEAK[id]);
+  if (!SOUND_DEFS[id].loop) release(out, Math.floor(sampleRate * 0.008)); // end at zero, so there is no click
   return out;
+}
+
+function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
+  switch (id) {
+    case Sound.Rustle:
+      return rustle(sr);
+    case Sound.Thump:
+      return thump(sr);
+    case Sound.Chime:
+      return chime(sr);
+    case Sound.Crackle:
+      return crackle(sr);
+    case Sound.Tick:
+      return tick(sr);
+    case Sound.Press:
+      return press(sr);
+    case Sound.Ignite:
+      return ignite(sr);
+    case Sound.Hum:
+      return hum(sr);
+    case Sound.Release:
+      return letGo(sr);
+    case Sound.Lost:
+      return lost(sr);
+    case Sound.Lift:
+      return lift(sr);
+    case Sound.Set:
+      return set(sr);
+    case Sound.Music:
+      return music(sr);
+    default: {
+      const unreachable: never = id;
+      throw new Error(`no placeholder for sound ${String(unreachable)}`);
+    }
+  }
 }
 
 /** Paper: a short burst of noise with a few quick crinkles, high-passed so it is dry and light. */
@@ -114,6 +167,271 @@ function crackle(sr: number): Float32Array<ArrayBuffer> {
     out[n - 1 - i] *= f;
   }
   return out;
+}
+
+/** A small dry tick, like a fingernail on wood: a short falling sine and a speck of noise. */
+function tick(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.09);
+  const out = new Float32Array(n);
+  const rnd = seeded(41);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    phase += (TAU * (1100 + 800 * Math.exp(-t * 80))) / sr;
+    out[i] = Math.sin(phase) * Math.exp(-t * 55) + (rnd() * 2 - 1) * 0.12 * Math.exp(-t * 400);
+  }
+  return out;
+}
+
+/** A warm knock with a small bell in it: a wooden press that is not a click. */
+function press(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.4);
+  const out = new Float32Array(n);
+  const rnd = seeded(43);
+  let phase = 0;
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    phase += (TAU * (60 + 95 * Math.exp(-t * 28))) / sr;
+    lp += (rnd() * 2 - 1 - lp) * 0.25;
+    const knock = Math.sin(phase) * Math.exp(-t * 14);
+    const bell = t > 0.015 ? Math.sin(TAU * 660 * t) * 0.28 * Math.exp(-(t - 0.015) * 9) : 0;
+    out[i] = knock + bell + lp * 0.2 * Math.exp(-t * 120);
+  }
+  return out;
+}
+
+/**
+ * A match and a flame: a dry scratch, a soft whoosh that opens up as the flame catches, a low warm swell under it,
+ * and a faint shimmer that rings out. About a second and a half.
+ */
+function ignite(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 1.6);
+  const out = new Float32Array(n);
+  const rnd = seeded(47);
+  let prev = 0;
+  let a = 0;
+  let b = 0;
+  let swellPhase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const noise = rnd() * 2 - 1;
+    // The scratch: high-passed noise with a rough, uneven grain, over in a tenth of a second.
+    const hp = noise - prev * 0.7;
+    prev = noise;
+    const scratch = t < 0.1 ? hp * (0.6 + 0.4 * Math.sin(TAU * 90 * t)) * Math.exp(-t * 25) * 0.7 : 0;
+    // The whoosh: noise through two low-pass stages whose cutoff opens as the flame catches.
+    const open = Math.min(1, Math.max(0, (t - 0.1) / 0.3));
+    const k = 0.03 + 0.25 * open;
+    a += (noise - a) * k;
+    b += (a - b) * k;
+    const whoosh = t >= 0.1 ? b * Math.min(1, (t - 0.1) / 0.12) * Math.exp(-(t - 0.25) * 2.6) * 2.2 : 0;
+    // The swell: a low note that glides up a fourth while it rises and fades.
+    swellPhase += (TAU * (110 + 55 * Math.min(1, t / 0.7))) / sr;
+    const swell =
+      t >= 0.12
+        ? Math.sin(swellPhase) *
+          Math.sin(Math.min(1, (t - 0.12) / 0.5) * Math.PI * 0.5) *
+          Math.exp(-(t - 0.4) * 2.2) *
+          0.35
+        : 0;
+    // The shimmer: two soft high partials that ring out after the flame has caught.
+    const shimmer =
+      t >= 0.35
+        ? (Math.sin(TAU * 880 * t) * 0.14 * Math.exp(-(t - 0.35) * 3) +
+            Math.sin(TAU * 1320 * t) * 0.08 * Math.exp(-(t - 0.35) * 4.5)) *
+          Math.min(1, (t - 0.35) / 0.05)
+        : 0;
+    out[i] = scratch + whoosh + swell + shimmer;
+  }
+  return out;
+}
+
+/**
+ * The room at night, as a six-second loop: two very low notes (each a whole number of cycles long, so they join),
+ * a slow breath, and a soft low rumble of air. The air is noise, so the end is crossfaded into the start.
+ */
+function hum(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * HUM_S);
+  const fade = Math.floor(sr * 0.6);
+  const raw = new Float32Array(n + fade);
+  const rnd = seeded(53);
+  let a = 0;
+  let b = 0;
+  let c = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const t = i / sr;
+    a += (rnd() * 2 - 1 - a) * 0.012;
+    b += (a - b) * 0.05;
+    c += (b - c) * 0.2;
+    const breath = 0.85 + 0.15 * Math.sin((TAU * t) / HUM_S);
+    const notes =
+      Math.sin(TAU * 55 * t) * 0.5 + Math.sin(TAU * 82.5 * t + 0.7) * 0.24 + Math.sin(TAU * 110 * t + 1.9) * 0.1;
+    raw[i] = (notes * 0.5 + c * 28) * breath;
+  }
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = raw[i];
+  // Blend the tail (which carries on past the loop point) under the head, with equal-power curves.
+  for (let i = 0; i < fade; i++) {
+    const w = (i / fade) * Math.PI * 0.5;
+    out[i] = raw[i] * Math.sin(w) + raw[n + i] * Math.cos(w);
+  }
+  return out;
+}
+
+/** Letting go of a shape: a soft breath of paper settling and a small falling note. Quieter and rounder than the rustle. */
+function letGo(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.3);
+  const out = new Float32Array(n);
+  const rnd = seeded(59);
+  let a = 0;
+  let b = 0;
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    a += (rnd() * 2 - 1 - a) * 0.22;
+    b += (a - b) * 0.3;
+    phase += (TAU * (340 - 120 * Math.min(1, t / 0.25))) / sr;
+    const air = b * Math.min(1, t / 0.05) * Math.exp(-t * 11) * 1.6;
+    out[i] = air + Math.sin(phase) * 0.35 * Math.min(1, t / 0.01) * Math.exp(-t * 13);
+  }
+  return out;
+}
+
+/** Tracking lost: two soft notes, the second a fourth below, as if a breath went out. Gentle: it is a hint, not an alarm. */
+function lost(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.9);
+  const out = new Float32Array(n);
+  const notes: readonly (readonly [number, number])[] = [
+    [494, 0],
+    [370, 0.24],
+  ];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let s = 0;
+    for (const [f, start] of notes) {
+      if (t < start) continue;
+      const u = t - start;
+      s += (Math.sin(TAU * f * t) + 0.25 * Math.sin(TAU * f * 2 * t)) * Math.min(1, u / 0.012) * Math.exp(-u * 5.5);
+    }
+    out[i] = s;
+  }
+  return out;
+}
+
+/** The candle lifted off the table: a small wooden tap and a hush of cloth sliding. */
+function lift(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.25);
+  const out = new Float32Array(n);
+  const rnd = seeded(61);
+  let phase = 0;
+  let prev = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    phase += (TAU * (160 + 70 * Math.exp(-t * 40))) / sr;
+    const noise = rnd() * 2 - 1;
+    const hp = noise - prev * 0.8;
+    prev = noise;
+    out[i] = Math.sin(phase) * Math.exp(-t * 30) + hp * 0.14 * Math.min(1, t / 0.02) * Math.exp(-t * 12);
+  }
+  return out;
+}
+
+/** The candle set down: a low settled thud and a tiny ceramic tink. */
+function set(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.35);
+  const out = new Float32Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    phase += (TAU * (50 + 50 * Math.exp(-t * 20))) / sr;
+    const thud = Math.sin(phase) * Math.exp(-t * 15);
+    const tink =
+      t > 0.004
+        ? Math.sin(TAU * 1180 * t) * 0.2 * Math.exp(-(t - 0.004) * 30) +
+          Math.sin(TAU * 1790 * t) * 0.1 * Math.exp(-(t - 0.004) * 38)
+        : 0;
+    out[i] = thud + tink;
+  }
+  return out;
+}
+
+/**
+ * Slow, cosy background music, made of nothing but sines: four soft chords (A minor, F, C, G) that swell and fade into
+ * each other, and a few music-box notes picked from each chord. Twenty-four seconds that loop with no seam: every
+ * pad note fits a whole number of cycles in the loop, the chord swells wrap round, and the bell tails wrap too.
+ */
+function music(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * MUSIC_S);
+  const out = new Float32Array(n);
+  const chordS = MUSIC_S / 4;
+  // Each chord's notes in Hz, each nudged to a whole number of cycles in MUSIC_S (a change of under 0.02 Hz).
+  const whole = (f: number) => Math.round(f * MUSIC_S) / MUSIC_S;
+  const chords: readonly (readonly number[])[] = [
+    [110, 164.81, 220, 261.63], // A minor
+    [87.31, 130.81, 220, 329.63], // F major seventh
+    [130.81, 196, 261.63, 329.63], // C
+    [98, 146.83, 246.94, 329.63], // G with a sixth
+  ].map((c) => c.map(whole));
+  const pad = new Float32Array(n);
+  for (let k = 0; k < 4; k++) {
+    const centre = k * chordS + chordS / 2;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      // How far from this chord's middle, going the short way round the loop.
+      let d = Math.abs(t - centre);
+      if (d > MUSIC_S / 2) d = MUSIC_S - d;
+      if (d >= chordS) continue;
+      const c = Math.cos((Math.PI / 2) * (d / chordS));
+      const w = c * c; // overlapping swells that always add up to one
+      let s = 0;
+      for (let j = 0; j < chords[k].length; j++) s += Math.sin(TAU * chords[k][j] * t + j);
+      pad[i] += s * w * (0.9 + 0.1 * Math.sin(TAU * 0.25 * t + k));
+    }
+  }
+  for (let i = 0; i < n; i++) out[i] = pad[i] * 0.07;
+  // The music box: a note every 0.75 s from the chord that is sounding, some left out, high and bell-like.
+  const rnd = seeded(71);
+  const steps = Math.floor(MUSIC_S / 0.75);
+  for (let st = 0; st < steps; st++) {
+    if (rnd() < 0.42) continue;
+    const at = st * 0.75;
+    const chord = chords[Math.floor(at / chordS) % 4];
+    const f = chord[1 + Math.floor(rnd() * 3)] * (rnd() < 0.5 ? 4 : 2);
+    const amp = 0.1 + 0.06 * rnd();
+    const len = Math.floor(sr * 3);
+    for (let j = 0; j < len; j++) {
+      const u = j / sr;
+      const v =
+        (Math.sin(TAU * f * u) * Math.exp(-u * 2.2) + Math.sin(TAU * f * 2 * u) * 0.3 * Math.exp(-u * 4.5)) *
+        Math.min(1, u / 0.004);
+      out[(Math.floor(at * sr) + j) % n] += v * amp; // the tail wraps round to the start
+    }
+  }
+  return out;
+}
+
+/** Sounds rendered ahead of time (the music, while the title screen is idle) so starting one does not cost a frame. */
+const prewarmed = new Map<SoundId, Float32Array<ArrayBuffer>>();
+
+/** The rate to render `id` at for a context running at `contextRate`. */
+export function renderRateFor(id: SoundId, contextRate: number): number {
+  return id === Sound.Music ? Math.min(contextRate, MUSIC_RATE) : contextRate;
+}
+
+/** Renders the music now and keeps it for the engine to take. Safe to call twice. */
+export function prewarmMusic(): void {
+  if (!prewarmed.has(Sound.Music)) prewarmed.set(Sound.Music, renderPlaceholder(Sound.Music, MUSIC_RATE));
+}
+
+/** The samples for `id` at `rate`: the prewarmed ones if they are at that rate (handed over once), else rendered now. */
+export function takeSamples(id: SoundId, rate: number): Float32Array<ArrayBuffer> {
+  const ready = prewarmed.get(id);
+  if (ready && rate === MUSIC_RATE) {
+    prewarmed.delete(id);
+    return ready;
+  }
+  return renderPlaceholder(id, rate);
 }
 
 /** Fades the last `n` samples to silence. */

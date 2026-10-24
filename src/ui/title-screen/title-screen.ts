@@ -8,6 +8,14 @@ const STYLE_ID = 'wsw-title-style';
 
 export interface TitleScreenItem extends TitleItem {
   onPress: () => void;
+  /** BEGIN is the item that starts the game, which the sounds treat differently from the rest. */
+  begin?: boolean;
+}
+
+/** Called as a fingertip or the keyboard reaches an item, and as one is pressed (for the sounds; this file knows none). */
+export interface TitleScreenHooks {
+  onReach?(item: TitleScreenItem): void;
+  onPressed?(item: TitleScreenItem): void;
 }
 
 export interface TitleScreen {
@@ -18,7 +26,11 @@ export interface TitleScreen {
   setVisible(visible: boolean): void;
 }
 
-export function createTitleScreen(items: readonly TitleScreenItem[], parent: HTMLElement = document.body): TitleScreen {
+export function createTitleScreen(
+  items: readonly TitleScreenItem[],
+  hooks: TitleScreenHooks = {},
+  parent: HTMLElement = document.body,
+): TitleScreen {
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement('style');
     style.id = STYLE_ID;
@@ -33,7 +45,15 @@ export function createTitleScreen(items: readonly TitleScreenItem[], parent: HTM
   element.innerHTML = titleMarkup(items);
 
   const buttons = element.querySelectorAll<HTMLButtonElement>('.wsw-item');
-  buttons.forEach((b, i) => b.addEventListener('click', () => items[i].onPress()));
+  buttons.forEach((b, i) => {
+    // Reach, not move: one sound as the pointer arrives, not a stream while it crosses the item.
+    b.addEventListener('pointerenter', () => hooks.onReach?.(items[i]));
+    b.addEventListener('focus', () => hooks.onReach?.(items[i]));
+    b.addEventListener('click', () => {
+      hooks.onPressed?.(items[i]);
+      items[i].onPress();
+    });
+  });
 
   // The glow follows the pointer by two CSS variables: no layout, only the one gradient repaints.
   element.addEventListener('pointermove', (e) => {

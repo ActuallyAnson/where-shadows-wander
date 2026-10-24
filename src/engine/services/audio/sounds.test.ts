@@ -3,11 +3,17 @@ import { Bus } from './mixer';
 import { Cooldowns, Sound, SOUND_COUNT, SOUND_DEFS, soundForShapeEvent } from './sounds';
 
 describe('soundForShapeEvent', () => {
-  it('rustles when a shape is recognised and thumps when it commits, and is silent otherwise', () => {
+  it('rustles when a shape is recognised and thumps when it commits, and is silent on cancel', () => {
     expect(soundForShapeEvent('candidate')).toBe(Sound.Rustle);
     expect(soundForShapeEvent('commit')).toBe(Sound.Thump);
     expect(soundForShapeEvent('cancel')).toBeNull();
-    expect(soundForShapeEvent('release')).toBeNull();
+  });
+
+  it('lets go softly, falls low if tracking was lost, and stays quiet when another shape took over', () => {
+    expect(soundForShapeEvent('release')).toBe(Sound.Release);
+    expect(soundForShapeEvent('release', 'exit')).toBe(Sound.Release);
+    expect(soundForShapeEvent('release', 'lost')).toBe(Sound.Lost);
+    expect(soundForShapeEvent('release', 'switch')).toBeNull();
   });
 });
 
@@ -17,12 +23,28 @@ describe('SOUND_DEFS', () => {
     expect(new Set(SOUND_DEFS.map((d) => d.name)).size).toBe(SOUND_COUNT);
   });
 
-  it('puts the feedback sounds on effects and the flame on ambience, looping only the flame', () => {
+  it('has each sound at its own index, in the order of Sound', () => {
+    for (const [key, id] of Object.entries(Sound)) expect(SOUND_DEFS[id].name).toBe(key.toLowerCase());
+    expect(Object.values(Sound).sort((a, b) => a - b)).toEqual(Array.from({ length: SOUND_COUNT }, (_, i) => i));
+  });
+
+  it('puts the menu and feedback sounds on effects, the flame and the room on ambience and the music on music', () => {
+    expect(SOUND_DEFS[Sound.Music].bus).toBe(Bus.Music);
+    expect(SOUND_DEFS[Sound.Hum].bus).toBe(Bus.Ambience);
+    for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost, Sound.Lift, Sound.Set])
+      expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
+  });
+
+  it('loops only the flame, the room tone and the music', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'hum', 'music']);
+  });
+
+  it('keeps the first four sounds where they were: rustle, thump and chime on effects, the crackle on ambience', () => {
     expect(SOUND_DEFS[Sound.Rustle].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Thump].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Chime].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Crackle].bus).toBe(Bus.Ambience);
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle']);
+    expect(SOUND_DEFS[Sound.Crackle].loop).toBe(true);
   });
 });
 

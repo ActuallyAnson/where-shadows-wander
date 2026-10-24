@@ -2,11 +2,12 @@ import type { World } from '@iwsdk/core';
 import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
+import type { UiSound } from './ui-sound';
 
 /** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
 const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
 
-export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
+export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound): Promise<void> {
   const xr = navigator.xr;
   if (!xr) {
     console.warn('[Launcher] navigator.xr is not available');
@@ -193,15 +194,22 @@ export async function mountEnterArButtonIfNeeded(world: World): Promise<void> {
   // builds keep the debug row at the bottom, on top of it. Without VR support the title is not shown, so the no-XR
   // notice (no-xr-notice.ts) stays readable.
   if (vrSupported) {
-    title = createTitleScreen([
-      {
-        label: 'BEGIN',
-        onPress: () => {
-          void launchDirect('immersive-vr', false);
+    title = createTitleScreen(
+      [
+        {
+          label: 'BEGIN',
+          begin: true,
+          onPress: () => {
+            void launchDirect('immersive-vr', false);
+          },
         },
+        ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
+      ],
+      {
+        onReach: () => sound?.hover(),
+        onPressed: (item) => (item.begin ? sound?.begin() : sound?.press()),
       },
-      ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
-    ]);
+    );
   }
 
   if (vrSupported && (DEBUG_TOOLS || !title)) {
