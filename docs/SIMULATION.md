@@ -154,7 +154,9 @@ Call `solver.step(store, dt)` after `store.beginStep()` and after gameplay has s
 
 ## Puzzle layouts: `src/game/level.ts`
 
-Layouts are authored in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). `public/scenes/chapter-1.iwsdk.scene.json` holds one group per puzzle, `puzzle-1` to `puzzle-6`.
+A puzzle's layout comes from one of two places:
+- **TypeScript, with its props** ([ADR 0014](adr/0014-props-and-layouts-in-typescript.md)). `PuzzleDef.layout` is a `LevelLayout` in stage space: the traveller's start, the goal, and any markers and pieces. `PuzzleDef.props` are the invisible props whose shadows are its ground (next section). The bedroom puzzles are written this way.
+- **The scene editor** ([ADR 0006](adr/0006-editor-authored-layouts.md)). `PuzzleDef.layoutId` names a group in `public/scenes/chapter-1.iwsdk.scene.json`, which holds `puzzle-1` to `puzzle-6`. The rest of this section is about those groups.
 
 ### Coordinates
 
@@ -164,10 +166,10 @@ Layouts are authored in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authore
 
 ### The ground
 
-- Every puzzle has a ground line with its top at `GROUND_Y` (−0.3 m, 0.2 m above the bottom of the wall). It runs 0.3 m past each side of the wall.
+- A puzzle has a ground line with its top at `GROUND_Y` (−0.3 m, 0.2 m above the bottom of the wall), unless it sets `ground: false`. It runs 0.3 m past each side of the wall.
 - **Each `marker-gap` cuts a hole** as wide as the marker. The marker's height and y are only for the editor's view.
 - The ground is a capsule 0.1 m thick, so its ends are rounded: the walkable top slopes away over the last few centimetres before a hole.
-- Terrain capsules carry a `TerrainTag`: Ground, Gate, Rope, SoftGround or Wall. Gameplay uses it to tell what something stood on.
+- Terrain capsules carry a `TerrainTag`: Ground (1), Gate (2) or Wall (5); a prop's capsules carry `PROP_TAG_BASE` (16) plus its index. Gameplay uses the tag to tell what something stood on.
 
 ### What lives where
 
@@ -178,17 +180,50 @@ Layouts are authored in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authore
 
 ### Loading
 
-`loadPuzzle(doc, 'puzzle-N', store, solver)` does it all in one call:
+`loadLevel(doc, def, store, solver, caster)` does it all in one call (`loadPuzzle` is the same for a chapter-file group with no props):
 1. Clears the store and the solver's terrain.
-2. Loads the layout in stage space.
-3. Builds the ground.
-4. Spawns the pieces.
+2. Loads the layout in stage space, from `def.layout` or the chapter file's `def.layoutId`.
+3. Builds the ground line, unless `def.ground` is false.
+4. Adds each solid prop's ground through the caster.
+5. Spawns the pieces.
 
 It runs on puzzle load, never per frame. `markerOf` and `markersOf` find markers by tag.
+
+## Props as ground: `src/game/props.ts`
+
+The landscape is the shadows of invisible props (GDD). A `LevelProp` is authored in stage space:
+- `x`, `y`: its centre as seen on the wall
+- `depth`: how far it stands in front of the wall (default 5 cm)
+- `size`: a box's full width, height and depth; a sphere's radius; a cylinder's radius and height
+- `tilt`: a turn in the wall's plane, for a ramp
+- `solid: false`: a shadow that is only drawn, never walked on
+
+A prop close to the wall casts a shadow about its own size, so a puzzle is drawn as the shadow it needs. Keep props thin (a few centimetres deep) so the real shadow matches.
+
+### Casting
+
+`addProps` hands each solid prop to a `PropCaster`, which adds one capsule per edge of its shadow to the terrain, tagged `PROP_TAG_BASE + index`. A prop that adds no ground (no shadow, or the pool is full) is listed in the layout's `problems`, and `Game` warns.
+
+- **In the app** the caster places the prop in scene space with `propToScene(prop, stage, out)`. It then calls Anson's `addPropTerrain` (`src/engine/shadow/pure/prop-terrain.ts`) with the flame's position, the stage, and the blend from the shadow settings the hands use. That simplifies each silhouette to at most 8 edges.
+- **Headless and in tests** `Game` defaults to `orthoCaster`: the fully orthographic shadow, which is the prop's outline (a box's 4 edges, a sphere's 8, a standing cylinder's 4).
+
+Pure code may not import `src/engine/shadow` (the lint rule covers its `pure` folder too), so the real projection reaches the game only through the caster.
+
+### Budgets
+
+- The game's terrain pool is 128 capsules (`TERRAIN_CAPACITY`).
+- A puzzle has at most 32 props (`MAX_PROPS`).
+- Props are projected once, when the puzzle loads, and cost nothing per step beyond their capsules.
 
 ### Tests
 
 `src/engine/sim/scene-layout.test.ts` now reads a small fixed fixture, `src/engine/sim/fixtures/sample-chapter.scene.json` (the first editor trial's file), so re-authoring the real chapter doesn't break the loader's tests. `level.test.ts` checks that every chapter-1 puzzle loads cleanly and fits on the wall.
+
+`props.test.ts` covers the props:
+- placing a prop against a tilted wall, and the orthographic caster
+- the tags, and the problems the loader reports
+- a puzzle whose only ground is one box: the traveller stands on its shadow and walks to the goal, and with no prop under it, it falls
+- a stand-in point light: loading with the lantern elsewhere builds different ground, and the ground stays still while the puzzle plays
 
 ## The game: `src/game/game.ts`
 

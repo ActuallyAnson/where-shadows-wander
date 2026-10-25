@@ -3,8 +3,10 @@
 // Plain TypeScript; no allocation per step.
 //
 // A puzzle is "a single screen of the stage with one obstacle", and "every puzzle accepts at least
-// two solutions" (GDD; the tutorial has one). The layout (pieces, gap/goal/plate markers) comes from
-// the chapter file; everything that moves or reacts is the puzzle's code, in its hooks:
+// two solutions" (GDD; the tutorial has one). The layout (pieces, gap/goal/plate markers) is written
+// beside the puzzle in TypeScript, with the props whose shadows are its ground, or comes from a group
+// in the chapter file (the older puzzles); everything that moves or reacts is the puzzle's code, in
+// its hooks:
 //   setup(ctx)      once on load: terrain, fixtures, spawns beyond the layout
 //   step(ctx)       each fixed step before the traveller and the solver: hazards, wind, holds
 //   afterStep(ctx)  each fixed step after the solver: react to contacts, open gates, credit solutions
@@ -24,13 +26,16 @@ import type { Shape } from '../engine/hands/shapes';
 import { HAND_COUNT, Touch } from '../engine/sim/solver';
 import { ROLE_NAMES } from './abilities';
 import type { GameContext } from './context';
-import { markerOf } from './level';
+import { markerOf, type LevelSource } from './level';
 
-export interface PuzzleDef {
+/**
+ * A puzzle. Where its layout and ground come from is LevelSource: `layout` and `props` written in
+ * TypeScript, or `layoutId`, a group in the chapter file ("puzzle-1"); `ground: false` drops the
+ * ground line.
+ */
+export interface PuzzleDef extends LevelSource {
   /** Stable id, used in saves and events ("p1-gap"). */
   readonly id: string;
-  /** The group in the chapter file ("puzzle-1"). */
-  readonly layoutId: string;
   readonly title: string;
   /** Solution ids, intended one first. */
   readonly solutions: readonly string[];

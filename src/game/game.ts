@@ -36,7 +36,8 @@ import type { GameContext } from './context';
 import { Creatures } from './creatures';
 import { Fixtures } from './fixtures';
 import { GameEventQueue } from './game-events';
-import { GROUND_Y, loadPuzzle, markerOf } from './level';
+import { GROUND_Y, loadLevel, markerOf } from './level';
+import { orthoCaster, type PropCaster } from './props';
 import { PuzzleRunner, type PuzzleDef } from './puzzle';
 import { addSolution, newSave, readSave, type SaveState } from './save-state';
 import { Traveller } from './traveller';
@@ -45,6 +46,11 @@ import { Traveller } from './traveller';
 export const SIM_HZ = 60;
 /** At most this many steps a frame; a longer stall drops time instead of catching up in a burst. */
 export const MAX_STEPS_PER_FRAME = 4;
+/**
+ * Terrain capsules: a puzzle's props (up to 6, at most 8 edges each) plus the ground line and its
+ * own pieces (gates, shelves) need up to about 60, so the solver's default of 64 is doubled.
+ */
+export const TERRAIN_CAPACITY = 128;
 
 type Readable<E> = { readonly count: number; at(i: number): Readonly<E> };
 
@@ -64,8 +70,8 @@ export interface GameInput {
 }
 
 export interface GameOptions {
-  /** The parsed chapter scene file (public/scenes/chapter-1.iwsdk.scene.json). */
-  chapter: unknown;
+  /** The parsed chapter scene file (public/scenes/chapter-1.iwsdk.scene.json), for puzzles laid out there. */
+  chapter?: unknown;
   /** The chapter's puzzles in order. */
   puzzles: readonly PuzzleDef[];
   chapterId?: string;
@@ -73,6 +79,11 @@ export interface GameOptions {
   seed?: number;
   /** Progress to resume from (readSave()); a new save if omitted. */
   save?: SaveState;
+  /**
+   * Turns props' shadows into ground. The app passes one that projects from the lantern with the
+   * hands' blend (see src/game/props.ts); headless play uses the orthographic stand-in.
+   */
+  caster?: PropCaster;
 }
 
 /** Game-wide solver tuning: what falls, what flies, what collides with what. */
@@ -95,7 +106,7 @@ export function gameSolverConfig(): SolverConfig {
 
 export class Game implements GameContext {
   readonly store = new EntityStore(DEFAULT_CAPACITIES);
-  readonly solver = new Solver(this.store.capacity, gameSolverConfig());
+  readonly solver = new Solver(this.store.capacity, gameSolverConfig(), TERRAIN_CAPACITY);
   readonly rng = new Rng(1);
   readonly events = new GameEventQueue(128);
   readonly fixtures = new Fixtures();
@@ -119,6 +130,7 @@ export class Game implements GameContext {
 
   private readonly chapter: unknown;
   private readonly puzzles: readonly PuzzleDef[];
+  private readonly caster: PropCaster;
   private readonly seed: number;
   private wasPaused = false;
   private pendingLoad = -1;
@@ -129,6 +141,7 @@ export class Game implements GameContext {
     if (opts.puzzles.length === 0) throw new RangeError('a chapter needs at least one puzzle');
     this.chapter = opts.chapter;
     this.puzzles = opts.puzzles;
+    this.caster = opts.caster ?? orthoCaster;
     this.seed = opts.seed ?? 1;
     // A copy: the game changes its save as the player progresses, and the caller's object (say, a
     // replay's options) must stay as it was.
@@ -254,8 +267,8 @@ export class Game implements GameContext {
     const def = this.puzzles[index];
     this.puzzleIndex = index;
     this.groundY = def.groundY ?? GROUND_Y;
-    const loaded = loadPuzzle(this.chapter, def.layoutId, this.store, this.solver, [], this.groundY);
-    if (loaded.layout.problems.length > 0) console.warn(`${def.layoutId}:`, loaded.layout.problems.join('; '));
+    const loaded = loadLevel(this.chapter, def, this.store, this.solver, this.caster, this.groundY);
+    if (loaded.layout.problems.length > 0) console.warn(`${def.id}:`, loaded.layout.problems.join('; '));
     this.layout = loaded.layout;
     this.puzzleTime = 0;
     this.rng.state = (this.seed * 2654435761 + index * 40503) >>> 0;
