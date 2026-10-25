@@ -2,12 +2,30 @@
 // driver system hands each frame to our code. Pure code (src/engine/hands,
 // src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
-import { AmbientLight, Color, Matrix4, Quaternion, SessionMode, Vector3, World, createSystem } from '@iwsdk/core';
+import {
+  AmbientLight,
+  Color,
+  Group,
+  Matrix4,
+  Quaternion,
+  SessionMode,
+  Vector3,
+  World,
+  createSystem,
+} from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
+import { GhostTargetView } from '../engine/render/ghost-target-view';
+import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
+import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
+import { StageRenderer } from '../engine/render/stage-renderer';
+import { DEFAULT_CAPACITIES } from '../engine/sim/entity-kinds';
+import { EntityStore } from '../engine/sim/entity-store';
+import { Solver } from '../engine/sim/solver';
+import { TutorialFlow } from '../game/tutorial-flow';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
@@ -180,8 +198,33 @@ async function start(): Promise<void> {
   const cutsceneView = new CutsceneView();
   const cutscenes = new CutsceneHost(cutsceneView);
   const cutsceneTips = new Float32Array(6);
+  const stageGroup = new Group();
+  stageGroup.matrixAutoUpdate = false;
+  const stageRenderer = new StageRenderer(stageGroup);
+  const ghostTarget = new GhostTargetView(stageGroup, {
+    targetId: 'tutorial_bridge_hint',
+    x: 0.0,
+    y: -0.15,
+    requiredShape: 'flat',
+    active: false,
+  });
+  const entityStore = new EntityStore(DEFAULT_CAPACITIES);
+  const solver = new Solver(entityStore.capacity);
+  const propProjector = new PropProjector();
+  const propShadowView = new RenderPropShadowView(stageGroup);
+  const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
+  const bakePropTerrain = (): void => {
+    const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
+    solver.terrain.clear();
+    for (let i = 0; i < terrainCapsules.length; i++) {
+      const c = terrainCapsules[i];
+      solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
+    }
+    propShadowView.updatePolygons(polygons);
+  };
   world.scene.add(
     stageView.group,
+    stageGroup,
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
@@ -201,6 +244,7 @@ async function start(): Promise<void> {
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
   const gameAudio = new GameAudio(audio);
+  const tutorial = new TutorialFlow(entityStore, solver, ghostTarget, gameAudio);
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
@@ -257,6 +301,20 @@ async function start(): Promise<void> {
     } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
     stageView.place(stage, lantern);
     candleView.place(lantern);
+    const r = stage.right,
+      u = stage.up,
+      n = stage.normal,
+      o = stage.origin;
+    // prettier-ignore
+    stageGroup.matrix.set(
+      r[0], u[0], n[0], o[0],
+      r[1], u[1], n[1], o[1],
+      r[2], u[2], n[2], o[2],
+      0, 0, 0, 1,
+    );
+    stageGroup.matrixWorldNeedsUpdate = true;
+    bakePropTerrain();
+    tutorial.start();
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -304,9 +362,13 @@ async function start(): Promise<void> {
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
-  const sim = new FixedStepLoop(SIM_HZ, () => {
-    // Game simulation steps go here (week 2+).
-  });
+  const sim = Object.assign(
+    new FixedStepLoop(SIM_HZ, (dt) => {
+      entityStore.beginStep();
+      solver.step(entityStore, dt);
+    }),
+    { store: entityStore, solver },
+  );
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -365,6 +427,22 @@ async function start(): Promise<void> {
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
     render: renderReport(),
+    stageRenderer: {
+      liveCount: stageRenderer.liveCount,
+      drawCalls: 1,
+      ghostTargetActive: ghostTarget.active,
+    },
+    propTerrain: {
+      propCount: props.length,
+      terrainCapsules: sim.solver.terrain.count,
+      baked: propShadowView.isBaked,
+    },
+    tutorial: {
+      state: tutorial.state,
+      travellerX: tutorial.travellerX,
+      travellerGrounded: tutorial.isGrounded,
+      bridgeActive: tutorial.isBridgeActive,
+    },
     shadow: {
       stage: stageChoice,
       placed: rigPlaced,
@@ -625,6 +703,9 @@ async function start(): Promise<void> {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
+            if (candleAction.justPlaced) {
+              bakePropTerrain();
+            }
           }
         } catch (e) {
           failures.report('candle pickup', e);
@@ -698,6 +779,10 @@ async function start(): Promise<void> {
       if (paused) simWasPaused = true;
       else {
         try {
+          if (rigPlaced) {
+            ghostTarget.update(delta, projector.shadows, shapes);
+            tutorial.update(delta, projector.shadows, shapes);
+          }
           // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
           // replay it (docs/SIMULATION.md).
           if (simWasPaused) {
@@ -709,6 +794,11 @@ async function start(): Promise<void> {
         } catch (e) {
           failures.report('simulation', e);
         }
+      }
+      try {
+        stageRenderer.update(sim.store, sim.alpha);
+      } catch (e) {
+        failures.report('stage renderer', e);
       }
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       try {
@@ -791,6 +881,15 @@ async function start(): Promise<void> {
         sharpen,
         lanternLight,
         candleView,
+        stageGroup,
+        stageRenderer,
+        ghostTarget,
+        propProjector,
+        propShadowView,
+        props,
+        solver,
+        tutorial,
+        entityStore,
         audio,
         gameAudio,
         debug,

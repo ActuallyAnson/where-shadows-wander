@@ -11,7 +11,11 @@ export class FakeParam {
     this.cell[0] = v;
   }
   setTargetAtTime(v: number): void {
-    this.targets.push(v);
+    if (this.targets.length < 64) {
+      this.targets.push(v);
+    } else {
+      this.targets[this.targets.length - 1] = v;
+    }
     this.cell[0] = v;
   }
   cancelScheduledValues(): void {}

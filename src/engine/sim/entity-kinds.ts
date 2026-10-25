@@ -28,4 +28,6 @@ export const Flag = {
   Sensor: 1 << 2,
   /** Simulated but not drawn. */
   Hidden: 1 << 3,
+  /** Wait pose: traveller looks back toward player. */
+  WaitPose: 1 << 8,
 } as const;
