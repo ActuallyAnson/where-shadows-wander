@@ -43,6 +43,7 @@ import { KindredView } from '../engine/shadow/kindred-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
 import { SHAPES } from '../engine/hands/shapes';
+import { Bus } from '../engine/services/audio/mixer';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -834,6 +835,7 @@ async function start(): Promise<void> {
               lastTutorial = tutorial.state;
             }
             solveBloom.update(step);
+            audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
             glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
             const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
             for (let i = 0; i < 2; i++) {

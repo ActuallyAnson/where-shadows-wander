@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Bus, Mixer, volumeToGain } from './mixer';
+import { Bus, LIFT_MAX, Mixer, volumeToGain } from './mixer';
 
 describe('volumeToGain', () => {
   it('is silent at 0, unity at 1, and quieter than linear in between', () => {
@@ -56,5 +56,22 @@ describe('Mixer', () => {
     m.setVolume(Bus.Music, -3);
     expect(m.master).toBe(1);
     expect(m.volume(Bus.Music)).toBe(0);
+  });
+});
+
+describe('Mixer lift', () => {
+  it('lifts a bus a little, ignores tiny changes and never goes past the limit', () => {
+    const m = new Mixer();
+    const base = m.busGain(Bus.Music);
+    const v = m.version;
+    m.setLift(Bus.Music, 1.004);
+    expect(m.version).toBe(v);
+    m.setLift(Bus.Music, 1.3);
+    expect(m.busGain(Bus.Music)).toBeCloseTo(base * 1.3);
+    m.setLift(Bus.Music, 9);
+    expect(m.busGain(Bus.Music)).toBeCloseTo(base * LIFT_MAX);
+    m.setLift(Bus.Music, 0.2);
+    expect(m.busGain(Bus.Music)).toBeCloseTo(base);
+    expect(m.busGain(Bus.Effects)).toBeCloseTo(new Mixer().busGain(Bus.Effects));
   });
 });
