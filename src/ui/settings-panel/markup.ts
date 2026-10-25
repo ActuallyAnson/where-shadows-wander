@@ -89,15 +89,15 @@ const WHITE = '#ffffff';
 const BLACK = '#000000';
 export const PALETTE: Readonly<Record<Look, Readonly<Record<string, Readonly<Record<string, string | number>>>>>> = {
   normal: {
-    'wsw-panel': { backgroundColor: '#1c1a17', borderWidth: 0, borderColor: '#1c1a17' },
-    'wsw-title': { color: '#f1e9d8' },
-    'wsw-card': { backgroundColor: '#2a2622', borderWidth: 0, borderColor: '#2a2622' },
-    'wsw-name': { color: '#f1e9d8' },
-    'wsw-help': { color: '#bdb4a2' },
-    'wsw-value': { color: '#ffb454' },
-    'wsw-step': { color: '#1c1a17', backgroundColor: '#e9c46a' },
-    'wsw-wide': { color: '#1c1a17', backgroundColor: '#e9c46a' },
-    'wsw-action': { color: '#1c1a17', backgroundColor: '#e9c46a' },
+    'wsw-panel': { backgroundColor: '#05070d', borderWidth: 2, borderColor: '#1b2233' },
+    'wsw-title': { color: '#f2f5f9' },
+    'wsw-card': { backgroundColor: '#0c111c', borderWidth: 0, borderColor: '#0c111c' },
+    'wsw-name': { color: '#f2f5f9' },
+    'wsw-help': { color: '#7f8898' },
+    'wsw-value': { color: '#ffd89a' },
+    'wsw-step': { color: '#05070d', backgroundColor: '#ffd89a' },
+    'wsw-wide': { color: '#05070d', backgroundColor: '#ffd89a' },
+    'wsw-action': { color: '#05070d', backgroundColor: '#ffd89a' },
   },
   high: {
     'wsw-panel': { backgroundColor: WHITE, borderWidth: 6, borderColor: BLACK },

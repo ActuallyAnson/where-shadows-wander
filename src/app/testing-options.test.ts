@@ -26,6 +26,7 @@ describe('parseTesting', () => {
       shadow: true,
       settings: true,
       record: 'shapes',
+      menu: 'off',
       cutscene: false,
       kindred: false,
     });
@@ -47,6 +48,7 @@ describe('buildTesting', () => {
       shadow: true,
       settings: true,
       record: 'free',
+      menu: 'off',
       cutscene: false,
       kindred: false,
     };
@@ -68,7 +70,15 @@ describe('buildTesting', () => {
       for (const shadow of [false, true])
         for (const settings of [false, true])
           for (const record of RECORD_CHOICES) {
-            const o: TestingOptions = { joints, shadow, settings, record, cutscene: false, kindred: false };
+            const o: TestingOptions = {
+              joints,
+              shadow,
+              settings,
+              record,
+              menu: 'off',
+              cutscene: false,
+              kindred: false,
+            };
             expect(parseTesting(buildTesting('?mock=1', o))).toEqual(o);
           }
   });
@@ -104,6 +114,7 @@ describe('remembering the switches (no address needed)', () => {
           shadow: !joints,
           settings: joints,
           record,
+          menu: 'pause',
           cutscene: joints,
           kindred: !joints,
         };
@@ -124,6 +135,7 @@ describe('remembering the switches (no address needed)', () => {
       shadow: false,
       settings: true,
       record: 'off',
+      menu: 'off',
       cutscene: false,
       kindred: false,
     });
