@@ -36,9 +36,11 @@ import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
-import { JOINT } from '../engine/hands/hand';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
+import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { CutsceneHost } from './cutscene-host';
+import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
@@ -194,6 +196,9 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x1a1410, 0.04);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
+  // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
+  const cutsceneView = new CutsceneView();
+  const cutscenes = new CutsceneHost(cutsceneView);
   const stageGroup = new Group();
   stageGroup.matrixAutoUpdate = false;
   const stageRenderer = new StageRenderer(stageGroup);
@@ -218,7 +223,15 @@ async function start(): Promise<void> {
     }
     propShadowView.updatePolygons(polygons);
   };
-  world.scene.add(stageView.group, stageGroup, shadowRenderer.mesh, propShadows.mesh, candleView.group, ambientLight);
+  world.scene.add(
+    stageView.group,
+    stageGroup,
+    shadowRenderer.mesh,
+    propShadows.mesh,
+    cutsceneView.group,
+    candleView.group,
+    ambientLight,
+  );
   let rigPlaced = false;
   let rigCalibratedFromHead = false;
   let everPlaced = false;
@@ -371,11 +384,18 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
+      cutscene: { play: () => void playTestCutscene() },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
   // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
   let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
+  // The test cutscene (a bird crosses the wall): the Hand Lab's Cutscene button, or the Testing panel's switch when VR starts.
+  const playTestCutscene = async () => {
+    if (!DEBUG_TOOLS) return;
+    const problems = cutscenes.play((await import('../debug/demo-cutscene')).DEMO_CUTSCENE);
+    if (problems.length > 0) failures.report('test cutscene', new Error(problems.join('; ')));
+  };
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
@@ -622,6 +642,7 @@ async function start(): Promise<void> {
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
+      if (t.cutscene) setTimeout(() => void playTestCutscene(), 1000);
       armRecording(t.record);
     });
   }
@@ -751,8 +772,8 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
-          if (menu.group.visible) {
-            // The fingertips that can reach the menu: each tracked hand's index tip.
+          if (menu.group.visible || cutscenes.playing) {
+            // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
               if (!h.tracked) continue;
@@ -762,7 +783,9 @@ async function start(): Promise<void> {
               menuTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            menu.update(step, menuTips, tips);
+            if (menu.group.visible) menu.update(step, menuTips, tips);
+            if (cutscenes.playing)
+              cutscenes.update(step, stage, menuTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
           }
           debug?.frame(rigPlaced);
         } catch (e) {
@@ -891,6 +914,7 @@ async function start(): Promise<void> {
         showMenu,
         stageView,
         shadowRenderer,
+        cutscenes,
         openSettings,
         shapes,
         gestures,
