@@ -2,11 +2,13 @@
 // a chore (and nobody should have to). A press takes effect at once (the page is told with a `wsw-testing` event), is
 // remembered in the browser for next time (testing-options.ts), and nothing reloads. The overlays change live; the
 // settings panel and the recording start when VR starts, so they are armed here and begin when you press Enter VR.
+import { loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import {
   DEFAULT_TESTING,
   describeTesting,
   FREE_RECORD_SECONDS,
   loadTesting,
+  MENU_CHOICES,
   nextChoice,
   RECORD_CHOICES,
   saveTesting,
@@ -66,12 +68,19 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     joints.textContent = `Joint dots: ${options.joints ? 'ON' : 'off'}`;
     shadow.textContent = `Shadow capsules: ${options.shadow ? 'ON' : 'off'}`;
     settings.textContent = `Settings panel opens when VR starts: ${options.settings ? 'ON' : 'off'}`;
+    kindred.textContent = `Kindred (the shadow bird): ${options.kindred ? 'ON' : 'off'}`;
+    cutscene.textContent = `Test cutscene plays when VR starts: ${options.cutscene ? 'ON' : 'off'}`;
+    capture.textContent = `Capture mode (demo video; press reloads): ${loadCaptureChoice()}`;
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
+    menu.textContent = `Menu screen showing: ${options.menu}`;
     for (const [b, isOn] of [
       [joints, options.joints],
       [shadow, options.shadow],
       [settings, options.settings],
+      [cutscene, options.cutscene],
+      [kindred, options.kindred],
       [record, options.record !== 'off'],
+      [menu, options.menu !== 'off'],
     ] as const) {
       b.style.background = isOn ? '#163824' : '#21262d';
       b.style.borderColor = isOn ? '#2ea043' : '#30363d';
@@ -82,12 +91,19 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   const joints = button(() => set({ ...options, joints: !options.joints }));
   const shadow = button(() => set({ ...options, shadow: !options.shadow }));
   const settings = button(() => set({ ...options, settings: !options.settings }));
+  const kindred = button(() => set({ ...options, kindred: !options.kindred }));
+  const cutscene = button(() => set({ ...options, cutscene: !options.cutscene }));
   const record = button(() => set({ ...options, record: nextChoice(RECORD_CHOICES, options.record) }));
+  const menu = button(() => set({ ...options, menu: nextChoice(MENU_CHOICES, options.menu) }));
+  const capture = button(() => {
+    saveCaptureChoice(nextCapture(loadCaptureChoice()));
+    location.reload(); // the eye buffers' size is set when the page starts
+  });
   const clear = button(() => set({ ...DEFAULT_TESTING }));
   clear.textContent = 'Clear all switches';
   clear.style.cssText += 'background:#2d1b1b;color:#ff7b72;border-color:#6e2f2f;';
 
-  element.append(title, active, joints, shadow, settings, record, hint, clear);
+  element.append(title, active, joints, shadow, settings, cutscene, kindred, record, menu, capture, hint, clear);
   refresh();
   return {
     element,

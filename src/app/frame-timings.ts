@@ -27,6 +27,8 @@ export class FrameTimings {
   private readonly lastAvg = new Float64Array(COUNT);
   private readonly lastWorst = new Float64Array(COUNT);
   private readonly lastHits = new Float64Array(COUNT);
+  /** The last full window in one short line ("3.1 ms avg, 6.2 worst · shadow 1.2"), for a tester's on-screen readout. Empty until the first window ends. */
+  line = '';
   private frames = 0;
   private lastFrames = 0;
 
@@ -59,6 +61,8 @@ export class FrameTimings {
       this.lastHits[i] = this.hits[i];
     }
     this.lastFrames = this.frames;
+    const f = (v: number) => (Math.round(v * 10) / 10).toFixed(1);
+    this.line = `${f(this.lastAvg[SLOT.total])} ms avg, ${f(this.lastWorst[SLOT.total])} worst · shadow ${f(this.lastAvg[SLOT.shadow])}`;
     this.frames = 0;
     this.sum.fill(0);
     this.hits.fill(0);

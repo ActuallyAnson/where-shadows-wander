@@ -1,36 +1,64 @@
 import { describe, expect, it } from 'vitest';
-import { captureFromUrl, NO_CAPTURE } from './capture-mode';
+import {
+  CAPTURE_KEY,
+  captureOptions,
+  loadCaptureChoice,
+  nextCapture,
+  NO_CAPTURE,
+  saveCaptureChoice,
+  type CaptureStorage,
+} from './capture-mode';
 
-describe('captureFromUrl', () => {
-  it('is off without ?capture, whatever else is in the address', () => {
-    expect(captureFromUrl('')).toEqual(NO_CAPTURE);
-    expect(captureFromUrl('?foveation=0.5&scale=1.5')).toEqual(NO_CAPTURE);
-    expect(captureFromUrl('?debug=joints')).toEqual(NO_CAPTURE);
+function memory(initial: Record<string, string> = {}): CaptureStorage & { data: Record<string, string> } {
+  const data = { ...initial };
+  return { data, getItem: (k) => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
+}
+
+describe('captureOptions', () => {
+  it('is off, clean (no foveation) or sharp (no foveation, 1.5 times the resolution)', () => {
+    expect(captureOptions('off')).toEqual(NO_CAPTURE);
+    expect(captureOptions('clean')).toEqual({ enabled: true, foveation: 0, scale: null });
+    expect(captureOptions('sharp')).toEqual({ enabled: true, foveation: 0, scale: 1.5 });
   });
 
-  it('turns on with ?capture or ?capture=1, with no foveation and the default resolution', () => {
-    expect(captureFromUrl('?capture')).toEqual({ enabled: true, foveation: 0, scale: null });
-    expect(captureFromUrl('capture=1')).toEqual({ enabled: true, foveation: 0, scale: null });
-  });
-
-  it('reads the foveation and the render scale', () => {
-    expect(captureFromUrl('?capture&foveation=0.5&scale=1.4')).toEqual({ enabled: true, foveation: 0.5, scale: 1.4 });
-  });
-
-  it('keeps both values in range', () => {
-    expect(captureFromUrl('?capture&foveation=7&scale=9')).toEqual({ enabled: true, foveation: 1, scale: 2 });
-    expect(captureFromUrl('?capture&foveation=-1&scale=0.2')).toEqual({ enabled: true, foveation: 0, scale: 1 });
-  });
-
-  it('ignores a value that is empty or not a number', () => {
-    expect(captureFromUrl('?capture&foveation=&scale=')).toEqual({ enabled: true, foveation: 0, scale: null });
-    expect(captureFromUrl('?capture&foveation=high&scale=big')).toEqual({ enabled: true, foveation: 0, scale: null });
-  });
-
-  it('does not share its default object between calls', () => {
-    const a = captureFromUrl('');
+  it('does not share its off object between calls', () => {
+    const a = captureOptions('off');
     a.enabled = true;
-    expect(captureFromUrl('').enabled).toBe(false);
+    expect(captureOptions('off').enabled).toBe(false);
     expect(NO_CAPTURE.enabled).toBe(false);
+  });
+});
+
+describe('nextCapture', () => {
+  it('steps off, clean, sharp and round again', () => {
+    expect(nextCapture('off')).toBe('clean');
+    expect(nextCapture('clean')).toBe('sharp');
+    expect(nextCapture('sharp')).toBe('off');
+  });
+});
+
+describe('remembering the choice', () => {
+  it('saves and loads it', () => {
+    const s = memory();
+    expect(loadCaptureChoice(s)).toBe('off');
+    expect(saveCaptureChoice('sharp', s)).toBe(true);
+    expect(s.data[CAPTURE_KEY]).toBe('sharp');
+    expect(loadCaptureChoice(s)).toBe('sharp');
+  });
+
+  it('is off for anything else, and for storage that is missing or refuses', () => {
+    expect(loadCaptureChoice(memory({ [CAPTURE_KEY]: 'loud' }))).toBe('off');
+    expect(loadCaptureChoice(null)).toBe('off');
+    const broken: CaptureStorage = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('full');
+      },
+    };
+    expect(loadCaptureChoice(broken)).toBe('off');
+    expect(saveCaptureChoice('clean', broken)).toBe(false);
+    expect(saveCaptureChoice('clean', null)).toBe(false);
   });
 });

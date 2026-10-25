@@ -1,13 +1,23 @@
 import type { World } from '@iwsdk/core';
 import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
+import { captureOptions, loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
 import type { UiSound } from './ui-sound';
 
 /** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
 const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
 
-export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound): Promise<void> {
+/** Things the page's own screens ask of the app, filled in once the app has them (the settings exist after the title does). */
+export interface LauncherHooks {
+  openSettings?: () => void;
+}
+
+export async function mountEnterArButtonIfNeeded(
+  world: World,
+  sound?: UiSound,
+  hooks: LauncherHooks = {},
+): Promise<void> {
   const xr = navigator.xr;
   if (!xr) {
     console.warn('[Launcher] navigator.xr is not available');
@@ -106,6 +116,7 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
 
   // Direct clean launch function
   const launchDirect = async (mode: XRSessionMode, forceWebGLLayer: boolean) => {
+    title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
     appendLog(`Requesting ${mode} session (forceWebGLLayer: ${forceWebGLLayer})...`, '#e3b341');
@@ -167,6 +178,7 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
+      title?.setBusy(false);
       showNote("Couldn't start VR. Try again, or use one of the other ways in below.");
       openOtherWays();
     }
@@ -203,13 +215,21 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
             void launchDirect('immersive-vr', false);
           },
         },
+        { label: 'SETTINGS', onPress: () => hooks.openSettings?.() },
         ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
       ],
       {
         onReach: () => sound?.hover(),
         onPressed: (item) => (item.begin ? sound?.begin() : sound?.press()),
+        // Five taps on the emblem step capture mode (demo video) through off, clean and sharp, and reload to apply it.
+        onEmblemTaps: () => {
+          saveCaptureChoice(nextCapture(loadCaptureChoice()));
+          location.reload();
+        },
       },
     );
+    const choice = loadCaptureChoice();
+    if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
 
   if (vrSupported && (DEBUG_TOOLS || !title)) {

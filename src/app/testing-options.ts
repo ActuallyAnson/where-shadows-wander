@@ -4,6 +4,9 @@
 // scripts that drive the page. Plain TypeScript.
 
 export type RecordChoice = 'off' | 'free' | 'shapes';
+/** Which menu screen to show in the room (menu-panel), or none. */
+export type MenuChoice = 'off' | 'pause' | 'solved' | 'end';
+export const MENU_CHOICES: readonly MenuChoice[] = ['off', 'pause', 'solved', 'end'];
 
 export interface TestingOptions {
   /** A dot on every tracked hand joint (?debug=joints). */
@@ -12,15 +15,24 @@ export interface TestingOptions {
   shadow: boolean;
   /** The settings panel opens a second after the headset session starts (?settings). */
   settings: boolean;
+  /** The test cutscene plays a second after the headset session starts (set in the Testing panel; no address form). */
+  cutscene: boolean;
+  /** The kindred (a shadow bird flying about the wall) shows from the start (set in the Testing panel; no address form). */
+  kindred: boolean;
   /** Hand recording: 20 s of free hands (?record=20), or the guided shape script, 84 s (?record&script=shapes). */
   record: RecordChoice;
+  /** A menu screen showing in the room, to look at it (set in the Testing panel; there is no address form). */
+  menu: MenuChoice;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   joints: false,
   shadow: false,
   settings: false,
+  cutscene: false,
+  kindred: false,
   record: 'off',
+  menu: 'off',
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
@@ -34,7 +46,10 @@ export function parseTesting(search: string): TestingOptions {
     joints: debug.has('joints'),
     shadow: debug.has('shadow'),
     settings: p.has('settings'),
+    cutscene: false,
+    kindred: false,
     record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
+    menu: 'off',
   };
 }
 
@@ -69,8 +84,11 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.joints) on.push('joint dots');
   if (o.shadow) on.push('shadow capsules');
   if (o.settings) on.push('settings panel on entry');
+  if (o.cutscene) on.push('test cutscene on entry');
+  if (o.kindred) on.push('kindred');
   if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
+  if (o.menu !== 'off') on.push(`${o.menu} screen`);
   return on;
 }
 
@@ -106,7 +124,10 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       joints: raw.joints === true,
       shadow: raw.shadow === true,
       settings: raw.settings === true,
+      cutscene: raw.cutscene === true,
+      kindred: raw.kindred === true,
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
+      menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
     };
   } catch {
     return { ...DEFAULT_TESTING };

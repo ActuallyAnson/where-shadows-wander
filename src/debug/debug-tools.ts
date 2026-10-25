@@ -26,6 +26,8 @@ export interface DebugContext {
   lantern: { settings: { amplitude: number } };
   candleLight: { visible: boolean };
   settings: SettingsStore;
+  /** The frame-time summary line, if there is one (it changes once a few seconds). */
+  readout?: () => string;
   /** main.ts draws the glove only while this is true. */
   flags: { handVisual: boolean };
   flame: () => ArrayLike<number> | null;
@@ -43,6 +45,7 @@ export class DebugTools {
   private flickerOff = false;
   private readonly hud: HTMLDivElement;
   private lastStatus = '\u0000';
+  private lastLine: string | undefined;
   private readonly removers: (() => void)[] = [];
 
   constructor(private readonly ctx: DebugContext) {
@@ -94,6 +97,11 @@ export class DebugTools {
 
   /** Per frame, after the shadows are updated. Returns at once when nothing is shown. */
   frame(rigPlaced: boolean): void {
+    const line = this.ctx.readout?.();
+    if (line !== this.lastLine) {
+      this.lastLine = line;
+      this.drawHud();
+    }
     const o = this.controller.overlays;
     if (o.capsules)
       this.shadowDebug.update(
@@ -153,10 +161,13 @@ export class DebugTools {
   }
 
   private drawHud(): void {
-    const status = this.controller.status();
+    const status = this.controller.status() + (this.ctx.readout?.() ?? '');
     if (status === this.lastStatus) return;
     this.lastStatus = status;
-    this.hud.textContent = status ? `DEBUG  ${status}` : 'DEBUG  Alt+P pause  Alt+.  step  Alt+[ ]  speed';
+    const frames = this.ctx.readout?.();
+    const text = this.controller.status();
+    this.hud.textContent =
+      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+P pause  Alt+.  step  Alt+[ ]  speed') + (frames ? `  |  ${frames}` : '');
   }
 }
 

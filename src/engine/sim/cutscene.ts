@@ -10,7 +10,7 @@ export interface CaptionBeat {
   readonly text: string;
 }
 
-/** A shadow puppet (the name of a drawing, e.g. 'bird') sliding from one point to another. */
+/** A shadow puppet (the name of a drawing, e.g. 'bird') sliding from one point to another (metres on the real 1.6 m wall; a smaller stage scales them). */
 export interface PuppetBeat {
   readonly kind: 'puppet';
   readonly at: number;

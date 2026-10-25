@@ -33,6 +33,8 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Lift]: 0.8,
   [Sound.Set]: 0.8,
   [Sound.Music]: MUSIC_PEAK,
+  [Sound.Twinkle]: 0.8,
+  [Sound.Hop]: 0.8,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -45,6 +47,10 @@ export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array
 
 function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
   switch (id) {
+    case Sound.Twinkle:
+      return twinkle(sr);
+    case Sound.Hop:
+      return hop(sr);
     case Sound.Rustle:
       return rustle(sr);
     case Sound.Thump:
@@ -105,6 +111,36 @@ function thump(sr: number): Float32Array<ArrayBuffer> {
     const t = i / sr;
     phase += (TAU * (45 + 65 * Math.exp(-t * 18))) / sr;
     out[i] = Math.sin(phase) * Math.exp(-t * 11) + (rnd() * 2 - 1) * 0.15 * Math.exp(-t * 90);
+  }
+  return out;
+}
+
+/** Fairy dust: four soft high notes, each a little lower than the last, each a pure tone that dies away quickly. */
+function twinkle(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.9);
+  const out = new Float32Array(n);
+  const notes = [2093, 1760, 2349, 1568]; // C7, A6, D7, G6
+  for (let k = 0; k < notes.length; k++) {
+    const start = Math.floor(sr * 0.11 * k);
+    for (let i = start; i < n; i++) {
+      const t = (i - start) / sr;
+      out[i] += Math.sin(TAU * notes[k] * t) * Math.exp(-t * 11) * Math.min(1, t / 0.003) * (1 - k * 0.15);
+    }
+  }
+  return out;
+}
+
+/** A rabbit's soft landing: a low, short, muffled thud with a little air in it. */
+function hop(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.18);
+  const out = new Float32Array(n);
+  const noise = seeded(41);
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    lp += (noise() * 2 - 1 - lp) * 0.08; // a muffled breath
+    out[i] =
+      (Math.sin(TAU * (95 - 40 * t) * t) * Math.exp(-t * 28) + lp * 0.5 * Math.exp(-t * 40)) * Math.min(1, t / 0.002);
   }
   return out;
 }

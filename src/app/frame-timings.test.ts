@@ -55,4 +55,17 @@ describe('frame timings', () => {
     expect(r.frameShare.shadow).toBe(0.5);
     expect(r.frameShare.lab).toBe(0);
   });
+
+  it('keeps a one-line summary of the last window', () => {
+    let t = 0;
+    const timings = new FrameTimings(() => t, 2);
+    expect(timings.line).toBe('');
+    for (let i = 0; i < 2; i++) {
+      timings.begin(SLOT.total);
+      t += 4;
+      timings.end(SLOT.total);
+      timings.endFrame();
+    }
+    expect(timings.line).toBe('4.0 ms avg, 4.0 worst · shadow 0.0');
+  });
 });

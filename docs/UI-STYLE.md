@@ -20,8 +20,9 @@ Night, pale and one candle colour. Nothing else on UI.
 | Candle | `#ffd89a` | markers, flame, press colour |
 | Glow | `#ffc46e` at 30% | the light that follows the fingertip |
 
-The current settings panel (`src/ui/settings-panel/markup.ts`) uses a warmer brown palette and
-moves to this one when the real panels are built. High contrast stays pure black on pure white
+The settings panel (`src/ui/settings-panel/markup.ts`) and the pause, solved and end screens
+(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. To look at them: the Hand Lab's **Menu** button steps through pause, solved and end, and the launcher's Testing panel has the same switch (no address to type). The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
+and reads presses from `menu.onPress`. High contrast stays pure black on pure white
 with black outlines (`PALETTE.high`), and every new screen needs a high-contrast version.
 
 ## Light and shadow

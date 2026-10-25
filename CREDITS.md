@@ -16,4 +16,4 @@ None yet.
 
 ## Fonts
 
-The title screen's lettering is Cinzel Decorative (regular and bold, Latin subset), by Natanael Gama, under the SIL Open Font License 1.1. The files and the licence text are in `src/ui/title-screen/fonts/`. It is a third-party font: replace it if the competition's "original work" rule turns out to exclude free fonts.
+The title screen's lettering is Cinzel Decorative (regular and bold, Latin subset), by Natanael Gama, under the SIL Open Font License 1.1. The files and the licence text are in `src/ui/title-screen/fonts/`. It is a third-party font: replace it if the competition's "original work" rule turns out to exclude free fonts. The pause, solved and end screens use plain Cinzel (regular, Latin subset, same author and licence); the file and licence text are in `src/ui/menu-panel/fonts/`.
