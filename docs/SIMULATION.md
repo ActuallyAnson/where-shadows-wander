@@ -249,6 +249,7 @@ const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right,
 | `left`, `right` | `ShadowProjector.shadows` (stage space) |
 | `shapeEvents` | `ShapeRecognizer.events` |
 | `gestureEvents` | `GestureDetector.events` (latched; not used by gameplay yet) |
+| `leftTracked`, `rightTracked` | each hand's own tracking (`hands.hands.left.tracked`); default true |
 
 | Output | For |
 |---|---|
@@ -270,6 +271,20 @@ const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right,
 The loop runs at 60 Hz, at most 4 steps a frame.
 
 Pausing stops time completely. On resume the remainder is dropped, so the world never jumps.
+
+### Tracking loss
+
+The engine shows "Show me your hands" after 3 s without a tracked hand (`src/engine/xr/hands-status.ts`). The game itself:
+- **A hand that drops out keeps its last shadow, standing still, for `HOLD_LOST_HAND_S` (0.5 s).** A short dropout leaves a bridge under the traveller. The classifier releases a committed shape after the same 0.5 s, so the hold never outlives the role.
+- **With no hand tracked for longer than that, the world holds still** (`waitingForHands`), as it does when paused, until a hand returns. Then it carries on with no catch-up.
+- **A hand that stays lost while the other is tracked is let go,** as if it were taken out of the light: its role ends, and a traveller standing on it falls and is put back at its start.
+
+What the player notices:
+- A brief glitch changes nothing.
+- Hands dropped out of view freeze the scene until they come back. That includes hands resting in the lap, below the cameras' view.
+- When they come back, the shape has to be made again (0.4 s). A traveller that was standing on a bridge hand falls and is put back at its start, because the classifier released the shape while the hands were away.
+
+The tracking flags are recorded in replays (bits 1 and 2 of the per-frame `paused` byte), so a session with dropouts replays exactly (`tracking.test.ts`).
 
 ### Solver tuning: `gameSolverConfig()`
 
@@ -453,6 +468,22 @@ A session from the title to the end is a small state machine (GDD "Player journe
 
 `readSave(unknown)` turns untrusted stored data into a valid save. It never throws, and it is where future migrations go. Storage itself belongs to B's save service.
 
+### The bridge to the save service: `src/game/save-bridge.ts`
+
+The save service (ADR 0010) stores the save, versioned and crash-safe. `SaveStore` is the part of its `SaveManager` the game uses (pure code may not import the service; a `SaveManager` fits the interface as it is).
+
+- **On launch,** `saveStateFrom(store, puzzleIds)` builds the game's `SaveState`. It carries the resume point (only if the save is in the night, chapter 1 to the service), the solutions found for each puzzle, and whether the night was finished.
+- **Once a frame,** after `game.frame()`, `bridge.update()` reads the game's events and writes only on them:
+  - `puzzle-start`: `setProgress(1, index)`, marked but not written. The service's hooks write it when the headset comes off or the page is hidden.
+  - `puzzle-solved`: `puzzleEnded(id, { solved, solutionId, next })`, written at once.
+  - `chapter-complete`: `completeChapter(1)` and a `flush()`.
+
+  Frames with no events call nothing.
+- **What the player notices:** quitting mid-puzzle resumes at the start of that puzzle, with every solution found so far kept. A write that fails is counted (`failedWrites`) and the game carries on.
+- **Not built:** the creature gallery. Nothing writes creatures since the companions were cut.
+
+`save-bridge.test.ts` runs the bridge against a stand-in store with the service's behaviour: changes are marked, `flush` writes them, and a reopen reads what was written. It quits mid-puzzle, reopens, and checks the puzzle and the solutions. A test against the real `SaveManager` would have to live outside the pure folders, since the lint rule keeps `src/game` and its tests from importing `src/engine/services`.
+
 ## Fixtures: `src/game/fixtures.ts`
 
 Puzzle objects that aren't entities, for the renderer. Each has a `kind`, centre and size in stage metres, `active` and a kind-specific `value`.
@@ -513,7 +544,8 @@ Puzzles are factories (`createChapter1()`), so each `Game` has its own puzzle st
 ## Cost of a game frame
 
 - **Time:** `game.perf.ts` measures about 0.02 ms a frame on a desktop (0.021 to 0.023 ms mean), in the dripping plant (drops, a cup and a roof), the fan (wind, a windbreak and an anchor) and the castle (a fist over the counterweight, a bridge). The scenes are in `busy-scenes.ts`. The budget is about 0.5 ms.
-- **Allocation:** `game.alloc.test.ts` measures about 225 B a frame in the dripping plant, against a budget of 320 B. That is number boxing; no objects or arrays are built.
+- **In CI:** `game.budget.test.ts` runs the same three scenes in every `npm test` and fails a scene over 0.5 ms a frame (the best of three 2,000-frame windows). Today they take about 21 to 24 µs.
+- **Allocation:** `game.alloc.test.ts` measures about 210 to 225 B a frame in the dripping plant, against a budget of 320 B. That is number boxing; no objects or arrays are built. It runs in CI too, where garbage collection is exposed.
 
 ## Entity store, layouts, 2D maths
 

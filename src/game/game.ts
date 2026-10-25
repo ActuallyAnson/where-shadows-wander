@@ -5,7 +5,8 @@
 //
 // Each display frame, Game.frame(input):
 //   1. clears last frame's events;
-//   2. if paused, stops (and on resume drops the time that passed, so nothing jumps);
+//   2. if paused, or no hand has been tracked for a while, stops (and on resume drops the time
+//      that passed, so nothing jumps);
 //   3. latches this frame's shape and gesture events, copies both hand shadows into the solver;
 //   4. runs 0..N fixed steps and returns the interpolation factor for the renderer.
 //
@@ -47,6 +48,12 @@ export const SIM_HZ = 60;
 /** At most this many steps a frame; a longer stall drops time instead of catching up in a burst. */
 export const MAX_STEPS_PER_FRAME = 4;
 /**
+ * A hand whose tracking drops out keeps its last shadow this long, seconds: a short dropout leaves
+ * a bridge under the traveller. It matches the classifier, which releases a committed shape after
+ * 0.5 s without tracking. With no hand tracked for longer, the world holds still until one returns.
+ */
+export const HOLD_LOST_HAND_S = 0.5;
+/**
  * Terrain capsules: a puzzle's props (up to 6, at most 8 edges each) plus the ground line and its
  * own pieces (gates, shelves) need up to about 60, so the solver's default of 64 is doubled.
  */
@@ -67,6 +74,12 @@ export interface GameInput {
   shapeEvents: Readable<ShapeEvent> | null;
   /** This frame's lantern gestures (GestureDetector.events); latched for gameplay that wants them. */
   gestureEvents?: Readable<GestureEvent> | null;
+  /**
+   * Whether each hand is tracked this frame (the hand's own tracking, not whether its shadow is on
+   * the stage: a tracked hand out of the light has no shadow). Both default to true.
+   */
+  leftTracked?: boolean;
+  rightTracked?: boolean;
 }
 
 export interface GameOptions {
@@ -127,6 +140,10 @@ export class Game implements GameContext {
   puzzleIndex = 0;
   /** True once the last puzzle is solved: the final scene stays painted on the stage. */
   complete = false;
+  /** True while the world holds because no hand has been tracked for HOLD_LOST_HAND_S. */
+  waitingForHands = false;
+  /** Seconds each hand (left, right) has been untracked. */
+  readonly lostS = new Float64Array(2);
 
   private readonly chapter: unknown;
   private readonly puzzles: readonly PuzzleDef[];
@@ -162,6 +179,11 @@ export class Game implements GameContext {
     return this.puzzles.length;
   }
 
+  /** The id of puzzle `index` in this game's list. */
+  puzzleIdAt(index: number): string {
+    return this.puzzles[index].id;
+  }
+
   /** The interpolation factor for drawing entity state (px + (x - px) * alpha). */
   get alpha(): number {
     return this.loop.alpha;
@@ -174,7 +196,11 @@ export class Game implements GameContext {
     else this.events.clear();
     // Latch first: a shape committed or released while paused still counts once play resumes.
     this.latch.capture(input.shapeEvents, input.gestureEvents ?? null);
-    if (input.paused) {
+    const lost = this.lostS;
+    lost[0] = input.leftTracked === false ? lost[0] + input.dt : 0;
+    lost[1] = input.rightTracked === false ? lost[1] + input.dt : 0;
+    this.waitingForHands = lost[0] > HOLD_LOST_HAND_S && lost[1] > HOLD_LOST_HAND_S;
+    if (input.paused || this.waitingForHands) {
       this.wasPaused = true;
       return this.loop.alpha;
     }
@@ -188,7 +214,14 @@ export class Game implements GameContext {
       this.pendingLoad = -1;
       this.load(i, true);
     }
-    this.abilities.setShadows(input.left, input.right, input.dt, this.solver.hands);
+    this.abilities.setShadows(
+      input.left,
+      input.right,
+      input.dt,
+      this.solver.hands,
+      lost[0] > 0 && lost[0] <= HOLD_LOST_HAND_S,
+      lost[1] > 0 && lost[1] <= HOLD_LOST_HAND_S,
+    );
     return this.loop.advance(input.dt);
   }
 

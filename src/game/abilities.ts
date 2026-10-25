@@ -105,18 +105,26 @@ export class Abilities {
 
   /**
    * Once per display frame: copies both shadows into the solver's colliders and estimates each
-   * hand's velocity from how far its shadow moved since the last frame.
+   * hand's velocity from how far its shadow moved since the last frame. A hand whose tracking just
+   * dropped out (`holdLeft`, `holdRight`) keeps its last shadow, standing still.
    */
   setShadows(
     left: HandShadow | null,
     right: HandShadow | null,
     frameDt: number,
     colliders: readonly HandCollider[],
+    holdLeft = false,
+    holdRight = false,
   ): void {
     for (let h = 0; h < HAND_COUNT; h++) {
       const sh = h === LEFT ? left : right;
       const a = this.hands[h];
       const c = colliders[h];
+      if (h === LEFT ? holdLeft : holdRight) {
+        a.vx = 0;
+        a.vy = 0;
+        continue;
+      }
       if (sh !== null && sh.active) c.copyFrom(true, sh.capsules, sh.bounds);
       else c.active = false;
       if (!c.active || sh === null) {

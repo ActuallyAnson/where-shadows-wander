@@ -13,6 +13,8 @@ import type { InputRecorder } from './replay';
 
 /** Classifier hold time (GDD): a shape commits after 0.4 s. */
 export const HOLD_S = 0.4;
+/** Untracked this long, the classifier releases a committed shape (GDD "Pose classifier"). */
+export const RELEASE_LOST_S = 0.5;
 
 interface ScriptedHand {
   shape: Shape | null;
@@ -22,6 +24,8 @@ interface ScriptedHand {
   /** The shape being held toward a commit, and for how long. */
   holding: Shape | null;
   heldS: number;
+  /** Seconds the hand has been untracked. */
+  lostS: number;
 }
 
 export class Headless {
@@ -36,10 +40,12 @@ export class Headless {
   t = 0;
   private readonly queue = new ShapeEventQueue(16);
   private readonly hands: Record<Handedness, ScriptedHand> = {
-    left: { shape: null, x: 0, y: 0, committed: null, holding: null, heldS: 0 },
-    right: { shape: null, x: 0, y: 0, committed: null, holding: null, heldS: 0 },
+    left: { shape: null, x: 0, y: 0, committed: null, holding: null, heldS: 0, lostS: 0 },
+    right: { shape: null, x: 0, y: 0, committed: null, holding: null, heldS: 0, lostS: 0 },
   };
   paused = false;
+  /** Whether each hand is tracked; false stands in for the hand dropping out of the cameras' view. */
+  tracked: Record<Handedness, boolean> = { left: true, right: true };
   /** When set, every frame's input is recorded (for replay tests and bug reports). */
   recorder: InputRecorder | null = null;
 
@@ -110,6 +116,8 @@ export class Headless {
       left: this.shadows.left,
       right: this.shadows.right,
       shapeEvents: this.queue,
+      leftTracked: this.tracked.left,
+      rightTracked: this.tracked.right,
     };
     this.recorder?.record(input);
     this.game.frame(input);
@@ -117,10 +125,25 @@ export class Headless {
     this.record();
   }
 
-  /** The stand-in classifier: candidate, then commit after the hold; release on exit or switch. */
+  /**
+   * The stand-in classifier: candidate, then commit after the hold; release on exit or switch. An
+   * untracked hand casts no shadow; its hold waits, and a commit is released after RELEASE_LOST_S.
+   */
   private classify(hand: Handedness, dt: number): void {
     const h = this.hands[hand];
     const sh = this.shadows[hand];
+    if (!this.tracked[hand]) {
+      hideShadow(sh);
+      h.lostS += dt;
+      if (h.committed && h.lostS >= RELEASE_LOST_S) {
+        this.queue.push('release', hand, h.committed, this.t, 0, 0, 'lost');
+        h.committed = null;
+      }
+      h.holding = null;
+      h.heldS = 0;
+      return;
+    }
+    h.lostS = 0;
     if (h.shape === null) {
       hideShadow(sh);
       if (h.committed) this.queue.push('release', hand, h.committed, this.t, 0, 0, 'exit');

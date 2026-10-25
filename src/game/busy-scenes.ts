@@ -1,6 +1,6 @@
-// The night's busiest scenes as one-frame functions, for the frame-time bench (game.perf.ts). Each
-// keeps its puzzle going without ending it, so no puzzle load lands inside a timed frame. Test and
-// tooling code: it allocates while it sets up.
+// The night's busiest scenes as one-frame functions, for the frame-time bench (game.perf.ts) and
+// the CI budget test (game.budget.test.ts). Each keeps its puzzle going without ending it, so no
+// puzzle load lands inside a timed frame. Test and tooling code: it allocates while it sets up.
 import { createHandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
 import type { Shape } from '../engine/hands/shapes';

@@ -23,6 +23,7 @@ export class InputRecorder {
   /** Set once maxFrames frames are recorded; later frames are not. */
   full = false;
   readonly dt: Float64Array;
+  /** Per frame: bit 0 paused, bit 1 the left hand untracked, bit 2 the right hand untracked. */
   readonly paused: Uint8Array;
   /** Per frame and hand: shadow present, capsules, bounds. Hand 0 is the left. */
   readonly active: Uint8Array;
@@ -73,7 +74,8 @@ export class InputRecorder {
       this.commandArg[f + 1] = 0;
     }
     this.dt[f] = input.dt;
-    this.paused[f] = input.paused ? 1 : 0;
+    this.paused[f] =
+      (input.paused ? 1 : 0) | (input.leftTracked === false ? 2 : 0) | (input.rightTracked === false ? 4 : 0);
     this.hand(f, 0, input.left);
     this.hand(f, 1, input.right);
     const ev = input.shapeEvents;
@@ -117,7 +119,10 @@ export function replay(rec: InputRecorder, game: Game, each?: (frame: number) =>
     if (rec.command[f] === 1) game.restart();
     else if (rec.command[f] === 2) game.goto(rec.commandArg[f]);
     input.dt = rec.dt[f];
-    input.paused = rec.paused[f] === 1;
+    const p = rec.paused[f];
+    input.paused = (p & 1) !== 0;
+    input.leftTracked = (p & 2) === 0;
+    input.rightTracked = (p & 4) === 0;
     restoreHand(rec, f, 0, left);
     restoreHand(rec, f, 1, right);
     queue.clear();
