@@ -40,6 +40,18 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
+import { ENDING, ENDING_MOOD } from './ending';
+import { OPENING, openingFoxAlpha } from './opening';
+import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
+import { KindredView } from '../engine/shadow/kindred-view';
+import { GlowView } from '../engine/shadow/glow-view';
+import { AirView } from '../engine/shadow/air-view';
+import { RabbitView } from '../engine/shadow/rabbit-view';
+import { PropTouch } from '../engine/shadow/pure/prop-touch';
+import { SparkleLayer } from '../engine/shadow/sparkle-layer';
+import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
+import { SHAPES } from '../engine/hands/shapes';
+import { Bus } from '../engine/services/audio/mixer';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -74,7 +86,7 @@ import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
-import { captureFromUrl } from './capture-mode';
+import { captureOptions, loadCaptureChoice } from './capture-mode';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -157,9 +169,9 @@ async function start(): Promise<void> {
   // ?stage=wall is a bigger stand-in and ?stage=real the real wall, to look at it on a desktop.
   // ?debug=shadow shows the capsules. The lantern is placed by the same stand-in rule in both until the lantern flow exists.
   const params = new URLSearchParams(location.search);
-  // ?capture: a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
+  // Capture mode (five taps on the title's emblem, or the Testing panel): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
   // before the session starts, so it is set here; the foveation is set when the session starts.
-  const capture = captureFromUrl(location.search);
+  const capture = captureOptions(loadCaptureChoice());
   if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
   const stageChoice: 'real' | StageMode =
     !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
@@ -199,6 +211,59 @@ async function start(): Promise<void> {
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
   const cutsceneView = new CutsceneView();
   const cutscenes = new CutsceneHost(cutsceneView);
+  // The kindred (a shadow bird that flies about the wall): the Hand Lab's Kindred button, or the Testing panel's switch.
+  const kindred = new Kindred();
+  const kindredStartX = 0.4;
+  const spot = new Float64Array(2);
+  const kindredView = new KindredView();
+  // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
+  const glow = new GlowView();
+  const air = new AirView();
+  // The shadow animals come alive: a committed rabbit shape hops out of the hand, a committed fox shape calls the kindred.
+  const rabbits = new RabbitView();
+  // Dust that a hand's shadow shakes off a prop's shadow when it reaches into it.
+  const propTouch = new PropTouch();
+  const dust = new SparkleLayer(9);
+  let summonT = 0; // seconds the kindred stays after a fox shape called it (it is switched on for the visit)
+  let perchT = 0;
+  const solveBloom = new SolveBloom();
+  const nearGlow = [new Follower(), new Follower()];
+  let lastTutorial = 'IDLE' as string;
+  let moodNow = 0.4;
+  let moodGoal = 0.4;
+  // The ending: the room cools and dims as the cutscene plays (the game flow calls this after the last puzzle).
+  const playEnding = () => {
+    const problems = cutscenes.play(ENDING);
+    if (problems.length > 0) failures.report('ending', new Error(problems.join('; ')));
+    else moodGoal = ENDING_MOOD;
+  };
+  const playSolve = () => {
+    moodGoal = 1;
+    solveBloom.trigger();
+    if (kindredOn) kindredView.burst(kindred);
+    if (rigPlaced) gameAudio.twinkleAt(stage, kindred.x, kindred.y);
+  };
+  let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
+  let kindredOn = false;
+  let kindredWanted = false; // the Testing panel's switch, which the opening must not leave switched off
+  const setKindred = (on: boolean) => {
+    if (openingT < 0) kindredWanted = on;
+    kindredOn = on;
+    if (!on) kindredView.hide();
+  };
+  const playOpening = () => {
+    const problems = cutscenes.play(OPENING, () => {
+      openingT = -1;
+      setKindred(kindredWanted);
+    });
+    if (problems.length > 0) {
+      failures.report('opening', new Error(problems.join('; ')));
+      return;
+    }
+    openingT = 0;
+    kindred.x = -kindredStartX; // enters from the left edge
+    setKindred(true);
+  };
   const stageGroup = new Group();
   stageGroup.matrixAutoUpdate = false;
   const stageRenderer = new StageRenderer(stageGroup);
@@ -222,6 +287,7 @@ async function start(): Promise<void> {
       solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
     }
     propShadowView.updatePolygons(polygons);
+    propTouch.setPolygons(polygons);
   };
   world.scene.add(
     stageView.group,
@@ -229,6 +295,11 @@ async function start(): Promise<void> {
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
+    glow.group,
+    rabbits.group,
+    dust.mesh,
+    air.group,
+    kindredView.group,
     candleView.group,
     ambientLight,
   );
@@ -384,18 +455,15 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
-      cutscene: { play: () => void playTestCutscene() },
+      cutscene: { play: () => playOpening() },
+      kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
+      solve: { play: () => playSolve() },
+      ending: { play: () => playEnding() },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
   // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
   let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
-  // The test cutscene (a bird crosses the wall): the Hand Lab's Cutscene button, or the Testing panel's switch when VR starts.
-  const playTestCutscene = async () => {
-    if (!DEBUG_TOOLS) return;
-    const problems = cutscenes.play((await import('../debug/demo-cutscene')).DEMO_CUTSCENE);
-    if (problems.length > 0) failures.report('test cutscene', new Error(problems.join('; ')));
-  };
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
@@ -430,6 +498,7 @@ async function start(): Promise<void> {
       candleLight: candleView.pointLight,
       settings,
       flags: handFlags,
+      readout: () => timings.line,
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
@@ -565,6 +634,8 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
+    // A moment after the wall is set up, the opening plays (once per session; the Skip button ends it).
+    setTimeout(() => guard('sessionstart: opening', () => playOpening()), 1500);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
@@ -634,20 +705,23 @@ async function start(): Promise<void> {
     };
     applyOverlays(loadTesting());
     showMenuChoice(loadTesting().menu);
+    setKindred(loadTesting().kindred);
     window.addEventListener(TESTING_EVENT, (e) => {
       const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
       applyOverlays(t);
       showMenuChoice(t.menu);
+      setKindred(t.kindred);
     });
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
-      if (t.cutscene) setTimeout(() => void playTestCutscene(), 1000);
+      if (t.cutscene) setTimeout(() => playOpening(), 1000);
+      setKindred(t.kindred);
       armRecording(t.record);
     });
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
-  // Capture mode (?capture) keeps this message out of a recording: it would show whenever tracking drops mid-take.
+  // Capture mode keeps this message out of a recording: it would show whenever tracking drops mid-take.
   const handsPanel = mock || capture.enabled ? null : new PromptPanel();
   if (handsPanel) world.player.add(handsPanel.mesh);
   let handsPanelVersion = handsStatus.version;
@@ -772,6 +846,124 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (kindredOn && rigPlaced) {
+            // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
+            const f = candleView.flamePosition,
+              o = stage.origin,
+              r = stage.right,
+              up = stage.up;
+            const dx = f[0] - o[0],
+              dy = f[1] - o[1],
+              dz = f[2] - o[2];
+            const hw = stage.width / 2,
+              hh = stage.height / 2;
+            const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
+            const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
+            // A hand's shadow coming close startles it (the palm's shadow, from the light through the hand).
+            if (kindred.startled <= 0 && openingT < 0 && perchT <= 0) {
+              const fl = candleView.flamePosition;
+              for (const h of handList) {
+                if (!h.tracked) continue;
+                const o3 = JOINT['middle-finger-metacarpal'] * 3;
+                if (
+                  !shadowSpot(
+                    stage,
+                    fl[0],
+                    fl[1],
+                    fl[2],
+                    h.positions[o3],
+                    h.positions[o3 + 1],
+                    h.positions[o3 + 2],
+                    spot,
+                  )
+                )
+                  continue;
+                const ex = spot[0] - kindred.x,
+                  ey = spot[1] - kindred.y;
+                if (ex * ex + ey * ey < SCARE_RADIUS_M * SCARE_RADIUS_M) {
+                  kindred.scare(spot[0], spot[1]);
+                  break;
+                }
+              }
+            }
+            kindred.update(step, hw, hh, fx, fy, true);
+            let foxAlpha = 1;
+            if (summonT > 0) foxAlpha = Math.min(1, summonT, (7 - summonT) / 0.6);
+            if (openingT >= 0) {
+              openingT += step;
+              foxAlpha = openingFoxAlpha(openingT);
+            }
+            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
+          }
+          // Dust: a hand's shadow reaching into a prop's shadow shakes a little off it, with a soft rustle.
+          for (let i = 0; i < 2; i++) {
+            const sh = projector.shadows[i === 0 ? 'left' : 'right'];
+            if (
+              propTouch.update(i, step, sh.active && sh.onStage, sh.bounds[0], sh.bounds[1], sh.bounds[2], sh.bounds[3])
+            ) {
+              dust.sparkles.burst(propTouch.touchX, propTouch.touchY, 9, 0.05);
+              gameAudio.bridgeActivated(stage, propTouch.touchX, propTouch.touchY);
+            }
+          }
+          dust.sparkles.update(step, 0, 0, 0);
+          dust.draw(stage, shadowRenderer.baseOpacity * candleView.occlusion * 0.8);
+          // The shadow animals: what a hand just committed comes alive on the wall (visual only, no gameplay).
+          for (let i = 0; i < shapes.events.count; i++) {
+            const e = shapes.events.at(i);
+            if (e.type !== 'commit' || (e.shape !== 'rabbit' && e.shape !== 'fox')) continue;
+            const sh = projector.shadows[e.hand];
+            if (!sh.active || !sh.onStage) continue;
+            const cx = (sh.bounds[0] + sh.bounds[2]) * 0.5;
+            const cy = (sh.bounds[1] + sh.bounds[3]) * 0.5;
+            if (e.shape === 'rabbit') {
+              rabbits.spawn(e.hand === 'left' ? 0 : 1, cx, cy - 0.05, cx >= 0 ? 1 : -1);
+              gameAudio.hopAt(stage, cx, cy);
+            } else {
+              if (!kindredOn) {
+                kindred.x = cx + (cx >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
+                kindred.y = cy + 0.1;
+                summonT = 7;
+                kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
+              }
+              kindred.perchAt(cx, cy + 0.09);
+              perchT = 3.2;
+              gameAudio.twinkleAt(stage, cx, cy + 0.09);
+            }
+          }
+          rabbits.update(step, stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (perchT > 0 && (perchT -= step) <= 0) kindred.release();
+          if (summonT > 0 && (summonT -= step) <= 0) {
+            kindredOn = kindredWanted;
+            if (!kindredOn) kindredView.hide();
+          }
+          // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
+          {
+            const occ = candleView.occlusion;
+            if (tutorial.state !== lastTutorial) {
+              if (tutorial.state === 'GOAL_REACHED') playSolve();
+              lastTutorial = tutorial.state;
+            }
+            solveBloom.update(step);
+            audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
+            glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
+            const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
+            for (let i = 0; i < 2; i++) {
+              const h = i === 0 ? 'left' : 'right';
+              const sh = projector.shadows[h];
+              let level = 0;
+              if (wanted >= 0 && sh.active && sh.onStage && shapes[h].state.committed !== ghostTarget.requiredShape)
+                level = nearMissLevel(shapes[h].margins[wanted]);
+              const f = nearGlow[i].update(level, step);
+              glow.set(
+                1 + i,
+                stage,
+                (sh.bounds[0] + sh.bounds[2]) * 0.5,
+                (sh.bounds[1] + sh.bounds[3]) * 0.5,
+                0.1,
+                f * 0.55 * occ,
+              );
+            }
+          }
           if (menu.group.visible || cutscenes.playing) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
@@ -846,7 +1038,17 @@ async function start(): Promise<void> {
       try {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
         world.camera.getWorldQuaternion(cameraQuat);
-        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
+        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
+        moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
+        stageView.mood = moodNow;
+        air.update(
+          stage,
+          candleView.flamePosition,
+          rigPlaced && lanternLight.light.lit ? candleView.occlusion : 0,
+          step,
+          !passthrough,
+        );
         candleView.update(lanternLight.light, cameraQuat);
         lab?.applyLight(lanternLight.light, cameraQuat);
       } catch (e) {
@@ -915,6 +1117,8 @@ async function start(): Promise<void> {
         stageView,
         shadowRenderer,
         cutscenes,
+        kindred,
+        kindredView,
         openSettings,
         shapes,
         gestures,

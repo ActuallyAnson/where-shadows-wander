@@ -4,10 +4,13 @@
 import { CanvasTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import type { Beat, BeatState, CutscenePlayer } from '../sim/cutscene';
 import { makeBeatStates } from '../sim/cutscene';
+import { FOX_BOX, paintFox } from './fox-art';
 import { hasPuppet, PUPPETS } from './pure/puppets';
+import { paintTraveller, Pose } from './traveller-art';
 import { skipCentre, SKIP_RADIUS_M } from './pure/skip-touch';
 import type { StagePlane } from './pure/stage-plane';
 import { DEFAULT_SHADOW_OPACITY } from './shadow-renderer';
+import { placeOnStage, crispTexture } from './stage-quad';
 
 /** Beats showing at once; more than this are dropped (the data is checked at load). */
 const SLOTS = 4;
@@ -20,11 +23,39 @@ const CAPTION_ASPECT = 8;
 const CAPTION_Y = -0.3; // of the stage height, from the centre
 const SKIP_LIFT_M = 0.006;
 const INK = '#1a1410';
+/** Puppet positions in a cutscene are metres on the real wall (about this wide); they scale to the stage actually in use. */
+const REF_STAGE_WIDTH_M = 1.6;
 
 interface Art {
   readonly tex: CanvasTexture;
   /** Width over height. */
   readonly aspect: number;
+  /** Width as a fraction of the stage's (a puppet that is not the default size). */
+  readonly width?: number;
+}
+
+/** Puppets drawn by code in their own files (the fox and the traveller's poses) rather than as a few paths. */
+const PAINTED: Readonly<
+  Record<string, { aspect: number; width: number; paint: (g: CanvasRenderingContext2D, w: number, h: number) => void }>
+> = {
+  fox: { aspect: FOX_BOX[0] / FOX_BOX[1], width: 0.3, paint: (g, w, h) => paintFox(g, w, h, 1) },
+  'fox-flying': { aspect: FOX_BOX[0] / FOX_BOX[1], width: 0.3, paint: (g, w, h) => paintFox(g, w, h, 2) },
+  traveller: { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Idle) },
+  'traveller-wait': { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Wait) },
+  'traveller-cheer': { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Cheer) },
+};
+
+function hasAnyPuppet(name: string): boolean {
+  return hasPuppet(name) || Object.prototype.hasOwnProperty.call(PAINTED, name);
+}
+
+function paintedArt(name: string): Art {
+  const a = PAINTED[name];
+  const W = 512;
+  const H = Math.round(W / a.aspect);
+  const [c, g] = canvas(W, H);
+  a.paint(g, W, H);
+  return { tex: crispTexture(c), aspect: a.aspect, width: a.width };
 }
 
 function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -48,7 +79,7 @@ function puppetArt(name: string): Art {
   g.shadowColor = '#000';
   g.shadowBlur = 6;
   for (const d of art.paths) g.fill(new Path2D(d));
-  return { tex: new CanvasTexture(c), aspect: bw / bh };
+  return { tex: crispTexture(c), aspect: bw / bh };
 }
 
 function captionArt(text: string): Art {
@@ -62,7 +93,7 @@ function captionArt(text: string): Art {
     size -= 4;
   } while (g.measureText(text).width > 980 && size > 20);
   g.fillText(text, 512, 66);
-  return { tex: new CanvasTexture(c), aspect: CAPTION_ASPECT };
+  return { tex: crispTexture(c), aspect: CAPTION_ASPECT };
 }
 
 function skipArt(): CanvasTexture {
@@ -77,7 +108,7 @@ function skipArt(): CanvasTexture {
   g.textBaseline = 'middle';
   g.font = "700 56px 'Cinzel Decorative', Georgia, serif";
   g.fillText('SKIP', 128, 132);
-  return new CanvasTexture(c);
+  return crispTexture(c);
 }
 
 export class CutsceneView {
@@ -126,8 +157,13 @@ export class CutsceneView {
     this.owned = [];
     this.art.clear();
     for (const b of beats) {
-      if (b.kind === 'puppet' && !hasPuppet(b.puppet)) continue;
-      const a = b.kind === 'puppet' ? puppetArt(b.puppet) : captionArt(b.text);
+      if (b.kind === 'puppet' && !hasAnyPuppet(b.puppet)) continue;
+      const a =
+        b.kind === 'puppet'
+          ? Object.prototype.hasOwnProperty.call(PAINTED, b.puppet)
+            ? paintedArt(b.puppet)
+            : puppetArt(b.puppet)
+          : captionArt(b.text);
       this.owned.push(a.tex);
       this.art.set(b, a);
     }
@@ -153,10 +189,11 @@ export class CutsceneView {
       q.visible = !!art;
       if (!art || !s.beat) continue;
       const puppet = s.beat.kind === 'puppet';
-      const w = stage.width * (puppet ? PUPPET_WIDTH : CAPTION_WIDTH);
-      const x = puppet ? s.x : 0;
-      const y = puppet ? s.y : stage.height * CAPTION_Y;
-      this.place(q, stage, x, y, w, w / art.aspect, LIFT_M);
+      const w = stage.width * (puppet ? (art.width ?? PUPPET_WIDTH) : CAPTION_WIDTH);
+      const scale = stage.width / REF_STAGE_WIDTH_M;
+      const x = puppet ? s.x * scale : 0;
+      const y = puppet ? s.y * scale : stage.height * CAPTION_Y;
+      placeOnStage(this.m, q, stage, x, y, w, w / art.aspect, LIFT_M);
       const mat = this.mats[i];
       if (mat.map !== art.tex) {
         mat.map = art.tex;
@@ -167,23 +204,7 @@ export class CutsceneView {
     skipCentre(stage, this.c);
     this.skip.visible = true;
     const d = SKIP_RADIUS_M * 2;
-    this.place(this.skip, stage, this.c[0], this.c[1], d, d, SKIP_LIFT_M);
+    placeOnStage(this.m, this.skip, stage, this.c[0], this.c[1], d, d, SKIP_LIFT_M);
     this.skipMat.opacity = (0.45 + 0.55 * skipProgress) * opacity;
-  }
-
-  private place(q: Mesh, stage: StagePlane, x: number, y: number, w: number, h: number, lift: number): void {
-    const r = stage.right,
-      u = stage.up,
-      nn = stage.normal,
-      o = stage.origin;
-    // prettier-ignore
-    this.m.set(
-      r[0] * w, u[0] * h, nn[0], o[0] + r[0] * x + u[0] * y + nn[0] * lift,
-      r[1] * w, u[1] * h, nn[1], o[1] + r[1] * x + u[1] * y + nn[1] * lift,
-      r[2] * w, u[2] * h, nn[2], o[2] + r[2] * x + u[2] * y + nn[2] * lift,
-      0, 0, 0, 1,
-    );
-    q.matrix.copy(this.m);
-    q.matrixWorldNeedsUpdate = true;
   }
 }

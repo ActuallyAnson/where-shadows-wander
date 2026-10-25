@@ -55,6 +55,18 @@ export class GameAudio {
     }
   }
 
+  /** The spirit fox's sparkle, from a point on the wall (stage coordinates). */
+  twinkleAt(stage: StagePlane, x: number, y: number): void {
+    stagePoint(stage, x, y, WALL_LIFT_M, this.at);
+    this.player.playAt(Sound.Twinkle, this.at.x, this.at.y, this.at.z);
+  }
+
+  /** A rabbit landing at a point on the wall (stage coordinates). */
+  hopAt(stage: StagePlane, x: number, y: number): void {
+    stagePoint(stage, x, y, WALL_LIFT_M, this.at);
+    this.player.playAt(Sound.Hop, this.at.x, this.at.y, this.at.z);
+  }
+
   /** The room tone and the music play under everything while `on` (a headset session is running). Where they sit does not matter: they are the room's. */
   setRoom(on: boolean): void {
     this.player.setLoop(Sound.Hum, on, 0, 1.5, 0);

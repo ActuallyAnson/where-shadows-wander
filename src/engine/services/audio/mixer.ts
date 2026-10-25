@@ -14,10 +14,15 @@ export function volumeToGain(volume: number): number {
   return v * v;
 }
 
+/** The most a bus can be lifted: a swell, not a jump scare. */
+export const LIFT_MAX = 1.5;
+
 export class Mixer {
   private readonly volumes = new Float64Array([0.7, 1, 0.6]);
   private readonly muted = new Uint8Array(BUS_COUNT);
   private masterVolume = 1;
+  /** A momentary lift on a bus (the music swelling when a puzzle is solved): 1 is none. Never louder than LIFT_MAX. */
+  private readonly lifts = new Float64Array([1, 1, 1]);
   private allMuted = false;
   /** Bumped on every change, so the engine only touches Web Audio when something moved. */
   version = 0;
@@ -40,6 +45,14 @@ export class Mixer {
     this.version++;
   }
 
+  /** Lifts a bus by `factor` (1 to LIFT_MAX) on top of its volume. Only a change counts, so it is cheap to call every frame. */
+  setLift(bus: BusId, factor: number): void {
+    const f = factor >= LIFT_MAX ? LIFT_MAX : factor > 1 ? factor : 1;
+    if (Math.abs(f - this.lifts[bus]) < 0.01) return;
+    this.lifts[bus] = f;
+    this.version++;
+  }
+
   setMuted(bus: BusId, muted: boolean): void {
     this.muted[bus] = muted ? 1 : 0;
     this.version++;
@@ -57,7 +70,7 @@ export class Mixer {
 
   /** The linear gain for a bus's node: master and bus volumes through the curve, or 0 if muted. */
   busGain(bus: BusId): number {
-    return this.isMuted(bus) ? 0 : volumeToGain(this.masterVolume) * volumeToGain(this.volumes[bus]);
+    return this.isMuted(bus) ? 0 : volumeToGain(this.masterVolume) * volumeToGain(this.volumes[bus]) * this.lifts[bus];
   }
 }
 

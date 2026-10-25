@@ -1,7 +1,11 @@
-// Capture mode (?capture): a clean headset session for recording the demo video. It keeps the non-diegetic messages
-// out of the picture (the "Show me your hands" panel would appear whenever tracking drops mid-take), turns the
-// headset's foveated rendering off (a recording shows its blurred edges), and can render at a higher resolution for a
-// crisper capture. It costs frame time, so it is for taking video, not for playing. Plain TypeScript.
+// Capture mode: a clean headset session for recording the demo video. It keeps the non-diegetic messages out of the
+// picture (the "Show me your hands" panel would appear whenever tracking drops mid-take), turns the headset's foveated
+// rendering off (a recording shows its blurred edges), and can render at a higher resolution for a crisper capture. It
+// costs frame time, so it is for taking video, not for playing.
+//
+// It is switched without an address option, and works in the judges' build too: five quick taps on the title screen's
+// emblem step through off, clean and sharp (it is remembered in the browser, and the page reloads to apply it); the
+// tester build's Testing panel has the same switch. Plain TypeScript.
 
 export interface CaptureOptions {
   enabled: boolean;
@@ -13,26 +17,53 @@ export interface CaptureOptions {
 
 export const NO_CAPTURE: Readonly<CaptureOptions> = { enabled: false, foveation: 0, scale: null };
 
-const MAX_SCALE = 2;
+export type CaptureChoice = 'off' | 'clean' | 'sharp';
+export const CAPTURE_CHOICES: readonly CaptureChoice[] = ['off', 'clean', 'sharp'];
 
-/**
- * Reads ?capture, ?foveation=0..1 and ?scale=1..2 from an address's query string. `foveation` and `scale` only count
- * with ?capture on, and a value that is not a number, or is out of range, is clamped (an empty one is ignored).
- */
-export function captureFromUrl(search: string): CaptureOptions {
-  const p = new URLSearchParams(search);
-  if (!p.has('capture')) return { ...NO_CAPTURE };
-  const number = (key: string): number | null => {
-    const raw = p.get(key);
-    if (raw === null || raw.trim() === '') return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  };
-  const foveation = number('foveation');
-  const scale = number('scale');
-  return {
-    enabled: true,
-    foveation: foveation === null ? 0 : Math.min(Math.max(foveation, 0), 1),
-    scale: scale === null ? null : Math.min(Math.max(scale, 1), MAX_SCALE),
-  };
+/** clean: no foveation, the default resolution. sharp: no foveation and 1.5 times the resolution (check it holds the frame rate first). */
+export function captureOptions(choice: CaptureChoice): CaptureOptions {
+  if (choice === 'clean') return { enabled: true, foveation: 0, scale: null };
+  if (choice === 'sharp') return { enabled: true, foveation: 0, scale: 1.5 };
+  return { ...NO_CAPTURE };
+}
+
+export function nextCapture(choice: CaptureChoice): CaptureChoice {
+  return CAPTURE_CHOICES[(CAPTURE_CHOICES.indexOf(choice) + 1) % CAPTURE_CHOICES.length];
+}
+
+export const CAPTURE_KEY = 'wsw.capture';
+
+/** The part of localStorage this uses. */
+export interface CaptureStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function browserStorage(): CaptureStorage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage; // reading the property can throw when blocked
+  } catch {
+    return null;
+  }
+}
+
+/** The remembered choice ('off' if there is none, or the storage is blocked or holds something else). */
+export function loadCaptureChoice(storage: CaptureStorage | null = browserStorage()): CaptureChoice {
+  try {
+    const raw = storage?.getItem(CAPTURE_KEY);
+    return (CAPTURE_CHOICES as readonly (string | null | undefined)[]).includes(raw) ? (raw as CaptureChoice) : 'off';
+  } catch {
+    return 'off';
+  }
+}
+
+/** Remembers the choice. Returns false if the storage refused. */
+export function saveCaptureChoice(choice: CaptureChoice, storage: CaptureStorage | null = browserStorage()): boolean {
+  try {
+    if (!storage) return false;
+    storage.setItem(CAPTURE_KEY, choice);
+    return true;
+  } catch {
+    return false;
+  }
 }

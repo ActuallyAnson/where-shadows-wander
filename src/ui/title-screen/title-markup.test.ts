@@ -64,3 +64,10 @@ describe('fontFaceCss', () => {
     expect(TITLE_CSS).toContain("font-family:'Cinzel Decorative'");
   });
 });
+
+describe('the busy look', () => {
+  it('guttering flame and locked items come from one class', () => {
+    expect(TITLE_CSS).toContain('.wsw-busy .wsw-flame');
+    expect(TITLE_CSS).toContain('.wsw-busy .wsw-item{pointer-events:none');
+  });
+});

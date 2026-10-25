@@ -21,7 +21,15 @@ describe('parseTesting', () => {
   it('reads each switch the way the game reads it', () => {
     expect(parseTesting('?debug=joints,shadow&settings&record=20').record).toBe('free');
     const o = parseTesting('?debug=joints,shadow&settings&record&script=shapes');
-    expect(o).toEqual({ joints: true, shadow: true, settings: true, record: 'shapes', menu: 'off', cutscene: false });
+    expect(o).toEqual({
+      joints: true,
+      shadow: true,
+      settings: true,
+      record: 'shapes',
+      menu: 'off',
+      cutscene: false,
+      kindred: false,
+    });
   });
 
   it('accepts a repeated debug parameter', () => {
@@ -42,6 +50,7 @@ describe('buildTesting', () => {
       record: 'free',
       menu: 'off',
       cutscene: false,
+      kindred: false,
     };
     expect(buildTesting('', all)).toBe('?debug=joints,shadow&settings&record=20');
     expect(buildTesting('', { ...DEFAULT_TESTING, record: 'shapes' })).toBe('?record&script=shapes');
@@ -61,7 +70,15 @@ describe('buildTesting', () => {
       for (const shadow of [false, true])
         for (const settings of [false, true])
           for (const record of RECORD_CHOICES) {
-            const o: TestingOptions = { joints, shadow, settings, record, menu: 'off', cutscene: false };
+            const o: TestingOptions = {
+              joints,
+              shadow,
+              settings,
+              record,
+              menu: 'off',
+              cutscene: false,
+              kindred: false,
+            };
             expect(parseTesting(buildTesting('?mock=1', o))).toEqual(o);
           }
   });
@@ -99,6 +116,7 @@ describe('remembering the switches (no address needed)', () => {
           record,
           menu: 'pause',
           cutscene: joints,
+          kindred: !joints,
         };
         expect(saveTesting(o, s)).toBe(true);
         expect(loadTesting(s)).toEqual(o);
@@ -119,6 +137,7 @@ describe('remembering the switches (no address needed)', () => {
       record: 'off',
       menu: 'off',
       cutscene: false,
+      kindred: false,
     });
     expect(loadTesting(null)).toEqual(DEFAULT_TESTING);
     const throwing = {

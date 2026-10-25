@@ -41,6 +41,12 @@ export interface LabView {
   menu?: { cycle(): void; label(): string };
   /** The test cutscene (a bird crossing the wall): the Cutscene button plays it. */
   cutscene?: { play(): void };
+  /** The kindred (a shadow bird that flies about the wall): the Kindred button shows and hides it. */
+  kindred?: { toggle(): void; isOn(): boolean };
+  /** The solve moment (the wall's light swells and the kindred bursts into sparkles): the Solve button plays it. */
+  solve?: { play(): void };
+  /** The ending cutscene (the fox flies to the traveller, the room settles): the Ending button plays it. */
+  ending?: { play(): void };
 }
 
 export class HandLab {
@@ -289,6 +295,9 @@ export class HandLab {
       else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'menu') this.view.menu?.cycle();
       else if (act === 'cutscene') this.view.cutscene?.play();
+      else if (act === 'kindred') this.view.kindred?.toggle();
+      else if (act === 'solve') this.view.solve?.play();
+      else if (act === 'ending') this.view.ending?.play();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -348,7 +357,10 @@ export class HandLab {
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show the pause, solved and end screens, one after the other') : ''}
-        ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the test cutscene: a bird crosses the wall') : ''}
+        ${this.view.kindred ? btn('kindred', '', 'Kindred', this.view.kindred.isOn(), 'A shadow bird that flies about the wall and circles the light') : ''}
+        ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}
+        ${this.view.solve ? btn('solve', '', 'Solve', false, 'Play the solve moment: the wall glows and light bursts out') : ''}
+        ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the opening: the title, and the fox drifts in') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
