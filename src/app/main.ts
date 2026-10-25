@@ -37,6 +37,7 @@ import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
 import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
+import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { JOINT } from '../engine/hands/hand';
@@ -291,6 +292,8 @@ async function start(): Promise<void> {
   const solver = new Solver(entityStore.capacity);
   const propProjector = new PropProjector();
   const propShadowView = new RenderPropShadowView(stageGroup);
+  const wallPauseView = new WallPauseView();
+  stageGroup.add(wallPauseView.group);
   const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
   let propTerrainBaked = false;
   const bakePropTerrain = (force = false): void => {
@@ -370,7 +373,7 @@ async function start(): Promise<void> {
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
-      void showMenu('pause');
+      wallPauseView.show();
     }
   };
   const settingsHead = new Vector3();
@@ -585,6 +588,7 @@ async function start(): Promise<void> {
       sessionState,
       candleLocked: candleView.isLocked,
       palmOverFlame: candleView.isCovered,
+      wallPauseActive: wallPauseView.visible,
       handVisualScale: 0.68,
     },
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
@@ -804,6 +808,11 @@ async function start(): Promise<void> {
       diagnostics.mark('firstFrame');
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
+      if (!frame && !mock) {
+        timings.end(SLOT.total);
+        timings.endFrame();
+        return;
+      }
       // The headset's system menu (visible-blurred) or a hidden page: no hand data arrives and the game holds still.
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
@@ -909,14 +918,51 @@ async function start(): Promise<void> {
           if (candleView.isCovered) {
             sessionState = 'paused';
             simWasPaused = true;
-            void showMenu('pause');
+            candleView.lit = false;
+            ambientLight.color.setHex(0x101522);
+            ambientLight.intensity = 0.03;
+            audio.mixer.setLift(Bus.Ambience, 0.15);
+            audio.mixer.setLift(Bus.Music, 0.25);
+            wallPauseView.show();
           }
         } else if (sessionState === 'paused') {
-          if (candleView.checkIgnition(handList)) {
-            menu.hide();
-            menuChoice = 'off';
+          let isControllerTrigger = false;
+          if (frame) {
+            for (const source of frame.session.inputSources) {
+              if (source.gamepad?.buttons.some((b) => b.pressed)) {
+                isControllerTrigger = true;
+                break;
+              }
+            }
+          }
+          const action = wallPauseView.update(handList, stage, isControllerTrigger);
+          const candleIgnition = candleView.checkIgnition(handList);
+          if (action === 'resume' || candleIgnition) {
+            wallPauseView.hide();
             sessionState = 'playing';
+            candleView.lit = true;
             candleView.setLocked(true);
+            ambientLight.color.setHex(0x2a1c12);
+            ambientLight.intensity = 0.04;
+            audio.mixer.setLift(Bus.Ambience, 1.0);
+            audio.mixer.setLift(Bus.Music, 1.0);
+            gameAudio.candleIgnited(candleView.flamePosition);
+            simWasPaused = true;
+          } else if (action === 'restart') {
+            wallPauseView.hide();
+            sessionState = 'playing';
+            candleView.lit = true;
+            candleView.setLocked(true);
+            ambientLight.color.setHex(0x2a1c12);
+            ambientLight.intensity = 0.04;
+            audio.mixer.setLift(Bus.Ambience, 1.0);
+            audio.mixer.setLift(Bus.Music, 1.0);
+            gameAudio.candleIgnited(candleView.flamePosition);
+            tutorial.start();
+            simWasPaused = true;
+          } else if (action === 'settings') {
+            wallPauseView.hide();
+            void openSettings();
           }
         }
         timings.begin(SLOT.shadow);
@@ -1243,6 +1289,7 @@ async function start(): Promise<void> {
         handVisual,
         bedTray,
         vrTitle,
+        wallPauseView,
         sessionState: () => sessionState,
         igniteCandle: () => {
           if (sessionState === 'title_vr') {

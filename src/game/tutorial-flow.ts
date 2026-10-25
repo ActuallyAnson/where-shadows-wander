@@ -14,7 +14,7 @@ import { LEFT, RIGHT, type Solver } from '../engine/sim/solver';
 
 export type TutorialState = 'IDLE' | 'WALK_TO_GAP' | 'WAIT_AT_GAP' | 'CROSSING_BRIDGE' | 'GOAL_REACHED';
 
-export const OVERLAP_TOLERANCE_M = 0.1;
+export const OVERLAP_TOLERANCE_M = 0.22;
 
 export const TUTORIAL_CONFIG = {
   SPAWN_X: -0.75,
@@ -238,7 +238,10 @@ export class TutorialFlow {
       const cy = (shadow.bounds[1] + shadow.bounds[3]) * 0.5;
       const dist = Math.hypot(cx - TUTORIAL_CONFIG.BRIDGE_TARGET_X, cy - TUTORIAL_CONFIG.BRIDGE_TARGET_Y);
 
-      if (dist <= OVERLAP_TOLERANCE_M) {
+      if (
+        dist <= OVERLAP_TOLERANCE_M ||
+        (Math.abs(cx) < 0.28 && Math.abs(cy - TUTORIAL_CONFIG.BRIDGE_TARGET_Y) < 0.25)
+      ) {
         const classifier = 'left' in shapes && 'right' in shapes ? shapes[h] : null;
         if (classifier?.state?.committed === 'flat') {
           return h;
@@ -249,32 +252,47 @@ export class TutorialFlow {
   }
 
   private activateBridge(shadows: Readonly<Record<Handedness, HandShadow>>): void {
-    const handIdx = this.bridgeHand === 'left' ? LEFT : RIGHT;
-    const shadow = shadows[this.bridgeHand];
-    if (shadow && shadow.active && shadow.onStage) {
-      this.solver.hands[handIdx].copyFrom(true, shadow.capsules, shadow.bounds);
-      this.solver.hands[handIdx].mask = 1 << Kind.Traveller;
-      this._isBridgeActive = true;
+    for (const h of ['left', 'right'] as const) {
+      const handIdx = h === 'left' ? LEFT : RIGHT;
+      const shadow = shadows[h];
+      if (shadow && shadow.active && shadow.onStage) {
+        this.solver.hands[handIdx].copyFrom(true, shadow.capsules, shadow.bounds);
+        this.solver.hands[handIdx].mask = 1 << Kind.Traveller;
+      }
     }
+    this._isBridgeActive = true;
   }
 
   private maintainBridge(
     shadows: Readonly<Record<Handedness, HandShadow>>,
     shapes: ShapeRecognizer | Readonly<Record<Handedness, ShapeClassifier>>,
   ): void {
-    const handIdx = this.bridgeHand === 'left' ? LEFT : RIGHT;
-    const shadow = shadows[this.bridgeHand];
-    const classifier = 'left' in shapes && 'right' in shapes ? shapes[this.bridgeHand] : null;
-    const isFlat = classifier?.state?.committed === 'flat';
+    let bridgeActive = false;
+    for (const h of ['left', 'right'] as const) {
+      const handIdx = h === 'left' ? LEFT : RIGHT;
+      const shadow = shadows[h];
+      const classifier = 'left' in shapes && 'right' in shapes ? shapes[h] : null;
+      const isFlat = classifier?.state?.committed === 'flat';
 
-    if (shadow && shadow.active && shadow.onStage && isFlat) {
-      this.solver.hands[handIdx].copyFrom(true, shadow.capsules, shadow.bounds);
-      this.solver.hands[handIdx].mask = 1 << Kind.Traveller;
-      this._isBridgeActive = true;
-    } else {
-      // Bridge lost
-      this.solver.hands[handIdx].mask = 0;
-      this._isBridgeActive = false;
+      if (shadow && shadow.active && shadow.onStage && isFlat) {
+        // Flat hand registers collision physics in the solver
+        this.solver.hands[handIdx].copyFrom(true, shadow.capsules, shadow.bounds);
+        this.solver.hands[handIdx].mask = 1 << Kind.Traveller;
+
+        const cx = (shadow.bounds[0] + shadow.bounds[2]) * 0.5;
+        const cy = (shadow.bounds[1] + shadow.bounds[3]) * 0.5;
+        const dist = Math.hypot(cx - TUTORIAL_CONFIG.BRIDGE_TARGET_X, cy - TUTORIAL_CONFIG.BRIDGE_TARGET_Y);
+        if (
+          dist <= OVERLAP_TOLERANCE_M ||
+          (Math.abs(cx) < 0.28 && Math.abs(cy - TUTORIAL_CONFIG.BRIDGE_TARGET_Y) < 0.25)
+        ) {
+          bridgeActive = true;
+          this.bridgeHand = h;
+        }
+      } else {
+        this.solver.hands[handIdx].mask = 0;
+      }
     }
+    this._isBridgeActive = bridgeActive;
   }
 }
