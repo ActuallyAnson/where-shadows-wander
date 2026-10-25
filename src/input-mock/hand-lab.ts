@@ -37,6 +37,8 @@ export interface LabView {
   canvas: HTMLCanvasElement;
   /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
   settings?: { toggle(): void; isOpen(): boolean };
+  /** The test cutscene (a bird crossing the wall): the Cutscene button plays it. */
+  cutscene?: { play(): void };
 }
 
 export class HandLab {
@@ -283,6 +285,7 @@ export class HandLab {
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
+      else if (act === 'cutscene') this.view.cutscene?.play();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -341,6 +344,7 @@ export class HandLab {
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
       ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
+        ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the test cutscene: a bird crosses the wall') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
