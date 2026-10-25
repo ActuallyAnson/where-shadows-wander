@@ -66,11 +66,12 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
+import { createSettingsPage } from '../ui/settings-panel/settings-page';
 import { SettingsScreen } from '../ui/settings-panel/settings-screen';
 import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
-import { mountEnterArButtonIfNeeded } from './enter-ar-button';
+import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureFromUrl } from './capture-mode';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
@@ -119,7 +120,8 @@ async function start(): Promise<void> {
   // The title screen's sounds play through the audio engine, which is made further down.
   let uiAudio: AudioEngine | null = null;
   const uiSound = createUiSound(() => uiAudio);
-  if (!mockOptions) void mountEnterArButtonIfNeeded(world, uiSound);
+  const launcherHooks: LauncherHooks = {};
+  if (!mockOptions) void mountEnterArButtonIfNeeded(world, uiSound, launcherHooks);
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -246,6 +248,9 @@ async function start(): Promise<void> {
     saves.data.settings,
   );
   settings.subscribe(() => saves.setSettings(settings.value));
+  // The title screen's SETTINGS item opens the same settings as a page, before the headset is on.
+  const settingsPage = createSettingsPage(settings);
+  launcherHooks.openSettings = () => settingsPage.open();
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
