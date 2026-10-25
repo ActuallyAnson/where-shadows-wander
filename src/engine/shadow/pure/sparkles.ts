@@ -87,6 +87,19 @@ export class Sparkles {
     }
   }
 
+  /** `n` motes at once from (ex, ey), flying outward at up to `speed` metres a second: a burst of light. */
+  burst(ex: number, ey: number, n: number, speed = 0.12): void {
+    for (let i = 0; i < n; i++) {
+      this.spawn(ex, ey, 0.01);
+      const slot = (this.cursor + SPARKLE_MAX - 1) % SPARKLE_MAX;
+      const a = this.rand() * Math.PI * 2;
+      const v = speed * (0.3 + 0.7 * this.rand());
+      this.vx[slot] = Math.cos(a) * v;
+      this.vy[slot] = Math.sin(a) * v;
+      this.life[slot] = 1.2 + this.rand() * 1.3;
+    }
+  }
+
   private spawn(ex: number, ey: number, spread: number): void {
     // Reuse the next empty slot, or the oldest one if the pool is full.
     let slot = -1;

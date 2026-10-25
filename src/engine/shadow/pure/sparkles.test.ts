@@ -78,3 +78,18 @@ describe('Sparkles', () => {
     expect(s.alive).toBe(0);
   });
 });
+
+describe('Sparkles burst', () => {
+  it('throws a ring of motes outward at once', () => {
+    const s = new Sparkles(3);
+    s.burst(0.1, 0.05, 20);
+    expect(s.alive).toBe(20);
+    for (let i = 0; i < 5; i++) s.update(0.1, 0, 0, 0);
+    const out = createSparkleOut();
+    s.fill(out);
+    let far = 0;
+    for (let i = 0; i < SPARKLE_MAX; i++)
+      if (out.size[i] > 0 && Math.hypot(out.x[i] - 0.1, out.y[i] - 0.05) > 0.01) far++;
+    expect(far).toBeGreaterThan(10);
+  });
+});

@@ -40,6 +40,9 @@ import { CutsceneHost } from './cutscene-host';
 import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
+import { GlowView } from '../engine/shadow/glow-view';
+import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
+import { SHAPES } from '../engine/hands/shapes';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -206,6 +209,15 @@ async function start(): Promise<void> {
   const kindredStartX = 0.4;
   const spot = new Float64Array(2);
   const kindredView = new KindredView();
+  // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
+  const glow = new GlowView();
+  const solveBloom = new SolveBloom();
+  const nearGlow = [new Follower(), new Follower()];
+  let lastTutorial = 'IDLE' as string;
+  const playSolve = () => {
+    solveBloom.trigger();
+    if (kindredOn) kindredView.burst(kindred);
+  };
   let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
   let kindredOn = false;
   let kindredWanted = false; // the Testing panel's switch, which the opening must not leave switched off
@@ -257,6 +269,7 @@ async function start(): Promise<void> {
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
+    glow.group,
     kindredView.group,
     candleView.group,
     ambientLight,
@@ -379,6 +392,7 @@ async function start(): Promise<void> {
       },
       cutscene: { play: () => playOpening() },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
+      solve: { play: () => playSolve() },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -810,6 +824,33 @@ async function start(): Promise<void> {
               foxAlpha = openingFoxAlpha(openingT);
             }
             kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
+          }
+          // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
+          {
+            const occ = candleView.occlusion;
+            if (tutorial.state !== lastTutorial) {
+              if (tutorial.state === 'GOAL_REACHED') playSolve();
+              lastTutorial = tutorial.state;
+            }
+            solveBloom.update(step);
+            glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
+            const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
+            for (let i = 0; i < 2; i++) {
+              const h = i === 0 ? 'left' : 'right';
+              const sh = projector.shadows[h];
+              let level = 0;
+              if (wanted >= 0 && sh.active && sh.onStage && shapes[h].state.committed !== ghostTarget.requiredShape)
+                level = nearMissLevel(shapes[h].margins[wanted]);
+              const f = nearGlow[i].update(level, step);
+              glow.set(
+                1 + i,
+                stage,
+                (sh.bounds[0] + sh.bounds[2]) * 0.5,
+                (sh.bounds[1] + sh.bounds[3]) * 0.5,
+                0.1,
+                f * 0.55 * occ,
+              );
+            }
           }
           if (cutscenes.playing) {
             // The fingertips that can poke Skip: each tracked hand's index tip.

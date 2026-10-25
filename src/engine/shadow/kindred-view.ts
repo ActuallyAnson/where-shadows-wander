@@ -181,6 +181,11 @@ export class KindredView {
     (this.geometry.getAttribute('color') as BufferAttribute).needsUpdate = true;
   }
 
+  /** A burst of light from the fox's place (a puzzle was solved). */
+  burst(k: Kindred, n = 28): void {
+    this.sparkles.burst(k.x, k.y, n);
+  }
+
   hide(): void {
     this.group.visible = false;
     this.sparkles.clear();
