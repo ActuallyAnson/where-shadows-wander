@@ -33,6 +33,9 @@ import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import type { Prop } from '../engine/shadow/pure/prop-shadow';
+import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
+import { MenuPanel } from '../ui/menu-panel/menu-panel';
+import type { MenuScreenId } from '../ui/menu-panel/screens';
 import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
@@ -65,11 +68,12 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
-import { SettingsPanel } from '../ui/settings-panel/settings-panel';
+import { createSettingsPage } from '../ui/settings-panel/settings-page';
+import { SettingsScreen } from '../ui/settings-panel/settings-screen';
 import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
-import { mountEnterArButtonIfNeeded } from './enter-ar-button';
+import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureFromUrl } from './capture-mode';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
@@ -117,11 +121,9 @@ async function start(): Promise<void> {
   // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   // The title screen's sounds play through the audio engine, which is made further down.
   let uiAudio: AudioEngine | null = null;
-  if (!mockOptions)
-    void mountEnterArButtonIfNeeded(
-      world,
-      createUiSound(() => uiAudio),
-    );
+  const uiSound = createUiSound(() => uiAudio);
+  const launcherHooks: LauncherHooks = {};
+  if (!mockOptions) void mountEnterArButtonIfNeeded(world, uiSound, launcherHooks);
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -197,7 +199,6 @@ async function start(): Promise<void> {
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
   const cutsceneView = new CutsceneView();
   const cutscenes = new CutsceneHost(cutsceneView);
-  const cutsceneTips = new Float32Array(6);
   const stageGroup = new Group();
   stageGroup.matrixAutoUpdate = false;
   const stageRenderer = new StageRenderer(stageGroup);
@@ -260,6 +261,9 @@ async function start(): Promise<void> {
     saves.data.settings,
   );
   settings.subscribe(() => saves.setSettings(settings.value));
+  // The title screen's SETTINGS item opens the same settings as a page, before the headset is on.
+  const settingsPage = createSettingsPage(settings);
+  launcherHooks.openSettings = () => settingsPage.open();
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
@@ -272,13 +276,42 @@ async function start(): Promise<void> {
   // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it
   // (the lantern flow will).
   // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
-  const settingsPanel = new SettingsPanel(world, settings, () => debug?.controller.pages() ?? []);
+  const menu = new MenuPanel(settings);
+  world.scene.add(menu.group);
+  const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
   const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
     return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+  };
+  // The pause, solved and end screens. The game flow calls menu.show('pause' | 'solved' | 'end') and reads the
+  // presses from menu.onPress; here a press on Settings opens the settings panel and Resume closes the screen.
+  const menuTips = new Float32Array(6);
+  // The menu screen being looked at from the Hand Lab's Menu button or the launcher's Testing panel (never by the game).
+  let menuChoice: MenuChoice = 'off';
+  const showMenuChoice = (choice: MenuChoice) => {
+    menuChoice = choice;
+    if (choice === 'off') menu.hide();
+    else void showMenu(choice);
+  };
+  menu.onReach = () => uiSound.hover();
+  menu.onPress = (screen, button) => {
+    uiSound.press();
+    if (button === 'settings') {
+      menu.hide();
+      menuChoice = 'off';
+      void openSettings();
+    } else if (screen === 'pause' && button === 'resume') {
+      menu.hide();
+      menuChoice = 'off';
+    }
+  };
+  const showMenu = (id: MenuScreenId) => {
+    world.camera.getWorldPosition(settingsHead);
+    world.camera.getWorldDirection(settingsLook);
+    return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
@@ -346,6 +379,10 @@ async function start(): Promise<void> {
       settings: {
         toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
         isOpen: () => settingsPanel.isOpen,
+      },
+      menu: {
+        cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
+        label: () => menuChoice,
       },
       cutscene: { play: () => void playTestCutscene() },
     });
@@ -596,9 +633,12 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
-    window.addEventListener(TESTING_EVENT, (e) =>
-      applyOverlays((e as CustomEvent<ReturnType<typeof loadTesting>>).detail),
-    );
+    showMenuChoice(loadTesting().menu);
+    window.addEventListener(TESTING_EVENT, (e) => {
+      const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
+      applyOverlays(t);
+      showMenuChoice(t.menu);
+    });
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
@@ -732,18 +772,20 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
-          if (cutscenes.playing) {
-            // The fingertips that can poke Skip: each tracked hand's index tip.
+          if (menu.group.visible || cutscenes.playing) {
+            // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
               if (!h.tracked) continue;
               const o = JOINT['index-finger-tip'] * 3;
-              cutsceneTips[tips * 3] = h.positions[o];
-              cutsceneTips[tips * 3 + 1] = h.positions[o + 1];
-              cutsceneTips[tips * 3 + 2] = h.positions[o + 2];
+              menuTips[tips * 3] = h.positions[o];
+              menuTips[tips * 3 + 1] = h.positions[o + 1];
+              menuTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            cutscenes.update(step, stage, cutsceneTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
+            if (menu.group.visible) menu.update(step, menuTips, tips);
+            if (cutscenes.playing)
+              cutscenes.update(step, stage, menuTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
           }
           debug?.frame(rigPlaced);
         } catch (e) {
@@ -868,6 +910,8 @@ async function start(): Promise<void> {
         saves,
         settings,
         settingsPanel,
+        menu,
+        showMenu,
         stageView,
         shadowRenderer,
         cutscenes,

@@ -7,7 +7,16 @@ import type { UiSound } from './ui-sound';
 /** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
 const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
 
-export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound): Promise<void> {
+/** Things the page's own screens ask of the app, filled in once the app has them (the settings exist after the title does). */
+export interface LauncherHooks {
+  openSettings?: () => void;
+}
+
+export async function mountEnterArButtonIfNeeded(
+  world: World,
+  sound?: UiSound,
+  hooks: LauncherHooks = {},
+): Promise<void> {
   const xr = navigator.xr;
   if (!xr) {
     console.warn('[Launcher] navigator.xr is not available');
@@ -203,6 +212,7 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
             void launchDirect('immersive-vr', false);
           },
         },
+        { label: 'SETTINGS', onPress: () => hooks.openSettings?.() },
         ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
       ],
       {
