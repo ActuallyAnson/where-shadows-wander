@@ -13,7 +13,7 @@ import {
 
 describe('sprite-atlas', () => {
   it('defines correct atlas dimensions and grid', () => {
-    expect(ATLAS_SIZE).toBe(512);
+    expect(ATLAS_SIZE).toBe(1024);
     expect(GRID_COLS).toBe(4);
     expect(GRID_ROWS).toBe(4);
   });
@@ -59,6 +59,11 @@ describe('sprite-atlas', () => {
       save: vi.fn(),
       restore: vi.fn(),
       translate: vi.fn(),
+      scale: vi.fn(),
+      rotate: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      arcTo: vi.fn(),
       beginPath: vi.fn(),
       closePath: vi.fn(),
       moveTo: vi.fn(),
@@ -73,6 +78,10 @@ describe('sprite-atlas', () => {
         addColorStop: vi.fn(),
       }),
       fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+      lineCap: '',
+      lineJoin: '',
       globalCompositeOperation: '',
     };
 
@@ -84,9 +93,9 @@ describe('sprite-atlas', () => {
 
     renderSpriteAtlasToCanvas(mockCanvas);
 
-    expect(mockCanvas.width).toBe(512);
-    expect(mockCanvas.height).toBe(512);
-    expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 512, 512);
+    expect(mockCanvas.width).toBe(1024);
+    expect(mockCanvas.height).toBe(1024);
+    expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 1024, 1024);
     expect(mockCtx.translate).toHaveBeenCalled();
     expect(mockCtx.fill).toHaveBeenCalled();
   });

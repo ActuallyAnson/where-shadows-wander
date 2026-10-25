@@ -1,26 +1,33 @@
 // Procedural in-memory sprite atlas for Where Shadows Wander entities.
-// Generates a 512x512 CanvasTexture divided into a 4x4 grid of 128x128 sprite cells.
+// Generates a 1024x1024 CanvasTexture divided into a 4x4 grid of 256x256 sprite cells.
 // Zero external file dependencies (0 ms download delay, 0 bundle bytes).
 //
 // Grid layout:
 // Row 0: [0,0] Traveller Idle  | [1,0] Traveller Walk 1 | [2,0] Traveller Walk 2 | [3,0] Traveller Wait
 // Row 1: [0,1] Raindrop        | [1,1] Jagged Rock      | [2,1] Flying Crow      | [3,1] Rabbit
-// Row 2: [0,2] Fox             | [1,2] Firefly          | [2,2] Reserved         | [3,2] Reserved
-// Row 3: Reserved
+// Row 2: [0,2] Fox             | [1,2] Firefly          | [2,2] Traveller Cheer  | [3,2] Traveller Shiver
+// Row 3: [0,3] Traveller Walk 3 | [1,3] Traveller Walk 4 | [2,3] Traveller Blink  | [3,3] Reserved
+// The traveller is drawn at full resolution by shadow/traveller-art.ts; the other sprites are drawn on a 128 grid and scaled up.
 
 import { CanvasTexture, LinearFilter } from '@iwsdk/core';
 import { Kind } from '../sim/entity-kinds';
+import { paintTraveller, Pose } from '../shadow/traveller-art';
 
-export const ATLAS_SIZE = 512;
+export const ATLAS_SIZE = 1024;
 export const GRID_COLS = 4;
 export const GRID_ROWS = 4;
-export const CELL_SIZE = 128; // 512 / 4
+export const CELL_SIZE = 256; // 1024 / 4
 
 export const SpriteTile = {
   TravellerIdle: { col: 0, row: 0 },
   TravellerWalk1: { col: 1, row: 0 },
   TravellerWalk2: { col: 2, row: 0 },
   TravellerWait: { col: 3, row: 0 },
+  TravellerCheer: { col: 2, row: 2 },
+  TravellerShiver: { col: 3, row: 2 },
+  TravellerWalk3: { col: 0, row: 3 },
+  TravellerWalk4: { col: 1, row: 3 },
+  TravellerBlink: { col: 2, row: 3 },
   Raindrop: { col: 0, row: 1 },
   Rock: { col: 1, row: 1 },
   Crow: { col: 2, row: 1 },
@@ -48,14 +55,26 @@ export function getSpriteUvBounds(
   return out;
 }
 
+const TRAVELLER_TILES = [
+  SpriteTile.TravellerIdle,
+  SpriteTile.TravellerWalk1,
+  SpriteTile.TravellerWalk2,
+  SpriteTile.TravellerWait,
+  SpriteTile.TravellerCheer,
+  SpriteTile.TravellerShiver,
+  SpriteTile.TravellerWalk3,
+  SpriteTile.TravellerWalk4,
+  SpriteTile.TravellerBlink,
+] as const;
+
 /**
  * Selects the sprite tile for a given Entity Kind and optional animation frame.
  */
 export function getTileForKind(kind: number, animFrame = 0): { col: number; row: number } {
   switch (kind) {
     case Kind.Traveller:
-      // animFrame: 0 = idle, 1 = walk1, 2 = walk2, 3 = wait
-      return { col: Math.abs(animFrame | 0) % 4, row: 0 };
+      // animFrame is a pose number from shadow/traveller-art.ts (idle, walk 1, walk 2, wait, cheer, shiver, walk 3, walk 4, blink)
+      return TRAVELLER_TILES[Math.max(0, Math.min(TRAVELLER_TILES.length - 1, animFrame | 0))];
     case Kind.Rock:
       return SpriteTile.Rock;
     case Kind.Raindrop:
@@ -84,11 +103,19 @@ export function renderSpriteAtlasToCanvas(canvas: HTMLCanvasElement): void {
   canvas.height = ATLAS_SIZE;
   ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-  // Row 0: Traveller animation frames
-  drawCell(ctx, 0, 0, (c) => drawTraveller(c, 0));
-  drawCell(ctx, 1, 0, (c) => drawTraveller(c, 1));
-  drawCell(ctx, 2, 0, (c) => drawTraveller(c, 2));
-  drawCell(ctx, 3, 0, (c) => drawTraveller(c, 3));
+  // The traveller's poses (shadow/traveller-art.ts), each in its own cell at full resolution.
+  const poses: readonly [number, number, number][] = [
+    [0, 0, Pose.Idle],
+    [1, 0, Pose.Walk1],
+    [2, 0, Pose.Walk2],
+    [3, 0, Pose.Wait],
+    [2, 2, Pose.Cheer],
+    [3, 2, Pose.Shiver],
+    [0, 3, Pose.Walk3],
+    [1, 3, Pose.Walk4],
+    [2, 3, Pose.Blink],
+  ];
+  for (const [col, row, pose] of poses) drawCell(ctx, col, row, (c) => paintTraveller(c, CELL_SIZE, pose), false);
 
   // Row 1: Environmental props & animals
   drawCell(ctx, 0, 1, drawRaindrop);
@@ -106,101 +133,14 @@ function drawCell(
   col: number,
   row: number,
   drawFn: (ctx: CanvasRenderingContext2D) => void,
+  /** Sprites drawn on the original 128 grid are scaled up to fill the cell. */
+  legacy = true,
 ): void {
   ctx.save();
   ctx.translate(col * CELL_SIZE, row * CELL_SIZE);
+  if (legacy) ctx.scale(CELL_SIZE / 128, CELL_SIZE / 128);
   drawFn(ctx);
   ctx.restore();
-}
-
-/**
- * Storybook hooded pilgrim with pointed cowl, walking boots, and a warm amber lantern opening.
- */
-function drawTraveller(ctx: CanvasRenderingContext2D, frame: number): void {
-  ctx.fillStyle = '#000000';
-
-  // Hood & pointed cowl
-  ctx.beginPath();
-  if (frame === 3) {
-    // Wait / looking back over shoulder: cowl leans slightly back
-    ctx.moveTo(56, 24);
-    ctx.quadraticCurveTo(72, 30, 80, 48);
-    ctx.lineTo(44, 48);
-    ctx.quadraticCurveTo(46, 30, 56, 24);
-  } else {
-    // Forward-facing pointed cowl
-    ctx.moveTo(64, 22);
-    ctx.quadraticCurveTo(76, 28, 80, 48);
-    ctx.lineTo(46, 48);
-    ctx.quadraticCurveTo(52, 28, 64, 22);
-  }
-  ctx.fill();
-
-  // Face shadow opening (cowl hollow)
-  ctx.beginPath();
-  ctx.arc(63, 40, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cloak & robe body
-  ctx.beginPath();
-  ctx.moveTo(48, 48);
-  ctx.lineTo(78, 48);
-
-  if (frame === 1) {
-    // Walk frame 1: forward stride
-    ctx.quadraticCurveTo(86, 72, 92, 96);
-    ctx.lineTo(36, 96);
-    ctx.quadraticCurveTo(42, 72, 48, 48);
-  } else if (frame === 2) {
-    // Walk frame 2: passing stride
-    ctx.quadraticCurveTo(82, 72, 86, 96);
-    ctx.lineTo(40, 96);
-    ctx.quadraticCurveTo(44, 72, 48, 48);
-  } else {
-    // Idle / wait
-    ctx.quadraticCurveTo(84, 72, 88, 96);
-    ctx.lineTo(38, 96);
-    ctx.quadraticCurveTo(42, 72, 48, 48);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Boots
-  ctx.beginPath();
-  if (frame === 1) {
-    // Stride forward: front foot extended, back foot trailing
-    // Back foot
-    ctx.rect(38, 96, 12, 14);
-    // Front foot
-    ctx.rect(74, 96, 16, 14);
-  } else if (frame === 2) {
-    // Passing stride
-    ctx.rect(48, 96, 14, 14);
-    ctx.rect(66, 96, 14, 14);
-  } else {
-    // Idle boots
-    ctx.rect(46, 96, 14, 14);
-    ctx.rect(66, 96, 14, 14);
-  }
-  ctx.fill();
-
-  // Small transparent hole at hands with warm amber glowing dot
-  const lanternX = frame === 3 ? 54 : 70;
-  const lanternY = 66;
-
-  // Clear aperture hole through cloak
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(lanternX, lanternY, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Warm amber shining lantern dot
-  ctx.fillStyle = '#ffdf80';
-  ctx.beginPath();
-  ctx.arc(lanternX, lanternY, 4, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 /**

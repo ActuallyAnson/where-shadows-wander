@@ -21,6 +21,7 @@ import {
 import { SHADOW_RENDER_ORDER } from '../shadow/shadow-renderer';
 import { Flag, Kind } from '../sim/entity-kinds';
 import type { EntityStore } from '../sim/entity-store';
+import { WALK_CYCLE } from '../shadow/traveller-art';
 import { createSpriteAtlas, getTileForKind, GRID_ROWS } from './sprite-atlas';
 
 export const MAX_STAGE_INSTANCES = 256;
@@ -146,7 +147,7 @@ export class StageRenderer {
           const speed = Math.hypot(vx, vy);
           if (speed > 0.05) {
             // Walk animation cadence based on stage position
-            animFrame = Math.floor(Math.abs(renderX) * 8) % 2 === 0 ? 1 : 2;
+            animFrame = WALK_CYCLE[Math.floor(Math.abs(renderX) * 16) % WALK_CYCLE.length];
           } else {
             animFrame = 0; // idle
           }
