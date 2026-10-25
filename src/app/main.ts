@@ -18,6 +18,7 @@ import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
+import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
@@ -210,12 +211,13 @@ async function start(): Promise<void> {
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
   const candleView = new CandleView();
   candleView.lit = false;
+  const titleLighter = new TitleLighterView();
   const bedTray = new BedTrayView();
   const bedroomView = new BedroomView();
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
-  const ambientLight = new AmbientLight(0x24283b, 0.14);
+  const ambientLight = new AmbientLight(0x182035, 0.12);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
@@ -323,6 +325,7 @@ async function start(): Promise<void> {
     air.group,
     kindredView.group,
     candleView.group,
+    titleLighter.group,
     bedTray.group,
     vrTitle.group,
     ambientLight,
@@ -596,6 +599,7 @@ async function start(): Promise<void> {
       palmOverFlame: candleView.isCovered,
       coverProgress: candleView.coverProgress,
       wallPauseActive: wallPauseView.visible,
+      titleLighterActive: titleLighter.visible,
       handVisualScale: 0.68,
     },
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
@@ -703,8 +707,6 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
-    // A moment after the wall is set up, the opening plays (once per session; the Skip button ends it).
-    setTimeout(() => guard('sessionstart: opening', () => playOpening()), 1500);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
@@ -720,6 +722,13 @@ async function start(): Promise<void> {
         placeRig([0, 1.2, 0], 0);
       });
     }
+    guard('sessionend: state', () => {
+      sessionState = 'title_vr';
+      candleView.lit = false;
+      candleView.setLocked(false);
+      titleLighter.visible = false;
+      wallPauseView.hide();
+    });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
     guard('sessionend: hands status', () => handsStatus.stop());
@@ -901,85 +910,104 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         if (sessionState === 'title_vr') {
           vrTitle.update(step, cameraQuat);
-          let triggerIgnition = candleView.checkIgnition(handList);
-          if (!triggerIgnition && frame) {
-            for (const source of frame.session.inputSources) {
-              if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                triggerIgnition = true;
-                break;
-              }
+          titleLighter.visible = true;
+          titleLighter.update(hands.hands.right, cameraQuat, clock);
+
+          let triggerIgnition = false;
+          if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
+            const lfx = titleLighter.flamePosition[0];
+            const lfy = titleLighter.flamePosition[1];
+            const lfz = titleLighter.flamePosition[2];
+            const cfx = candleView.flamePosition[0];
+            const cfy = candleView.flamePosition[1];
+            const cfz = candleView.flamePosition[2];
+            const distLighterToWick = Math.hypot(lfx - cfx, lfy - cfy, lfz - cfz);
+            if (distLighterToWick < 0.15) {
+              triggerIgnition = true;
             }
           }
+          if (!triggerIgnition && (mock || candleView.checkIgnition(handList))) {
+            triggerIgnition = true;
+          }
+
           if (triggerIgnition) {
             sessionState = 'opening';
             candleView.lit = true;
+            titleLighter.visible = false;
             ambientLight.color.setHex(0x35281e);
             ambientLight.intensity = 0.16;
             gameAudio.candleIgnited(candleView.flamePosition);
             vrTitle.ignite();
             playOpening();
           }
-        } else if (sessionState === 'opening') {
-          vrTitle.update(step, cameraQuat);
-        } else if (sessionState === 'playing') {
-          if (candleView.isCovered) {
-            sessionState = 'paused';
-            simWasPaused = true;
-            candleView.lit = false;
-            candleView.resetCover();
-            ambientLight.color.setHex(0x182035);
-            ambientLight.intensity = 0.1;
-            audio.mixer.setLift(Bus.Ambience, 0.15);
-            audio.mixer.setLift(Bus.Music, 0.25);
-            wallPauseView.show();
-          }
-        } else if (sessionState === 'paused') {
-          let isControllerTrigger = false;
-          if (frame) {
-            for (const source of frame.session.inputSources) {
-              if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                isControllerTrigger = true;
-                break;
+        } else {
+          titleLighter.visible = false;
+          if (sessionState === 'opening') {
+            vrTitle.update(step, cameraQuat);
+          } else if (sessionState === 'playing') {
+            if (candleView.isCovered) {
+              sessionState = 'paused';
+              simWasPaused = true;
+              candleView.lit = false;
+              candleView.resetCover();
+              ambientLight.color.setHex(0x182035);
+              ambientLight.intensity = 0.08;
+              audio.mixer.setLift(Bus.Ambience, 0.15);
+              audio.mixer.setLift(Bus.Music, 0.25);
+              wallPauseView.show();
+            }
+          } else if (sessionState === 'paused') {
+            let isControllerTrigger = false;
+            if (frame) {
+              for (const source of frame.session.inputSources) {
+                if (source.gamepad?.buttons.some((b) => b.pressed)) {
+                  isControllerTrigger = true;
+                  break;
+                }
               }
             }
-          }
-          const action = wallPauseView.update(handList, stage, isControllerTrigger);
-          const candleIgnition = candleView.checkIgnition(handList);
-          if (action === 'resume' || candleIgnition) {
-            wallPauseView.hide();
-            sessionState = 'playing';
-            candleView.resetCover();
-            candleView.lit = true;
-            candleView.setLocked(true);
-            ambientLight.color.setHex(0x35281e);
-            ambientLight.intensity = 0.16;
-            audio.mixer.setLift(Bus.Ambience, 1.0);
-            audio.mixer.setLift(Bus.Music, 1.0);
-            gameAudio.candleIgnited(candleView.flamePosition);
-            simWasPaused = true;
-          } else if (action === 'restart') {
-            wallPauseView.hide();
-            sessionState = 'playing';
-            candleView.resetCover();
-            candleView.lit = true;
-            candleView.setLocked(true);
-            ambientLight.color.setHex(0x35281e);
-            ambientLight.intensity = 0.16;
-            audio.mixer.setLift(Bus.Ambience, 1.0);
-            audio.mixer.setLift(Bus.Music, 1.0);
-            gameAudio.candleIgnited(candleView.flamePosition);
-            tutorial.start();
-            simWasPaused = true;
-          } else if (action === 'settings') {
-            wallPauseView.hide();
-            void openSettings();
+            const action = wallPauseView.update(handList, stage, isControllerTrigger, step);
+            if (action === 'resume') {
+              wallPauseView.hide();
+              sessionState = 'playing';
+              candleView.resetCover();
+              candleView.lit = true;
+              candleView.setLocked(true);
+              ambientLight.color.setHex(0x35281e);
+              ambientLight.intensity = 0.16;
+              audio.mixer.setLift(Bus.Ambience, 1.0);
+              audio.mixer.setLift(Bus.Music, 1.0);
+              gameAudio.candleIgnited(candleView.flamePosition);
+              simWasPaused = true;
+            } else if (action === 'restart') {
+              wallPauseView.hide();
+              sessionState = 'playing';
+              candleView.resetCover();
+              candleView.lit = true;
+              candleView.setLocked(true);
+              ambientLight.color.setHex(0x35281e);
+              ambientLight.intensity = 0.16;
+              audio.mixer.setLift(Bus.Ambience, 1.0);
+              audio.mixer.setLift(Bus.Music, 1.0);
+              gameAudio.candleIgnited(candleView.flamePosition);
+              tutorial.start();
+              simWasPaused = true;
+            } else if (action === 'settings') {
+              wallPauseView.hide();
+              void openSettings();
+            }
           }
         }
         timings.begin(SLOT.shadow);
         try {
+          const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
+          shadowRenderer.mesh.visible = shadowsVisible;
+          propShadowView.mesh.visible = shadowsVisible;
+          propShadows.mesh.visible = shadowsVisible;
+
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-          shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.lit ? candleView.occlusion : 0);
+          shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
             const o = stage.origin,
@@ -996,7 +1024,8 @@ async function start(): Promise<void> {
               demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
             }
           }
-          propShadows.update(stage, shadowRenderer.baseOpacity * (candleView.lit ? candleView.occlusion : 0));
+          propShadows.update(stage, shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
+          propShadowView.material.opacity = shadowsVisible ? 0.88 * candleView.occlusion : 0;
           if (kindredOn && rigPlaced) {
             // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
             const f = candleView.flamePosition,
@@ -1231,7 +1260,13 @@ async function start(): Promise<void> {
         occluder.update(handList);
         timings.begin(SLOT.handVisual);
         handVisual.object.visible = !passthrough && handFlags.handVisual;
-        handVisual.update(handList, step, rigPlaced && candleView.lit ? candleView.flamePosition : null, !paused);
+        const activeHands = sessionState === 'title_vr' ? [] : handList;
+        handVisual.update(
+          activeHands,
+          step,
+          rigPlaced && candleView.lit ? candleView.flamePosition : null,
+          !paused && sessionState !== 'title_vr',
+        );
         timings.end(SLOT.handVisual);
       } catch (e) {
         failures.report('hands drawing', e);

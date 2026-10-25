@@ -5,12 +5,15 @@
 
 import {
   CanvasTexture,
+  CylinderGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  Quaternion,
   RingGeometry,
   SRGBColorSpace,
+  Vector3,
 } from '@iwsdk/core';
 import { JOINT, type HandFrame } from '../../engine/hands/hand';
 import { distanceToPlane, type StagePlane } from '../../engine/shadow/pure/stage-plane';
@@ -85,13 +88,26 @@ export class WallPauseView {
   private readonly cursorMaterial: MeshBasicMaterial;
   private readonly cursorMesh: Mesh;
 
+  // Sleek laser pointer beam connecting index fingertip to the wall
+  private readonly beamGeometry: CylinderGeometry;
+  private readonly beamMaterial: MeshBasicMaterial;
+  private readonly beamMesh: Mesh;
+
   private _visible = false;
   private hoveredButtonIndex = -1;
-  private lastPaintedHover = -2;
   private cursorX = 0;
   private cursorY = 0;
   private cursorVisible = false;
   private pinchArmed = true;
+  private hoverDwellTimer = 0;
+
+  // Scratch vectors for zero allocation beam orientation
+  private readonly beamStart = new Vector3();
+  private readonly beamEnd = new Vector3();
+  private readonly beamMid = new Vector3();
+  private readonly beamDir = new Vector3();
+  private readonly beamQuat = new Quaternion();
+  private readonly upVec = new Vector3(0, 1, 0);
 
   constructor(customCanvas?: HTMLCanvasElement) {
     let cvs = customCanvas;
@@ -126,11 +142,11 @@ export class WallPauseView {
     this.wallMesh.renderOrder = 2.5;
 
     // 2. Cursor Mesh: ring with glowing dot
-    this.cursorGeometry = new RingGeometry(0.012, 0.022, 24);
+    this.cursorGeometry = new RingGeometry(0.012, 0.024, 24);
     this.cursorMaterial = new MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
       depthWrite: false,
     });
     this.cursorMesh = new Mesh(this.cursorGeometry, this.cursorMaterial);
@@ -138,7 +154,19 @@ export class WallPauseView {
     this.cursorMesh.renderOrder = 2.6;
     this.cursorMesh.visible = false;
 
-    this.group.add(this.wallMesh, this.cursorMesh);
+    // 3. Pointer Beam Mesh: slender white beam
+    this.beamGeometry = new CylinderGeometry(0.0018, 0.0018, 1.0, 6);
+    this.beamMaterial = new MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    });
+    this.beamMesh = new Mesh(this.beamGeometry, this.beamMaterial);
+    this.beamMesh.renderOrder = 2.6;
+    this.beamMesh.visible = false;
+
+    this.group.add(this.wallMesh, this.cursorMesh, this.beamMesh);
     this.group.visible = false;
 
     this.paint();
@@ -153,7 +181,9 @@ export class WallPauseView {
     this.group.visible = true;
     this.hoveredButtonIndex = -1;
     this.cursorVisible = false;
+    this.beamMesh.visible = false;
     this.pinchArmed = true;
+    this.hoverDwellTimer = 0;
     this.paint();
   }
 
@@ -161,19 +191,34 @@ export class WallPauseView {
     this._visible = false;
     this.group.visible = false;
     this.cursorMesh.visible = false;
+    this.beamMesh.visible = false;
   }
 
   /**
-   * Updates pointer tracking, hover state, and pinch/click detection.
+   * Updates pointer tracking, hover state, and pinch/poke/dwell selection.
    * Zero per-frame allocations.
    */
-  update(hands: readonly HandFrame[], stage: StagePlane, isControllerTriggerPressed = false): PauseMenuAction | null {
+  update(
+    hands: readonly HandFrame[],
+    stage: StagePlane,
+    isControllerTriggerPressed = false,
+    delta = 0.016,
+  ): PauseMenuAction | null {
     if (!this._visible) return null;
 
     let hitX = 0;
     let hitY = 0;
     let hasPointer = false;
     let isPinching = false;
+    let isPoking = false;
+
+    let pointerWorldX = 0;
+    let pointerWorldY = 0;
+    let pointerWorldZ = 0;
+
+    let hitWorldX = 0;
+    let hitWorldY = 0;
+    let hitWorldZ = 0;
 
     for (let i = 0; i < hands.length; i++) {
       const h = hands[i];
@@ -182,6 +227,7 @@ export class WallPauseView {
 
       const idx = JOINT['index-finger-tip'] * 3;
       const mcp = JOINT['index-finger-metacarpal'] * 3;
+      const wrist = JOINT['wrist'] * 3;
       const thmb = JOINT['thumb-tip'] * 3;
 
       // Index tip world coordinates
@@ -189,11 +235,18 @@ export class WallPauseView {
       const ty = p[idx + 1];
       const tz = p[idx + 2];
 
-      // Pointing vector from knuckle to tip
-      let dirX = tx - p[mcp];
-      let dirY = ty - p[mcp + 1];
-      let dirZ = tz - p[mcp + 2];
-      const dirLen = Math.hypot(dirX, dirY, dirZ);
+      // Pointing vector: prefer wrist -> index tip; fallback to mcp -> tip if wrist is at origin
+      let dirX = tx - p[wrist];
+      let dirY = ty - p[wrist + 1];
+      let dirZ = tz - p[wrist + 2];
+      let dirLen = Math.hypot(dirX, dirY, dirZ);
+
+      if (dirLen > 1.5 || (p[wrist] === 0 && p[wrist + 1] === 0 && p[wrist + 2] === 0 && (tx !== 0 || ty !== 0))) {
+        dirX = tx - p[mcp];
+        dirY = ty - p[mcp + 1];
+        dirZ = tz - p[mcp + 2];
+        dirLen = Math.hypot(dirX, dirY, dirZ);
+      }
 
       const dToWall = distanceToPlane(stage, tx, ty, tz);
 
@@ -204,10 +257,10 @@ export class WallPauseView {
 
         const normalDot = dirX * stage.normal[0] + dirY * stage.normal[1] + dirZ * stage.normal[2];
 
-        // Ray pointing towards the wall (normalDot < -0.15)
-        if (normalDot < -0.15 && dToWall > 0.05) {
+        // Ray pointing towards the wall
+        if (normalDot < -0.12 && dToWall > 0.04) {
           const t = -dToWall / normalDot;
-          if (t > 0 && t < 3.0) {
+          if (t > 0 && t < 3.5) {
             const wx = tx + dirX * t;
             const wy = ty + dirY * t;
             const wz = tz + dirZ * t;
@@ -218,27 +271,44 @@ export class WallPauseView {
 
             hitX = dx * stage.right[0] + dy * stage.right[1] + dz * stage.right[2];
             hitY = dx * stage.up[0] + dy * stage.up[1] + dz * stage.up[2];
+            hitWorldX = wx;
+            hitWorldY = wy;
+            hitWorldZ = wz;
+            pointerWorldX = tx;
+            pointerWorldY = ty;
+            pointerWorldZ = tz;
             hasPointer = true;
           }
         }
       }
 
-      // Fallback: direct perpendicular projection if pointing Ray wasn't steep enough
-      if (!hasPointer && dToWall > 0.01 && dToWall < 1.2) {
+      // Fallback: direct perpendicular projection
+      if (!hasPointer && dToWall > 0.01 && dToWall < 1.4) {
         const dx = tx - stage.origin[0] - dToWall * stage.normal[0];
         const dy = ty - stage.origin[1] - dToWall * stage.normal[1];
         const dz = tz - stage.origin[2] - dToWall * stage.normal[2];
         hitX = dx * stage.right[0] + dy * stage.right[1] + dz * stage.right[2];
         hitY = dx * stage.up[0] + dy * stage.up[1] + dz * stage.up[2];
+        hitWorldX = tx - dToWall * stage.normal[0];
+        hitWorldY = ty - dToWall * stage.normal[1];
+        hitWorldZ = tz - dToWall * stage.normal[2];
+        pointerWorldX = tx;
+        pointerWorldY = ty;
+        pointerWorldZ = tz;
         hasPointer = true;
       }
 
-      // Check pinch gesture
+      // Direct physical poke detection: index fingertip physically near wall (< 8cm)
+      if (dToWall < 0.08) {
+        isPoking = true;
+      }
+
+      // Check pinch gesture (thumb tip to index tip < 7cm)
       const pdx = p[idx] - p[thmb];
       const pdy = p[idx + 1] - p[thmb + 1];
       const pdz = p[idx + 2] - p[thmb + 2];
       const pinchDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      if (pinchDist < 0.065) {
+      if (pinchDist < 0.07) {
         isPinching = true;
       }
     }
@@ -250,11 +320,32 @@ export class WallPauseView {
       this.cursorMesh.visible = true;
       this.cursorVisible = true;
 
-      // Check which button is hovered
+      // Position and orient laser beam in local stage space
+      this.beamStart.set(pointerWorldX, pointerWorldY, pointerWorldZ);
+      this.group.worldToLocal(this.beamStart);
+      this.beamEnd.set(hitWorldX, hitWorldY, hitWorldZ);
+      this.group.worldToLocal(this.beamEnd);
+
+      this.beamMid.addVectors(this.beamStart, this.beamEnd).multiplyScalar(0.5);
+      this.beamMesh.position.copy(this.beamMid);
+
+      this.beamDir.subVectors(this.beamEnd, this.beamStart);
+      const beamLen = this.beamDir.length();
+      if (beamLen > 0.05) {
+        this.beamMesh.scale.set(1.0, beamLen, 1.0);
+        this.beamDir.normalize();
+        this.beamQuat.setFromUnitVectors(this.upVec, this.beamDir);
+        this.beamMesh.quaternion.copy(this.beamQuat);
+        this.beamMesh.visible = true;
+      } else {
+        this.beamMesh.visible = false;
+      }
+
+      // Check which button is hovered (with comfortable padding for easy pointing)
       let hovered = -1;
       for (let b = 0; b < PAUSE_BUTTONS.length; b++) {
         const btn = PAUSE_BUTTONS[b];
-        if (hitX >= btn.xMin && hitX <= btn.xMax && hitY >= btn.yMin && hitY <= btn.yMax) {
+        if (hitX >= btn.xMin - 0.03 && hitX <= btn.xMax + 0.03 && hitY >= btn.yMin - 0.02 && hitY <= btn.yMax + 0.02) {
           hovered = b;
           break;
         }
@@ -262,27 +353,34 @@ export class WallPauseView {
 
       if (hovered !== this.hoveredButtonIndex) {
         this.hoveredButtonIndex = hovered;
+        this.hoverDwellTimer = 0;
         this.paint();
+      } else if (hovered >= 0) {
+        this.hoverDwellTimer += delta;
       }
     } else {
       if (this.cursorVisible) {
         this.cursorVisible = false;
         this.cursorMesh.visible = false;
+        this.beamMesh.visible = false;
       }
       if (this.hoveredButtonIndex !== -1) {
         this.hoveredButtonIndex = -1;
+        this.hoverDwellTimer = 0;
         this.paint();
       }
     }
 
-    // Trigger activation on pinch or controller button
-    const activate = isPinching || isControllerTriggerPressed;
+    // Trigger activation on pinch, controller trigger, physical poke, or 1.2s dwell
+    const isDwellTrigger = this.hoverDwellTimer >= 1.2;
+    const activate = isPinching || isControllerTriggerPressed || isPoking || isDwellTrigger;
     if (!activate) {
       this.pinchArmed = true;
     }
 
     if (this.pinchArmed && activate && this.hoveredButtonIndex >= 0) {
       this.pinchArmed = false;
+      this.hoverDwellTimer = 0;
       return PAUSE_BUTTONS[this.hoveredButtonIndex].id;
     }
 
@@ -367,5 +465,7 @@ export class WallPauseView {
     this.texture.dispose();
     this.cursorGeometry.dispose();
     this.cursorMaterial.dispose();
+    this.beamGeometry.dispose();
+    this.beamMaterial.dispose();
   }
 }

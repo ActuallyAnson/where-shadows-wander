@@ -6,7 +6,7 @@ import { WallPauseView } from './wall-pause-view';
 describe('WallPauseView', () => {
   it('creates geometry, canvas and buttons', () => {
     const view = new WallPauseView();
-    expect(view.group.children.length).toBe(2); // wall plane and cursor ring
+    expect(view.group.children.length).toBe(3); // wall plane, cursor ring, and laser beam
     expect(view.visible).toBe(false);
 
     view.show();

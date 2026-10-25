@@ -317,6 +317,26 @@ describe('CandleView', () => {
     expect(candle.coverProgress).toBe(0);
   });
 
+  it('detects two-handed cupping to trigger deliberate pause', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+
+    // Both hands cupping around the flame (flame at [0, 0.845, -0.4])
+    // Left hand at x = -0.06, right hand at x = +0.06
+    setPalm(left, -0.06, 0.87, -0.4);
+    setPalm(right, 0.06, 0.87, -0.4);
+
+    expect(candle.isCovered).toBe(false);
+    expect(candle.coverProgress).toBe(0);
+
+    // Hold for 3.0 seconds
+    candle.updateInteraction({ left, right }, 3.0);
+    expect(candle.coverProgress).toBe(1.0);
+    expect(candle.isCovered).toBe(true);
+  });
+
   it('disposes resources cleanly without error', () => {
     const candle = new CandleView();
     expect(() => candle.dispose()).not.toThrow();

@@ -220,14 +220,14 @@ export class CandleView {
     this.wickIndicator.position.set(0, 0.098, 0);
     this.wickIndicator.visible = false;
 
-    // 10. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when palm covers flame
-    this.coverProgressGeometry = new PlaneGeometry(0.14, 0.14);
+    // 10. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when hands cup/cover flame
+    this.coverProgressGeometry = new PlaneGeometry(0.2, 0.2);
     this.coverProgressMaterial = new ShaderMaterial({
       vertexShader: COVER_RING_VERT,
       fragmentShader: COVER_RING_FRAG,
       uniforms: {
         uProgress: { value: 0.0 },
-        uColor: { value: new Color(0xff9922) },
+        uColor: { value: new Color(0xffaa33) },
       },
       transparent: true,
       depthWrite: false,
@@ -454,36 +454,67 @@ export class CandleView {
       this.lightOcclusion = 1.0;
     }
 
-    // Palm hovering directly over flame detection (within 0.15m, palm normal pointing downwards)
-    let hoveringPalm = false;
+    // Dual-hand cupping or single-hand hovering to extinguish flame and pause
+    let coveringFlame = false;
     if (this._lit) {
-      if (leftTracked) {
+      // 1. Check dual-hand cupping (both hands around or above flame)
+      if (leftTracked && rightTracked) {
+        const dflx = this.leftPalm[0] - fx;
+        const dfly = this.leftPalm[1] - fy;
+        const dflz = this.leftPalm[2] - fz;
+        const leftDist = Math.sqrt(dflx * dflx + dfly * dfly + dflz * dflz);
+
+        const dfrx = this.rightPalm[0] - fx;
+        const dfry = this.rightPalm[1] - fy;
+        const dfrz = this.rightPalm[2] - fz;
+        const rightDist = Math.sqrt(dfrx * dfrx + dfry * dfry + dfrz * dfrz);
+
+        const hdx = this.leftPalm[0] - this.rightPalm[0];
+        const hdy = this.leftPalm[1] - this.rightPalm[1];
+        const hdz = this.leftPalm[2] - this.rightPalm[2];
+        const handDist = Math.sqrt(hdx * hdx + hdy * hdy + hdz * hdz);
+
+        const mx = (this.leftPalm[0] + this.rightPalm[0]) * 0.5 - fx;
+        const my = (this.leftPalm[1] + this.rightPalm[1]) * 0.5 - fy;
+        const mz = (this.leftPalm[2] + this.rightPalm[2]) * 0.5 - fz;
+        const midDist = Math.sqrt(mx * mx + my * my + mz * mz);
+
+        const heightOk = my >= -0.08 && my <= 0.22 && dfly >= -0.08 && dfry >= -0.08;
+        if (leftDist < 0.22 && rightDist < 0.22 && midDist < 0.18 && handDist < 0.28 && heightOk) {
+          coveringFlame = true;
+        }
+      }
+
+      // 2. Check single-hand covering (either palm hovering over flame)
+      if (!coveringFlame && leftTracked) {
         const palm = derivePalm(left, this.scratchPalm);
         if (palm) {
           const dx = palm.position[0] - fx;
           const dy = palm.position[1] - fy;
           const dz = palm.position[2] - fz;
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 0.15 && palm.position[1] >= fy - 0.05 && palm.normal[1] < -0.2) {
-            hoveringPalm = true;
+          const horizDist = Math.hypot(dx, dz);
+          if (dist < 0.17 && dy >= -0.06 && dy <= 0.2 && horizDist < 0.14) {
+            coveringFlame = true;
           }
         }
       }
-      if (!hoveringPalm && rightTracked) {
+      if (!coveringFlame && rightTracked) {
         const palm = derivePalm(right, this.scratchPalm);
         if (palm) {
           const dx = palm.position[0] - fx;
           const dy = palm.position[1] - fy;
           const dz = palm.position[2] - fz;
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 0.15 && palm.position[1] >= fy - 0.05 && palm.normal[1] < -0.2) {
-            hoveringPalm = true;
+          const horizDist = Math.hypot(dx, dz);
+          if (dist < 0.17 && dy >= -0.06 && dy <= 0.2 && horizDist < 0.14) {
+            coveringFlame = true;
           }
         }
       }
     }
 
-    if (hoveringPalm) {
+    if (coveringFlame) {
       this.coverTimer += delta;
       const progress = Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
       this.coverProgressMaterial.uniforms.uProgress.value = progress;
