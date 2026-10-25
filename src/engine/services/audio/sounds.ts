@@ -26,6 +26,10 @@ export const Sound = {
   Set: 11,
   /** The slow background music, a loop. */
   Music: 12,
+  /** The spirit fox's sparkle: a few soft high notes falling like fairy dust. */
+  Twinkle: 13,
+  /** A rabbit's soft landing. */
+  Hop: 14,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -177,6 +181,26 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     // Like the hum, it is the room's, not a thing in it.
     refDistance: 50,
     maxDistance: 100,
+  },
+  {
+    name: 'twinkle',
+    bus: Bus.Effects,
+    gain: 0.45,
+    loop: false,
+    priority: 1,
+    minGapS: 0.6,
+    refDistance: 1,
+    maxDistance: 10,
+  },
+  {
+    name: 'hop',
+    bus: Bus.Effects,
+    gain: 0.5,
+    loop: false,
+    priority: 1,
+    minGapS: 0.2,
+    refDistance: 1,
+    maxDistance: 8,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

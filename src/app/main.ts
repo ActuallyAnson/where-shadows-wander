@@ -235,6 +235,7 @@ async function start(): Promise<void> {
     moodGoal = 1;
     solveBloom.trigger();
     if (kindredOn) kindredView.burst(kindred);
+    if (rigPlaced) gameAudio.twinkleAt(stage, kindred.x, kindred.y);
   };
   let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
   let kindredOn = false;
@@ -856,8 +857,10 @@ async function start(): Promise<void> {
             if (!sh.active || !sh.onStage) continue;
             const cx = (sh.bounds[0] + sh.bounds[2]) * 0.5;
             const cy = (sh.bounds[1] + sh.bounds[3]) * 0.5;
-            if (e.shape === 'rabbit') rabbits.spawn(e.hand === 'left' ? 0 : 1, cx, cy - 0.05, cx >= 0 ? 1 : -1);
-            else {
+            if (e.shape === 'rabbit') {
+              rabbits.spawn(e.hand === 'left' ? 0 : 1, cx, cy - 0.05, cx >= 0 ? 1 : -1);
+              gameAudio.hopAt(stage, cx, cy);
+            } else {
               if (!kindredOn) {
                 kindred.x = cx + (cx >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
                 kindred.y = cy + 0.1;
@@ -866,6 +869,7 @@ async function start(): Promise<void> {
               }
               kindred.perchAt(cx, cy + 0.09);
               perchT = 3.2;
+              gameAudio.twinkleAt(stage, cx, cy + 0.09);
             }
           }
           rabbits.update(step, stage, shadowRenderer.baseOpacity * candleView.occlusion);
