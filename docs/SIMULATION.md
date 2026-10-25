@@ -404,6 +404,42 @@ The fist anchor's reach was widened from 0.15 to 0.25 m: a fist lower than about
 3. **Register it.** Add it to `createNight()` in `src/game/puzzles/index.ts`.
 4. **Test it.** Add headless tests to `night.test.ts` that solve it every way it should be solvable, check the recorded solution, and check one way that shouldn't work.
 
+## Session flow: `src/game/flow.ts`
+
+A session from the title to the end is a small state machine (GDD "Player journey"). Its states, events and transitions are data (`FLOW_STATES`, `FLOW_TRANSITIONS`); `GameFlow` holds the current state and applies events. It is pure and allocates nothing per frame. It is not wired into the app yet; neither is `Game`.
+
+| State | The world | Screen | Leaves on |
+|---|---|---|---|
+| `title` | still | `title` | `start` → `tutorial` |
+| `tutorial` | still | `tutorial` (light the lantern) | `lantern-lit` → `playing`; `pause` → `paused` |
+| `playing` | runs | none | `pause` → `paused`; `puzzle-solved` → `solved`; `night-complete` → `night-complete` |
+| `paused` | still | `pause` | `resume` or `lantern-lit` → back; `restart` → `playing` |
+| `solved` | runs (the outro) | `solved` | `next-puzzle` or `replay` → `playing`; `night-complete` → `night-complete`; `pause` → `paused` |
+| `night-complete` | runs (the last scene stays) | none (the ending cutscene) | `ending-done` → `end`; `pause` → `paused` |
+| `end` | still | `end` | `again` → `title` |
+
+- **Where events come from.** `update(signals)` runs once a frame, after `game.frame()`:
+  - `pause`: the cover-the-flame gesture, or `SessionVisibility.paused` turning on (once per pause; coming back stays paused).
+  - `lantern-lit`: a pinch-release gesture.
+  - `puzzle-solved`, `next-puzzle` and `night-complete`: the game's `puzzle-solved`, `puzzle-start` and `chapter-complete` events.
+  - `start`, `resume`, `restart`, `replay`, `again`: the screens' buttons (the ids in `src/ui/menu-panel/screens.ts`).
+  - `ending-done`: the ending cutscene finished.
+- **The game is paused by the flow:** the app passes `paused: !flow.simRuns` to `game.frame`, one frame behind the flow's own changes.
+- **Actions** the app runs on a transition, through `FlowHost.run`:
+  - `restart-puzzle`: `game.restart()`.
+  - `new-night`: a new save and `game.goto(0)`.
+  - `play-ending`: the ending cutscene.
+- **Back from a pause** goes to the state the pause interrupted. A relight pinch resumes (GDD). A pause that began in the tutorial resumes into `playing`, since the pinch lights the lantern.
+- **The cover-flame tip** ("cover the flame to pause") is the tutorial screen's second line, so the player learns both lantern gestures before the night starts.
+
+`flow.test.ts` checks:
+- every state is reachable and has a way out, and every listed event goes where the table says
+- an unlisted event is ignored
+- pausing from each state and resuming back to it
+- the engine's signals and the game's events
+- the actions
+- a whole night driven through the flow
+
 ## Saves: `src/game/save-state.ts`
 
 ### The save
