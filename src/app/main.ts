@@ -41,6 +41,7 @@ import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { GlowView } from '../engine/shadow/glow-view';
+import { AirView } from '../engine/shadow/air-view';
 import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
 import { SHAPES } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
@@ -212,10 +213,14 @@ async function start(): Promise<void> {
   const kindredView = new KindredView();
   // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
   const glow = new GlowView();
+  const air = new AirView();
   const solveBloom = new SolveBloom();
   const nearGlow = [new Follower(), new Follower()];
   let lastTutorial = 'IDLE' as string;
+  let moodNow = 0.4;
+  let moodGoal = 0.4;
   const playSolve = () => {
+    moodGoal = 1;
     solveBloom.trigger();
     if (kindredOn) kindredView.burst(kindred);
   };
@@ -271,6 +276,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     glow.group,
+    air.group,
     kindredView.group,
     candleView.group,
     ambientLight,
@@ -927,7 +933,17 @@ async function start(): Promise<void> {
       try {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
         world.camera.getWorldQuaternion(cameraQuat);
-        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion);
+        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
+        moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
+        stageView.mood = moodNow;
+        air.update(
+          stage,
+          candleView.flamePosition,
+          rigPlaced && lanternLight.light.lit ? candleView.occlusion : 0,
+          step,
+          !passthrough,
+        );
         candleView.update(lanternLight.light, cameraQuat);
         lab?.applyLight(lanternLight.light, cameraQuat);
       } catch (e) {

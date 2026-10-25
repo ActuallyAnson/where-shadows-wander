@@ -1,6 +1,7 @@
 // Puts a unit quad on the stage plane: centred at (x, y) in stage coordinates (metres from the stage's centre), w wide
 // and h tall (a negative w mirrors it), turned `angle` radians about its centre (counter-clockwise seen from the player),
 // lifted `lift` metres toward the player. Builds nothing.
+import { CanvasTexture } from '@iwsdk/core';
 import type { Matrix4, Mesh } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
 
@@ -33,4 +34,11 @@ export function placeOnStage(
   );
   q.matrix.copy(scratch);
   q.matrixWorldNeedsUpdate = true;
+}
+
+/** A texture from a drawn canvas that stays sharp when the wall is seen at a slant (the renderer lowers this to what the device allows). */
+export function crispTexture(c: HTMLCanvasElement): CanvasTexture {
+  const t = new CanvasTexture(c);
+  t.anisotropy = 8;
+  return t;
 }

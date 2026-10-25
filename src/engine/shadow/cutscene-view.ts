@@ -8,7 +8,7 @@ import { hasPuppet, PUPPETS } from './pure/puppets';
 import { skipCentre, SKIP_RADIUS_M } from './pure/skip-touch';
 import type { StagePlane } from './pure/stage-plane';
 import { DEFAULT_SHADOW_OPACITY } from './shadow-renderer';
-import { placeOnStage } from './stage-quad';
+import { placeOnStage, crispTexture } from './stage-quad';
 
 /** Beats showing at once; more than this are dropped (the data is checked at load). */
 const SLOTS = 4;
@@ -49,7 +49,7 @@ function puppetArt(name: string): Art {
   g.shadowColor = '#000';
   g.shadowBlur = 6;
   for (const d of art.paths) g.fill(new Path2D(d));
-  return { tex: new CanvasTexture(c), aspect: bw / bh };
+  return { tex: crispTexture(c), aspect: bw / bh };
 }
 
 function captionArt(text: string): Art {
@@ -63,7 +63,7 @@ function captionArt(text: string): Art {
     size -= 4;
   } while (g.measureText(text).width > 980 && size > 20);
   g.fillText(text, 512, 66);
-  return { tex: new CanvasTexture(c), aspect: CAPTION_ASPECT };
+  return { tex: crispTexture(c), aspect: CAPTION_ASPECT };
 }
 
 function skipArt(): CanvasTexture {
@@ -78,7 +78,7 @@ function skipArt(): CanvasTexture {
   g.textBaseline = 'middle';
   g.font = "700 56px 'Cinzel Decorative', Georgia, serif";
   g.fillText('SKIP', 128, 132);
-  return new CanvasTexture(c);
+  return crispTexture(c);
 }
 
 export class CutsceneView {

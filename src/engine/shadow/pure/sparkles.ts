@@ -74,7 +74,8 @@ export class Sparkles {
       }
       // They sink slowly and wander a little sideways.
       this.vy[i] -= 0.03 * dt;
-      this.vx[i] += (this.rand() - 0.5) * 0.12 * dt;
+      // A smooth sway from the mote's own phase (a random step here boxed a number per mote per frame).
+      this.vx[i] += Math.sin(this.age[i] * 1.9 + this.phase[i]) * 0.06 * dt;
       this.px[i] += this.vx[i] * dt;
       this.py[i] += this.vy[i] * dt;
     }

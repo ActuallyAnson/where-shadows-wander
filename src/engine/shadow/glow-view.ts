@@ -3,7 +3,7 @@
 // and the hands' shadows, so a shadow still reads black on top of them.
 import { CanvasTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
-import { placeOnStage } from './stage-quad';
+import { placeOnStage, crispTexture } from './stage-quad';
 
 export const GLOW_SLOTS = 3;
 const RENDER_ORDER = 1.8;
@@ -20,7 +20,7 @@ function glowTexture(): CanvasTexture {
   r.addColorStop(1, 'rgba(255,215,130,0)');
   g.fillStyle = r;
   g.fillRect(0, 0, 256, 256);
-  return new CanvasTexture(c);
+  return crispTexture(c);
 }
 
 export class GlowView {

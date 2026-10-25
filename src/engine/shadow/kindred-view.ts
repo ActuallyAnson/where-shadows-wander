@@ -18,7 +18,7 @@ import type { Kindred } from './pure/kindred';
 import { createSparkleOut, Sparkles, SPARKLE_MAX } from './pure/sparkles';
 import type { StagePlane } from './pure/stage-plane';
 import { SHADOW_RENDER_ORDER } from './shadow-renderer';
-import { placeOnStage } from './stage-quad';
+import { placeOnStage, crispTexture } from './stage-quad';
 
 const LIFT_M = 0.003;
 const SPARKLE_LIFT_M = 0.0035;
@@ -41,7 +41,7 @@ function foxFrame(frame: number): CanvasTexture {
   c.width = W;
   c.height = H;
   paintFox(c.getContext('2d')!, W, H, frame);
-  return new CanvasTexture(c);
+  return crispTexture(c);
 }
 
 /** A sheet with a soft round dot on the left and a four-point star on the right, in warm black. */
@@ -64,7 +64,7 @@ function sparkleSheet(): CanvasTexture {
   g.quadraticCurveTo(93, 35, 68, 32);
   g.quadraticCurveTo(93, 29, 96, 4);
   g.fill();
-  return new CanvasTexture(c);
+  return crispTexture(c);
 }
 
 export class KindredView {
