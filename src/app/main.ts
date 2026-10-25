@@ -20,7 +20,7 @@ import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
 import { OPENING, openingFoxAlpha } from './opening';
-import { Kindred } from '../engine/shadow/pure/kindred';
+import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
@@ -186,6 +186,7 @@ async function start(): Promise<void> {
   // The kindred (a shadow bird that flies about the wall): the Hand Lab's Kindred button, or the Testing panel's switch.
   const kindred = new Kindred();
   const kindredStartX = 0.4;
+  const spot = new Float64Array(2);
   const kindredView = new KindredView();
   let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
   let kindredOn = false;
@@ -694,6 +695,33 @@ async function start(): Promise<void> {
               hh = stage.height / 2;
             const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
             const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
+            // A hand's shadow coming close startles it (the palm's shadow, from the light through the hand).
+            if (kindred.startled <= 0 && openingT < 0) {
+              const fl = candleView.flamePosition;
+              for (const h of handList) {
+                if (!h.tracked) continue;
+                const o3 = JOINT['middle-finger-metacarpal'] * 3;
+                if (
+                  !shadowSpot(
+                    stage,
+                    fl[0],
+                    fl[1],
+                    fl[2],
+                    h.positions[o3],
+                    h.positions[o3 + 1],
+                    h.positions[o3 + 2],
+                    spot,
+                  )
+                )
+                  continue;
+                const ex = spot[0] - kindred.x,
+                  ey = spot[1] - kindred.y;
+                if (ex * ex + ey * ey < SCARE_RADIUS_M * SCARE_RADIUS_M) {
+                  kindred.scare(spot[0], spot[1]);
+                  break;
+                }
+              }
+            }
             kindred.update(step, hw, hh, fx, fy, true);
             let foxAlpha = 1;
             if (openingT >= 0) {

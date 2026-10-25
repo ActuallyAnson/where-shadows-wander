@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Kindred } from './kindred';
+import { createStagePlane } from './stage-plane';
+import { Kindred, SCARE_RADIUS_M, shadowSpot } from './kindred';
 
 const HW = 0.4;
 const HH = 0.3;
@@ -81,5 +82,23 @@ describe('Kindred', () => {
     k.update(1e6, HW, HH, 0, 0, false);
     expect(Number.isFinite(k.x + k.y + k.vx + k.vy + k.flap)).toBe(true);
     expect(Math.abs(k.x)).toBeLessThanOrEqual(HW);
+  });
+});
+
+describe('shadowSpot', () => {
+  const stage = createStagePlane(); // at the origin, facing +z
+  const out = new Float64Array(2);
+
+  it('casts a hand point onto the wall, bigger the nearer the light', () => {
+    // light 1 m out, hand halfway: the shadow is twice as far from the middle
+    expect(shadowSpot(stage, 0, 0, 1, 0.1, 0.05, 0.5, out)).toBe(true);
+    expect(out[0]).toBeCloseTo(0.2);
+    expect(out[1]).toBeCloseTo(0.1);
+  });
+
+  it('gives no shadow for a point behind the light or the wall', () => {
+    expect(shadowSpot(stage, 0, 0, 1, 0, 0, 1.5, out)).toBe(false);
+    expect(shadowSpot(stage, 0, 0, 1, 0, 0, -0.5, out)).toBe(false);
+    expect(SCARE_RADIUS_M).toBeGreaterThan(0);
   });
 });

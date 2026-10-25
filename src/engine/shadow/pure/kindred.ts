@@ -12,6 +12,8 @@ const PERCH_DAMP = 5;
 /** How far from the edge of the stage it stays, as a fraction of the half-size. */
 const MARGIN = 0.88;
 
+import type { StagePlane } from './stage-plane';
+
 export type KindredFrame = 0 | 1 | 2; // three poses of the gait
 
 export class Kindred {
@@ -25,6 +27,11 @@ export class Kindred {
   flap = 0;
   private t = 0;
   private startle = 0;
+
+  /** Seconds of fright left (0 when calm). */
+  get startled(): number {
+    return this.startle;
+  }
   private perchX = 0;
   private perchY = 0;
   private perched = false;
@@ -135,4 +142,41 @@ export class Kindred {
     const hz = landed ? 0.4 : 1.4 + 3 * Math.min(1, this.speed / MAX_SPEED);
     this.flap = (this.flap + hz * dt) % 1;
   }
+}
+
+/** How close (stage metres) a hand's shadow must come to startle the kindred. */
+export const SCARE_RADIUS_M = 0.09;
+
+/**
+ * Where the shadow of a hand point (hx, hy, hz) falls on the stage, with the light at (lx, ly, lz): the light's ray through
+ * the point, cut with the stage plane. Writes stage coordinates into out and returns true, or false when the point is
+ * not between the light and the wall (no shadow).
+ */
+export function shadowSpot(
+  stage: StagePlane,
+  lx: number,
+  ly: number,
+  lz: number,
+  hx: number,
+  hy: number,
+  hz: number,
+  out: Float64Array,
+): boolean {
+  const n = stage.normal;
+  const dx = hx - lx,
+    dy = hy - ly,
+    dz = hz - lz;
+  const o = stage.origin;
+  const denom = dx * n[0] + dy * n[1] + dz * n[2];
+  if (!(denom < -1e-9)) return false; // the ray must run toward the wall (the normal points at the lantern)
+  const t = ((o[0] - lx) * n[0] + (o[1] - ly) * n[1] + (o[2] - lz) * n[2]) / denom;
+  if (!(t >= 1)) return false;
+  const px = lx + dx * t - o[0],
+    py = ly + dy * t - o[1],
+    pz = lz + dz * t - o[2];
+  const r = stage.right,
+    u = stage.up;
+  out[0] = px * r[0] + py * r[1] + pz * r[2];
+  out[1] = px * u[0] + py * u[1] + pz * u[2];
+  return true;
 }
