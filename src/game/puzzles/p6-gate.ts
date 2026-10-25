@@ -1,6 +1,7 @@
 // Puzzle 6, the gate: a gate across the path opens while its weight plate is pressed down. The
 // plate sits on a shelf above the path (so a rock on it doesn't block the traveller's way).
-// Intended: a fist rock rests on the plate. Also works: the fox digs under the gate. The last
+// Intended: a fist rock rests on the plate. The fox's dig under the gate was the second solution
+// and is cut with the companions; this puzzle has one solution until the bedroom rework. The last
 // puzzle of the chapter: its goal is the lit window (Game adds it).
 import { HAND_COUNT } from '../../engine/sim/solver';
 import { Role } from '../abilities';
@@ -43,17 +44,15 @@ export function createGatePuzzle(): PuzzleDef {
     gate: -1,
     gateFixture: null as Fixture | null,
     plateFixture: null as Fixture | null,
-    dug: false,
   };
   return {
     id: 'p6-gate',
     layoutId: 'puzzle-6',
     title: 'The gate',
-    solutions: ['rock', 'fox'],
+    solutions: ['rock'],
     hintShape: 'fist',
 
     setup(ctx) {
-      state.dug = false;
       const y0 = ctx.groundY + GATE_R,
         y1 = ctx.groundY + GATE_HEIGHT;
       state.gate = ctx.solver.terrain.add(GATE_X, y0, GATE_X, y1, GATE_R, TerrainTag.Gate);
@@ -79,18 +78,13 @@ export function createGatePuzzle(): PuzzleDef {
     afterStep(ctx) {
       if (state.gate < 0) return;
       const terrain = ctx.solver.terrain;
-      if (!state.dug && ctx.companions.fox.dugGate === state.gate) {
-        state.dug = true;
-        ctx.credit('fox', 5);
-        ctx.fixtures.add('tunnel', GATE_X, ctx.groundY - 0.02, 0.12, 0.06);
-      }
       const down = pressed(ctx);
       if (down) ctx.credit('rock', ctx.dt);
       if (state.plateFixture) state.plateFixture.value = down ? 1 : 0;
       const s = ctx.traveller.slot(ctx);
       const passing = s >= 0 && Math.abs(ctx.store.x[s] - GATE_X) < PASSING;
       const wasOpen = terrain.enabled[state.gate] === 0;
-      const open = state.dug || down || (wasOpen && passing);
+      const open = down || (wasOpen && passing);
       if (open !== wasOpen) {
         terrain.enabled[state.gate] = open ? 0 : 1;
         if (state.gateFixture) state.gateFixture.active = !open;

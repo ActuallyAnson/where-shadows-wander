@@ -1,10 +1,9 @@
 // Puzzle objects that are not entities: a rain cloud, a wind stream, a gate, a rope, the lit
-// window, the ghost hint, a creature hint in the scenery. Puzzles add them on load and update them
+// window. Puzzles add them on load and update them
 // as they change; the renderer (Teammate B) draws them from this list. Plain TypeScript; a fixed
 // pool of reused records, so updating them each step builds nothing.
 
-export type FixtureKind =
-  'cloud' | 'wind' | 'gate' | 'rope' | 'plate' | 'tunnel' | 'window' | 'hint-rabbit' | 'hint-fox';
+export type FixtureKind = 'cloud' | 'wind' | 'gate' | 'plate' | 'window';
 
 export interface Fixture {
   kind: FixtureKind;

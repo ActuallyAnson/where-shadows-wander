@@ -6,14 +6,13 @@
 import type { Handedness } from '../engine/hands/hand';
 import { createHandShadow, type HandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
-import { COMPANION_SHAPES, type Shape } from '../engine/hands/shapes';
+import type { Shape } from '../engine/hands/shapes';
 import { hideShadow, shapeShadow } from '../engine/sim/shadow-shapes';
 import { Game, type GameInput, type GameOptions } from './game';
 import type { InputRecorder } from './replay';
 
-/** Classifier hold times (GDD): a shape commits after 0.4 s, a companion shape after about 1 s. */
+/** Classifier hold time (GDD): a shape commits after 0.4 s. */
 export const HOLD_S = 0.4;
-export const COMPANION_HOLD_S = 1.0;
 
 interface ScriptedHand {
   shape: Shape | null;
@@ -138,8 +137,7 @@ export class Headless {
       this.queue.push('candidate', hand, h.shape, this.t, 0.5, 0);
     }
     h.heldS += dt;
-    const need = COMPANION_SHAPES.includes(h.shape) ? COMPANION_HOLD_S : HOLD_S;
-    if (h.heldS >= need) {
+    if (h.heldS >= HOLD_S) {
       if (h.committed) this.queue.push('release', hand, h.committed, this.t, 0, h.heldS, 'switch');
       this.queue.push('commit', hand, h.shape, this.t, 0.5, h.heldS);
       h.committed = h.shape;

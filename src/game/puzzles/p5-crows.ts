@@ -1,6 +1,6 @@
-// Puzzle 5, crows: crows sit on the path and the traveller won't walk past them. Intended: the fox
-// (found from the hint in puzzle 4) trots up and scares them away. Also works: catch fireflies in a
-// cup and use their light to lure the crows off the path, then lift them away.
+// Puzzle 5, crows: crows sit on the path and the traveller won't walk past them. Intended: catch
+// fireflies in a cup and use their light to lure the crows off the path, then lift them away. Also
+// works: shoo them with a spread hand swept quickly past them.
 import { Kind } from '../../engine/sim/entity-kinds';
 import { HAND_COUNT } from '../../engine/sim/solver';
 import { Role } from '../abilities';
@@ -12,8 +12,9 @@ import type { PuzzleDef } from '../puzzle';
 const WARY = 0.2;
 /** A crow counts as on the path while it is lower than this above the ground. */
 const ON_PATH = 0.15;
-/** The fox frightens crows within this distance. */
-const FOX_SCARE = 0.3;
+/** A spread hand moving at least this fast (m/s), its centre this close to a crow, scares it. */
+export const SHOO_SPEED = 0.5;
+const SHOO_REACH = 0.25;
 /** A cup with at least this many fireflies, this close to a crow, lures it. */
 const LURE_FIREFLIES = 3;
 const LURE_REACH = 0.4;
@@ -25,6 +26,20 @@ function lantern(ctx: GameContext): number {
     if (ctx.abilities.has(h, Role.Catcher) && a.carried >= LURE_FIREFLIES) return h;
   }
   return -1;
+}
+
+/** Whether a spread hand sweeping fast is close enough to scare the crow in slot `s`. */
+function shooed(ctx: GameContext, s: number): boolean {
+  const store = ctx.store;
+  for (let h = 0; h < HAND_COUNT; h++) {
+    if (!ctx.abilities.has(h, Role.Wall)) continue;
+    const a = ctx.abilities.hands[h];
+    if (a.vx * a.vx + a.vy * a.vy < SHOO_SPEED * SHOO_SPEED) continue;
+    const dx = a.cx - store.x[s],
+      dy = a.cy - store.y[s];
+    if (dx * dx + dy * dy <= SHOO_REACH * SHOO_REACH) return true;
+  }
+  return false;
 }
 
 function anyLured(ctx: GameContext): boolean {
@@ -41,26 +56,21 @@ export function createCrowsPuzzle(): PuzzleDef {
     id: 'p5-crows',
     layoutId: 'puzzle-5',
     title: 'Crows',
-    solutions: ['fox', 'fireflies'],
-    hintShape: 'fox',
+    solutions: ['fireflies', 'shoo'],
+    hintShape: 'cup',
 
     step(ctx) {
       const { store } = ctx;
-      const fox = ctx.companions.slotOf(ctx.companions.fox, ctx);
       const cup = lantern(ctx);
       let scared = false;
       // Crows flock: once one follows the light, they all do.
       let lured = cup >= 0 && anyLured(ctx);
       for (let s = store.kindStart[Kind.Crow]; s < store.kindEnd[Kind.Crow]; s++) {
         if (!store.alive[s] || store.flags[s] & GameFlag.Scared) continue;
-        if (fox >= 0) {
-          const dx = store.x[fox] - store.x[s],
-            dy = store.y[fox] - store.y[s];
-          if (dx * dx + dy * dy <= FOX_SCARE * FOX_SCARE) {
-            store.flags[s] = (store.flags[s] & ~GameFlag.Lured) | GameFlag.Scared;
-            scared = true;
-            continue;
-          }
+        if (shooed(ctx, s)) {
+          store.flags[s] = (store.flags[s] & ~GameFlag.Lured) | GameFlag.Scared;
+          scared = true;
+          continue;
         }
         if (cup >= 0) {
           const a = ctx.abilities.hands[cup];
@@ -80,7 +90,7 @@ export function createCrowsPuzzle(): PuzzleDef {
       }
       if (scared) {
         ctx.events.push('puzzle-event', 'crows-flee', ctx.time);
-        ctx.credit('fox', 1);
+        ctx.credit('shoo', 1);
       }
       if (lured) ctx.credit('fireflies', ctx.dt);
 

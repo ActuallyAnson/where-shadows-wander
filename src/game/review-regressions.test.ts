@@ -21,24 +21,19 @@ const opts = (puzzle = 0, seed = 1) => {
 const tx = (h: Headless) => h.game.store.x[h.game.traveller.slot(h.game)];
 
 describe('review regressions', () => {
-  it('a restart forgets what the rabbit did (no rope without a rabbit)', () => {
+  it('a restart forgets which bridges the traveller stood on', () => {
     const h = new Headless(opts(3));
-    h.pose('left', 'rabbit', -0.5, -0.1).run(1.5).hide('left');
-    expect(h.runUntil(() => h.saw('puzzle-event', 'rope-lowered'), 10)).toBe(true);
+    h.pose('left', 'flat', -0.1, -0.32);
+    expect(h.runUntil(() => h.game.traveller.standingOnId(h.game) === 0, 15)).toBe(true);
     h.game.restart();
-    const before = h.log.length;
-    h.run(3);
-    expect(h.log.slice(before).some((e) => e.what === 'puzzle-event:rope-lowered')).toBe(false);
-  });
-
-  it('a restart forgets the fox dug under the gate (the gate is shut again)', () => {
-    const h = new Headless(opts(5));
-    h.pose('left', 'fox', -0.3, -0.15).run(1.5).hide('left');
-    expect(h.runUntil(() => h.saw('puzzle-event', 'dig'), 15)).toBe(true);
-    h.game.restart();
-    h.run(1);
-    expect(h.game.fixtures.find('gate')?.active).toBe(true);
-    expect(h.game.fixtures.find('tunnel')).toBeNull();
+    h.hide('left').pose('right', 'flat', -0.1, -0.32);
+    const ferry = () => {
+      const x = tx(h);
+      if (x > -0.25) h.move('right', Math.min(x, 0.2), -0.32);
+    };
+    expect(h.runUntil(() => h.saw('puzzle-solved'), 40, ferry)).toBe(true);
+    expect(h.saw('puzzle-solved', 'ferry')).toBe(true);
+    expect(h.saw('puzzle-solved', 'two-bridges')).toBe(false);
   });
 
   it('a shape committed while paused takes its role on resume', () => {
@@ -55,14 +50,10 @@ describe('review regressions', () => {
   });
 
   it('a win nobody designed is recorded as "other", not as the intended solution', () => {
-    // One bridge carried along under the traveller ferries it over the chasm.
-    const h = new Headless(opts(3));
-    h.pose('right', 'flat', -0.1, -0.32);
-    const ferry = () => {
-      const x = tx(h);
-      if (x > -0.25) h.move('right', Math.min(x, 0.2), -0.32);
-    };
-    expect(h.runUntil(() => h.saw('puzzle-solved'), 40, ferry)).toBe(true);
+    // Two fists side by side fill the tutorial's gap as stepping stones.
+    const h = new Headless(opts(0));
+    h.pose('left', 'fist', -0.05, -0.35).pose('right', 'fist', 0.05, -0.35);
+    expect(h.runUntil(() => h.saw('puzzle-solved'), 30)).toBe(true);
     expect(h.saw('puzzle-solved', OTHER_SOLUTION)).toBe(true);
   });
 
@@ -96,14 +87,6 @@ describe('review regressions', () => {
     expect(h.runUntil(() => h.game.puzzle.id === 'p2-rain', 30)).toBe(true);
     h.run(0.2);
     expect(h.game.abilities.of('right').role).toBe(Role.Bridge);
-  });
-
-  it('the fox walks on once the gap it waits at is bridged', () => {
-    const h = new Headless(opts(3));
-    h.pose('left', 'fox', -0.5, -0.1).run(1.5).hide('left').run(3);
-    expect(h.game.companions.fox.state).toBe('wait');
-    h.pose('left', 'flat', -0.1, -0.32).pose('right', 'flat', 0.18, -0.32).run(1);
-    expect(h.game.companions.fox.state).toBe('walk');
   });
 
   it('replays a session that used restart and goto, and leaves the options save untouched', () => {

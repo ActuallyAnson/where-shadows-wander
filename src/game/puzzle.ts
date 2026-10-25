@@ -40,8 +40,6 @@ export interface PuzzleDef {
   readonly hintDelayS?: number;
   /** Top of the ground (default GROUND_Y). */
   readonly groundY?: number;
-  /** A creature whose hint is drawn into this puzzle's scenery until it is discovered. */
-  readonly creatureHint?: { readonly creature: 'rabbit' | 'fox'; readonly x: number; readonly y: number };
   setup?(ctx: GameContext): void;
   step?(ctx: GameContext): void;
   afterStep?(ctx: GameContext): void;

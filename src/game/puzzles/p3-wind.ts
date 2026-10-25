@@ -1,7 +1,7 @@
 // Puzzle 3, wind: a strong wind blows from the right across the second half of the stage and pushes
 // the traveller back. Intended: a spread hand stands upright on its windward side as a windbreak.
 // Also works: a fist held just above the traveller as a rock to hold on to (an anchor), carried
-// along with it. The rabbit's hint is in this puzzle's scenery, ahead of the chasm in puzzle 4.
+// along with it.
 import { HAND_COUNT } from '../../engine/sim/solver';
 import { WALL_WIDTH_M } from '../../engine/stage/stage-frame';
 import { Role } from '../abilities';
@@ -42,7 +42,6 @@ export function createWindPuzzle(): PuzzleDef {
     title: 'Wind',
     solutions: ['wall', 'anchor'],
     hintShape: 'spread',
-    creatureHint: { creature: 'rabbit', x: 0.45, y: 0.25 },
 
     setup(ctx) {
       const right = WALL_WIDTH_M / 2;

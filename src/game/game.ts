@@ -1,5 +1,5 @@
 // The game: one object main.ts drives with one call a frame (ADR 0013). Owns the fixed-step loop,
-// the entity store, the solver, the traveller, the abilities, the companions and the puzzle runner,
+// the entity store, the solver, the traveller, the abilities and the puzzle runner,
 // and plays a chapter's puzzles in order. Plain TypeScript; per-frame and per-step code builds no
 // objects (puzzle loads do, between puzzles).
 //
@@ -10,15 +10,15 @@
 //   4. runs 0..N fixed steps and returns the interpolation factor for the renderer.
 //
 // Each fixed step:
-//   hand events → abilities (roles), discovery     (only the first step after a frame captures them)
+//   hand events → abilities (roles)                (only the first step after a frame captures them)
 //   store.beginStep()
 //   abilities.beforeSolve   hands solid to what their roles say
 //   puzzle.step             hazards, wind, holds
-//   creatures, traveller, companions think          set speeds
+//   creatures, traveller think                      set speeds
 //   solver.step
 //   abilities.afterSolve    catching, carrying, splashes on hands
 //   puzzle.afterStep        contacts, gates, credit
-//   traveller.after, companions.after, creatures.after
+//   traveller.after, creatures.after
 //   runner.update           credit, hint, win, outro → next puzzle
 
 import type { GestureEvent } from '../engine/hands/gesture-events';
@@ -32,10 +32,8 @@ import { Rng } from '../engine/sim/rng';
 import type { ParsedLayout } from '../engine/sim/scene-layout';
 import { defaultSolverConfig, Solver, type SolverConfig } from '../engine/sim/solver';
 import { Abilities } from './abilities';
-import { Companions } from './companions';
 import type { GameContext } from './context';
 import { Creatures } from './creatures';
-import { Discovery } from './discovery';
 import { Fixtures } from './fixtures';
 import { GameEventQueue } from './game-events';
 import { GROUND_Y, loadPuzzle, markerOf } from './level';
@@ -81,14 +79,13 @@ export interface GameOptions {
 export function gameSolverConfig(): SolverConfig {
   const cfg = defaultSolverConfig();
   const bit = (k: number) => 1 << k;
-  const walkers = bit(Kind.Traveller) | bit(Kind.Rock) | bit(Kind.Rabbit) | bit(Kind.Fox);
+  const walkers = bit(Kind.Traveller) | bit(Kind.Rock);
   cfg.kindGravity[Kind.Crow] = 0;
   cfg.kindGravity[Kind.Firefly] = 0;
   // Drops start falling fast and speed up gently: rain should read as rain, not hail.
   cfg.kindGravity[Kind.Raindrop] = 0.5;
   cfg.kindCollides.fill(0);
-  for (const k of [Kind.Traveller, Kind.Rock, Kind.Rabbit, Kind.Fox])
-    cfg.kindCollides[k] = walkers | bit(Kind.Raindrop);
+  for (const k of [Kind.Traveller, Kind.Rock]) cfg.kindCollides[k] = walkers | bit(Kind.Raindrop);
   cfg.kindCollides[Kind.Traveller] |= bit(Kind.Crow);
   cfg.kindCollides[Kind.Raindrop] = walkers;
   cfg.kindCollides[Kind.Crow] = bit(Kind.Traveller);
@@ -104,10 +101,8 @@ export class Game implements GameContext {
   readonly fixtures = new Fixtures();
   readonly traveller = new Traveller();
   readonly abilities = new Abilities();
-  readonly companions = new Companions();
   readonly creatures: Creatures;
   readonly runner = new PuzzleRunner();
-  readonly discovery: Discovery;
   readonly save: SaveState;
   readonly loop: FixedStepLoop;
   readonly latch = new InputLatch();
@@ -138,7 +133,6 @@ export class Game implements GameContext {
     // A copy: the game changes its save as the player progresses, and the caller's object (say, a
     // replay's options) must stay as it was.
     this.save = opts.save ? readSave(opts.save, opts.save.chapter) : newSave(opts.chapterId);
-    this.discovery = new Discovery(this.save);
     this.creatures = new Creatures(this.store.capacity);
     this.loop = new FixedStepLoop(SIM_HZ, (dt) => this.step(dt), MAX_STEPS_PER_FRAME);
     this.dt = this.loop.step;
@@ -206,9 +200,7 @@ export class Game implements GameContext {
     this.puzzleTime += dt;
     const shapes = this.latch.shapes;
     for (let i = 0; i < shapes.count; i++) {
-      const e = shapes.at(i);
-      this.discovery.onShapeEvent(e, this);
-      this.abilities.onShapeEvent(e, this);
+      this.abilities.onShapeEvent(shapes.at(i), this);
     }
     this.latch.consume();
 
@@ -218,12 +210,10 @@ export class Game implements GameContext {
     if (!this.complete) def.step?.(this);
     this.creatures.think(this);
     this.traveller.think(this);
-    this.companions.think(this);
     this.solver.step(this.store, dt);
     this.abilities.afterSolve(this);
     if (!this.complete) def.afterStep?.(this);
     this.traveller.after(this);
-    this.companions.after(this);
     this.creatures.after(this);
     if (this.complete) return;
     const result = this.runner.update(this);
@@ -273,11 +263,9 @@ export class Game implements GameContext {
     this.latch.clear();
     // Roles stay: the classifier still holds its commits across a load, and will release them later.
     this.abilities.resetForPuzzle();
-    this.companions.reset();
     this.traveller.spawn(this, markerOf(this.layout, 'goal'));
     this.runner.start(def);
     def.setup?.(this);
-    this.discovery.setup(def, this);
     // After setup, so fireflies a puzzle spawns itself also get their home.
     this.creatures.settle(this.store);
     if (index === this.puzzles.length - 1 && !this.fixtures.find('window')) {

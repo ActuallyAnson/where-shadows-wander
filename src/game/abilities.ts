@@ -2,11 +2,13 @@
 // hand's shadow a role in the world until the shape is released. Plain TypeScript; no allocation
 // per step.
 //
-//   flat    → bridge   a plank the traveller, rocks and companions stand on; a roof that stops rain
+//   flat    → bridge   a plank the traveller and rocks stand on; a roof that stops rain
 //   fist    → rock     a heavy solid: pushes, blocks, presses weight plates, anchors the traveller
 //   cup     → catcher  catches raindrops (absorbed, counted) and fireflies (carried until released)
 //   spread  → wall     blocks wind (puzzles test `wallShelters`), rain, crows and walkers
-//   rabbit, fox → companion: the creature breaks free (Companions); the shadow itself does nothing
+//
+// Any other shape the classifier knows (the animal shapes, cut from the game) gives no role: its
+// commit ends the hand's current role, and its shadow passes through everything.
 //
 // The shadow always mirrors the live hand; bridge and rock collide with its actual capsules, so a
 // slightly imperfect shape still works (GDD). A hand with no role passes through everything, so a
@@ -29,12 +31,11 @@ export const Role = {
   Rock: 2,
   Catcher: 3,
   Wall: 4,
-  Companion: 5,
 } as const;
 export type RoleId = (typeof Role)[keyof typeof Role];
 
 /** Role names, indexed by Role: the ids used in events and solution credit. */
-export const ROLE_NAMES = ['none', 'bridge', 'rock', 'catcher', 'wall', 'companion'] as const;
+export const ROLE_NAMES = ['none', 'bridge', 'rock', 'catcher', 'wall'] as const;
 
 export function roleOfShape(shape: Shape): RoleId {
   switch (shape) {
@@ -47,12 +48,12 @@ export function roleOfShape(shape: Shape): RoleId {
     case 'spread':
       return Role.Wall;
     default:
-      return Role.Companion;
+      return Role.None;
   }
 }
 
 const bit = (k: number) => 1 << k;
-const WALKERS = bit(Kind.Traveller) | bit(Kind.Rock) | bit(Kind.Rabbit) | bit(Kind.Fox);
+const WALKERS = bit(Kind.Traveller) | bit(Kind.Rock);
 /** Per role: the kinds the hand's shadow is solid to (HandCollider.mask). */
 export const ROLE_MASK: readonly number[] = [
   0,
@@ -60,7 +61,6 @@ export const ROLE_MASK: readonly number[] = [
   WALKERS | bit(Kind.Raindrop) | bit(Kind.Crow),
   WALKERS | bit(Kind.Raindrop) | bit(Kind.Firefly),
   WALKERS | bit(Kind.Raindrop) | bit(Kind.Crow),
-  0,
 ];
 
 /** Raindrops a cup holds before it overflows (spilling them all). */
@@ -146,11 +146,12 @@ export class Abilities {
     const a = this.of(e.hand);
     if (e.type === 'commit') {
       if (a.role !== Role.None) this.end(a, ctx);
-      a.role = roleOfShape(e.shape);
+      const role = roleOfShape(e.shape);
+      if (role === Role.None) return;
+      a.role = role;
       a.shape = e.shape;
       a.since = ctx.time;
       ctx.events.push('ability-start', ROLE_NAMES[a.role], ctx.time, 0, a.cx, a.cy, a.hand);
-      if (a.role === Role.Companion) ctx.companions.release(e.shape, a.cx, a.cy, ctx);
     } else if (e.type === 'release' && a.shape === e.shape && a.role !== Role.None) {
       this.end(a, ctx);
     }

@@ -1,12 +1,11 @@
 // What every gameplay module sees during a fixed step. Game builds one and passes it around, so a
-// puzzle, the traveller, the abilities and the companions all read the same world. Plain TypeScript.
+// puzzle, the traveller and the abilities all read the same world. Plain TypeScript.
 
 import type { EntityStore } from '../engine/sim/entity-store';
 import type { Rng } from '../engine/sim/rng';
 import type { ParsedLayout } from '../engine/sim/scene-layout';
 import type { Solver } from '../engine/sim/solver';
 import type { Abilities } from './abilities';
-import type { Companions } from './companions';
 import type { Creatures } from './creatures';
 import type { Fixtures } from './fixtures';
 import type { GameEventQueue } from './game-events';
@@ -21,7 +20,6 @@ export interface GameContext {
   readonly fixtures: Fixtures;
   readonly traveller: Traveller;
   readonly abilities: Abilities;
-  readonly companions: Companions;
   /** Fireflies and crows (where lured crows head). */
   readonly creatures: Creatures;
   /** The current puzzle's layout, in stage space. */

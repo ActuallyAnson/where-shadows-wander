@@ -23,12 +23,6 @@ export type GameEventType =
   | 'traveller-state'
   /** The traveller fell and was put back at its start. */
   | 'traveller-fell'
-  /** A companion broke free of the hand (id: rabbit or fox). */
-  | 'companion-released'
-  /** A companion faded away (id: rabbit or fox). */
-  | 'companion-gone'
-  /** A creature was found for the first time (id: rabbit or fox). */
-  | 'creature-discovered'
   /** Show the ghost hint (id: the shape to make, x, y: where on the stage). */
   | 'hint-show'
   /** Hide the ghost hint. */
@@ -37,7 +31,7 @@ export type GameEventType =
   | 'caught'
   /** A raindrop hit something and burst (id: ground, hand or traveller). */
   | 'splash'
-  /** A puzzle object changed (id: gate-open, gate-close, rope-lowered, dig, crows-flee, lantern-out, ...). */
+  /** A puzzle object changed (id: gate-open, gate-close, crows-flee, ...). */
   | 'puzzle-event';
 
 export interface GameEvent {

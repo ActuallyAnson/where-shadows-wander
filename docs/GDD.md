@@ -96,8 +96,8 @@ Only a fixed set of one-handed shapes is recognised. Two-handed shapes are left 
 | Fist | Closed hand | Becomes a rock that pushes, weighs down, or breaks things |
 | Cup | Palm up, fingers curled | Catches rain, embers, or fireflies and carries them |
 | Spread | Fingers spread wide | Blocks wind, holds back vines, forms a cage |
-| Rabbit | Index and middle up, others pinched to thumb | Releases the rabbit companion |
-| Fox | Fingers together, thumb up as an ear (the thumb out to the side like an L, with the hand turned so it points up) | Releases the fox companion |
+
+The rabbit and fox shapes are cut from gameplay (25 Oct 2026, see Companions below). Every shape the game uses is simple and bold; no puzzle needs a fine finger gap or a thin shape.
 
 ### How a shape is used
 
@@ -109,18 +109,17 @@ Only a fixed set of one-handed shapes is recognised. Two-handed shapes are left 
 
 4.  Releasing the shape returns the shadow to a plain hand.
 
-Simple physical roles (bridge, rock) use the shadow's actual outline for collision, so slight variations still work. Companions and special actions require the exact recognised shape.
+Simple physical roles (bridge, rock) use the shadow's actual outline for collision, so slight variations still work. Special actions (catching, the windbreak) require the exact recognised shape.
 
-### Companions
+### Companions (cut, 25 Oct 2026)
 
-Making an animal shape and holding it longer (about 1 second) lets the creature break free from the hand and become an independent helper.
+The rabbit and fox companions are cut. Their shapes are the most complicated in the set, and the classifier is weakest on them, so a puzzle that needs one would fail players for reasons they can't see. The puzzles they solved now use the four verb shapes:
 
-| Companion | Ability                                        |
-|-----------|------------------------------------------------|
-| Rabbit    | Hops over gaps and triggers far switches       |
-| Fox       | Digs through soft ground and scares away crows |
+- **The chasm:** two flat-hand bridges end to end, or one flat hand carried across as a ferry with the traveller on it (the rabbit's rope is gone).
+- **Crows:** lure them away with a cup of fireflies, or shoo them with a spread hand swept quickly past (the fox's scare is gone).
+- **The gate:** a fist on the weight plate; the fox's dig under the gate is gone, so it has one solution until the bedroom rework.
 
-New creatures are discovered, not unlocked from a menu: a faint hint appears in the scenery, and the player finds the shape.
+Creature discovery (a scenery hint, then finding the animal shape) went with them.
 
 ### Puzzles (NOT FIXED – JUST IDEAS)
 
@@ -131,9 +130,9 @@ The puzzles will be finalised later, around the bedroom and its invisible props;
 | 1 | Gap in the path | Flat-hand bridge | — (tutorial) |
 | 2 | Rain puts out the traveller's lantern | Cup to catch the rain | Flat hand as a roof |
 | 3 | Strong wind pushes the traveller back | Spread hand as a wall | Fist rock as an anchor |
-| 4 | Wide chasm | Rabbit hops across and lowers a rope | Two bridges in sequence |
-| 5 | Crows block the path | Fox scares them away | Cup fireflies to distract them |
-| 6 | Locked gate with a weight plate | Fist rock on the plate | Fox digs under the gate |
+| 4 | Wide chasm | Two bridges in sequence | One flat hand carried across as a ferry |
+| 5 | Crows block the path | Cup fireflies to distract them | Spread hand swept past to shoo them |
+| 6 | Locked gate with a weight plate | Fist rock on the plate | — (the fox's dig is cut) |
 
 ### The night
 
@@ -399,14 +398,14 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 ## Scope, milestones and risks
 
-v1 is one polished night: a short run of puzzles (to be finalised), 4 verb shapes, 2 companions, with features frozen at the start of week 7.
+v1 is one polished night: a short run of puzzles (to be finalised) and 4 verb shapes (the 2 companions are cut), with features frozen at the start of week 7.
 
 ### In scope / out of scope
 
 | In v1                           | Later                               |
 |---------------------------------|-------------------------------------|
 | One night (puzzles to be finalised) | More levels                     |
-| 4 verb shapes, 2 companions     | Two-handed shapes (bird, butterfly) |
+| 4 verb shapes                   | Two-handed shapes (bird, butterfly), animal companions |
 | Bedroom with a wall stage and invisible-prop landscape | Multiplayer shadow duets |
 | —                               | Real-room mode (table or wall in passthrough) |
 | Creature gallery                | Player-made shadow stories          |
@@ -422,7 +421,7 @@ v1 is one polished night: a short run of puzzles (to be finalised), 4 verb shape
 
 4.  **Week 4 (to 29 Oct):** Traveller, invisible-prop shadows as terrain, and the first puzzles of the night, including the wordless tutorial.
 
-5.  **Week 5 (to 5 Nov):** The remaining puzzles, rabbit and fox companions, the ending (the kid falls asleep), saved gallery.
+5.  **Week 5 (to 5 Nov):** The remaining puzzles, the ending (the kid falls asleep), saved gallery. (The rabbit and fox companions planned here are cut.)
 
 6.  **Week 6 (to 12 Nov):** The bedroom and hand models, art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
 

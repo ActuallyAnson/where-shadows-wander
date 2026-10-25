@@ -116,8 +116,7 @@ export class Traveller {
       const px = x + this.dir * (r * 0.5 + 0.02),
         py = y + 0.025,
         pr = r * 0.75;
-      // A wall, or a creature or rock standing in the way: it waits rather than shoving it along
-      // (it would push a waiting fox into the chasm).
+      // A wall, or a rock standing in the way: it waits rather than shoving it along.
       const wall = solver.blocked(store, px, py, pr, TRAVELLER_BIT, s) || bodyAhead(store, px, y, pr);
       if (ground && !wall) {
         next = 'walk';
@@ -193,9 +192,9 @@ export class Traveller {
 }
 
 /** Kinds the traveller will not walk into: it stops for them as for a wall. */
-const STOPS_FOR = [Kind.Rock, Kind.Rabbit, Kind.Fox] as const;
+const STOPS_FOR = [Kind.Rock] as const;
 
-/** Whether a rock or companion overlaps the probe circle ahead (at body height). */
+/** Whether a rock overlaps the probe circle ahead (at body height). */
 function bodyAhead(store: EntityStore, x: number, y: number, r: number): boolean {
   for (let k = 0; k < STOPS_FOR.length; k++) {
     const kind = STOPS_FOR[k];

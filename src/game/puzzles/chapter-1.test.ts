@@ -1,5 +1,6 @@
 // Every chapter-1 puzzle, played headless from scripted hands: each is solved every way it should
-// be (GDD: at least two solutions, one for the tutorial), and the right solution is recorded.
+// be (GDD: at least two solutions, one for the tutorial), the right solution is recorded, and one
+// way that should not work (a cheat or a half-solution) does not.
 import { describe, expect, it } from 'vitest';
 import chapter1 from '../../../public/scenes/chapter-1.iwsdk.scene.json';
 import { Headless } from '../headless';
@@ -36,6 +37,14 @@ describe('puzzle 1: the gap', () => {
     expect(h.saw('puzzle-solved', 'bridge')).toBe(true);
     expect(h.game.save.solutions['p1-gap']).toEqual(['bridge']);
   });
+
+  it('is not crossed on an animal shape, which has no role any more', () => {
+    const h = at(0);
+    h.pose('right', 'rabbit', 0, -0.32);
+    h.run(20);
+    expect(h.saw('ability-start')).toBe(false);
+    expect(h.saw('puzzle-solved')).toBe(false);
+  });
 });
 
 describe('puzzle 2: rain', () => {
@@ -61,6 +70,13 @@ describe('puzzle 2: rain', () => {
     expect(h.runUntil(solved(h), 40)).toBe(true);
     expect(h.saw('puzzle-solved', 'roof')).toBe(true);
   });
+
+  it('is not solved by a cup held off to the side of the rain', () => {
+    const h = at(1);
+    h.pose('right', 'cup', 0.5, 0.2);
+    h.run(25);
+    expect(h.saw('puzzle-solved')).toBe(false);
+  });
 });
 
 describe('puzzle 3: wind', () => {
@@ -85,25 +101,16 @@ describe('puzzle 3: wind', () => {
     expect(h.saw('puzzle-solved', 'anchor')).toBe(true);
   });
 
-  it('shows the rabbit hint in the scenery', () => {
+  it('is not solved by a windbreak on the sheltered side', () => {
+    // The wind blows from the right: a wall on the traveller's left shelters nothing.
     const h = at(2);
-    h.run(0.1);
-    expect(h.game.fixtures.find('hint-rabbit')?.active).toBe(true);
+    const follow = () => h.pose('right', 'spread', travellerX(h) - 0.15, -0.11);
+    h.run(25, follow);
+    expect(h.saw('puzzle-solved')).toBe(false);
   });
 });
 
 describe('puzzle 4: the chasm', () => {
-  it('is solved by the rabbit hopping across and lowering the rope', () => {
-    const h = at(3);
-    h.pose('left', 'rabbit', -0.5, -0.1).run(1.5).hide('left');
-    expect(h.saw('companion-released', 'rabbit')).toBe(true);
-    expect(h.saw('creature-discovered', 'rabbit')).toBe(true);
-    expect(h.runUntil(solved(h), 40)).toBe(true);
-    expect(h.saw('puzzle-event', 'rope-lowered')).toBe(true);
-    expect(h.saw('puzzle-solved', 'rabbit')).toBe(true);
-    expect(h.game.save.creatures).toEqual(['rabbit']);
-  });
-
   it('is solved with two flat-hand bridges end to end', () => {
     const h = at(3);
     h.pose('left', 'flat', -0.1, -0.32).pose('right', 'flat', 0.18, -0.32);
@@ -111,7 +118,19 @@ describe('puzzle 4: the chasm', () => {
     expect(h.saw('puzzle-solved', 'two-bridges')).toBe(true);
   });
 
-  it('cannot be crossed on one bridge', () => {
+  it('is solved by ferrying the traveller across on one flat hand', () => {
+    const h = at(3);
+    h.pose('right', 'flat', -0.1, -0.32);
+    // The player carries the hand along under the traveller once it has stepped on.
+    const ferry = () => {
+      const x = travellerX(h);
+      if (x > -0.25) h.move('right', Math.min(x, 0.2), -0.32);
+    };
+    expect(h.runUntil(solved(h), 40, ferry)).toBe(true);
+    expect(h.saw('puzzle-solved', 'ferry')).toBe(true);
+  });
+
+  it('cannot be crossed on one bridge held still', () => {
     const h = at(3);
     h.pose('left', 'flat', 0.05, -0.32);
     h.run(25);
@@ -126,14 +145,6 @@ describe('puzzle 5: crows', () => {
     expect(h.game.traveller.state).toBe('held');
   });
 
-  it('is solved by the fox scaring the crows away', () => {
-    const h = at(4);
-    h.pose('right', 'fox', -0.45, -0.15).run(1.5).hide('right');
-    expect(h.runUntil(solved(h), 40)).toBe(true);
-    expect(h.saw('puzzle-event', 'crows-flee')).toBe(true);
-    expect(h.saw('puzzle-solved', 'fox')).toBe(true);
-  });
-
   it('is solved by luring the crows away with a cup of fireflies', () => {
     const h = at(4);
     h.pose('left', 'cup', -0.45, 0.13).run(2);
@@ -142,6 +153,27 @@ describe('puzzle 5: crows', () => {
     h.move('left', -0.05, 0.0).run(2).move('left', -0.05, 0.4);
     expect(h.runUntil(solved(h), 40)).toBe(true);
     expect(h.saw('puzzle-solved', 'fireflies')).toBe(true);
+  });
+
+  it('is solved by shooing the crows with a spread hand swept past them', () => {
+    const h = at(4);
+    h.pose('right', 'spread', -0.3, -0.1).run(1);
+    // A quick sweep left to right through the flock, about 1 m/s.
+    const from = h.t;
+    h.run(0.8, (t) => h.move('right', Math.min(-0.3 + (t - from) * 1.0, 0.4), -0.1));
+    expect(h.saw('puzzle-event', 'crows-flee')).toBe(true);
+    // The hand comes down out of the light, out of the traveller's way.
+    h.hide('right');
+    expect(h.runUntil(solved(h), 40)).toBe(true);
+    expect(h.saw('puzzle-solved', 'shoo')).toBe(true);
+  });
+
+  it('is not solved by a spread hand held still beside the crows', () => {
+    const h = at(4);
+    h.pose('right', 'spread', 0.17, -0.1);
+    h.run(25);
+    expect(h.saw('puzzle-event', 'crows-flee')).toBe(false);
+    expect(h.saw('puzzle-solved')).toBe(false);
   });
 });
 
@@ -160,12 +192,13 @@ describe('puzzle 6: the gate', () => {
     expect(h.saw('puzzle-solved', 'rock')).toBe(true);
   });
 
-  it('is solved by the fox digging under the gate', () => {
+  it('is not opened by a flat hand on the weight plate', () => {
+    // Only a rock has weight; a bridge on the plate leaves the gate shut.
     const h = at(5);
-    h.pose('left', 'fox', -0.3, -0.15).run(1.5).hide('left');
-    expect(h.runUntil(solved(h), 40)).toBe(true);
-    expect(h.saw('puzzle-event', 'dig')).toBe(true);
-    expect(h.saw('puzzle-solved', 'fox')).toBe(true);
+    h.pose('right', 'flat', 0, 0.03);
+    h.run(20);
+    expect(h.saw('puzzle-event', 'gate-open')).toBe(false);
+    expect(h.saw('puzzle-solved')).toBe(false);
   });
 
   it('ends the chapter after the outro and lights the window', () => {

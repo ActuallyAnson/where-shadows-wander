@@ -11,7 +11,7 @@
 // The ground. Every puzzle has a ground line along the bottom of the stage, its top at `groundY`.
 // Each `marker-gap` cuts a hole in it: the hole spans the marker's width (its height and y are only
 // for the editor's view). Everything else a puzzle needs beyond pieces and markers (wind, rain,
-// gates, ropes) is built in its puzzle code.
+// gates) is built in its puzzle code.
 
 import { CAPSULE_STRIDE } from '../engine/hands/hand-shadow';
 import type { EntityStore, Handle } from '../engine/sim/entity-store';
@@ -23,8 +23,7 @@ import { WALL_WIDTH_M } from '../engine/stage/stage-frame';
 export const TerrainTag = {
   Ground: 1,
   Gate: 2,
-  Rope: 3,
-  SoftGround: 4,
+  // 3 and 4 were the rope and the fox's soft ground, cut with the companions.
   Wall: 5,
 } as const;
 
