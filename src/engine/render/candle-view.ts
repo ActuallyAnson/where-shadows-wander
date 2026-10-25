@@ -154,9 +154,9 @@ export class CandleView {
     this.placementRingMesh.visible = false;
 
     // 9. Unlit Wick Indicator: soft warm pulsing orb hovering over wick when candle is unlit
-    this.wickIndicatorGeometry = new SphereGeometry(0.005, 8, 8);
+    this.wickIndicatorGeometry = new SphereGeometry(0.012, 10, 10);
     this.wickIndicatorMaterial = new MeshBasicMaterial({
-      color: 0xffaa44,
+      color: 0xffb844,
       transparent: true,
       opacity: 0.0,
       toneMapped: false,
@@ -242,7 +242,7 @@ export class CandleView {
   }
 
   /**
-   * Checks if an index fingertip touches near the wick or a pinch gesture is near the wick.
+   * Checks if an index fingertip touches near the wick, hand approaches, or a pinch gesture is near the wick.
    * Zero per-frame allocations.
    */
   checkIgnition(hands: Readonly<Record<Handedness, HandFrame>> | readonly HandFrame[]): boolean {
@@ -259,30 +259,53 @@ export class CandleView {
         : i === 0
           ? (hands as Readonly<Record<Handedness, HandFrame>>).left
           : (hands as Readonly<Record<Handedness, HandFrame>>).right;
-      if (!h.tracked || h.validJoints < 10) continue;
+      if (!h.tracked || h.validJoints < 3) continue;
       const p = h.positions;
 
-      // Check index tip touch
+      // 1. Check index tip touch (within 15 cm of wick)
       const idx = JOINT['index-finger-tip'] * 3;
-      const dx = p[idx] - fx;
-      const dy = p[idx + 1] - fy;
-      const dz = p[idx + 2] - fz;
-      const tipDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (tipDist < 0.08) return true;
+      const idxDx = p[idx] - fx;
+      const idxDy = p[idx + 1] - fy;
+      const idxDz = p[idx + 2] - fz;
+      const idxDist = Math.sqrt(idxDx * idxDx + idxDy * idxDy + idxDz * idxDz);
+      if (idxDist < 0.15) return true;
 
-      // Check index-to-thumb pinch near wick
+      // 2. Check thumb tip touch (within 15 cm of wick)
       const thmb = JOINT['thumb-tip'] * 3;
+      const thmbDx = p[thmb] - fx;
+      const thmbDy = p[thmb + 1] - fy;
+      const thmbDz = p[thmb + 2] - fz;
+      const thmbDist = Math.sqrt(thmbDx * thmbDx + thmbDy * thmbDy + thmbDz * thmbDz);
+      if (thmbDist < 0.15) return true;
+
+      // 3. Check middle tip touch (within 15 cm of wick)
+      const mid = JOINT['middle-finger-tip'] * 3;
+      const midDx = p[mid] - fx;
+      const midDy = p[mid + 1] - fy;
+      const midDz = p[mid + 2] - fz;
+      const midDist = Math.sqrt(midDx * midDx + midDy * midDy + midDz * midDz);
+      if (midDist < 0.15) return true;
+
+      // 4. Check index-to-thumb pinch near wick (pinch < 6.5 cm, near wick < 20 cm)
       const pdx = p[idx] - p[thmb];
       const pdy = p[idx + 1] - p[thmb + 1];
       const pdz = p[idx + 2] - p[thmb + 2];
       const pinchDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      if (pinchDist < 0.04) {
+      if (pinchDist < 0.065) {
         const mx = (p[idx] + p[thmb]) * 0.5 - fx;
         const my = (p[idx + 1] + p[thmb + 1]) * 0.5 - fy;
         const mz = (p[idx + 2] + p[thmb + 2]) * 0.5 - fz;
         const pinchWickDist = Math.sqrt(mx * mx + my * my + mz * mz);
-        if (pinchWickDist < 0.1) return true;
+        if (pinchWickDist < 0.2) return true;
       }
+
+      // 5. Check wrist/palm approach (within 16 cm of wick)
+      const wrist = JOINT['wrist'] * 3;
+      const wdx = p[wrist] - fx;
+      const wdy = p[wrist + 1] - fy;
+      const wdz = p[wrist + 2] - fz;
+      const wristDist = Math.sqrt(wdx * wdx + wdy * wdy + wdz * wdz);
+      if (wristDist < 0.16) return true;
     }
     return false;
   }
@@ -385,8 +408,8 @@ export class CandleView {
       }
     }
 
-    // If locked during gameplay, 2-handed pickup is disabled
-    if (this._isLocked) {
+    // If locked during gameplay or unlit in title ritual, pickup is disabled
+    if (this._isLocked || !this._lit) {
       if (this._state === 'held') {
         this._state = 'placed';
         this.auraMesh.visible = false;
@@ -529,9 +552,9 @@ export class CandleView {
       this.flame.mesh.visible = false;
       this.pointLight.intensity = 0;
       this.wickIndicator.visible = true;
-      const pulse = 0.5 + 0.4 * Math.sin(performance.now() * 0.005);
-      this.wickIndicatorMaterial.opacity = pulse;
-      this.wickIndicator.scale.setScalar(0.8 + 0.3 * pulse);
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.007);
+      this.wickIndicatorMaterial.opacity = 0.4 + 0.55 * pulse;
+      this.wickIndicator.scale.setScalar(0.85 + 0.35 * pulse);
       return;
     }
 

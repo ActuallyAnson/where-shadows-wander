@@ -40,11 +40,11 @@ function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement 
     ctx.fillStyle = '#ffcf70';
     ctx.beginPath();
     const cx = 256;
-    const cy = 48;
-    ctx.moveTo(cx, cy - 18);
-    ctx.lineTo(cx + 12, cy);
-    ctx.lineTo(cx, cy + 18);
-    ctx.lineTo(cx - 12, cy);
+    const cy = 68;
+    ctx.moveTo(cx, cy - 20);
+    ctx.lineTo(cx + 14, cy);
+    ctx.lineTo(cx, cy + 20);
+    ctx.lineTo(cx - 14, cy);
     ctx.closePath();
     ctx.fill();
 
@@ -53,32 +53,24 @@ function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement 
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(cx - 120, cy);
-    ctx.lineTo(cx - 24, cy);
-    ctx.moveTo(cx + 24, cy);
+    ctx.lineTo(cx - 26, cy);
+    ctx.moveTo(cx + 26, cy);
     ctx.lineTo(cx + 120, cy);
     ctx.stroke();
 
-    // Main Title: "WHERE SHADOWS WANDER"
+    // Main Title: "WHERE SHADOWS WANDER" (no CPU shadowBlur)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 28px serif, Georgia, "Cinzel Decorative"';
     ctx.fillStyle = '#ffebcc';
-    ctx.shadowColor = 'rgba(255, 170, 60, 0.6)';
-    ctx.shadowBlur = 14;
-    ctx.fillText('WHERE SHADOWS WANDER', cx, 116);
-    ctx.shadowBlur = 0;
-
-    // Subtitle / Ritual Prompt
-    ctx.font = '400 16px sans-serif, "Cinzel", serif';
-    ctx.fillStyle = '#ffc885';
-    ctx.fillText('Touch or pinch the candle to begin', cx, 172);
+    ctx.fillText('WHERE SHADOWS WANDER', cx, 136);
 
     // Bottom soft flourish line
     ctx.strokeStyle = 'rgba(255, 200, 130, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx - 60, 205);
-    ctx.lineTo(cx + 60, 205);
+    ctx.moveTo(cx - 70, 182);
+    ctx.lineTo(cx + 70, 182);
     ctx.stroke();
   }
   return canvas;

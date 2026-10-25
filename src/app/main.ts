@@ -292,7 +292,9 @@ async function start(): Promise<void> {
   const propProjector = new PropProjector();
   const propShadowView = new RenderPropShadowView(stageGroup);
   const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
-  const bakePropTerrain = (): void => {
+  let propTerrainBaked = false;
+  const bakePropTerrain = (force = false): void => {
+    if (propTerrainBaked && !force) return;
     const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
     solver.terrain.clear();
     for (let i = 0; i < terrainCapsules.length; i++) {
@@ -301,6 +303,7 @@ async function start(): Promise<void> {
     }
     propShadowView.updatePolygons(polygons);
     propTouch.setPolygons(polygons);
+    propTerrainBaked = true;
   };
   world.scene.add(
     stageView.group,
@@ -873,7 +876,7 @@ async function start(): Promise<void> {
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
             if (candleAction.justPlaced) {
-              bakePropTerrain();
+              bakePropTerrain(true);
             }
           }
         } catch (e) {
@@ -882,7 +885,16 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         if (sessionState === 'title_vr') {
           vrTitle.update(step, cameraQuat);
-          if (candleView.checkIgnition(handList)) {
+          let triggerIgnition = candleView.checkIgnition(handList);
+          if (!triggerIgnition && frame) {
+            for (const source of frame.session.inputSources) {
+              if (source.gamepad?.buttons.some((b) => b.pressed)) {
+                triggerIgnition = true;
+                break;
+              }
+            }
+          }
+          if (triggerIgnition) {
             sessionState = 'opening';
             candleView.lit = true;
             ambientLight.color.setHex(0x2a1c12);

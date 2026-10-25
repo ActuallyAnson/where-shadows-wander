@@ -12,7 +12,7 @@ import {
   DoubleSide,
   Group,
   Mesh,
-  MeshStandardMaterial,
+  MeshBasicMaterial,
   PlaneGeometry,
   SRGBColorSpace,
 } from '@iwsdk/core';
@@ -33,18 +33,18 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   }
   if (!canvas) {
     canvas = {
-      width: 512,
-      height: 512,
+      width: 128,
+      height: 128,
       getContext: () => null,
     } as unknown as HTMLCanvasElement;
   }
 
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = 128;
+  canvas.height = 128;
   const ctx = canvas.getContext ? canvas.getContext('2d') : null;
   if (ctx) {
-    const cols = 6;
-    const rows = 5;
+    const cols = 4;
+    const rows = 4;
     const pw = canvas.width / cols;
     const ph = canvas.height / rows;
 
@@ -54,17 +54,10 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
         ctx.fillStyle = PATCH_COLORS[colorIdx];
         ctx.fillRect(c * pw, r * ph, pw, ph);
 
-        // Subtle weave noise
-        ctx.fillStyle = 'rgba(0,0,0,0.06)';
-        for (let i = 0; i < 6; i++) {
-          ctx.fillRect(c * pw + i * (pw / 6), r * ph, pw / 12, ph);
-        }
-
         // Stitched seam lines
-        ctx.strokeStyle = 'rgba(235, 225, 205, 0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([3, 4]);
-        ctx.strokeRect(c * pw + 2, r * ph + 2, pw - 4, ph - 4);
+        ctx.strokeStyle = 'rgba(235, 225, 205, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(c * pw + 1, r * ph + 1, pw - 2, ph - 2);
       }
     }
   }
@@ -83,24 +76,20 @@ export class BedTrayView {
   private readonly legGeo: BoxGeometry;
   private readonly blanketGeo: PlaneGeometry;
 
-  private readonly woodMat: MeshStandardMaterial;
-  private readonly blanketMat: MeshStandardMaterial;
+  private readonly woodMat: MeshBasicMaterial;
+  private readonly blanketMat: MeshBasicMaterial;
   private readonly quiltTexture: CanvasTexture;
 
   private _triangleCount = 0;
 
   constructor() {
-    this.woodMat = new MeshStandardMaterial({
-      color: 0x443224,
-      roughness: 0.85,
-      metalness: 0.05,
+    this.woodMat = new MeshBasicMaterial({
+      color: 0x3d2c1e,
     });
 
     this.quiltTexture = createQuiltTexture();
-    this.blanketMat = new MeshStandardMaterial({
+    this.blanketMat = new MeshBasicMaterial({
       map: this.quiltTexture,
-      roughness: 0.95,
-      metalness: 0.0,
       side: DoubleSide,
     });
 
