@@ -49,6 +49,8 @@ import { ENDING, ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
+import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
+import { StickerView } from '../engine/shadow/sticker-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
 import { RabbitView } from '../engine/shadow/rabbit-view';
@@ -180,6 +182,10 @@ async function start(): Promise<void> {
   if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
   const stageChoice: 'real' | StageMode =
     !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
+  // The Hand Lab's stand-in stage can be switched between the tabletop theatre and a wall-sized one (the Stage button).
+  let mockStage: StageMode = stageChoice === 'real' ? 'table' : stageChoice;
+  const lastHead = new Float64Array(3);
+  let lastYaw = 0;
   const stageFrame = new StageFrame();
   const standInStage = createStagePlane();
   const stage: StagePlane = stageChoice === 'real' ? stageFrame : standInStage;
@@ -229,6 +235,10 @@ async function start(): Promise<void> {
   const kindredStartX = 0.4;
   const spot = new Float64Array(2);
   const kindredView = new KindredView();
+  // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
+  const travellerMood = new TravellerMood();
+  const stickerView = new StickerView();
+  let stickerNext = 0;
   // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
   const glow = new GlowView();
   const air = new AirView();
@@ -325,6 +335,7 @@ async function start(): Promise<void> {
     dust.mesh,
     air.group,
     kindredView.group,
+    stickerView.group,
     candleView.group,
     titleLighter.group,
     bedTray.group,
@@ -441,10 +452,14 @@ async function start(): Promise<void> {
       return false;
     }
     headY = head[1];
+    lastHead[0] = head[0];
+    lastHead[1] = head[1];
+    lastHead[2] = head[2];
+    lastYaw = yaw;
     if (stageChoice === 'real') {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
-    } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
+    } else placeTestRig(mockStage, head, yaw, standInStage, lantern);
 
     const stageDist = Math.hypot(stage.origin[0] - head[0], stage.origin[2] - head[2]);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
@@ -525,6 +540,23 @@ async function start(): Promise<void> {
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
+      stage:
+        stageChoice === 'real'
+          ? undefined
+          : {
+              toggle: () => {
+                mockStage = mockStage === 'table' ? 'wall' : 'table';
+                if (rigPlaced) placeRig(lastHead, lastYaw);
+              },
+              label: () => mockStage,
+            },
+      sticker: {
+        // Shows the next sticker over the traveller, to see them all.
+        next: () => {
+          travellerMood.show(stickerNext as StickerId, tutorial.travellerX, tutorial.travellerY);
+          stickerNext = (stickerNext + 1) % STICKER_COUNT;
+        },
+      },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -1170,6 +1202,7 @@ async function start(): Promise<void> {
               lastTutorial = tutorial.state;
             }
             solveBloom.update(step);
+            stickerView.update(travellerMood, stage, shadowRenderer.baseOpacity * occ);
             audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
             glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
             const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
@@ -1245,6 +1278,24 @@ async function start(): Promise<void> {
             ghostTarget.update(delta, projector.shadows, shapes);
             ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
             tutorial.update(delta, projector.shadows, shapes);
+            // The traveller's mood: how near is the nearer hand's shadow?
+            let gap = 1e9;
+            for (let i = 0; i < 2; i++) {
+              const hs = projector.shadows[i === 0 ? 'left' : 'right'];
+              if (hs.active && hs.onStage)
+                gap = Math.min(
+                  gap,
+                  nearestJointGap(hs.joints, hs.joints.length / 2, tutorial.travellerX, tutorial.travellerY),
+                );
+            }
+            travellerMood.update(
+              delta,
+              tutorial.travellerX,
+              tutorial.travellerY,
+              tutorial.state === 'WAIT_AT_GAP',
+              tutorial.state === 'GOAL_REACHED',
+              gap,
+            );
           }
           // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
           // replay it (docs/SIMULATION.md).
@@ -1360,6 +1411,7 @@ async function start(): Promise<void> {
         cutscenes,
         kindred,
         kindredView,
+        stickerView,
         openSettings,
         shapes,
         gestures,
