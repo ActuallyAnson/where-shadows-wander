@@ -929,6 +929,14 @@ async function start(): Promise<void> {
           if (!triggerIgnition && (mock || candleView.checkIgnition(handList))) {
             triggerIgnition = true;
           }
+          if (!triggerIgnition && frame) {
+            for (const source of frame.session.inputSources) {
+              if (source.gamepad?.buttons.some((b) => b.pressed)) {
+                triggerIgnition = true;
+                break;
+              }
+            }
+          }
 
           if (triggerIgnition) {
             sessionState = 'opening';

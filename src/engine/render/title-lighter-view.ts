@@ -94,6 +94,7 @@ export class TitleLighterView {
     if (!this._visible) return;
 
     if (hand && hand.tracked && hand.validJoints >= 5) {
+      this.group.visible = true;
       const p = hand.positions;
       // Prefer index fingertip, fallback to wrist
       const idx = hand.validJoints >= 20 ? JOINT['index-finger-tip'] * 3 : JOINT['wrist'] * 3;
@@ -111,6 +112,9 @@ export class TitleLighterView {
       this.lightState.intensity = flicker * 1.15;
       this.flame.update(this.lightState, cameraQuaternion);
       this.pointLight.intensity = flicker * 0.85;
+    } else {
+      this.group.visible = false;
+      this.pointLight.intensity = 0;
     }
   }
 
