@@ -432,6 +432,7 @@ async function start(): Promise<void> {
       candleLight: candleView.pointLight,
       settings,
       flags: handFlags,
+      readout: () => timings.line,
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
