@@ -19,6 +19,7 @@ import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
+import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
 import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
@@ -210,6 +211,7 @@ async function start(): Promise<void> {
   const candleView = new CandleView();
   candleView.lit = false;
   const bedTray = new BedTrayView();
+  const bedroomView = new BedroomView();
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
@@ -311,6 +313,7 @@ async function start(): Promise<void> {
   world.scene.add(
     stageView.group,
     stageGroup,
+    bedroomView.group,
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
@@ -437,6 +440,8 @@ async function start(): Promise<void> {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
     } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
+
+    bedroomView.place(head, yaw);
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -588,6 +593,7 @@ async function start(): Promise<void> {
       sessionState,
       candleLocked: candleView.isLocked,
       palmOverFlame: candleView.isCovered,
+      coverProgress: candleView.coverProgress,
       wallPauseActive: wallPauseView.visible,
       handVisualScale: 0.68,
     },
@@ -919,6 +925,7 @@ async function start(): Promise<void> {
             sessionState = 'paused';
             simWasPaused = true;
             candleView.lit = false;
+            candleView.resetCover();
             ambientLight.color.setHex(0x101522);
             ambientLight.intensity = 0.03;
             audio.mixer.setLift(Bus.Ambience, 0.15);
@@ -940,6 +947,7 @@ async function start(): Promise<void> {
           if (action === 'resume' || candleIgnition) {
             wallPauseView.hide();
             sessionState = 'playing';
+            candleView.resetCover();
             candleView.lit = true;
             candleView.setLocked(true);
             ambientLight.color.setHex(0x2a1c12);
@@ -951,6 +959,7 @@ async function start(): Promise<void> {
           } else if (action === 'restart') {
             wallPauseView.hide();
             sessionState = 'playing';
+            candleView.resetCover();
             candleView.lit = true;
             candleView.setLocked(true);
             ambientLight.color.setHex(0x2a1c12);
@@ -1182,6 +1191,7 @@ async function start(): Promise<void> {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
         moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
         stageView.mood = moodNow;
@@ -1288,6 +1298,7 @@ async function start(): Promise<void> {
         getRecorder: () => recorder,
         handVisual,
         bedTray,
+        bedroomView,
         vrTitle,
         wallPauseView,
         sessionState: () => sessionState,

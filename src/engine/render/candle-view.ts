@@ -11,19 +11,23 @@
 //   - Aura Ring: warm glowing halo around the saucer indicating the candle is "picked up".
 //   - Placement Ring: 1-second expanding ripple animation when hands separate to place the candle.
 //   - Wick Indicator: soft pulsing warm glow hovering over the wick when the candle is unlit.
-//   - Palm Covering: hovering a palm over the flame (within 12cm for 0.4s) dims light and signals pause.
+//   - Palm Covering & Deliberate Pause: hovering a palm over the flame displays a radial progress ring filling
+//     clockwise over 3.0 seconds before extinguishing the candle and pausing.
 //   - In-Game Lock: locks candle in place once gameplay starts.
 //
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
 import {
+  Color,
   CylinderGeometry,
   DoubleSide,
   Group,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   PointLight,
   RingGeometry,
+  ShaderMaterial,
   SphereGeometry,
   TorusGeometry,
 } from '@iwsdk/core';
@@ -33,6 +37,52 @@ import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 
 export type CandleInteractionState = 'placed' | 'held' | 'placing';
+
+export const COVER_PAUSE_DURATION_S = 3.0;
+
+const COVER_RING_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const COVER_RING_FRAG = /* glsl */ `
+  varying vec2 vUv;
+  uniform float uProgress;
+  uniform vec3 uColor;
+
+  void main() {
+    vec2 p = vUv - vec2(0.5);
+    float r = length(p);
+    // Smooth anti-aliased circular ring between r = 0.32 and r = 0.46
+    float ring = smoothstep(0.31, 0.33, r) * (1.0 - smoothstep(0.45, 0.47, r));
+    if (ring <= 0.001) {
+      discard;
+    }
+
+    // Angle starting at 12 o'clock (top, p.y > 0, p.x = 0) filling clockwise
+    float angle = atan(p.x, p.y);
+    if (angle < 0.0) {
+      angle += 6.28318530718;
+    }
+    float normAngle = angle / 6.28318530718;
+
+    // Faint dark amber background track
+    vec4 trackCol = vec4(0.4, 0.25, 0.1, 0.28 * ring);
+
+    if (normAngle <= uProgress) {
+      // Filled progress arc with leading edge glow
+      float isLead = smoothstep(max(0.0, uProgress - 0.08), uProgress, normAngle);
+      vec3 col = mix(uColor, vec3(1.0, 0.95, 0.8), isLead * 0.65);
+      gl_FragColor = vec4(col, 0.95 * ring);
+    } else {
+      gl_FragColor = trackCol;
+    }
+    #include <colorspace_fragment>
+  }
+`;
 
 export class CandleView {
   readonly group = new Group();
@@ -59,6 +109,11 @@ export class CandleView {
   private readonly auraMesh: Mesh;
   private readonly placementRingMesh: Mesh;
   private readonly wickIndicator: Mesh;
+
+  // Deliberate pause radial gauge
+  private readonly coverProgressGeometry: PlaneGeometry;
+  private readonly coverProgressMaterial: ShaderMaterial;
+  private readonly coverProgressMesh: Mesh;
 
   // Interaction state
   private _state: CandleInteractionState = 'placed';
@@ -165,6 +220,24 @@ export class CandleView {
     this.wickIndicator.position.set(0, 0.098, 0);
     this.wickIndicator.visible = false;
 
+    // 10. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when palm covers flame
+    this.coverProgressGeometry = new PlaneGeometry(0.14, 0.14);
+    this.coverProgressMaterial = new ShaderMaterial({
+      vertexShader: COVER_RING_VERT,
+      fragmentShader: COVER_RING_FRAG,
+      uniforms: {
+        uProgress: { value: 0.0 },
+        uColor: { value: new Color(0xff9922) },
+      },
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    this.coverProgressMesh = new Mesh(this.coverProgressGeometry, this.coverProgressMaterial);
+    this.coverProgressMesh.position.set(0, 0.098, 0);
+    this.coverProgressMesh.renderOrder = 3;
+    this.coverProgressMesh.visible = false;
+
     this.group.add(
       plateMesh,
       rimMesh,
@@ -175,6 +248,7 @@ export class CandleView {
       this.auraMesh,
       this.placementRingMesh,
       this.wickIndicator,
+      this.coverProgressMesh,
     );
   }
 
@@ -216,6 +290,19 @@ export class CandleView {
   /** Whether a player's palm is currently covering the flame to pause. */
   get isCovered(): boolean {
     return this._isCovered;
+  }
+
+  /** Progress (0.0 to 1.0) of the 3-second palm cover hold toward triggering pause. */
+  get coverProgress(): number {
+    return Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
+  }
+
+  /** Resets cover timer, progress gauge, and covered flag. */
+  resetCover(): void {
+    this._isCovered = false;
+    this.coverTimer = 0;
+    this.coverProgressMaterial.uniforms.uProgress.value = 0.0;
+    this.coverProgressMesh.visible = false;
   }
 
   /** Current intensity of the dynamic point light. */
@@ -367,7 +454,7 @@ export class CandleView {
       this.lightOcclusion = 1.0;
     }
 
-    // Palm hovering directly over flame detection (within 0.12m, palm normal pointing downwards)
+    // Palm hovering directly over flame detection (within 0.15m, palm normal pointing downwards)
     let hoveringPalm = false;
     if (this._lit) {
       if (leftTracked) {
@@ -377,7 +464,7 @@ export class CandleView {
           const dy = palm.position[1] - fy;
           const dz = palm.position[2] - fz;
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 0.12 && palm.position[1] >= fy - 0.03 && palm.normal[1] < -0.35) {
+          if (dist < 0.15 && palm.position[1] >= fy - 0.05 && palm.normal[1] < -0.2) {
             hoveringPalm = true;
           }
         }
@@ -389,7 +476,7 @@ export class CandleView {
           const dy = palm.position[1] - fy;
           const dz = palm.position[2] - fz;
           const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 0.12 && palm.position[1] >= fy - 0.03 && palm.normal[1] < -0.35) {
+          if (dist < 0.15 && palm.position[1] >= fy - 0.05 && palm.normal[1] < -0.2) {
             hoveringPalm = true;
           }
         }
@@ -398,13 +485,20 @@ export class CandleView {
 
     if (hoveringPalm) {
       this.coverTimer += delta;
-      if (this.coverTimer >= 0.4) {
+      const progress = Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
+      this.coverProgressMaterial.uniforms.uProgress.value = progress;
+      this.coverProgressMesh.visible = progress > 0.005;
+      if (this.coverTimer >= COVER_PAUSE_DURATION_S) {
         this._isCovered = true;
       }
     } else {
-      this.coverTimer = Math.max(0, this.coverTimer - delta * 2.0);
+      this.coverTimer = Math.max(0, this.coverTimer - delta * 1.5);
+      const progress = Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
+      this.coverProgressMaterial.uniforms.uProgress.value = progress;
+      this.coverProgressMesh.visible = progress > 0.005;
       if (this.coverTimer <= 0) {
         this._isCovered = false;
+        this.coverProgressMesh.visible = false;
       }
     }
 
@@ -561,6 +655,7 @@ export class CandleView {
     this.wickIndicator.visible = false;
     this.flame.mesh.visible = true;
     this.flame.update(light, cameraQuaternion);
+    this.coverProgressMesh.quaternion.copy(cameraQuaternion);
     this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
     const coverFactor = this._isCovered ? 0.15 : 1.0;
     this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion * coverFactor;
@@ -578,11 +673,13 @@ export class CandleView {
     this.auraGeometry.dispose();
     this.placementRingGeometry.dispose();
     this.wickIndicatorGeometry.dispose();
+    this.coverProgressGeometry.dispose();
     this.plateMaterial.dispose();
     this.waxMaterial.dispose();
     this.wickMaterial.dispose();
     this.auraMaterial.dispose();
     this.placementRingMaterial.dispose();
     this.wickIndicatorMaterial.dispose();
+    this.coverProgressMaterial.dispose();
   }
 }

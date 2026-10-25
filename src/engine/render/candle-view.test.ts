@@ -56,7 +56,7 @@ function setHandJointsDown(hand: HandFrame, x: number, y: number, z: number): vo
 describe('CandleView', () => {
   it('builds the group with plate, rim, wax, wick, flame quad, point light, and feedback rings', () => {
     const candle = new CandleView();
-    expect(candle.group.children).toHaveLength(9);
+    expect(candle.group.children).toHaveLength(10);
     expect(candle.pointLight.castShadow).toBe(false);
     expect(candle.pointLight.position.y).toBeCloseTo(0.095, 3);
     expect(candle.flame.mesh.position.y).toBeCloseTo(0.095, 3);
@@ -163,17 +163,17 @@ describe('CandleView', () => {
     // Wick is at y = 0.75 + 0.095 = 0.845
     setHandJointsDown(left, 0.0, 0.9, -0.4);
 
-    // Step 0.2s: not yet covered (needs ~0.4s)
-    candle.updateInteraction({ left, right }, 0.2);
+    // Step 1.5s: not yet covered (needs 3.0s)
+    candle.updateInteraction({ left, right }, 1.5);
     expect(candle.isCovered).toBe(false);
 
-    // Step another 0.25s: now covered!
-    candle.updateInteraction({ left, right }, 0.25);
+    // Step another 1.6s: now covered!
+    candle.updateInteraction({ left, right }, 1.6);
     expect(candle.isCovered).toBe(true);
 
-    // Removing hand: step 0.3s clears cover
+    // Removing hand: step 2.5s clears cover
     setPalm(left, 0.5, 0.9, -0.4);
-    candle.updateInteraction({ left, right }, 0.3);
+    candle.updateInteraction({ left, right }, 2.5);
     expect(candle.isCovered).toBe(false);
   });
 
@@ -278,6 +278,43 @@ describe('CandleView', () => {
     setPalm(left, 0.0, 0.86, -0.4);
     candle.updateInteraction({ left, right }, 0.016);
     expect(candle.occlusion).toBe(0.0);
+  });
+
+  it('deliberately pauses after hovering palm over flame for 3.0 seconds with radial progress', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+    right.tracked = false;
+
+    // Position left palm directly hovering over flame facing down
+    // Flame is at y = 0.75 + 0.095 = 0.845
+    setHandJointsDown(left, 0.0, 0.89, -0.4);
+
+    expect(candle.isCovered).toBe(false);
+    expect(candle.coverProgress).toBe(0);
+
+    // Hold for 1.5 seconds (halfway)
+    candle.updateInteraction({ left, right }, 1.5);
+    expect(candle.isCovered).toBe(false);
+    expect(candle.coverProgress).toBeCloseTo(0.5, 2);
+
+    // Pull hand away for 0.5s: progress decays
+    setHandJointsDown(left, 0.0, 1.2, -0.4);
+    candle.updateInteraction({ left, right }, 0.5);
+    expect(candle.isCovered).toBe(false);
+    expect(candle.coverProgress).toBeLessThan(0.5);
+
+    // Put hand back over flame and hold for remaining time to reach 3.0 seconds
+    setHandJointsDown(left, 0.0, 0.89, -0.4);
+    candle.updateInteraction({ left, right }, 3.0);
+    expect(candle.coverProgress).toBe(1.0);
+    expect(candle.isCovered).toBe(true);
+
+    // resetCover() resets timer and progress
+    candle.resetCover();
+    expect(candle.isCovered).toBe(false);
+    expect(candle.coverProgress).toBe(0);
   });
 
   it('disposes resources cleanly without error', () => {
