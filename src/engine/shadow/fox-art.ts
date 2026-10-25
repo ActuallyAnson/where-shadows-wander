@@ -9,11 +9,14 @@ export const FOX_FRAMES = 3;
 const BODY =
   'M120 138C114 112 148 100 186 102C222 104 246 114 248 138C250 160 226 172 186 172C146 172 124 162 120 138Z';
 const HEAD =
-  'M252 106C250 72 278 56 306 62C330 68 346 84 358 102C364 112 360 120 350 122C336 124 324 128 312 140C288 158 254 140 252 106Z';
+  'M252 106C249 70 276 54 305 58C330 62 346 78 360 97C370 110 366 122 352 125C340 128 328 130 316 141C292 160 254 142 252 106Z';
 const EAR_FAR = 'M298 68C300 46 310 28 326 16C332 34 330 54 320 74Z';
 const EAR_NEAR = 'M256 76C248 52 252 30 262 12C282 26 294 46 294 70Z';
-/** A tuft of cheek fur under the jaw. */
-const TUFT = 'M292 130C296 144 302 152 312 156C314 148 316 138 320 128Z';
+/** A tuft of cheek fur sweeping back from the jaw. */
+const TUFT = 'M276 128C262 130 250 140 248 154C262 154 276 146 286 134Z';
+/** The pale inside of each ear, cut out of the black. */
+const EAR_FAR_IN = 'M305 58C306 44 312 34 320 28C322 40 320 50 316 60Z';
+const EAR_NEAR_IN = 'M262 70C258 54 260 40 265 28C275 38 281 50 282 66Z';
 const TAIL = 'M128 138C70 144 8 116 6 64C4 30 24 6 56 4C48 22 58 46 84 62C112 80 142 96 152 126Z';
 /** Where the tail grows from, and how far each frame swings it (radians). */
 const TAIL_ROOT = [136, 132] as const;
@@ -77,6 +80,15 @@ export function paintFox(g: CanvasRenderingContext2D, w: number, h: number, fram
   g.beginPath();
   g.ellipse(312, 98, 6.5, 8.5, 0.2, 0, Math.PI * 2);
   g.fill();
+  g.fill(new Path2D(EAR_FAR_IN));
+  g.fill(new Path2D(EAR_NEAR_IN));
+  // A small smile.
+  g.lineWidth = 3.4;
+  g.strokeStyle = '#000';
+  g.beginPath();
+  g.moveTo(334, 116);
+  g.quadraticCurveTo(344, 123, 353, 115);
+  g.stroke();
   g.globalCompositeOperation = 'source-over';
   g.restore();
 }
