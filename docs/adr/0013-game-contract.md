@@ -23,27 +23,33 @@ The boundary has to hold several properties:
 
 ## Decision
 
-**One object, one call.** `main.ts` builds `new Game({ chapter, puzzles, save })` once. Each frame it calls `game.frame(input)`, after the shadows are projected, in place of `sim.advance`. It returns the interpolation factor `alpha`.
+**One object, one call.** `main.ts` builds `new Game({ puzzles, save, caster })` once. Each frame it calls `game.frame(input)`, after the shadows are projected, in place of `sim.advance`. It returns the interpolation factor `alpha`.
 
 **Input** is a plain `GameInput`:
 - `dt` and `paused`
 - `left` and `right`: the `HandShadow`s, in stage space
 - `shapeEvents`: the `ShapeEventQueue`
 - `gestureEvents` (optional)
+- `leftTracked` and `rightTracked` (optional): each hand's own tracking, for the tracking-loss rules in `docs/SIMULATION.md`
 
 The game copies what it needs. Shape events go through `InputLatch`, so each event reaches exactly one fixed step at any display rate. Pausing is an input: while `paused`, no time passes, and on resume the remainder is dropped.
 
 **Outputs** are plain data, read after `frame()` returns:
 - **`game.store`** (the `EntityStore` columns) plus `alpha`, for sprites: draw kind `k` from `kindStart[k]` to `kindEnd[k]` at `px + (x - px) * alpha`.
-- **`game.fixtures`:** puzzle objects that aren't entities (cloud, wind, gate, rope, plate, tunnel, window, creature hints).
+- **`game.fixtures`:** puzzle objects that aren't entities (drip, wind, drawbridge, plate, window).
 - **`game.events`:** a `GameEventQueue` of one frame's events with constant-string ids. It is cleared at the start of the next `frame()`. Its consumers are audio, effects, the save service and the hint UI.
 - **Readable state for animation:**
   - `game.traveller.state` and `stateT`
-  - `game.companions.{rabbit,fox}.state`
   - `game.abilities.hands[h].role`
-- **`game.save`:** a JSON-safe `SaveState` the game keeps current. B's service stores it whenever `puzzle-solved`, `creature-discovered` or `chapter-complete` fires, and passes `readSave(stored)` back in on launch.
+- **`game.save`:** a JSON-safe `SaveState` the game keeps current. `SaveBridge` (`src/game/save-bridge.ts`) writes the service's save on `puzzle-start`, `puzzle-solved` and `chapter-complete`, and `saveStateFrom(store, ids)` builds the `SaveState` passed back in on launch.
 
 **Stage space throughout.** The game never sees scene space. `StageFrame` (`src/engine/stage`) converts at the edges, so the renderer turns stage positions into scene positions with `stageFrame.toScene`.
+
+## Update (25 Oct 2026)
+
+- The companions are cut, so `game.companions` and the `creature-discovered` event are gone.
+- The bedroom puzzles bring their own layouts and props (ADR 0014), so `chapter` is only needed for puzzles laid out in the chapter file. `caster` turns props' shadows into ground.
+- The session flow around the game (title, tutorial, pause, solved, ending) is `GameFlow` (`src/game/flow.ts`). The app passes `paused: !flow.simRuns`.
 
 ## Consequences
 
