@@ -48,7 +48,7 @@ import { HandLab } from '../input-mock/hand-lab';
 import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
-import { SettingsPanel } from '../ui/settings-panel/settings-panel';
+import { SettingsScreen } from '../ui/settings-panel/settings-screen';
 import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
@@ -215,7 +215,9 @@ async function start(): Promise<void> {
   // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it
   // (the lantern flow will).
   // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
-  const settingsPanel = new SettingsPanel(world, settings, () => debug?.controller.pages() ?? []);
+  const menu = new MenuPanel(settings);
+  world.scene.add(menu.group);
+  const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
   const openSettings = () => {
@@ -225,8 +227,6 @@ async function start(): Promise<void> {
   };
   // The pause, solved and end screens. The game flow calls menu.show('pause' | 'solved' | 'end') and reads the
   // presses from menu.onPress; here a press on Settings opens the settings panel and Resume closes the screen.
-  const menu = new MenuPanel(settings);
-  world.scene.add(menu.group);
   const menuTips = new Float32Array(6);
   // The menu screen being looked at from the Hand Lab's Menu button or the launcher's Testing panel (never by the game).
   let menuChoice: MenuChoice = 'off';

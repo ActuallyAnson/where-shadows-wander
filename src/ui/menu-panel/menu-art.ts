@@ -7,8 +7,8 @@ import type { MenuScreen } from './screens';
 export const MENU_FONT = 'Cinzel';
 export const MENU_CANVAS_PX = 1024;
 
-const INK = { title: '#e9eef6', line: '#8d97a8', dim: '#7e8694', lit: '#ffffff', rule: '#aab3c4' };
-const HIGH = { title: '#000', line: '#000', dim: '#000', lit: '#000', rule: '#000' };
+export const INK = { title: '#e9eef6', line: '#8d97a8', dim: '#7e8694', lit: '#ffffff', rule: '#aab3c4' };
+export const HIGH = { title: '#000', line: '#000', dim: '#000', lit: '#000', rule: '#000' };
 
 /** A small seeded generator, so the mist and the dust are the same every time. */
 function rng(seed: number): () => number {
@@ -30,7 +30,7 @@ export function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRend
 }
 
 /** The thin ornament under a title: lines that fade out, a diamond, and a small curl each side of it. */
-function ornament(g: CanvasRenderingContext2D, cx: number, y: number, half: number, colour: string): void {
+export function ornament(g: CanvasRenderingContext2D, cx: number, y: number, half: number, colour: string): void {
   const line = g.createLinearGradient(cx - half, 0, cx + half, 0);
   line.addColorStop(0, 'rgba(170,179,196,0)');
   line.addColorStop(0.3, colour);
@@ -64,7 +64,7 @@ function ornament(g: CanvasRenderingContext2D, cx: number, y: number, half: numb
   g.fill();
 }
 
-function arrow(g: CanvasRenderingContext2D, x: number, y: number, dir: 1 | -1): void {
+export function arrow(g: CanvasRenderingContext2D, x: number, y: number, dir: 1 | -1): void {
   g.beginPath();
   g.moveTo(x + dir * 14, y);
   g.lineTo(x - dir * 8, y - 11);

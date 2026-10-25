@@ -26,6 +26,11 @@ export function itemAt(screen: MenuScreen, u: number, v: number): number {
   return -1;
 }
 
+/** Anything a fingertip can reach by position: the item code under (u, v), or -1. */
+export interface MenuHits {
+  hitAt(u: number, v: number): number;
+}
+
 /** A plane in the room, with its unit axes and a scale. */
 export interface MenuPlane {
   readonly origin: Float64Array;
@@ -63,7 +68,7 @@ export class MenuInput {
   private armed = true;
 
   /** `tips` holds n fingertips as xyz triples in scene space. */
-  update(screen: MenuScreen, plane: MenuPlane, tips: ArrayLike<number>, n: number): MenuInputState {
+  update(screen: MenuScreen | MenuHits, plane: MenuPlane, tips: ArrayLike<number>, n: number): MenuInputState {
     const o = plane.origin,
       r = plane.right,
       u = plane.up,
@@ -78,7 +83,7 @@ export class MenuInput {
       if (d > REACH_M || d < -THROUGH_M) continue;
       const pu = (dx * r[0] + dy * r[1] + dz * r[2]) / MENU_SIZE_M + 0.5;
       const pv = 0.5 - (dx * u[0] + dy * u[1] + dz * u[2]) / MENU_SIZE_M;
-      const item = itemAt(screen, pu, pv);
+      const item = 'hitAt' in screen ? screen.hitAt(pu, pv) : itemAt(screen, pu, pv);
       if (item >= 0 && d < depth) {
         hover = item;
         depth = d;

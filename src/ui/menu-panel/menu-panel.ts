@@ -15,9 +15,9 @@ import {
 } from '@iwsdk/core';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
 import { placeSettingsPanel, type PanelPose } from '../settings-panel/placement';
-import { createMenuPlane, MENU_SIZE_M, MenuInput } from './menu-layout';
+import { createMenuPlane, itemAt, MENU_SIZE_M, MenuInput, type MenuHits } from './menu-layout';
 import { makeCanvas, MENU_CANVAS_PX, MENU_FONT, paintBackdrop, paintDust, paintMenu } from './menu-art';
-import { MENU_SCREENS, type MenuScreenId } from './screens';
+import { MENU_SCREENS, type MenuScreen, type MenuScreenId } from './screens';
 import fontUrl from './fonts/cinzel-latin-400-normal.woff2?url';
 
 /** After the paper wall (1) and the hands' shadows (2), so nothing washes over the screen. */
@@ -28,6 +28,14 @@ const BACKDROP_H = 1.06;
 const BACKDROP_Z = -0.14;
 const DUST_Z = -0.07;
 const DUST_SIZE = 1.5;
+
+/** What a screen shows and how it is reached: the button screens (screens.ts) and the settings screen are both one. */
+export interface MenuContent extends MenuHits {
+  /** Paints the screen's text on a transparent canvas; `hover` is the item code a fingertip is reaching, or -1. */
+  paint(g: CanvasRenderingContext2D, hover: number, high: boolean): void;
+  /** A press on item `code`. */
+  press(code: number): void;
+}
 
 function texture(c: HTMLCanvasElement): CanvasTexture {
   const t = new CanvasTexture(c);
@@ -50,6 +58,8 @@ export class MenuPanel {
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
   private fontReady: Promise<void> | null = null;
   private shown: MenuScreenId | null = null;
+  private content: MenuContent | null = null;
+  private readonly screenContents = new Map<MenuScreenId, MenuContent>();
   private lit = -1;
   private alpha = 0;
   private time = 0;
@@ -93,13 +103,42 @@ export class MenuPanel {
     this.dustTex.repeat.set(1, 0.7);
   }
 
-  /** The screen showing now, or null. */
+  /** The screen showing now, or null (null too while a custom screen shows). */
   get current(): MenuScreenId | null {
     return this.shown;
   }
 
+  /** The content showing now, or null. */
+  get showing(): MenuContent | null {
+    return this.content;
+  }
+
   /** Shows a screen in front of the head (`head` is the eye position, (fx, fz) the way it looks), replacing any other. */
-  async show(id: MenuScreenId, head: ArrayLike<number>, fx: number, fz: number): Promise<boolean> {
+  show(id: MenuScreenId, head: ArrayLike<number>, fx: number, fz: number): Promise<boolean> {
+    let c = this.screenContents.get(id);
+    if (!c) {
+      c = this.screenContent(MENU_SCREENS[id]);
+      this.screenContents.set(id, c);
+    }
+    return this.showContent(c, head, fx, fz, id);
+  }
+
+  private screenContent(screen: MenuScreen): MenuContent {
+    return {
+      hitAt: (u, v) => itemAt(screen, u, v),
+      paint: (g, hover, high) => paintMenu(g, screen, hover, high),
+      press: (code) => this.onPress?.(screen.id, screen.buttons[code].id),
+    };
+  }
+
+  /** Shows any screen's content in front of the head, replacing what shows. `id` names a button screen, null otherwise. */
+  async showContent(
+    content: MenuContent,
+    head: ArrayLike<number>,
+    fx: number,
+    fz: number,
+    id: MenuScreenId | null = null,
+  ): Promise<boolean> {
     try {
       await this.loadFont();
     } catch (e) {
@@ -118,7 +157,8 @@ export class MenuPanel {
       this.plane.normal[i] = e[8 + i];
       this.plane.origin[i] = e[12 + i];
     }
-    if (this.shown !== id) this.alpha = 0;
+    if (this.content !== content) this.alpha = 0;
+    this.content = content;
     this.shown = id;
     this.input.reset();
     this.lit = -1;
@@ -129,11 +169,13 @@ export class MenuPanel {
   }
 
   hide(): void {
-    this.shown = null; // the fade-out finishes in update()
+    this.shown = null;
+    this.content = null; // the fade-out finishes in update()
   }
 
   dispose(): void {
     this.shown = null;
+    this.content = null;
     this.group.visible = false;
     for (const t of [this.menuTex, this.backdropTex, this.dustTex]) t.dispose();
   }
@@ -145,9 +187,9 @@ export class MenuPanel {
   update(dt: number, tips: ArrayLike<number>, n: number): void {
     if (!this.group.visible) return;
     this.time += dt;
-    const target = this.shown ? 1 : 0;
+    const target = this.content ? 1 : 0;
     this.alpha += Math.sign(target - this.alpha) * Math.min(Math.abs(target - this.alpha), dt / FADE_S);
-    if (this.alpha <= 0 && !this.shown) {
+    if (this.alpha <= 0 && !this.content) {
       this.group.visible = false;
       return;
     }
@@ -157,27 +199,27 @@ export class MenuPanel {
     this.dustMat.opacity = a * 0.8;
     // Dust rises slowly and sways a little.
     this.dustTex.offset.set(Math.sin(this.time * 0.17) * 0.02, (this.time * 0.012) % 1);
-    if (!this.shown || a < 0.7) return;
-    const screen = MENU_SCREENS[this.shown];
-    const s = this.input.update(screen, this.plane, tips, n);
+    const content = this.content;
+    if (!content || a < 0.7) return;
+    const s = this.input.update(content, this.plane, tips, n);
     if (s.hover !== this.lit) {
       if (s.hover >= 0) this.onReach?.();
       this.lit = s.hover;
       this.repaint();
     }
     if (s.pressed >= 0) {
-      const id = this.shown;
       try {
-        this.onPress?.(id, screen.buttons[s.pressed].id);
+        content.press(s.pressed);
       } catch (e) {
         this.lastError = e instanceof Error ? e.message : String(e);
       }
     }
   }
 
-  private repaint(): void {
-    if (!this.shown) return;
-    paintMenu(this.menuCanvas[1], MENU_SCREENS[this.shown], this.lit, this.high);
+  /** Redraws the screen (its text changed, or the reached item did). */
+  repaint(): void {
+    if (!this.content) return;
+    this.content.paint(this.menuCanvas[1], this.lit, this.high);
     this.menuTex.needsUpdate = true;
   }
 
