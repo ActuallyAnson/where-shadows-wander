@@ -19,6 +19,7 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
+import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
@@ -184,11 +185,28 @@ async function start(): Promise<void> {
   const cutsceneTips = new Float32Array(6);
   // The kindred (a shadow bird that flies about the wall): the Hand Lab's Kindred button, or the Testing panel's switch.
   const kindred = new Kindred();
+  const kindredStartX = 0.4;
   const kindredView = new KindredView();
+  let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
   let kindredOn = false;
+  let kindredWanted = false; // the Testing panel's switch, which the opening must not leave switched off
   const setKindred = (on: boolean) => {
+    if (openingT < 0) kindredWanted = on;
     kindredOn = on;
     if (!on) kindredView.hide();
+  };
+  const playOpening = () => {
+    const problems = cutscenes.play(OPENING, () => {
+      openingT = -1;
+      setKindred(kindredWanted);
+    });
+    if (problems.length > 0) {
+      failures.report('opening', new Error(problems.join('; ')));
+      return;
+    }
+    openingT = 0;
+    kindred.x = -kindredStartX; // enters from the left edge
+    setKindred(true);
   };
   world.scene.add(
     stageView.group,
@@ -300,19 +318,13 @@ async function start(): Promise<void> {
         toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
         isOpen: () => settingsPanel.isOpen,
       },
-      cutscene: { play: () => void playTestCutscene() },
+      cutscene: { play: () => playOpening() },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
   // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
   let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
-  // The test cutscene (a bird crosses the wall): the Hand Lab's Cutscene button, or the Testing panel's switch when VR starts.
-  const playTestCutscene = async () => {
-    if (!DEBUG_TOOLS) return;
-    const problems = cutscenes.play((await import('../debug/demo-cutscene')).DEMO_CUTSCENE);
-    if (problems.length > 0) failures.report('test cutscene', new Error(problems.join('; ')));
-  };
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
@@ -462,6 +474,8 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
+    // A moment after the wall is set up, the opening plays (once per session; the Skip button ends it).
+    setTimeout(() => guard('sessionstart: opening', () => playOpening()), 1500);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
@@ -539,7 +553,7 @@ async function start(): Promise<void> {
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
-      if (t.cutscene) setTimeout(() => void playTestCutscene(), 1000);
+      if (t.cutscene) setTimeout(() => playOpening(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
     });
@@ -681,7 +695,12 @@ async function start(): Promise<void> {
             const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
             const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
             kindred.update(step, hw, hh, fx, fy, true);
-            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion, step);
+            let foxAlpha = 1;
+            if (openingT >= 0) {
+              openingT += step;
+              foxAlpha = openingFoxAlpha(openingT);
+            }
+            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
           }
           if (cutscenes.playing) {
             // The fingertips that can poke Skip: each tracked hand's index tip.
