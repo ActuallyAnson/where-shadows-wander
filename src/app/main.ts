@@ -215,7 +215,7 @@ async function start(): Promise<void> {
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
-  const ambientLight = new AmbientLight(0x182035, 0.05);
+  const ambientLight = new AmbientLight(0x24283b, 0.14);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
@@ -441,7 +441,8 @@ async function start(): Promise<void> {
       placeLantern(head, yaw, lantern);
     } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
 
-    bedroomView.place(head, yaw);
+    const stageDist = Math.hypot(stage.origin[0] - head[0], stage.origin[2] - head[2]);
+    bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -912,8 +913,8 @@ async function start(): Promise<void> {
           if (triggerIgnition) {
             sessionState = 'opening';
             candleView.lit = true;
-            ambientLight.color.setHex(0x2a1c12);
-            ambientLight.intensity = 0.04;
+            ambientLight.color.setHex(0x35281e);
+            ambientLight.intensity = 0.16;
             gameAudio.candleIgnited(candleView.flamePosition);
             vrTitle.ignite();
             playOpening();
@@ -926,8 +927,8 @@ async function start(): Promise<void> {
             simWasPaused = true;
             candleView.lit = false;
             candleView.resetCover();
-            ambientLight.color.setHex(0x101522);
-            ambientLight.intensity = 0.03;
+            ambientLight.color.setHex(0x182035);
+            ambientLight.intensity = 0.1;
             audio.mixer.setLift(Bus.Ambience, 0.15);
             audio.mixer.setLift(Bus.Music, 0.25);
             wallPauseView.show();
@@ -950,8 +951,8 @@ async function start(): Promise<void> {
             candleView.resetCover();
             candleView.lit = true;
             candleView.setLocked(true);
-            ambientLight.color.setHex(0x2a1c12);
-            ambientLight.intensity = 0.04;
+            ambientLight.color.setHex(0x35281e);
+            ambientLight.intensity = 0.16;
             audio.mixer.setLift(Bus.Ambience, 1.0);
             audio.mixer.setLift(Bus.Music, 1.0);
             gameAudio.candleIgnited(candleView.flamePosition);
@@ -962,8 +963,8 @@ async function start(): Promise<void> {
             candleView.resetCover();
             candleView.lit = true;
             candleView.setLocked(true);
-            ambientLight.color.setHex(0x2a1c12);
-            ambientLight.intensity = 0.04;
+            ambientLight.color.setHex(0x35281e);
+            ambientLight.intensity = 0.16;
             audio.mixer.setLift(Bus.Ambience, 1.0);
             audio.mixer.setLift(Bus.Music, 1.0);
             gameAudio.candleIgnited(candleView.flamePosition);
