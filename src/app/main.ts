@@ -43,6 +43,7 @@ import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindr
 import { KindredView } from '../engine/shadow/kindred-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
+import { RabbitView } from '../engine/shadow/rabbit-view';
 import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
 import { SHAPES } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
@@ -215,6 +216,10 @@ async function start(): Promise<void> {
   // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
   const glow = new GlowView();
   const air = new AirView();
+  // The shadow animals come alive: a committed rabbit shape hops out of the hand, a committed fox shape calls the kindred.
+  const rabbits = new RabbitView();
+  let summonT = 0; // seconds the kindred stays after a fox shape called it (it is switched on for the visit)
+  let perchT = 0;
   const solveBloom = new SolveBloom();
   const nearGlow = [new Follower(), new Follower()];
   let lastTutorial = 'IDLE' as string;
@@ -283,6 +288,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     glow.group,
+    rabbits.group,
     air.group,
     kindredView.group,
     candleView.group,
@@ -807,7 +813,7 @@ async function start(): Promise<void> {
             const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
             const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
             // A hand's shadow coming close startles it (the palm's shadow, from the light through the hand).
-            if (kindred.startled <= 0 && openingT < 0) {
+            if (kindred.startled <= 0 && openingT < 0 && perchT <= 0) {
               const fl = candleView.flamePosition;
               for (const h of handList) {
                 if (!h.tracked) continue;
@@ -835,11 +841,38 @@ async function start(): Promise<void> {
             }
             kindred.update(step, hw, hh, fx, fy, true);
             let foxAlpha = 1;
+            if (summonT > 0) foxAlpha = Math.min(1, summonT, (7 - summonT) / 0.6);
             if (openingT >= 0) {
               openingT += step;
               foxAlpha = openingFoxAlpha(openingT);
             }
             kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
+          }
+          // The shadow animals: what a hand just committed comes alive on the wall (visual only, no gameplay).
+          for (let i = 0; i < shapes.events.count; i++) {
+            const e = shapes.events.at(i);
+            if (e.type !== 'commit' || (e.shape !== 'rabbit' && e.shape !== 'fox')) continue;
+            const sh = projector.shadows[e.hand];
+            if (!sh.active || !sh.onStage) continue;
+            const cx = (sh.bounds[0] + sh.bounds[2]) * 0.5;
+            const cy = (sh.bounds[1] + sh.bounds[3]) * 0.5;
+            if (e.shape === 'rabbit') rabbits.spawn(e.hand === 'left' ? 0 : 1, cx, cy - 0.05, cx >= 0 ? 1 : -1);
+            else {
+              if (!kindredOn) {
+                kindred.x = cx + (cx >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
+                kindred.y = cy + 0.1;
+                summonT = 7;
+                kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
+              }
+              kindred.perchAt(cx, cy + 0.09);
+              perchT = 3.2;
+            }
+          }
+          rabbits.update(step, stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          if (perchT > 0 && (perchT -= step) <= 0) kindred.release();
+          if (summonT > 0 && (summonT -= step) <= 0) {
+            kindredOn = kindredWanted;
+            if (!kindredOn) kindredView.hide();
           }
           // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
           {

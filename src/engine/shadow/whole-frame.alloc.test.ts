@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { GameAudio, type SoundPlayer } from '../services/audio/game-audio';
 import { gc, makePipeline, measure } from './pure/frame-pipeline-fixture';
 import { AirView } from './air-view';
+import { Hopper } from './pure/hopper';
 import { Follower, nearMissLevel, SolveBloom } from './pure/glow';
 import { Kindred, shadowSpot } from './pure/kindred';
 import { createSparkleOut, Sparkles } from './pure/sparkles';
@@ -27,6 +28,7 @@ function wholeFrame(extra?: () => void) {
   const sparkles = new Sparkles(5);
   const motes = createSparkleOut();
   const bloom = new SolveBloom();
+  const hopper = new Hopper();
   const near = new Follower();
   const spot = new Float64Array(2);
   let tick = 0;
@@ -40,6 +42,8 @@ function wholeFrame(extra?: () => void) {
     sparkles.update(1 / 72, kindred.x, kindred.y, 30);
     sparkles.fill(motes);
     if (tick % 400 === 0) bloom.trigger();
+    if (tick % 300 === 0) hopper.spawn(0, 0, 1);
+    hopper.update(1 / 72, 0.8);
     bloom.update(1 / 72);
     near.update(nearMissLevel(-0.3 + 0.4 * Math.sin(tick * 0.05)), 1 / 72);
     shadowSpot(p.stage, 0, 0.65, 0.5, 0.05, 0.4, 0.2, spot);
