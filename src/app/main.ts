@@ -37,6 +37,7 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
+import { ENDING, ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
@@ -219,6 +220,12 @@ async function start(): Promise<void> {
   let lastTutorial = 'IDLE' as string;
   let moodNow = 0.4;
   let moodGoal = 0.4;
+  // The ending: the room cools and dims as the cutscene plays (the game flow calls this after the last puzzle).
+  const playEnding = () => {
+    const problems = cutscenes.play(ENDING);
+    if (problems.length > 0) failures.report('ending', new Error(problems.join('; ')));
+    else moodGoal = ENDING_MOOD;
+  };
   const playSolve = () => {
     moodGoal = 1;
     solveBloom.trigger();
@@ -400,6 +407,7 @@ async function start(): Promise<void> {
       cutscene: { play: () => playOpening() },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
+      ending: { play: () => playEnding() },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];

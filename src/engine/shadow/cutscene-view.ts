@@ -4,7 +4,9 @@
 import { CanvasTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import type { Beat, BeatState, CutscenePlayer } from '../sim/cutscene';
 import { makeBeatStates } from '../sim/cutscene';
+import { FOX_BOX, paintFox } from './fox-art';
 import { hasPuppet, PUPPETS } from './pure/puppets';
+import { paintTraveller, Pose } from './traveller-art';
 import { skipCentre, SKIP_RADIUS_M } from './pure/skip-touch';
 import type { StagePlane } from './pure/stage-plane';
 import { DEFAULT_SHADOW_OPACITY } from './shadow-renderer';
@@ -21,11 +23,39 @@ const CAPTION_ASPECT = 8;
 const CAPTION_Y = -0.3; // of the stage height, from the centre
 const SKIP_LIFT_M = 0.006;
 const INK = '#1a1410';
+/** Puppet positions in a cutscene are metres on the real wall (about this wide); they scale to the stage actually in use. */
+const REF_STAGE_WIDTH_M = 1.6;
 
 interface Art {
   readonly tex: CanvasTexture;
   /** Width over height. */
   readonly aspect: number;
+  /** Width as a fraction of the stage's (a puppet that is not the default size). */
+  readonly width?: number;
+}
+
+/** Puppets drawn by code in their own files (the fox and the traveller's poses) rather than as a few paths. */
+const PAINTED: Readonly<
+  Record<string, { aspect: number; width: number; paint: (g: CanvasRenderingContext2D, w: number, h: number) => void }>
+> = {
+  fox: { aspect: FOX_BOX[0] / FOX_BOX[1], width: 0.3, paint: (g, w, h) => paintFox(g, w, h, 1) },
+  'fox-flying': { aspect: FOX_BOX[0] / FOX_BOX[1], width: 0.3, paint: (g, w, h) => paintFox(g, w, h, 2) },
+  traveller: { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Idle) },
+  'traveller-wait': { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Wait) },
+  'traveller-cheer': { aspect: 1, width: 0.2, paint: (g, w) => paintTraveller(g, w, Pose.Cheer) },
+};
+
+function hasAnyPuppet(name: string): boolean {
+  return hasPuppet(name) || Object.prototype.hasOwnProperty.call(PAINTED, name);
+}
+
+function paintedArt(name: string): Art {
+  const a = PAINTED[name];
+  const W = 512;
+  const H = Math.round(W / a.aspect);
+  const [c, g] = canvas(W, H);
+  a.paint(g, W, H);
+  return { tex: crispTexture(c), aspect: a.aspect, width: a.width };
 }
 
 function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -127,8 +157,13 @@ export class CutsceneView {
     this.owned = [];
     this.art.clear();
     for (const b of beats) {
-      if (b.kind === 'puppet' && !hasPuppet(b.puppet)) continue;
-      const a = b.kind === 'puppet' ? puppetArt(b.puppet) : captionArt(b.text);
+      if (b.kind === 'puppet' && !hasAnyPuppet(b.puppet)) continue;
+      const a =
+        b.kind === 'puppet'
+          ? Object.prototype.hasOwnProperty.call(PAINTED, b.puppet)
+            ? paintedArt(b.puppet)
+            : puppetArt(b.puppet)
+          : captionArt(b.text);
       this.owned.push(a.tex);
       this.art.set(b, a);
     }
@@ -154,9 +189,10 @@ export class CutsceneView {
       q.visible = !!art;
       if (!art || !s.beat) continue;
       const puppet = s.beat.kind === 'puppet';
-      const w = stage.width * (puppet ? PUPPET_WIDTH : CAPTION_WIDTH);
-      const x = puppet ? s.x : 0;
-      const y = puppet ? s.y : stage.height * CAPTION_Y;
+      const w = stage.width * (puppet ? (art.width ?? PUPPET_WIDTH) : CAPTION_WIDTH);
+      const scale = stage.width / REF_STAGE_WIDTH_M;
+      const x = puppet ? s.x * scale : 0;
+      const y = puppet ? s.y * scale : stage.height * CAPTION_Y;
       placeOnStage(this.m, q, stage, x, y, w, w / art.aspect, LIFT_M);
       const mat = this.mats[i];
       if (mat.map !== art.tex) {
