@@ -93,6 +93,10 @@ export const TITLE_CSS = `
 .wsw-bird{animation:wsw-glide 7s ease-in-out infinite}
 .wsw-steam{stroke-dasharray:40;animation:wsw-steam 4s ease-in-out infinite;opacity:0}
 .wsw-steam-b{animation-delay:1.6s}
+@keyframes wsw-snuff{0%{opacity:1}100%{opacity:.12}}
+.wsw-busy .wsw-flame{animation:wsw-snuff .9s ease-in forwards}
+.wsw-busy .wsw-item{pointer-events:none;color:#ffd89a;letter-spacing:.3em}
+.wsw-busy .wsw-quiet{opacity:.35}
 @keyframes wsw-flap{0%,100%{transform:rotate(0)}50%{transform:rotate(16deg)}}
 @keyframes wsw-glide{0%,100%{transform:translate(830px,372px)}50%{transform:translate(838px,362px)}}
 @keyframes wsw-steam{0%{stroke-dashoffset:40;opacity:0}30%{opacity:.7}100%{stroke-dashoffset:-40;opacity:0}}

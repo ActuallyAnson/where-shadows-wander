@@ -106,6 +106,7 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
 
   // Direct clean launch function
   const launchDirect = async (mode: XRSessionMode, forceWebGLLayer: boolean) => {
+    title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
     appendLog(`Requesting ${mode} session (forceWebGLLayer: ${forceWebGLLayer})...`, '#e3b341');
@@ -167,6 +168,7 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
       const msg = err instanceof Error ? err.message : String(err);
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
+      title?.setBusy(false);
       showNote("Couldn't start VR. Try again, or use one of the other ways in below.");
       openOtherWays();
     }

@@ -5,6 +5,7 @@ import font400 from './fonts/cinzel-decorative-latin-400-normal.woff2?url';
 import font700 from './fonts/cinzel-decorative-latin-700-normal.woff2?url';
 
 const STYLE_ID = 'wsw-title-style';
+const BUSY_LABEL = 'LIGHTING THE CANDLE…';
 
 export interface TitleScreenItem extends TitleItem {
   onPress: () => void;
@@ -24,6 +25,8 @@ export interface TitleScreen {
   setNote(text: string): void;
   /** Shows or hides the whole screen (hidden while a VR session runs). */
   setVisible(visible: boolean): void;
+  /** While VR is starting: the begin item says so, nothing can be pressed twice and the emblem's flame gutters. false undoes it. */
+  setBusy(busy: boolean): void;
 }
 
 export function createTitleScreen(
@@ -72,6 +75,15 @@ export function createTitleScreen(
     setNote(text) {
       note.textContent = text;
       note.hidden = text === '';
+    },
+    setBusy(busy) {
+      element.classList.toggle('wsw-busy', busy);
+      buttons.forEach((b, i) => {
+        b.disabled = busy;
+        const label = items[i].begin && busy ? BUSY_LABEL : items[i].label;
+        const text = b.childNodes[1];
+        if (text) text.textContent = label;
+      });
     },
     setVisible(visible) {
       element.style.display = visible ? 'flex' : 'none';
