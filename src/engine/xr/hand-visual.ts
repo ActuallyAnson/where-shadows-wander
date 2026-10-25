@@ -1,13 +1,10 @@
 // The player's hands as drawn in the room (VR has no passthrough, so the real hands are not seen).
 // A HandVisual draws both hands from their HandFrames; the shadow is cast from the tracked joints, never
-// from this, so the look can change without touching the game. CapsuleHandVisual is the first look: a flat
-// dark glove built from the same capsule pairs as the shadow (CAPSULE_JOINTS), in two draw calls and with
-// nothing allocated per frame. A model-based look can replace it by implementing HandVisual.
+// from this, so the look can change without touching the game. CapsuleHandVisual is styled as child-proportioned
+// stitched dark leather gloves (~0.68x scale) with muted winter flannel pajama cuffs at the wrists.
 //
 // It draws after the paper and before the shadow, without writing depth, so where a hand overlaps its own
 // shadow on the wall the shadow stays on top and is never hidden by the glove.
-// Known limit: for the same reason it writes no depth, so the candle's flame (drawn after it) shows through
-// a hand held in front of it, and the candle's aura and placement rings (drawn before it) sit under it.
 import {
   Color,
   CylinderGeometry,
@@ -21,7 +18,6 @@ import {
 } from '@iwsdk/core';
 import { JOINT_COUNT, type HandFrame } from '../hands/hand';
 import { CAPSULE_JOINTS } from '../shadow/pure/shadow-projector';
-import { LIT_RADIUS_M } from './candle-tint';
 import { FADE_IN_S, FADE_OUT_S } from './hand-fade';
 
 export interface HandVisual {
@@ -37,6 +33,9 @@ export interface HandVisual {
 
 /** Between the stage paper (render order 1) and the shadow (2). */
 export const HAND_RENDER_ORDER = 1.5;
+export const CHILD_HAND_SCALE = 0.68;
+export const WRIST_CUFF_SCALE = 1.35;
+export const LIT_RADIUS_M = 0.2;
 const BONES = CAPSULE_JOINTS.length / 2;
 const MIN_RADIUS_M = 0.006;
 /** How far toward the warm colour a joint at the flame goes (the dots use the same 0.85-ish blend). */
@@ -78,14 +77,14 @@ export class CapsuleHandVisual implements HandVisual {
   private readonly seen = new Uint8Array(2);
   private readonly lastPositions = [new Float32Array(JOINT_COUNT * 3), new Float32Array(JOINT_COUNT * 3)];
   private readonly lastRadii = [new Float32Array(JOINT_COUNT), new Float32Array(JOINT_COUNT)];
-  // The glove's colour and the colour it warms toward, as rgb in typed arrays (plain numbers, no Color objects, so update allocates nothing).
-  private readonly baseRgb = Float64Array.from(rgb(0x2b2733));
-  private readonly litRgb = Float64Array.from(rgb(0xb8793a));
+  // Styling: weathered brown leather, darker seam lines, flannel pajama wrist cuffs, and warm amber candlelight.
+  private readonly baseRgb = Float64Array.from(rgb(0x3d2e24));
+  private readonly seamRgb = Float64Array.from(rgb(0x271e17));
+  private readonly cuffRgb = Float64Array.from(rgb(0x2a354d));
+  private readonly litRgb = Float64Array.from(rgb(0xd88a40));
 
   constructor() {
     const material = new MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false });
-    // One extra per-instance number, the hand's opacity (instance colour has no alpha). Transparent so it
-    // sorts with the paper and shadow; fragments are opaque, see DITHER_FADE.
     material.customProgramCacheKey = () => 'wsw-hand-visual';
     material.onBeforeCompile = (shader) => {
       shader.vertexShader = insertAfter(
@@ -109,7 +108,7 @@ export class CapsuleHandVisual implements HandVisual {
       mesh.frustumCulled = false;
       mesh.renderOrder = HAND_RENDER_ORDER;
       mesh.count = 0;
-      mesh.setColorAt(0, new Color(0x2b2733)); // makes the colour buffer now, not on the first frame
+      mesh.setColorAt(0, new Color(0x3d2e24));
       this.object.add(mesh);
     }
   }
@@ -121,9 +120,6 @@ export class CapsuleHandVisual implements HandVisual {
   }
 
   update(hands: readonly HandFrame[], dt: number, flame?: ArrayLike<number> | null, shown = true): void {
-    // Everything below is plain arithmetic on local numbers written straight into the typed arrays. Calling a
-    // helper with several decimal arguments allocates on some JavaScript engines (the Node version CI pins did,
-    // about 5 KB a frame), so the matrices, colours, fade and flame tint are all worked out here.
     const hasFlame = flame !== null && flame !== undefined;
     const fx = hasFlame ? flame[0] : 0;
     const fy = hasFlame ? flame[1] : 0;
@@ -132,7 +128,9 @@ export class CapsuleHandVisual implements HandVisual {
     const bm = this.bones.instanceMatrix.array as Float32Array;
     const jc = (this.joints.instanceColor as InstancedBufferAttribute).array as Float32Array;
     const bc = (this.bones.instanceColor as InstancedBufferAttribute).array as Float32Array;
-    const base = this.baseRgb;
+    const baseDefault = this.baseRgb;
+    const seam = this.seamRgb;
+    const cuff = this.cuffRgb;
     const lit = this.litRgb;
     let nj = 0;
     let nb = 0;
@@ -143,11 +141,9 @@ export class CapsuleHandVisual implements HandVisual {
         this.lastRadii[side].set(hand.radii);
         this.seen[side] = 1;
       }
-      // Quick in, slower out (see hand-fade.ts), and out while the game is paused.
       const was = this.fade[side];
       const fade = hand.tracked && shown ? Math.min(1, was + dt / FADE_IN_S) : Math.max(0, was - dt / FADE_OUT_S);
       this.fade[side] = fade;
-      // A lost or paused hand fades out where it was last fully tracked; one never seen draws nothing.
       if (fade <= 0 || this.seen[side] === 0) continue;
       const p = this.lastPositions[side];
       const r = this.lastRadii[side];
@@ -156,7 +152,9 @@ export class CapsuleHandVisual implements HandVisual {
         const y = p[j * 3 + 1];
         const z = p[j * 3 + 2];
         const rj = r[j];
-        const s = rj > MIN_RADIUS_M ? rj : MIN_RADIUS_M; // also catches a missing radius (NaN)
+        const rawS = rj > MIN_RADIUS_M ? rj : MIN_RADIUS_M;
+        const isWrist = j === 0;
+        const s = rawS * CHILD_HAND_SCALE * (isWrist ? WRIST_CUFF_SCALE : 1.0);
         const o = nj * 16;
         jm[o] = s;
         jm[o + 1] = 0;
@@ -174,15 +172,26 @@ export class CapsuleHandVisual implements HandVisual {
         jm[o + 13] = y;
         jm[o + 14] = z;
         jm[o + 15] = 1;
-        // Warmed toward candlelight by how close the joint is to the flame (the same tint as candle-tint.ts).
         const dx = x - fx;
         const dy = y - fy;
         const dz = z - fz;
         const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const t = hasFlame && d < LIT_RADIUS_M ? (1 - d / LIT_RADIUS_M) * LIT_MIX : 0;
-        jc[nj * 3] = base[0] + (lit[0] - base[0]) * t;
-        jc[nj * 3 + 1] = base[1] + (lit[1] - base[1]) * t;
-        jc[nj * 3 + 2] = base[2] + (lit[2] - base[2]) * t;
+        const isSeam =
+          j === 3 ||
+          j === 4 ||
+          j === 8 ||
+          j === 9 ||
+          j === 13 ||
+          j === 14 ||
+          j === 18 ||
+          j === 19 ||
+          j === 23 ||
+          j === 24;
+        const b = isWrist ? cuff : isSeam ? seam : baseDefault;
+        jc[nj * 3] = b[0] + (lit[0] - b[0]) * t;
+        jc[nj * 3 + 1] = b[1] + (lit[1] - b[1]) * t;
+        jc[nj * 3 + 2] = b[2] + (lit[2] - b[2]) * t;
         this.jointFade[nj++] = fade;
       }
       for (let k = 0; k < BONES; k++) {
@@ -196,8 +205,6 @@ export class CapsuleHandVisual implements HandVisual {
         const dz = p[j + 2] - az;
         const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (len < 1e-6) continue;
-        // The rotation taking +Y to the bone's direction, as a quaternion (qx, qy, qz, qw), then the matrix
-        // for rotation, scale (radius, length, radius) and the bone's midpoint, as three.js's compose does.
         const nx = dx / len;
         const ny = dy / len;
         const nz = dz / len;
@@ -206,7 +213,7 @@ export class CapsuleHandVisual implements HandVisual {
         let qz = -nx;
         let qw = 1 + ny;
         if (qw < 1e-6) {
-          qx = 1; // pointing straight down: a half turn about X
+          qx = 1;
           qz = 0;
           qw = 0;
         }
@@ -218,7 +225,8 @@ export class CapsuleHandVisual implements HandVisual {
         const r0 = r[i / 3];
         const r1 = r[j / 3];
         const rm = r0 < r1 ? r0 : r1;
-        const s = rm > MIN_RADIUS_M ? rm : MIN_RADIUS_M;
+        const rawS = rm > MIN_RADIUS_M ? rm : MIN_RADIUS_M;
+        const s = rawS * CHILD_HAND_SCALE;
         const x2 = qx + qx;
         const y2 = qy + qy;
         const z2 = qz + qz;
@@ -256,9 +264,9 @@ export class CapsuleHandVisual implements HandVisual {
         const ez = mz - fz;
         const e = Math.sqrt(ex * ex + ey * ey + ez * ez);
         const tb = hasFlame && e < LIT_RADIUS_M ? (1 - e / LIT_RADIUS_M) * LIT_MIX : 0;
-        bc[nb * 3] = base[0] + (lit[0] - base[0]) * tb;
-        bc[nb * 3 + 1] = base[1] + (lit[1] - base[1]) * tb;
-        bc[nb * 3 + 2] = base[2] + (lit[2] - base[2]) * tb;
+        bc[nb * 3] = baseDefault[0] + (lit[0] - baseDefault[0]) * tb;
+        bc[nb * 3 + 1] = baseDefault[1] + (lit[1] - baseDefault[1]) * tb;
+        bc[nb * 3 + 2] = baseDefault[2] + (lit[2] - baseDefault[2]) * tb;
         this.boneFade[nb++] = fade;
       }
     }

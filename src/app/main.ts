@@ -18,6 +18,8 @@ import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
+import { BedTrayView } from '../engine/render/room/bed-tray-view';
+import { VrTitleView } from '../ui/title-screen/vr-title-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
 import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
 import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
@@ -205,7 +207,12 @@ async function start(): Promise<void> {
   const stageView = new TestStageView();
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
   const candleView = new CandleView();
-  const ambientLight = new AmbientLight(0x1a1410, 0.04);
+  candleView.lit = false;
+  const bedTray = new BedTrayView();
+  const vrTitle = new VrTitleView();
+  type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
+  let sessionState: SessionState = 'title_vr';
+  const ambientLight = new AmbientLight(0x182035, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
@@ -255,9 +262,15 @@ async function start(): Promise<void> {
     const problems = cutscenes.play(OPENING, () => {
       openingT = -1;
       setKindred(kindredWanted);
+      sessionState = 'playing';
+      candleView.setLocked(true);
+      tutorial.start();
     });
     if (problems.length > 0) {
       failures.report('opening', new Error(problems.join('; ')));
+      sessionState = 'playing';
+      candleView.setLocked(true);
+      tutorial.start();
       return;
     }
     openingT = 0;
@@ -301,6 +314,8 @@ async function start(): Promise<void> {
     air.group,
     kindredView.group,
     candleView.group,
+    bedTray.group,
+    vrTitle.group,
     ambientLight,
   );
   let rigPlaced = false;
@@ -350,6 +365,11 @@ async function start(): Promise<void> {
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
+  settingsPanel.onVisibilityChange = (open) => {
+    if (!open && sessionState === 'paused') {
+      void showMenu('pause');
+    }
+  };
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
   const openSettings = () => {
@@ -377,6 +397,14 @@ async function start(): Promise<void> {
     } else if (screen === 'pause' && button === 'resume') {
       menu.hide();
       menuChoice = 'off';
+      sessionState = 'playing';
+      candleView.setLocked(true);
+    } else if (screen === 'pause' && button === 'restart') {
+      menu.hide();
+      menuChoice = 'off';
+      sessionState = 'playing';
+      candleView.setLocked(true);
+      tutorial.start();
     }
   };
   const showMenu = (id: MenuScreenId) => {
@@ -403,8 +431,29 @@ async function start(): Promise<void> {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
     } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
+
+    // Position bed tray and lap blanket across player's lap
+    const trayDist = 0.45;
+    const trayX = head[0] - Math.sin(yaw) * trayDist;
+    const trayY = Math.max(0.4, head[1] - 0.5);
+    const trayZ = head[2] - Math.cos(yaw) * trayDist;
+    bedTray.place(trayX, trayY, trayZ, yaw);
+
+    const saucerPos = new Float64Array(3);
+    bedTray.getCandleSaucerPosition(saucerPos);
+    lantern[0] = saucerPos[0];
+    lantern[1] = saucerPos[1];
+    lantern[2] = saucerPos[2];
+
     stageView.place(stage, lantern);
     candleView.place(lantern);
+
+    // Place floating VR title emblem above the tray
+    const titleDist = 0.55;
+    const titleX = head[0] - Math.sin(yaw) * titleDist;
+    const titleY = head[1] - 0.15;
+    const titleZ = head[2] - Math.cos(yaw) * titleDist;
+    vrTitle.place(titleX, titleY, titleZ);
     const r = stage.right,
       u = stage.up,
       n = stage.normal,
@@ -418,7 +467,7 @@ async function start(): Promise<void> {
     );
     stageGroup.matrixWorldNeedsUpdate = true;
     bakePropTerrain();
-    tutorial.start();
+    if (sessionState === 'playing') tutorial.start();
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -529,6 +578,12 @@ async function start(): Promise<void> {
     capture: capture.enabled ? { foveation: capture.foveation, scale: capture.scale } : null,
     settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
+    interaction: {
+      sessionState,
+      candleLocked: candleView.isLocked,
+      palmOverFlame: candleView.isCovered,
+      handVisualScale: 0.68,
+    },
     shapes: { commits: { ...shapes.commits }, droppedEvents: shapes.events.dropped },
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
@@ -824,11 +879,39 @@ async function start(): Promise<void> {
         } catch (e) {
           failures.report('candle pickup', e);
         }
+        world.camera.getWorldQuaternion(cameraQuat);
+        if (sessionState === 'title_vr') {
+          vrTitle.update(step, cameraQuat);
+          if (candleView.checkIgnition(handList)) {
+            sessionState = 'opening';
+            candleView.lit = true;
+            ambientLight.color.setHex(0x2a1c12);
+            ambientLight.intensity = 0.04;
+            gameAudio.candleIgnited(candleView.flamePosition);
+            vrTitle.ignite();
+            playOpening();
+          }
+        } else if (sessionState === 'opening') {
+          vrTitle.update(step, cameraQuat);
+        } else if (sessionState === 'playing') {
+          if (candleView.isCovered) {
+            sessionState = 'paused';
+            simWasPaused = true;
+            void showMenu('pause');
+          }
+        } else if (sessionState === 'paused') {
+          if (candleView.checkIgnition(handList)) {
+            menu.hide();
+            menuChoice = 'off';
+            sessionState = 'playing';
+            candleView.setLocked(true);
+          }
+        }
         timings.begin(SLOT.shadow);
         try {
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-          shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.occlusion);
+          shadowRenderer.update(projector.shadows, stage, sharpen.look, candleView.lit ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
             const o = stage.origin,
@@ -845,7 +928,7 @@ async function start(): Promise<void> {
               demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
             }
           }
-          propShadows.update(stage, shadowRenderer.baseOpacity * candleView.occlusion);
+          propShadows.update(stage, shadowRenderer.baseOpacity * (candleView.lit ? candleView.occlusion : 0));
           if (kindredOn && rigPlaced) {
             // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
             const f = candleView.flamePosition,
@@ -1010,7 +1093,9 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      if (paused) simWasPaused = true;
+      const isSimPaused =
+        paused || sessionState === 'paused' || sessionState === 'title_vr' || sessionState === 'opening';
+      if (isSimPaused) simWasPaused = true;
       else {
         try {
           if (rigPlaced) {
@@ -1036,7 +1121,7 @@ async function start(): Promise<void> {
       }
       // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       try {
-        lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, true);
+        lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
         // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
@@ -1077,7 +1162,7 @@ async function start(): Promise<void> {
         occluder.update(handList);
         timings.begin(SLOT.handVisual);
         handVisual.object.visible = !passthrough && handFlags.handVisual;
-        handVisual.update(handList, step, rigPlaced ? candleView.flamePosition : null, !paused);
+        handVisual.update(handList, step, rigPlaced && candleView.lit ? candleView.flamePosition : null, !paused);
         timings.end(SLOT.handVisual);
       } catch (e) {
         failures.report('hands drawing', e);
@@ -1144,6 +1229,20 @@ async function start(): Promise<void> {
         sim,
         getRecorder: () => recorder,
         handVisual,
+        bedTray,
+        vrTitle,
+        sessionState: () => sessionState,
+        igniteCandle: () => {
+          if (sessionState === 'title_vr') {
+            sessionState = 'opening';
+            candleView.lit = true;
+            ambientLight.color.setHex(0x2a1c12);
+            ambientLight.intensity = 0.04;
+            gameAudio.candleIgnited(candleView.flamePosition);
+            vrTitle.ignite();
+            playOpening();
+          }
+        },
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),
       },

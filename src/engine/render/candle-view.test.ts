@@ -1,6 +1,6 @@
 import { Quaternion } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
-import { createHandFrame, type HandFrame } from '../hands/hand';
+import { createHandFrame, JOINT, type HandFrame } from '../hands/hand';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 import { CandleView } from './candle-view';
 
@@ -16,16 +16,56 @@ function setPalm(hand: HandFrame, x: number, y: number, z: number): void {
   hand.positions[35] = z;
 }
 
+function setHandJointsDown(hand: HandFrame, x: number, y: number, z: number): void {
+  hand.tracked = true;
+  hand.validJoints = 25;
+  for (let j = 0; j < 25; j++) {
+    hand.positions[j * 3] = x;
+    hand.positions[j * 3 + 1] = y;
+    hand.positions[j * 3 + 2] = z;
+  }
+  // Setup wrist and knuckles for palm downward normal.
+  // For a left hand facing palm down: forward is -Z, across (pinky - index) is -X.
+  const wrist = JOINT.wrist * 3;
+  const midMeta = JOINT['middle-finger-metacarpal'] * 3;
+  const midProx = JOINT['middle-finger-phalanx-proximal'] * 3;
+  const idxProx = JOINT['index-finger-phalanx-proximal'] * 3;
+  const pnkProx = JOINT['pinky-finger-phalanx-proximal'] * 3;
+
+  hand.positions[wrist] = x;
+  hand.positions[wrist + 1] = y;
+  hand.positions[wrist + 2] = z + 0.08;
+
+  hand.positions[midMeta] = x;
+  hand.positions[midMeta + 1] = y;
+  hand.positions[midMeta + 2] = z;
+
+  hand.positions[midProx] = x;
+  hand.positions[midProx + 1] = y;
+  hand.positions[midProx + 2] = z - 0.05;
+
+  hand.positions[idxProx] = x + 0.04;
+  hand.positions[idxProx + 1] = y;
+  hand.positions[idxProx + 2] = z - 0.05;
+
+  hand.positions[pnkProx] = x - 0.04;
+  hand.positions[pnkProx + 1] = y;
+  hand.positions[pnkProx + 2] = z - 0.05;
+}
+
 describe('CandleView', () => {
   it('builds the group with plate, rim, wax, wick, flame quad, point light, and feedback rings', () => {
     const candle = new CandleView();
-    expect(candle.group.children).toHaveLength(8);
+    expect(candle.group.children).toHaveLength(9);
     expect(candle.pointLight.castShadow).toBe(false);
     expect(candle.pointLight.position.y).toBeCloseTo(0.095, 3);
     expect(candle.flame.mesh.position.y).toBeCloseTo(0.095, 3);
     expect(candle.lightIntensity).toBe(1.2);
     expect(candle.state).toBe('placed');
     expect(candle.isHeld).toBe(false);
+    expect(candle.lit).toBe(true);
+    expect(candle.isLocked).toBe(false);
+    expect(candle.isCovered).toBe(false);
   });
 
   it('places the candle group and syncs flamePosition', () => {
@@ -62,6 +102,79 @@ describe('CandleView', () => {
     light.intensity = 0;
     candle.update(light, cameraQuat);
     expect(candle.lightIntensity).toBe(0);
+  });
+
+  it('handles unlit state and wick pinch ignition', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    candle.lit = false;
+    expect(candle.lit).toBe(false);
+    expect(candle.lightIntensity).toBe(0);
+
+    const hand = createHandFrame('right');
+    hand.tracked = true;
+    hand.validJoints = 25;
+
+    // Hand far away
+    for (let j = 0; j < 25; j++) {
+      hand.positions[j * 3] = 0.5;
+      hand.positions[j * 3 + 1] = 0.5;
+      hand.positions[j * 3 + 2] = -0.4;
+    }
+    expect(candle.checkIgnition([hand])).toBe(false);
+
+    // Touch index tip to wick (wick is at 0, 0.75 + 0.095 = 0.845, -0.4)
+    const idx = JOINT['index-finger-tip'] * 3;
+    hand.positions[idx] = 0;
+    hand.positions[idx + 1] = 0.85;
+    hand.positions[idx + 2] = -0.4;
+
+    expect(candle.checkIgnition([hand])).toBe(true);
+
+    // Once lit, ignition returns false
+    candle.lit = true;
+    expect(candle.checkIgnition([hand])).toBe(false);
+  });
+
+  it('disables pickup when locked', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    candle.setLocked(true);
+    expect(candle.isLocked).toBe(true);
+
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+    setPalm(left, -0.05, 0.76, -0.4);
+    setPalm(right, 0.05, 0.76, -0.4);
+
+    const res = candle.updateInteraction({ left, right }, 0.2);
+    expect(res.state).toBe('placed');
+    expect(candle.isHeld).toBe(false);
+  });
+
+  it('detects palm hovering over flame to trigger isCovered pause', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+    right.tracked = false;
+
+    // Position palm 6 cm above wick with normal pointing downward
+    // Wick is at y = 0.75 + 0.095 = 0.845
+    setHandJointsDown(left, 0.0, 0.9, -0.4);
+
+    // Step 0.2s: not yet covered (needs ~0.4s)
+    candle.updateInteraction({ left, right }, 0.2);
+    expect(candle.isCovered).toBe(false);
+
+    // Step another 0.25s: now covered!
+    candle.updateInteraction({ left, right }, 0.25);
+    expect(candle.isCovered).toBe(true);
+
+    // Removing hand: step 0.3s clears cover
+    setPalm(left, 0.5, 0.9, -0.4);
+    candle.updateInteraction({ left, right }, 0.3);
+    expect(candle.isCovered).toBe(false);
   });
 
   it('handles two-handed pickup, moving, and 1-second separation placement feedback', () => {

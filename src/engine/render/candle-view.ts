@@ -10,6 +10,9 @@
 // - Interactive feedback:
 //   - Aura Ring: warm glowing halo around the saucer indicating the candle is "picked up".
 //   - Placement Ring: 1-second expanding ripple animation when hands separate to place the candle.
+//   - Wick Indicator: soft pulsing warm glow hovering over the wick when the candle is unlit.
+//   - Palm Covering: hovering a palm over the flame (within 12cm for 0.4s) dims light and signals pause.
+//   - In-Game Lock: locks candle in place once gameplay starts.
 //
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
 import {
@@ -21,10 +24,11 @@ import {
   MeshStandardMaterial,
   PointLight,
   RingGeometry,
+  SphereGeometry,
   TorusGeometry,
 } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
-import type { HandFrame, Handedness } from '../hands/hand';
+import { createPalm, derivePalm, JOINT, type HandFrame, type Handedness } from '../hands/hand';
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 
@@ -43,18 +47,25 @@ export class CandleView {
   private readonly wickGeometry: CylinderGeometry;
   private readonly auraGeometry: TorusGeometry;
   private readonly placementRingGeometry: RingGeometry;
+  private readonly wickIndicatorGeometry: SphereGeometry;
 
   private readonly plateMaterial: MeshStandardMaterial;
   private readonly waxMaterial: MeshStandardMaterial;
   private readonly wickMaterial: MeshStandardMaterial;
   private readonly auraMaterial: MeshBasicMaterial;
   private readonly placementRingMaterial: MeshBasicMaterial;
+  private readonly wickIndicatorMaterial: MeshBasicMaterial;
 
   private readonly auraMesh: Mesh;
   private readonly placementRingMesh: Mesh;
+  private readonly wickIndicator: Mesh;
 
   // Interaction state
   private _state: CandleInteractionState = 'placed';
+  private _lit = true;
+  private _isLocked = false;
+  private _isCovered = false;
+  private coverTimer = 0;
   private placingTimer = 0;
   private cooldownTimer = 0;
   private pickupDwellTimer = 0;
@@ -65,6 +76,7 @@ export class CandleView {
   private readonly rightPalm = new Float64Array(3);
   private readonly handsMidpoint = new Float64Array(3);
   private readonly targetPos = new Float64Array(3);
+  private readonly scratchPalm = createPalm();
 
   constructor() {
     // 1. Plate / Saucer: radiusTop 0.09m, radiusBottom 0.07m, height 0.015m, 24 segments
@@ -141,6 +153,18 @@ export class CandleView {
     this.placementRingMesh.position.set(0, 0.002, 0);
     this.placementRingMesh.visible = false;
 
+    // 9. Unlit Wick Indicator: soft warm pulsing orb hovering over wick when candle is unlit
+    this.wickIndicatorGeometry = new SphereGeometry(0.005, 8, 8);
+    this.wickIndicatorMaterial = new MeshBasicMaterial({
+      color: 0xffaa44,
+      transparent: true,
+      opacity: 0.0,
+      toneMapped: false,
+    });
+    this.wickIndicator = new Mesh(this.wickIndicatorGeometry, this.wickIndicatorMaterial);
+    this.wickIndicator.position.set(0, 0.098, 0);
+    this.wickIndicator.visible = false;
+
     this.group.add(
       plateMesh,
       rimMesh,
@@ -150,6 +174,7 @@ export class CandleView {
       this.pointLight,
       this.auraMesh,
       this.placementRingMesh,
+      this.wickIndicator,
     );
   }
 
@@ -159,6 +184,38 @@ export class CandleView {
     this.flamePosition[0] = position[0];
     this.flamePosition[1] = position[1] + 0.095;
     this.flamePosition[2] = position[2];
+  }
+
+  /** Whether the candle is lit. Setting to false turns off flame and enables wick pulse. */
+  get lit(): boolean {
+    return this._lit;
+  }
+
+  set lit(value: boolean) {
+    this._lit = value;
+    this.wickIndicator.visible = !value;
+    this.flame.mesh.visible = value;
+    if (!value) {
+      this.pointLight.intensity = 0;
+    }
+  }
+
+  /** Locks candle position during gameplay so projection math remains stable. */
+  setLocked(locked: boolean): void {
+    this._isLocked = locked;
+    if (locked && this._state === 'held') {
+      this._state = 'placed';
+      this.auraMesh.visible = false;
+    }
+  }
+
+  get isLocked(): boolean {
+    return this._isLocked;
+  }
+
+  /** Whether a player's palm is currently covering the flame to pause. */
+  get isCovered(): boolean {
+    return this._isCovered;
   }
 
   /** Current intensity of the dynamic point light. */
@@ -185,13 +242,53 @@ export class CandleView {
   }
 
   /**
-   * Updates candle pickup and placement interaction with the player's hands.
-   * - Pickup: Bringing two hands close to the candle (<0.22m from candle, <0.24m between hands)
-   *   transitions to 'held' with golden rim aura feedback.
-   * - Moving: While held, the candle smoothly follows the hands midpoint.
-   * - Placement: Moving the 2 hands far enough apart (>0.28m) triggers 1 second of placement
-   *   feedback (expanding ripple and settling flare) and places the candle.
-   *
+   * Checks if an index fingertip touches near the wick or a pinch gesture is near the wick.
+   * Zero per-frame allocations.
+   */
+  checkIgnition(hands: Readonly<Record<Handedness, HandFrame>> | readonly HandFrame[]): boolean {
+    if (this._lit) return false;
+    const fx = this.flamePosition[0];
+    const fy = this.flamePosition[1];
+    const fz = this.flamePosition[2];
+
+    const isArr = Array.isArray(hands);
+    const count = isArr ? hands.length : 2;
+    for (let i = 0; i < count; i++) {
+      const h = isArr
+        ? (hands as readonly HandFrame[])[i]
+        : i === 0
+          ? (hands as Readonly<Record<Handedness, HandFrame>>).left
+          : (hands as Readonly<Record<Handedness, HandFrame>>).right;
+      if (!h.tracked || h.validJoints < 10) continue;
+      const p = h.positions;
+
+      // Check index tip touch
+      const idx = JOINT['index-finger-tip'] * 3;
+      const dx = p[idx] - fx;
+      const dy = p[idx + 1] - fy;
+      const dz = p[idx + 2] - fz;
+      const tipDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (tipDist < 0.08) return true;
+
+      // Check index-to-thumb pinch near wick
+      const thmb = JOINT['thumb-tip'] * 3;
+      const pdx = p[idx] - p[thmb];
+      const pdy = p[idx + 1] - p[thmb + 1];
+      const pdz = p[idx + 2] - p[thmb + 2];
+      const pinchDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
+      if (pinchDist < 0.04) {
+        const mx = (p[idx] + p[thmb]) * 0.5 - fx;
+        const my = (p[idx + 1] + p[thmb + 1]) * 0.5 - fy;
+        const mz = (p[idx + 2] + p[thmb + 2]) * 0.5 - fz;
+        const pinchWickDist = Math.sqrt(mx * mx + my * my + mz * mz);
+        if (pinchWickDist < 0.1) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Updates candle pickup, placement, light occlusion, and palm-over-flame pause detection.
    * Zero per-frame allocations.
    */
   updateInteraction(
@@ -245,6 +342,56 @@ export class CandleView {
       this.lightOcclusion = t * t * (3 - 2 * t);
     } else {
       this.lightOcclusion = 1.0;
+    }
+
+    // Palm hovering directly over flame detection (within 0.12m, palm normal pointing downwards)
+    let hoveringPalm = false;
+    if (this._lit) {
+      if (leftTracked) {
+        const palm = derivePalm(left, this.scratchPalm);
+        if (palm) {
+          const dx = palm.position[0] - fx;
+          const dy = palm.position[1] - fy;
+          const dz = palm.position[2] - fz;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < 0.12 && palm.position[1] >= fy - 0.03 && palm.normal[1] < -0.35) {
+            hoveringPalm = true;
+          }
+        }
+      }
+      if (!hoveringPalm && rightTracked) {
+        const palm = derivePalm(right, this.scratchPalm);
+        if (palm) {
+          const dx = palm.position[0] - fx;
+          const dy = palm.position[1] - fy;
+          const dz = palm.position[2] - fz;
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < 0.12 && palm.position[1] >= fy - 0.03 && palm.normal[1] < -0.35) {
+            hoveringPalm = true;
+          }
+        }
+      }
+    }
+
+    if (hoveringPalm) {
+      this.coverTimer += delta;
+      if (this.coverTimer >= 0.4) {
+        this._isCovered = true;
+      }
+    } else {
+      this.coverTimer = Math.max(0, this.coverTimer - delta * 2.0);
+      if (this.coverTimer <= 0) {
+        this._isCovered = false;
+      }
+    }
+
+    // If locked during gameplay, 2-handed pickup is disabled
+    if (this._isLocked) {
+      if (this._state === 'held') {
+        this._state = 'placed';
+        this.auraMesh.visible = false;
+      }
+      return { state: this._state, justPlaced, justPickedUp };
     }
 
     if (leftTracked && rightTracked) {
@@ -378,9 +525,25 @@ export class CandleView {
    * Zero per-frame allocations.
    */
   update(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+    if (!this._lit) {
+      this.flame.mesh.visible = false;
+      this.pointLight.intensity = 0;
+      this.wickIndicator.visible = true;
+      const pulse = 0.5 + 0.4 * Math.sin(performance.now() * 0.005);
+      this.wickIndicatorMaterial.opacity = pulse;
+      this.wickIndicator.scale.setScalar(0.8 + 0.3 * pulse);
+      return;
+    }
+
+    this.wickIndicator.visible = false;
+    this.flame.mesh.visible = true;
     this.flame.update(light, cameraQuaternion);
     this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
-    this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion;
+    const coverFactor = this._isCovered ? 0.15 : 1.0;
+    this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion * coverFactor;
+    if (this._isCovered) {
+      this.flame.mesh.scale.setScalar(0.4);
+    }
   }
 
   /** Frees allocated geometries and materials. */
@@ -391,10 +554,12 @@ export class CandleView {
     this.wickGeometry.dispose();
     this.auraGeometry.dispose();
     this.placementRingGeometry.dispose();
+    this.wickIndicatorGeometry.dispose();
     this.plateMaterial.dispose();
     this.waxMaterial.dispose();
     this.wickMaterial.dispose();
     this.auraMaterial.dispose();
     this.placementRingMaterial.dispose();
+    this.wickIndicatorMaterial.dispose();
   }
 }

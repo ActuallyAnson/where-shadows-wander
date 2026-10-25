@@ -4,7 +4,7 @@ import { PRESETS, writeHandPose } from '../hands/synthetic-hand';
 import { createHandFrame, type HandFrame } from '../hands/hand';
 import { FADE_OUT_S, stepFade } from './hand-fade';
 import { CAPSULE_JOINTS } from '../shadow/pure/shadow-projector';
-import { CapsuleHandVisual, HAND_RENDER_ORDER, insertAfter } from './hand-visual';
+import { CapsuleHandVisual, CHILD_HAND_SCALE, HAND_RENDER_ORDER, insertAfter, WRIST_CUFF_SCALE } from './hand-visual';
 
 function hand(side: 'left' | 'right', x: number): HandFrame {
   const h = createHandFrame(side);
@@ -104,7 +104,7 @@ describe('CapsuleHandVisual', () => {
       const len = d.length();
       if (len < 1e-6) continue;
       const q = new Quaternion().setFromUnitVectors(up, d.clone().multiplyScalar(1 / len));
-      const s = Math.max(Math.min(r[i], r[j]) || 0, 0.006);
+      const s = Math.max(Math.min(r[i], r[j]) || 0, 0.006) * CHILD_HAND_SCALE;
       const want = new Matrix4().compose(new Vector3().addVectors(a, b).multiplyScalar(0.5), q, new Vector3(s, len, s));
       const got = bones.instanceMatrix.array.subarray(n * 16, n * 16 + 16);
       for (let e = 0; e < 16; e++) expect(got[e]).toBeCloseTo(want.elements[e], 4);
@@ -112,7 +112,7 @@ describe('CapsuleHandVisual', () => {
     }
     expect(n).toBe(bones.count);
     for (let j = 0; j < 25; j++) {
-      const s = Math.max(r[j] || 0, 0.006);
+      const s = Math.max(r[j] || 0, 0.006) * CHILD_HAND_SCALE * (j === 0 ? WRIST_CUFF_SCALE : 1.0);
       const want = new Matrix4().makeScale(s, s, s).setPosition(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]);
       for (let e = 0; e < 16; e++) expect(joints.instanceMatrix.array[j * 16 + e]).toBeCloseTo(want.elements[e], 5);
     }
