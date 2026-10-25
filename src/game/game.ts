@@ -1,4 +1,4 @@
-// The game: one object main.ts drives with one call a frame (ADR 0008). Owns the fixed-step loop,
+// The game: one object main.ts drives with one call a frame (ADR 0013). Owns the fixed-step loop,
 // the entity store, the solver, the traveller, the abilities, the companions and the puzzle runner,
 // and plays a chapter's puzzles in order. Plain TypeScript; per-frame and per-step code builds no
 // objects (puzzle loads do, between puzzles).

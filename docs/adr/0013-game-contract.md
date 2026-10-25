@@ -1,6 +1,8 @@
-# ADR 0008: One `Game` object behind one call a frame, talking to the app through plain data
+# ADR 0013: One `Game` object behind one call a frame, talking to the app through plain data
 
 Status: proposed 10 Oct 2026 (Teammate A). For review at the end of A's work; needs Anson (main.ts) and Teammate B (render, anim, services) to agree.
+
+Not wired yet (25 Oct 2026): `Game` is built and tested headless, but `main.ts` still runs its own store, solver and loop for the tutorial (`src/game/tutorial-flow.ts`). Switching `main.ts` over to `Game` waits until the bedroom puzzles are in `Game`.
 
 ## Context
 

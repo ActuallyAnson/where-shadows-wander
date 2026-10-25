@@ -1,7 +1,7 @@
 // What the game tells the rest of the app (audio, saves, UI, the renderer's effects): a fixed queue
 // of reused event objects, filled during Game.frame() and read after it. Plain TypeScript.
 //
-// Contract (ADR 0008): the queue holds the events of one display frame, from all the fixed steps
+// Contract (ADR 0013): the queue holds the events of one display frame, from all the fixed steps
 // that frame ran, oldest first. Game.frame() clears it at the start, so read it every frame after
 // frame() returns. Event objects are reused: copy what you keep. `id` is always one of the game's
 // constant strings (a puzzle, solution, role, state or creature name), never built per event.

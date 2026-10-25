@@ -19,7 +19,7 @@ All code here is pure TypeScript: no IWSDK, no three.js and no browser globals. 
 
 ## Frame flow
 
-`main.ts` makes one call a frame: `game.frame(input)`. Inside it:
+`Game` is driven with one call a frame: `game.frame(input)`. It is not wired into `main.ts` yet, which still runs the tutorial (`src/game/tutorial-flow.ts`) on its own store, solver and loop. Inside `game.frame`:
 
 ```
 Game.frame(input)                                   once per display frame
@@ -192,7 +192,7 @@ It runs on puzzle load, never per frame. `markerOf` and `markersOf` find markers
 
 ## The game: `src/game/game.ts`
 
-`Game` is the one object `main.ts` drives (see [ADR 0008](adr/0008-game-contract.md)). It owns:
+`Game` is the one object `main.ts` will drive (see [ADR 0013](adr/0013-game-contract.md)). It owns:
 - the loop, store, solver and RNG
 - the traveller, abilities, companions and creatures
 - the puzzle runner, discovery and the save
