@@ -1,23 +1,36 @@
-// Puzzle 4, the chasm: a gap wider than one hand's shadow. Intended: two flat hands as two bridges
-// end to end. Also works: one flat hand as a ferry, the traveller standing on it while the player
-// carries it across. One bridge held still is not enough: the traveller waits at its far end.
+// Puzzle 4, bed to toy box: the end of the bed and the toy box with a gap between them wider than one
+// hand's shadow. Intended: two flat hands as two bridges end to end. Also works: one flat hand as a
+// ferry, the traveller standing on it while the player carries it across. One bridge held still is
+// not enough: the traveller waits at its far end.
 import { Touch } from '../../engine/sim/solver';
 import { Role } from '../abilities';
 import type { PuzzleDef } from '../puzzle';
+import { goalOn, LEDGE_TOP, ledge, startOn } from './bedroom';
 
+/** The gap's edges, stage x: 0.5 m, wider than a 0.3 m hand shadow. */
+export const BED_END_X = -0.2;
+export const TOY_BOX_X = 0.3;
 /** A bridge hand moving at least this fast (m/s) with the traveller on it is a ferry. */
 export const FERRY_SPEED = 0.04;
 
 /** A fresh puzzle with its own state: one per Game, so two games never share it. */
-export function createChasmPuzzle(): PuzzleDef {
+export function createBedPuzzle(): PuzzleDef {
   const state = {
     /** Bit 0: the traveller stood on the left hand as a bridge; bit 1: on the right. */
     bridges: 0,
   };
+  const width = TOY_BOX_X - BED_END_X;
   return {
-    id: 'p4-chasm',
-    layoutId: 'puzzle-4',
-    title: 'The chasm',
+    id: 'n4-bed',
+    title: 'Bed to toy box',
+    layout: {
+      traveller: startOn(-0.7),
+      goal: goalOn(0.7),
+      markers: [{ tag: 'gap', x: (BED_END_X + TOY_BOX_X) / 2, y: LEDGE_TOP - 0.07, width, height: 0.14 }],
+    },
+    props: [ledge('bed', -0.8, BED_END_X), ledge('toy-box', TOY_BOX_X, 0.8)],
+    ground: false,
+    groundY: LEDGE_TOP,
     solutions: ['two-bridges', 'ferry'],
     hintShape: 'flat',
 

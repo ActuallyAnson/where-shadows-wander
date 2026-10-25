@@ -9,7 +9,7 @@ export const SAVE_VERSION = 1;
 
 export interface SaveState {
   version: typeof SAVE_VERSION;
-  /** Chapter id, e.g. "chapter-1". */
+  /** Chapter id, e.g. "night". */
   chapter: string;
   /** Index of the puzzle to resume at. */
   puzzle: number;
@@ -20,7 +20,7 @@ export interface SaveState {
   chapterComplete: boolean;
 }
 
-export function newSave(chapter = 'chapter-1'): SaveState {
+export function newSave(chapter = 'night'): SaveState {
   return { version: SAVE_VERSION, chapter, puzzle: 0, solutions: {}, creatures: [], chapterComplete: false };
 }
 
@@ -28,7 +28,7 @@ export function newSave(chapter = 'chapter-1'): SaveState {
  * Reads untrusted saved data (from storage, maybe an old or damaged version) into a valid SaveState.
  * Anything missing or malformed falls back to a new save's value; it never throws.
  */
-export function readSave(data: unknown, chapter = 'chapter-1'): SaveState {
+export function readSave(data: unknown, chapter = 'night'): SaveState {
   const save = newSave(chapter);
   if (typeof data !== 'object' || data === null) return save;
   const d = data as Record<string, unknown>;

@@ -35,7 +35,7 @@ Game.frame(input)                                   once per display frame
            creatures / traveller think                       speeds
            solver.step
            abilities.afterSolve                              catching, splashes on hands
-           puzzle.afterStep                                  contacts, gates, credit
+           puzzle.afterStep                                  contacts, drawbridge, credit
            traveller / creatures after                       goal, falls, crows leaving
            runner.update                                     credit, hint, win, outro -> next puzzle
   return alpha                                      renderer draws px + (x - px) * alpha
@@ -111,7 +111,7 @@ The reasoning is in [ADR 0007](adr/0007-custom-2d-solver.md). The solver is a sm
 | Thing | Shape | Who sets it |
 |---|---|---|
 | Entities | circles in the `EntityStore`. `Static` ones never move. `Sensor` ones report overlaps and push nothing. | gameplay, layouts |
-| Terrain | `solver.terrain`: up to 64 capsules, each with a `tag` and an `enabled` switch | puzzle load (ground, gates, ropes) |
+| Terrain | `solver.terrain`: 64 capsules by default (the game's has 128), each with a `tag` and an `enabled` switch | puzzle load (props' shadows, ground, a drawbridge) |
 | Hands | `solver.hands[LEFT/RIGHT]`: 28 capsules copied from `HandShadow` each frame, with `mask` (bit `1 << kind` per kind the hand is solid to) and the hand's velocity `vx`, `vy` | gameplay (abilities) |
 
 `config` holds:
@@ -173,8 +173,8 @@ A puzzle's layout comes from one of two places:
 
 ### What lives where
 
-- **The scene file** holds the pieces (the traveller's start, crows, fireflies) and the markers (`gap`, `goal`, `plate`).
-- **Puzzle code** in `src/game/puzzles/` holds everything that moves or reacts: rain, wind, gates and ropes.
+- **The scene file** holds the pieces (the traveller's start, crows, fireflies) and the markers (`gap`, `goal`, `plate`). No puzzle of the night reads it any more; it stays as the loader's test input for the editor path.
+- **Puzzle code** in `src/game/puzzles/` holds everything that moves or reacts: drips, wind, the drawbridge.
 - **`content/levels` stays unused,** per ADR 0006.
 - **Adding a marker tag or a `Kind`** needs a stand-in asset in `src/app/assets.ts`. That file is Anson's, and a test enforces it.
 
@@ -254,7 +254,7 @@ const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right,
 |---|---|
 | `alpha` and `store` (`x/y/px/py/radius/kind/flags`) | the sprite renderer (B) |
 | `events` (`GameEventQueue`): one frame of events, cleared at the next `frame()` | audio, saves, UI, effects |
-| `fixtures` | the renderer: cloud, wind, gate, plate, window |
+| `fixtures` | the renderer: drip, wind, drawbridge, plate, window |
 | `traveller.state`/`stateT`, `abilities.hands[h].role` | animation (B) |
 | `save` (`SaveState`), changed on `puzzle-solved` and `chapter-complete` | the save service (B) |
 
@@ -296,7 +296,7 @@ Pausing stops time completely. On resume the remainder is dropped, so the world 
 | `hint-show` / `hint-hide` | the shape to make (show) | `x`, `y`: where |
 | `caught` | `raindrop` / `firefly` | how many the cup holds |
 | `splash` | `ground` / `hand` / `traveller` | |
-| `puzzle-event` | `crows-flee`, `gate-open`, `gate-close`, `cup-overflow` | |
+| `puzzle-event` | `drawbridge-down`, `cup-overflow` (and `crows-flee`, from crows no puzzle uses now) | |
 
 ## The traveller: `src/game/traveller.ts`
 
@@ -309,7 +309,7 @@ The traveller walks on its own at `WALK_SPEED` (0.12 m/s) toward the goal. The p
 | `walk` | ground ahead (within a 3 cm step up or 5 cm step down), and no wall or rock at stride height |
 | `blocked` | otherwise; it stands still |
 | `look-back` | blocked for 3 s: it looks at the player, the cue to help |
-| `held` | a puzzle called `hold(reason)` this step (rain ahead, crows on the path) |
+| `held` | a puzzle called `hold(reason)` this step (drips ahead) |
 | `pushed` | wind (`push`) beats its stride |
 | `falling` | no ground for 0.15 s |
 | `goal` | inside the goal marker |
@@ -352,6 +352,8 @@ The rabbit and fox companions, and the creature discovery that came with them, a
 
 ## Creatures: `src/game/creatures.ts`
 
+No puzzle of the night uses creatures since the crows puzzle was dropped. The code stays, untested by the night's puzzles, for a puzzle that wants them.
+
 - **Fireflies** drift in slow loops around where the layout placed them, unless carried.
 - **Crows** perch, then do one of two things:
   - flee up and away when `Scared`, and are removed off the stage
@@ -364,7 +366,8 @@ The rabbit and fox companions, and the creature discovery that came with them, a
 ### A puzzle
 
 A `PuzzleDef` has:
-- `id`, `layoutId` and `title`
+- `id` and `title`
+- where its layout comes from: `layout` and `props` (TypeScript), or `layoutId` (the chapter file); `ground: false` drops the ground line
 - `solutions`: the intended one first
 - `hintShape`, plus an optional `hintDelayS`, `hintAt` and `groundY`
 - hooks: `setup` (on load), `step` (before the traveller and solver) and `afterStep` (after the solver)
@@ -378,30 +381,28 @@ A `PuzzleDef` has:
 - **Hint.** After the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`, `hint-show` names the shape and a stage position. The default is 20 s (GDD); the tutorial uses 0.5 s. `hint-hide` follows once it has walked for 0.5 s.
 - **Win and outro.** The traveller reaching the goal emits `puzzle-solved` and saves the solution. After a 2.5 s outro the next puzzle loads, between frames. After the last puzzle comes `chapter-complete`, with the window lit.
 
-### Chapter 1: `src/game/puzzles/`
+### The night: `src/game/puzzles/`
 
-| # | Puzzle | Obstacle | Solutions (intended first) | How the code decides |
-|---|---|---|---|---|
-| 1 | `p1-gap` (tutorial) | a 0.22 m gap | `bridge` | standing on a bridge hand |
-| 2 | `p2-rain` | a cloud rains on the path (seeded drops); the traveller waits while drops land just ahead or hit it | `cup`, `roof` | which cover is over it under the cloud |
-| 3 | `p3-wind` | wind from the right, stronger than its stride | `wall` (a spread hand on its windward side), `anchor` (a fist just above it) | sheltered by `wallShelters`, or a rock hand within 0.15 m above |
-| 4 | `p4-chasm` | a 0.5 m chasm, wider than one hand | `two-bridges`, `ferry` (one flat hand carried across with the traveller on it) | standing on both bridge hands, or on a bridge hand moving at 4 cm/s or more |
-| 5 | `p5-crows` | three crows on the path | `fireflies` (a cup of 3 or more lures the flock, then lift it away), `shoo` (a spread hand swept past them at 0.5 m/s or more, within 0.25 m) | crows lured or scared |
-| 6 | `p6-gate` | a gate that opens while its plate (on a shelf above the path) is pressed | `rock` (a fist on the plate); one solution until the bedroom rework | plate pressed by a rock hand |
+Five puzzles in a kid's bedroom (GDD "Puzzles"), each standing on the shadows of a few props (`bedroom.ts` has the shared ledge height, `LEDGE_TOP` −0.26 m, and helpers). None has a ground line: where there is no prop, the traveller falls and is put back at its start. `createNight()` lists them; the save's chapter id is `night`.
 
-Each puzzle's test also checks one way that should not work: an animal shape over the gap, a cup beside the rain, a windbreak on the sheltered side, one bridge held still over the chasm, a still spread hand by the crows, a flat hand on the weight plate.
+| # | Puzzle | Props (ground, and drawn only) | Obstacle | Solutions (intended first) | How the code decides |
+|---|---|---|---|---|---|
+| 1 | `n1-books` (tutorial) | books, toy block | a 0.22 m gap | `bridge` | standing on a bridge hand |
+| 2 | `n2-drip` | shelf; plant (drawn) | drips fall from the plant onto the path between x −0.1 and 0.2 (seeded drops); the traveller waits while drops land just ahead or hit it | `cup`, `roof` | which cover is over it under the drips |
+| 3 | `n3-fan` | shelf; fan head and stand (drawn) | the fan's wind from the right, stronger than its stride | `wall` (a spread hand on its windward side), `anchor` (a fist above it) | sheltered by `wallShelters`, or a rock hand within 0.25 m above its centre |
+| 4 | `n4-bed` | bed, toy box | a 0.5 m gap, wider than one hand | `two-bridges`, `ferry` (one flat hand carried across with the traveller on it) | standing on both bridge hands, or on a bridge hand moving at 4 cm/s or more |
+| 5 | `n5-castle` | path, castle floor; castle (drawn) | a 0.22 m moat; the drawbridge is up | `drawbridge` (a fist resting 0.3 s on the counterweight brings it down for good), `bridge` (a flat hand over the moat) | standing on the drawbridge, or on a bridge hand |
+
+Each puzzle's test (`night.test.ts`) also checks one way that should not work: an animal shape over the gap, a cup beside the drips, a windbreak on the sheltered side, one bridge held still over the gap, a flat hand on the counterweight. Another test plays the whole night start to finish.
+
+The fist anchor's reach was widened from 0.15 to 0.25 m: a fist lower than about 0.13 m above the traveller's centre stands in its way, so the old reach left a band only 2 cm tall to hold it in.
 
 ### Adding a puzzle
 
-1. **Layout.** In the scene editor, add a `puzzle-N` group to `public/scenes/chapter-1.iwsdk.scene.json` with:
-   - a `piece-traveller` at its start
-   - a `marker-goal`
-   - any `marker-gap` holes, `marker-plate` plates and pieces
-
-   Keep positions inside the 1.6 × 1.0 m stage around the group's origin.
-2. **Code.** Write a factory, `createXPuzzle(): PuzzleDef`, in `src/game/puzzles/`. Keep the puzzle's state inside it (each `Game` gets its own, so a replay beside the live game can't disturb it) and reset that state in `setup`. Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
-3. **Register it.** Add it to `createChapter1()` in `src/game/puzzles/index.ts`.
-4. **Test it.** Add a headless test to `chapter-1.test.ts` that solves it every way it should be solvable, and checks the recorded solution.
+1. **Layout and props.** Write a factory, `createXPuzzle(): PuzzleDef`, in `src/game/puzzles/`, with its `layout` (the traveller's start, the goal, any markers) and its `props`, using the helpers in `bedroom.ts`. Set `ground: false` and `groundY: LEDGE_TOP` as the others do.
+2. **Code.** Keep the puzzle's state inside the factory (each `Game` gets its own, so a replay beside the live game can't disturb it) and reset that state in `setup`. Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
+3. **Register it.** Add it to `createNight()` in `src/game/puzzles/index.ts`.
+4. **Test it.** Add headless tests to `night.test.ts` that solve it every way it should be solvable, check the recorded solution, and check one way that shouldn't work.
 
 ## Saves: `src/game/save-state.ts`
 
@@ -422,9 +423,9 @@ Puzzle objects that aren't entities, for the renderer. Each has a `kind`, centre
 
 | kind | active means | value |
 |---|---|---|
-| `cloud` | | |
+| `drip` | | |
 | `wind` | | how hard it reaches the traveller (1, or 0.2 when sheltered) |
-| `gate` | shut | 1 while open |
+| `drawbridge` | down | 1 once down |
 | `plate` | | 1 while pressed |
 | `window` | lit (chapter end) | |
 
@@ -475,8 +476,8 @@ Puzzles are factories (`createChapter1()`), so each `Game` has its own puzzle st
 
 ## Cost of a game frame
 
-- **Time:** `game.perf.ts` measures 0.02–0.03 ms a frame on a desktop, in the rain puzzle (shower, cup and roof) and the crows puzzle (crows, fireflies in a cup). The budget is about 0.5 ms.
-- **Allocation:** `game.alloc.test.ts` measures about 210 B a frame in the rain puzzle, against a budget of 320 B. That is number boxing; no objects or arrays are built.
+- **Time:** `game.perf.ts` measures about 0.02 ms a frame on a desktop (0.021 to 0.023 ms mean), in the dripping plant (drops, a cup and a roof), the fan (wind, a windbreak and an anchor) and the castle (a fist over the counterweight, a bridge). The scenes are in `busy-scenes.ts`. The budget is about 0.5 ms.
+- **Allocation:** `game.alloc.test.ts` measures about 225 B a frame in the dripping plant, against a budget of 320 B. That is number boxing; no objects or arrays are built.
 
 ## Entity store, layouts, 2D maths
 
@@ -490,9 +491,10 @@ The GDD doesn't specify these, so A's code makes them. They are flagged here so 
   - The traveller never dies. Hazards stop it or push it back, and it waits.
   - A fall puts it back at the puzzle start (`traveller-fell`).
 - **A hand with no role is not solid.** Only a committed shape's shadow touches the world. It still always mirrors the hand visually.
-- **The traveller won't walk into rain or past crows.** In puzzles 2 and 5 it is the traveller's caution, not damage, that makes the obstacle.
-- **Puzzle 3 anchor:** the GDD's "fist rock as an anchor" is read as a fist held just above the traveller, which it holds on to.
-- **Puzzle 6 plate:** the weight plate sits on a shelf above the path, so a fist resting on it doesn't block the traveller.
+- **The traveller won't walk into the drips.** In puzzle 2 it is the traveller's caution, not damage, that makes the obstacle.
+- **Puzzle 3 anchor:** the GDD's "fist rock as an anchor" is read as a fist held above the traveller, which it holds on to.
+- **Puzzle 5 counterweight:** the plate sits on a shelf above the path, so a fist resting on it doesn't block the traveller, and the drawbridge stays down once lowered, so the player can rest their arm.
+- **No ground line in the bedroom:** the props' shadows are all the ground. A traveller off the end of a prop falls and is put back at its start.
 - **A custom 2D solver rather than a library:** see [ADR 0007](adr/0007-custom-2d-solver.md).
 - **`content/levels` stays unused.** Per ADR 0006, layouts live in the scene file and puzzle logic in `src/game/puzzles/`.
 - **Stage size** uses the GDD's constants (about 2 m away, 1.6 m wide) until it is tuned in the headset. Puzzle sizes assume a hand shadow about 0.3 m long on the stage.

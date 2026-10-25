@@ -13,7 +13,7 @@ Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid 
 | Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
 | Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
 | Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
-| Session length | 5–8 minutes: one night, one level |
+| Session length | 10–15 minutes: one night, one level |
 | Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
 
 ### Direction (5 Oct 2026)
@@ -121,22 +121,36 @@ The rabbit and fox companions are cut. Their shapes are the most complicated in 
 
 Creature discovery (a scenery hint, then finding the animal shape) went with them.
 
-### Puzzles (NOT FIXED – JUST IDEAS)
+### Puzzles (proposal, 25 Oct 2026: for the team to review)
 
-The puzzles will be finalised later, around the bedroom and its invisible props; the table below is the earlier list of ideas. Each puzzle is a single scene of the stage with one obstacle. Every puzzle accepts at least two solutions.
+Five puzzles, one night, about 10 to 15 minutes seated. Each is one scene of the wall with one obstacle, built from the shadows of a few invisible bedroom props. Every puzzle but the tutorial accepts two solutions. They use only the four bold shapes (flat, fist, cup, spread): nothing needs a fine finger gap or a thin shape. An open ring (O) is left out until Anson confirms the classifier can tell it.
 
-| \# | Obstacle | Intended solution | Alternative |
-|----|----|----|----|
-| 1 | Gap in the path | Flat-hand bridge | — (tutorial) |
-| 2 | Rain puts out the traveller's lantern | Cup to catch the rain | Flat hand as a roof |
-| 3 | Strong wind pushes the traveller back | Spread hand as a wall | Fist rock as an anchor |
-| 4 | Wide chasm | Two bridges in sequence | One flat hand carried across as a ferry |
-| 5 | Crows block the path | Cup fireflies to distract them | Spread hand swept past to shoo them |
-| 6 | Locked gate with a weight plate | Fist rock on the plate | — (the fox's dig is cut) |
+What happened to the earlier forest ideas:
+
+| Earlier puzzle | Verdict | Why |
+|----|----|----|
+| 1 Gap | Rework: the books | The tutorial, unchanged in play: a gap between two stacks of books |
+| 2 Rain | Rework: the dripping plant | Rain in a bedroom reads oddly; a watered plant dripping off the shelf is the same puzzle |
+| 3 Wind | Rework: the fan | A desk fan is the bedroom's wind |
+| 4 Chasm | Rework: bed to toy box | The gap between the end of the bed and the toy box |
+| 5 Crows | Drop | Crows don't belong indoors, and with the cup already used for the drips it adds little to a short night |
+| 6 Gate | Rework: the castle drawbridge | The last scene: a toy castle whose drawbridge is down only while something heavy sits on its counterweight. The gate's weight plate becomes the counterweight |
+
+Each prop is a box, sphere or cylinder standing a few centimetres in front of the wall, so its shadow is about its own size. Positions are the prop's centre on the wall, in metres from the middle (x to the right, y up). The wall is 1.6 m wide and 1.0 m tall, so x runs from −0.8 to 0.8 and y from −0.5 to 0.5. The props are thin (4 cm deep). "Drawn" props cast a shadow that is only scenery; every other prop is ground.
+
+| \# | Puzzle | Props | The obstacle | Intended solution | Alternative |
+|----|----|----|----|----|----|
+| 1 | **The books** (tutorial) | Books: box 0.69 × 0.14 m at (−0.455, −0.33). Toy block: box 0.69 × 0.14 m at (0.455, −0.33). | A 0.22 m gap between the books and the block | Flat hand as a bridge over the gap (ghost hint after 0.5 s) | — |
+| 2 | **The dripping plant** | Shelf: box 1.62 × 0.14 m at (0, −0.33). Plant pot (drawn): cylinder, radius 0.07 m, 0.12 m tall, at (0.05, 0.38). | Water drips off the plant onto the shelf between x −0.1 and 0.2; the traveller won't walk into it | Cup held over the traveller catches the drips as it walks under | Flat hand held up as a roof |
+| 3 | **The fan** | Shelf as in 2. Fan (drawn): sphere, radius 0.12 m, at (0.72, 0.0), on a stand. | The fan blows from the right over the right half of the shelf, harder than the traveller can walk | Spread hand upright on its windward side as a windbreak | Fist held just above it as an anchor to hold on to |
+| 4 | **Bed to toy box** | Bed: box 0.6 × 0.14 m at (−0.5, −0.33). Toy box: box 0.5 × 0.14 m at (0.55, −0.33). | A 0.5 m gap, wider than one hand's shadow | Two flat hands as bridges end to end | One flat hand as a ferry, carried across with the traveller on it |
+| 5 | **The castle** (last) | Path: box 0.7 × 0.14 m at (−0.45, −0.33). Castle floor: box 0.68 × 0.14 m at (0.46, −0.33). Castle (drawn): box 0.3 × 0.5 m at (0.62, 0.1). | A 0.22 m moat before the castle; its drawbridge is up | Fist on the counterweight (a plate on a shelf at (−0.3, −0.02)) brings the drawbridge down | Flat hand as a bridge over the moat |
+
+Hands rest on the tray between puzzles; no puzzle needs a hand held up for long except the drips and the wind, which take about 10 to 15 seconds each. The ghost hint appears after the traveller has been stuck for 20 seconds (0.5 s in the tutorial).
 
 ### The night
 
-The whole game is one small level: one night, a short run of puzzles (how many is decided with the puzzles), about 5–8 minutes. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the lantern dims, and the last scene stays on the wall. There are no further nights or chapters.
+The whole game is one small level: one night, the five puzzles above, about 10 to 15 minutes seated. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the lantern dims, and the last scene stays on the wall. There are no further nights or chapters.
 
 ## Player journey
 
@@ -363,7 +377,7 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 | Hands-first, completable without a controller | Hands are the only input; no controller code path is needed |
 | Seated-optimised (airplane seat test) | All play happens seated (the kid sitting up in bed in a virtual bedroom), with the wall in view and the hands within reach |
 | Passthrough (judged for purpose if used) | Not used. The entry leans on hands-first design, the first five minutes, accessibility and polish instead |
-| Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, a 5–8 minute night |
+| Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, a 10–15 minute night |
 | Original, not a wrapper (take it away test) | All gameplay is built in-house; no third-party service |
 | New Experience division | Codebase started on or after 24 Sep 2026 |
 

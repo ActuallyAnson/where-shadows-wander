@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import chapter1 from '../../public/scenes/chapter-1.iwsdk.scene.json';
 import { createHandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
 import { Kind } from '../engine/sim/entity-kinds';
@@ -7,28 +6,29 @@ import { flatShadow } from '../engine/sim/shadow-shapes';
 import { Role } from './abilities';
 import { Game, MAX_STEPS_PER_FRAME, type GameInput } from './game';
 import { Headless } from './headless';
-import { createChapter1 } from './puzzles/index';
+import { createNight } from './puzzles/index';
 import { newSave } from './save-state';
 
-const opts = () => ({ chapter: chapter1, puzzles: createChapter1() });
+const opts = () => ({ puzzles: createNight() });
 
 function input(dt = 1 / 72, paused = false): GameInput {
   return { dt, paused, left: null, right: null, shapeEvents: null };
 }
 
 describe('Game', () => {
-  it('starts on the first puzzle with the traveller on the ground', () => {
+  it('starts on the first puzzle with the traveller on its props', () => {
     const g = new Game(opts());
-    expect(g.puzzle.id).toBe('p1-gap');
+    expect(g.puzzle.id).toBe('n1-books');
     expect(g.store.countOf(Kind.Traveller)).toBe(1);
-    expect(g.solver.terrain.count).toBe(2);
-    expect(g.events.has('puzzle-start', 'p1-gap')).toBe(true);
+    // The books and the toy block, four edges each, and no ground line.
+    expect(g.solver.terrain.count).toBe(8);
+    expect(g.events.has('puzzle-start', 'n1-books')).toBe(true);
   });
 
   it('resumes at the saved puzzle', () => {
     const save = newSave();
     save.puzzle = 2;
-    expect(new Game({ ...opts(), save }).puzzle.id).toBe('p3-wind');
+    expect(new Game({ ...opts(), save }).puzzle.id).toBe('n3-fan');
   });
 
   it('steps at 60 Hz whatever the display rate, and returns an interpolation factor', () => {
@@ -55,12 +55,12 @@ describe('Game', () => {
   it('delivers a load made between frames on the next frame, then clears events each frame', () => {
     const g = new Game(opts());
     g.frame(input());
-    expect(g.events.has('puzzle-start', 'p1-gap')).toBe(true);
+    expect(g.events.has('puzzle-start', 'n1-books')).toBe(true);
     g.frame(input());
     expect(g.events.has('puzzle-start')).toBe(false);
     g.goto(2);
     g.frame(input());
-    expect(g.events.has('puzzle-start', 'p3-wind')).toBe(true);
+    expect(g.events.has('puzzle-start', 'n3-fan')).toBe(true);
   });
 
   it('gives a committed flat hand the bridge role, solid to the traveller, until released', () => {
@@ -93,10 +93,10 @@ describe('Game', () => {
 
   it('moves on to the next puzzle after the outro and saves progress', () => {
     const h = new Headless(opts());
-    h.pose('right', 'flat', 0, -0.32);
-    expect(h.runUntil(() => h.game.puzzle.id === 'p2-rain', 30)).toBe(true);
+    h.pose('right', 'flat', 0, -0.27);
+    expect(h.runUntil(() => h.game.puzzle.id === 'n2-drip', 30)).toBe(true);
     expect(h.game.save.puzzle).toBe(1);
-    expect(h.saw('puzzle-start', 'p2-rain')).toBe(true);
+    expect(h.saw('puzzle-start', 'n2-drip')).toBe(true);
   });
 
   it('restart and goto reload a puzzle from its layout', () => {
@@ -107,14 +107,14 @@ describe('Game', () => {
     g.restart();
     expect(g.store.x[g.traveller.slot(g)]).toBeCloseTo(start, 9);
     g.goto(4);
-    expect(g.puzzle.id).toBe('p5-crows');
-    expect(g.store.countOf(Kind.Crow)).toBe(3);
+    expect(g.puzzle.id).toBe('n5-castle');
+    expect(g.fixtures.find('drawbridge')?.active).toBe(false);
   });
 
   it('puts a fallen traveller back at its start, unhurt', () => {
     const h = new Headless(opts());
     // A bridge that is pulled away halfway across.
-    h.pose('right', 'flat', 0, -0.32);
+    h.pose('right', 'flat', 0, -0.27);
     expect(h.runUntil(() => Math.abs(h.game.store.x[h.game.traveller.slot(h.game)]) < 0.02, 20)).toBe(true);
     h.hide('right');
     expect(h.runUntil(() => h.saw('traveller-fell'), 5)).toBe(true);

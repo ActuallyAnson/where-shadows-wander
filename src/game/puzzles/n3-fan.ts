@@ -1,7 +1,7 @@
-// Puzzle 3, wind: a strong wind blows from the right across the second half of the stage and pushes
-// the traveller back. Intended: a spread hand stands upright on its windward side as a windbreak.
-// Also works: a fist held just above the traveller as a rock to hold on to (an anchor), carried
-// along with it.
+// Puzzle 3, the fan: a desk fan at the end of the shelf blows across its right half and pushes the
+// traveller back. Intended: a spread hand stands upright on its windward side as a windbreak. Also
+// works: a fist held just above the traveller as a rock to hold on to (an anchor), carried along
+// with it.
 import { HAND_COUNT } from '../../engine/sim/solver';
 import { WALL_WIDTH_M } from '../../engine/stage/stage-frame';
 import { Role } from '../abilities';
@@ -9,17 +9,21 @@ import type { GameContext } from '../context';
 import type { Fixture } from '../fixtures';
 import type { PuzzleDef } from '../puzzle';
 import { WALK_SPEED } from '../traveller';
+import { goalOn, LEDGE_TOP, ledge, PROP_DEPTH, startOn } from './bedroom';
 
-/** Where the wind blows (from this stage x to the right edge), and how hard, m/s against the traveller. */
+/** Where the fan's wind blows (from this stage x to the right edge), and how hard, m/s against the traveller. */
 export const WIND_FROM_X = -0.25;
 export const WIND_PUSH = -0.22;
 /** An anchored traveller still feels this share of the wind (it leans in, but makes way). */
 const ANCHORED_SHARE = 0.25;
-/** How close the rock must be to anchor the traveller, metres. */
-const ANCHOR_REACH = 0.15;
+/**
+ * How close the rock must be to anchor the traveller, metres. A fist lower than about 0.13 m above
+ * the traveller's centre stands in its way, so this leaves a band about 12 cm tall to hold it in.
+ */
+const ANCHOR_REACH = 0.25;
 
 // The wind is stronger than the traveller's stride: on its own it never gets through.
-if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('p3-wind: the wind must out-push the traveller');
+if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n3-fan: the wind must out-push the traveller');
 
 /** Whether a rock-role hand is close above the traveller for it to hold on to. */
 function anchored(ctx: GameContext, x: number, y: number): boolean {
@@ -34,12 +38,20 @@ function anchored(ctx: GameContext, x: number, y: number): boolean {
 }
 
 /** A fresh puzzle with its own state: one per Game, so two games never share it. */
-export function createWindPuzzle(): PuzzleDef {
+export function createFanPuzzle(): PuzzleDef {
   const state: { wind: Fixture | null } = { wind: null };
   return {
-    id: 'p3-wind',
-    layoutId: 'puzzle-3',
-    title: 'Wind',
+    id: 'n3-fan',
+    title: 'The fan',
+    layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
+    props: [
+      ledge('shelf', -0.81, 0.81),
+      // The fan is scenery, standing above the end of the shelf: its head and its stand.
+      { id: 'fan-head', shape: 'sphere', x: 0.72, y: 0.0, size: [0.12], depth: 0.06, solid: false },
+      { id: 'fan-stand', shape: 'cylinder', x: 0.72, y: -0.17, size: [0.015, 0.18, PROP_DEPTH], solid: false },
+    ],
+    ground: false,
+    groundY: LEDGE_TOP,
     solutions: ['wall', 'anchor'],
     hintShape: 'spread',
 

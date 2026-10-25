@@ -5,7 +5,7 @@ describe('save state', () => {
   it('starts at the first puzzle with nothing found', () => {
     expect(newSave()).toEqual({
       version: SAVE_VERSION,
-      chapter: 'chapter-1',
+      chapter: 'night',
       puzzle: 0,
       solutions: {},
       creatures: [],

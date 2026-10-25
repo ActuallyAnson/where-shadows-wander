@@ -1,9 +1,9 @@
-// Puzzle objects that are not entities: a rain cloud, a wind stream, a gate, a rope, the lit
-// window. Puzzles add them on load and update them
+// Puzzle objects that are not entities: the drips' source, the fan's wind, a drawbridge, a weight
+// plate, the lit window. Puzzles add them on load and update them
 // as they change; the renderer (Teammate B) draws them from this list. Plain TypeScript; a fixed
 // pool of reused records, so updating them each step builds nothing.
 
-export type FixtureKind = 'cloud' | 'wind' | 'gate' | 'plate' | 'window';
+export type FixtureKind = 'drip' | 'wind' | 'drawbridge' | 'plate' | 'window';
 
 export interface Fixture {
   kind: FixtureKind;
@@ -12,9 +12,9 @@ export interface Fixture {
   y: number;
   w: number;
   h: number;
-  /** Shown and in effect (a gate that is shut, a rope that is down, wind that blows). */
+  /** Shown and in effect (a drawbridge that is down, wind that blows). */
   active: boolean;
-  /** Kind-specific, 0..1 unless noted: wind strength, how far a gate has opened, a plate pressed... */
+  /** Kind-specific, 0..1 unless noted: wind strength, a drawbridge down, a plate pressed... */
   value: number;
 }
 
@@ -24,7 +24,7 @@ export class Fixtures {
 
   constructor(readonly capacity = 16) {
     this.pool = Array.from({ length: capacity }, () => ({
-      kind: 'cloud' as FixtureKind,
+      kind: 'drip' as FixtureKind,
       x: 0,
       y: 0,
       w: 0,

@@ -1,26 +1,18 @@
-// Chapter 1's puzzles, in play order (GDD "Puzzles"; layouts in public/scenes/chapter-1.iwsdk.scene.json).
+// The night's puzzles, in play order (GDD "Puzzles": a kid's bedroom, the ground made of the
+// shadows of invisible props). Each puzzle's layout and props are written beside it (ADR 0014).
 //
-// Adding a puzzle: add a `puzzle-N` group to the chapter file in the scene editor (a traveller piece,
-// a goal marker, and any gap/plate markers and pieces), write a PuzzleDef in this folder (see
+// Adding a puzzle: write a PuzzleDef in this folder with its `layout`, `props` and hooks (see
 // docs/SIMULATION.md, "Adding a puzzle"), list it here, and add a headless test that solves it each
-// way it should be solvable.
+// way it should be solvable and checks one way it shouldn't.
 import type { PuzzleDef } from '../puzzle';
-import { createGapPuzzle } from './p1-gap';
-import { createRainPuzzle } from './p2-rain';
-import { createWindPuzzle } from './p3-wind';
-import { createChasmPuzzle } from './p4-chasm';
-import { createCrowsPuzzle } from './p5-crows';
-import { createGatePuzzle } from './p6-gate';
+import { createBooksPuzzle } from './n1-books';
+import { createDripPuzzle } from './n2-drip';
+import { createFanPuzzle } from './n3-fan';
+import { createBedPuzzle } from './n4-bed';
+import { createCastlePuzzle } from './n5-castle';
 
-/** Chapter 1's puzzles, freshly made: pass a new list to each Game (puzzles keep per-game state). */
-export function createChapter1(): PuzzleDef[] {
-  return [
-    createGapPuzzle(),
-    createRainPuzzle(),
-    createWindPuzzle(),
-    createChasmPuzzle(),
-    createCrowsPuzzle(),
-    createGatePuzzle(),
-  ];
+/** The night's puzzles, freshly made: pass a new list to each Game (puzzles keep per-game state). */
+export function createNight(): PuzzleDef[] {
+  return [createBooksPuzzle(), createDripPuzzle(), createFanPuzzle(), createBedPuzzle(), createCastlePuzzle()];
 }
-export const CHAPTER_1_ID = 'chapter-1';
+export const NIGHT_ID = 'night';
