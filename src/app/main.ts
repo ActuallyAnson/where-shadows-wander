@@ -44,6 +44,8 @@ import { KindredView } from '../engine/shadow/kindred-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
 import { RabbitView } from '../engine/shadow/rabbit-view';
+import { PropTouch } from '../engine/shadow/pure/prop-touch';
+import { SparkleLayer } from '../engine/shadow/sparkle-layer';
 import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
 import { SHAPES } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
@@ -218,6 +220,9 @@ async function start(): Promise<void> {
   const air = new AirView();
   // The shadow animals come alive: a committed rabbit shape hops out of the hand, a committed fox shape calls the kindred.
   const rabbits = new RabbitView();
+  // Dust that a hand's shadow shakes off a prop's shadow when it reaches into it.
+  const propTouch = new PropTouch();
+  const dust = new SparkleLayer(9);
   let summonT = 0; // seconds the kindred stays after a fox shape called it (it is switched on for the visit)
   let perchT = 0;
   const solveBloom = new SolveBloom();
@@ -281,6 +286,7 @@ async function start(): Promise<void> {
       solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
     }
     propShadowView.updatePolygons(polygons);
+    propTouch.setPolygons(polygons);
   };
   world.scene.add(
     stageView.group,
@@ -290,6 +296,7 @@ async function start(): Promise<void> {
     cutsceneView.group,
     glow.group,
     rabbits.group,
+    dust.mesh,
     air.group,
     kindredView.group,
     candleView.group,
@@ -849,6 +856,18 @@ async function start(): Promise<void> {
             }
             kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
           }
+          // Dust: a hand's shadow reaching into a prop's shadow shakes a little off it, with a soft rustle.
+          for (let i = 0; i < 2; i++) {
+            const sh = projector.shadows[i === 0 ? 'left' : 'right'];
+            if (
+              propTouch.update(i, step, sh.active && sh.onStage, sh.bounds[0], sh.bounds[1], sh.bounds[2], sh.bounds[3])
+            ) {
+              dust.sparkles.burst(propTouch.touchX, propTouch.touchY, 9, 0.05);
+              gameAudio.bridgeActivated(stage, propTouch.touchX, propTouch.touchY);
+            }
+          }
+          dust.sparkles.update(step, 0, 0, 0);
+          dust.draw(stage, shadowRenderer.baseOpacity * candleView.occlusion * 0.8);
           // The shadow animals: what a hand just committed comes alive on the wall (visual only, no gameplay).
           for (let i = 0; i < shapes.events.count; i++) {
             const e = shapes.events.at(i);
