@@ -1,6 +1,7 @@
 import type { World } from '@iwsdk/core';
 import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
+import { captureOptions, loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
 import type { UiSound } from './ui-sound';
 
@@ -210,8 +211,15 @@ export async function mountEnterArButtonIfNeeded(world: World, sound?: UiSound):
       {
         onReach: () => sound?.hover(),
         onPressed: (item) => (item.begin ? sound?.begin() : sound?.press()),
+        // Five taps on the emblem step capture mode (demo video) through off, clean and sharp, and reload to apply it.
+        onEmblemTaps: () => {
+          saveCaptureChoice(nextCapture(loadCaptureChoice()));
+          location.reload();
+        },
       },
     );
+    const choice = loadCaptureChoice();
+    if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
 
   if (vrSupported && (DEBUG_TOOLS || !title)) {

@@ -2,6 +2,7 @@
 // a chore (and nobody should have to). A press takes effect at once (the page is told with a `wsw-testing` event), is
 // remembered in the browser for next time (testing-options.ts), and nothing reloads. The overlays change live; the
 // settings panel and the recording start when VR starts, so they are armed here and begin when you press Enter VR.
+import { loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import {
   DEFAULT_TESTING,
   describeTesting,
@@ -68,6 +69,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     settings.textContent = `Settings panel opens when VR starts: ${options.settings ? 'ON' : 'off'}`;
     kindred.textContent = `Kindred (the shadow bird): ${options.kindred ? 'ON' : 'off'}`;
     cutscene.textContent = `Test cutscene plays when VR starts: ${options.cutscene ? 'ON' : 'off'}`;
+    capture.textContent = `Capture mode (demo video; press reloads): ${loadCaptureChoice()}`;
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
     for (const [b, isOn] of [
       [joints, options.joints],
@@ -89,11 +91,15 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   const kindred = button(() => set({ ...options, kindred: !options.kindred }));
   const cutscene = button(() => set({ ...options, cutscene: !options.cutscene }));
   const record = button(() => set({ ...options, record: nextChoice(RECORD_CHOICES, options.record) }));
+  const capture = button(() => {
+    saveCaptureChoice(nextCapture(loadCaptureChoice()));
+    location.reload(); // the eye buffers' size is set when the page starts
+  });
   const clear = button(() => set({ ...DEFAULT_TESTING }));
   clear.textContent = 'Clear all switches';
   clear.style.cssText += 'background:#2d1b1b;color:#ff7b72;border-color:#6e2f2f;';
 
-  element.append(title, active, joints, shadow, settings, cutscene, kindred, record, hint, clear);
+  element.append(title, active, joints, shadow, settings, cutscene, kindred, record, capture, hint, clear);
   refresh();
   return {
     element,

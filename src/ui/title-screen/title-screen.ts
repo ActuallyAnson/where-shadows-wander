@@ -17,6 +17,8 @@ export interface TitleScreenItem extends TitleItem {
 export interface TitleScreenHooks {
   onReach?(item: TitleScreenItem): void;
   onPressed?(item: TitleScreenItem): void;
+  /** Five quick taps on the emblem (a switch for the people making the demo video, not shown anywhere). */
+  onEmblemTaps?(): void;
 }
 
 export interface TitleScreen {
@@ -56,6 +58,18 @@ export function createTitleScreen(
       hooks.onPressed?.(items[i]);
       items[i].onPress();
     });
+  });
+
+  // Five taps within three seconds on the emblem.
+  const taps: number[] = [];
+  element.querySelector('.wsw-emblem')?.addEventListener('click', () => {
+    const now = performance.now();
+    taps.push(now);
+    while (taps.length > 0 && now - taps[0] > 3000) taps.shift();
+    if (taps.length >= 5) {
+      taps.length = 0;
+      hooks.onEmblemTaps?.();
+    }
   });
 
   // The glow follows the pointer by two CSS variables: no layout, only the one gradient repaints.
