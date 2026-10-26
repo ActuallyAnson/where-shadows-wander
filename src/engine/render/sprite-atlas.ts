@@ -10,6 +10,7 @@
 
 import { CanvasTexture, LinearFilter } from '@iwsdk/core';
 import { Kind } from '../sim/entity-kinds';
+import { paintTraveller, Pose } from '../shadow/traveller-art';
 
 export const ATLAS_SIZE = 512;
 export const GRID_COLS = 4;
@@ -27,6 +28,8 @@ export const SpriteTile = {
   Rabbit: { col: 3, row: 1 },
   Fox: { col: 0, row: 2 },
   Firefly: { col: 1, row: 2 },
+  TravellerCheer: { col: 0, row: 3 },
+  TravellerShiver: { col: 1, row: 3 },
 } as const;
 
 /**
@@ -54,7 +57,9 @@ export function getSpriteUvBounds(
 export function getTileForKind(kind: number, animFrame = 0): { col: number; row: number } {
   switch (kind) {
     case Kind.Traveller:
-      // animFrame: 0 = idle, 1 = walk1, 2 = walk2, 3 = wait
+      // animFrame: 0 = idle, 1 = walk1, 2 = walk2, 3 = wait, 4 = cheer, 5 = shiver
+      if (animFrame === 4) return SpriteTile.TravellerCheer;
+      if (animFrame === 5) return SpriteTile.TravellerShiver;
       return { col: Math.abs(animFrame | 0) % 4, row: 0 };
     case Kind.Rock:
       return SpriteTile.Rock;
@@ -84,11 +89,11 @@ export function renderSpriteAtlasToCanvas(canvas: HTMLCanvasElement): void {
   canvas.height = ATLAS_SIZE;
   ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-  // Row 0: Traveller animation frames
-  drawCell(ctx, 0, 0, (c) => drawTraveller(c, 0));
-  drawCell(ctx, 1, 0, (c) => drawTraveller(c, 1));
-  drawCell(ctx, 2, 0, (c) => drawTraveller(c, 2));
-  drawCell(ctx, 3, 0, (c) => drawTraveller(c, 3));
+  // Row 0: Traveller animation frames (drawn via full expressive character artist)
+  drawCell(ctx, 0, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Idle));
+  drawCell(ctx, 1, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Walk1));
+  drawCell(ctx, 2, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Walk2));
+  drawCell(ctx, 3, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Wait));
 
   // Row 1: Environmental props & animals
   drawCell(ctx, 0, 1, drawRaindrop);
@@ -99,6 +104,10 @@ export function renderSpriteAtlasToCanvas(canvas: HTMLCanvasElement): void {
   // Row 2: Fox & Firefly
   drawCell(ctx, 0, 2, drawFox);
   drawCell(ctx, 1, 2, drawFirefly);
+
+  // Row 3: Emotional Traveller Poses
+  drawCell(ctx, 0, 3, (c) => paintTraveller(c, CELL_SIZE, Pose.Cheer));
+  drawCell(ctx, 1, 3, (c) => paintTraveller(c, CELL_SIZE, Pose.Shiver));
 }
 
 function drawCell(
@@ -111,96 +120,6 @@ function drawCell(
   ctx.translate(col * CELL_SIZE, row * CELL_SIZE);
   drawFn(ctx);
   ctx.restore();
-}
-
-/**
- * Storybook hooded pilgrim with pointed cowl, walking boots, and a warm amber lantern opening.
- */
-function drawTraveller(ctx: CanvasRenderingContext2D, frame: number): void {
-  ctx.fillStyle = '#000000';
-
-  // Hood & pointed cowl
-  ctx.beginPath();
-  if (frame === 3) {
-    // Wait / looking back over shoulder: cowl leans slightly back
-    ctx.moveTo(56, 24);
-    ctx.quadraticCurveTo(72, 30, 80, 48);
-    ctx.lineTo(44, 48);
-    ctx.quadraticCurveTo(46, 30, 56, 24);
-  } else {
-    // Forward-facing pointed cowl
-    ctx.moveTo(64, 22);
-    ctx.quadraticCurveTo(76, 28, 80, 48);
-    ctx.lineTo(46, 48);
-    ctx.quadraticCurveTo(52, 28, 64, 22);
-  }
-  ctx.fill();
-
-  // Face shadow opening (cowl hollow)
-  ctx.beginPath();
-  ctx.arc(63, 40, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cloak & robe body
-  ctx.beginPath();
-  ctx.moveTo(48, 48);
-  ctx.lineTo(78, 48);
-
-  if (frame === 1) {
-    // Walk frame 1: forward stride
-    ctx.quadraticCurveTo(86, 72, 92, 96);
-    ctx.lineTo(36, 96);
-    ctx.quadraticCurveTo(42, 72, 48, 48);
-  } else if (frame === 2) {
-    // Walk frame 2: passing stride
-    ctx.quadraticCurveTo(82, 72, 86, 96);
-    ctx.lineTo(40, 96);
-    ctx.quadraticCurveTo(44, 72, 48, 48);
-  } else {
-    // Idle / wait
-    ctx.quadraticCurveTo(84, 72, 88, 96);
-    ctx.lineTo(38, 96);
-    ctx.quadraticCurveTo(42, 72, 48, 48);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Boots
-  ctx.beginPath();
-  if (frame === 1) {
-    // Stride forward: front foot extended, back foot trailing
-    // Back foot
-    ctx.rect(38, 96, 12, 14);
-    // Front foot
-    ctx.rect(74, 96, 16, 14);
-  } else if (frame === 2) {
-    // Passing stride
-    ctx.rect(48, 96, 14, 14);
-    ctx.rect(66, 96, 14, 14);
-  } else {
-    // Idle boots
-    ctx.rect(46, 96, 14, 14);
-    ctx.rect(66, 96, 14, 14);
-  }
-  ctx.fill();
-
-  // Small transparent hole at hands with warm amber glowing dot
-  const lanternX = frame === 3 ? 54 : 70;
-  const lanternY = 66;
-
-  // Clear aperture hole through cloak
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(lanternX, lanternY, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Warm amber shining lantern dot
-  ctx.fillStyle = '#ffdf80';
-  ctx.beginPath();
-  ctx.arc(lanternX, lanternY, 4, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 /**
