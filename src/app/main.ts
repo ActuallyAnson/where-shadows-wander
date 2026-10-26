@@ -185,6 +185,7 @@ async function start(): Promise<void> {
   // The Hand Lab's stand-in stage can be switched between the tabletop theatre and a wall-sized one (the Stage button).
   let mockStage: StageMode = stageChoice === 'real' ? 'table' : stageChoice;
   const lastHead = new Float64Array(3);
+  const saucerPos = new Float64Array(3);
   let lastYaw = 0;
   const stageFrame = new StageFrame();
   const standInStage = createStagePlane();
@@ -461,7 +462,9 @@ async function start(): Promise<void> {
       placeLantern(head, yaw, lantern);
     } else placeTestRig(mockStage, head, yaw, standInStage, lantern);
 
-    const stageDist = Math.hypot(stage.origin[0] - head[0], stage.origin[2] - head[2]);
+    const sdx = stage.origin[0] - head[0],
+      sdz = stage.origin[2] - head[2];
+    const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
 
     // Position bed tray and lap blanket across player's lap
@@ -471,7 +474,6 @@ async function start(): Promise<void> {
     const trayZ = head[2] - Math.cos(yaw) * trayDist;
     bedTray.place(trayX, trayY, trayZ, yaw);
 
-    const saucerPos = new Float64Array(3);
     bedTray.getCandleSaucerPosition(saucerPos);
     lantern[0] = saucerPos[0];
     lantern[1] = saucerPos[1];
@@ -847,6 +849,17 @@ async function start(): Promise<void> {
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
+  /** True while any controller button is down. Indexed loops, so no iterator or closure is made in the frame. */
+  const controllerPressed = (frame: XRFrame): boolean => {
+    const sources = frame.session.inputSources;
+    for (let i = 0; i < sources.length; i++) {
+      const buttons = sources[i].gamepad?.buttons;
+      if (!buttons) continue;
+      for (let j = 0; j < buttons.length; j++) if (buttons[j].pressed) return true;
+    }
+    return false;
+  };
+
   class FrameDriverSystem extends createSystem({}) {
     update(delta: number) {
       // Nothing in the frame may throw out of here: the browser and IWSDK do not catch it, and the next frame
@@ -963,22 +976,17 @@ async function start(): Promise<void> {
             const cfx = candleView.flamePosition[0];
             const cfy = candleView.flamePosition[1];
             const cfz = candleView.flamePosition[2];
-            const distLighterToWick = Math.hypot(lfx - cfx, lfy - cfy, lfz - cfz);
-            if (distLighterToWick < 0.15) {
+            const dlx = lfx - cfx,
+              dly = lfy - cfy,
+              dlz = lfz - cfz;
+            if (dlx * dlx + dly * dly + dlz * dlz < 0.15 * 0.15) {
               handTouchingWick = true;
             }
           }
           if (!handTouchingWick && candleView.checkIgnition(handList)) {
             handTouchingWick = true;
           }
-          if (!handTouchingWick && frame) {
-            for (const source of frame.session.inputSources) {
-              if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                handTouchingWick = true;
-                break;
-              }
-            }
-          }
+          if (!handTouchingWick && frame && controllerPressed(frame)) handTouchingWick = true;
           if (!handTouchingWick && mock) {
             handTouchingWick = true;
           }
@@ -1028,15 +1036,7 @@ async function start(): Promise<void> {
               wallPauseView.show();
             }
           } else if (sessionState === 'paused') {
-            let isControllerTrigger = false;
-            if (frame) {
-              for (const source of frame.session.inputSources) {
-                if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                  isControllerTrigger = true;
-                  break;
-                }
-              }
-            }
+            const isControllerTrigger = frame ? controllerPressed(frame) : false;
             const action = wallPauseView.update(handList, stage, isControllerTrigger, step);
             if (action === 'resume') {
               wallPauseView.hide();
