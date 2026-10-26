@@ -337,6 +337,40 @@ describe('CandleView', () => {
     expect(candle.isCovered).toBe(true);
   });
 
+  it('grows flame and point light smoothly during 3-second ignition hold', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    candle.lit = false;
+    expect(candle.lit).toBe(false);
+    expect(candle.ignitionProgress).toBe(0);
+
+    const quat = new Quaternion();
+    const light = {
+      color: [1, 0.8, 0.5] as [number, number, number],
+      intensity: 1.0,
+      lit: true,
+      phase: 0,
+    };
+
+    // When ignitionProgress = 0, flame is hidden, light is 0
+    candle.update(light as never, quat);
+    expect(candle.flame.mesh.visible).toBe(false);
+    expect(candle.lightIntensity).toBe(0);
+
+    // Mid-ignition: 50% hold
+    candle.ignitionProgress = 0.5;
+    candle.update(light as never, quat);
+    expect(candle.flame.mesh.visible).toBe(true);
+    expect(candle.flame.mesh.scale.x).toBeCloseTo(0.5);
+    expect(candle.lightIntensity).toBeGreaterThan(0);
+
+    // Full ignition: 100% hold
+    candle.ignitionProgress = 1.0;
+    candle.update(light as never, quat);
+    expect(candle.flame.mesh.visible).toBe(true);
+    expect(candle.flame.mesh.scale.x).toBeCloseTo(1.0);
+  });
+
   it('disposes resources cleanly without error', () => {
     const candle = new CandleView();
     expect(() => candle.dispose()).not.toThrow();

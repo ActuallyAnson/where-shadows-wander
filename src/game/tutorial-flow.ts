@@ -19,7 +19,7 @@ export const OVERLAP_TOLERANCE_M = 0.22;
 export const TUTORIAL_CONFIG = {
   SPAWN_X: -0.75,
   SPAWN_Y: -0.05,
-  TRAVELLER_RADIUS: 0.04,
+  TRAVELLER_RADIUS: 0.06, // 1.5x scale (was 0.04)
   WALK_SPEED: 0.18,
   GAP_WAIT_X: -0.22,
   BRIDGE_TARGET_X: 0.0,
@@ -159,7 +159,7 @@ export class TutorialFlow {
       case 'WALK_TO_GAP': {
         // Walk rightward toward the gap
         this.store.vx[s] = TUTORIAL_CONFIG.WALK_SPEED;
-        this.store.flags[s] &= ~Flag.WaitPose;
+        this.store.flags[s] &= ~(Flag.WaitPose | Flag.CheerPose | Flag.ShiverPose);
 
         if (x >= TUTORIAL_CONFIG.GAP_WAIT_X) {
           // Reached the edge of the gap! Stop, wait, and activate ghost hint.
@@ -189,7 +189,7 @@ export class TutorialFlow {
           this.activateBridge(shadows);
           this._state = 'CROSSING_BRIDGE';
           this.store.vx[s] = TUTORIAL_CONFIG.WALK_SPEED;
-          this.store.flags[s] &= ~Flag.WaitPose;
+          this.store.flags[s] &= ~(Flag.WaitPose | Flag.CheerPose | Flag.ShiverPose);
           this.audio?.bridgeActivated?.();
         }
         break;
@@ -201,12 +201,15 @@ export class TutorialFlow {
 
         // Keep moving forward across the bridge
         this.store.vx[s] = TUTORIAL_CONFIG.WALK_SPEED;
+        this.store.flags[s] &= ~(Flag.WaitPose | Flag.CheerPose | Flag.ShiverPose);
 
         // Check if Traveller has reached the goal ledge
         if (x >= TUTORIAL_CONFIG.GOAL_X) {
           this._state = 'GOAL_REACHED';
           this.store.vx[s] = 0;
           this.store.vy[s] = TUTORIAL_CONFIG.HOP_VELOCITY_Y; // Victory hop!
+          this.store.flags[s] &= ~Flag.WaitPose;
+          this.store.flags[s] |= Flag.CheerPose; // Celebrate reaching goal!
           this._isBridgeActive = false;
           this.solver.hands[LEFT].mask = 0;
           this.solver.hands[RIGHT].mask = 0;
@@ -217,8 +220,9 @@ export class TutorialFlow {
       }
 
       case 'GOAL_REACHED': {
-        // Rest on goal ledge
+        // Rest on goal ledge with victory cheer pose
         this.store.vx[s] = 0;
+        this.store.flags[s] |= Flag.CheerPose;
         break;
       }
     }

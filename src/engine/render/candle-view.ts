@@ -120,6 +120,7 @@ export class CandleView {
   private _lit = true;
   private _isLocked = false;
   private _isCovered = false;
+  private _ignitionProgress = 0;
   private coverTimer = 0;
   private placingTimer = 0;
   private cooldownTimer = 0;
@@ -303,6 +304,15 @@ export class CandleView {
     this.coverTimer = 0;
     this.coverProgressMaterial.uniforms.uProgress.value = 0.0;
     this.coverProgressMesh.visible = false;
+  }
+
+  /** Progress (0.0 to 1.0) of lighting the candle by holding hand over it for 3 seconds. */
+  get ignitionProgress(): number {
+    return this._ignitionProgress;
+  }
+
+  set ignitionProgress(value: number) {
+    this._ignitionProgress = Math.max(0, Math.min(1, value));
   }
 
   /** Current intensity of the dynamic point light. */
@@ -674,7 +684,29 @@ export class CandleView {
    */
   update(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
     if (!this._lit) {
+      if (this._ignitionProgress > 0) {
+        // Igniting: fire slowly grows from small spark (0.06) to full flame (1.0)
+        this.flame.mesh.visible = true;
+        this.flame.update(light, cameraQuaternion);
+        const scale = Math.max(0.06, this._ignitionProgress);
+        this.flame.mesh.scale.setScalar(scale);
+
+        // Circular progress gauge filling over 3 seconds
+        this.coverProgressMesh.quaternion.copy(cameraQuaternion);
+        this.coverProgressMaterial.uniforms.uProgress.value = this._ignitionProgress;
+        this.coverProgressMesh.visible = this._ignitionProgress > 0.01;
+
+        // Dynamic light grows warmly as fire grows
+        this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
+        this.pointLight.intensity = Math.pow(this._ignitionProgress, 2) * (light.intensity * 1.5);
+
+        // Wick indicator fades as flame grows
+        this.wickIndicator.visible = this._ignitionProgress < 0.6;
+        return;
+      }
+
       this.flame.mesh.visible = false;
+      this.coverProgressMesh.visible = false;
       this.pointLight.intensity = 0;
       this.wickIndicator.visible = true;
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.007);

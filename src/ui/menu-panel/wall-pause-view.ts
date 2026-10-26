@@ -1,6 +1,6 @@
-// High-contrast black-and-white Pause Menu projected directly onto the stage wall.
+// High-contrast black-and-white Pause & Settings Menu projected directly onto the stage wall.
 // Replaces the floating mid-air panel with a wall-scale, crisp paper-cut UI.
-// Supports seated pointing, shadow cursor, and pinch / trigger selection.
+// Supports seated pointing, shadow cursor, 3-second hover dwell selection, and controller trigger.
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
 
 import {
@@ -17,12 +17,14 @@ import {
 } from '@iwsdk/core';
 import { JOINT, type HandFrame } from '../../engine/hands/hand';
 import { distanceToPlane, type StagePlane } from '../../engine/shadow/pure/stage-plane';
+import type { SettingsStore } from '../../engine/services/settings/settings-store';
 
 export type PauseMenuAction = 'resume' | 'restart' | 'settings';
+export type WallMenuMode = 'pause' | 'settings';
 
-export interface PauseButtonDef {
-  readonly id: PauseMenuAction;
-  readonly label: string;
+export interface WallButtonDef {
+  readonly id: string;
+  readonly label: string | ((store: SettingsStore | null) => string);
   readonly yMin: number;
   readonly yMax: number;
   readonly xMin: number;
@@ -32,7 +34,7 @@ export interface PauseButtonDef {
   readonly canvasW: number;
 }
 
-export const PAUSE_BUTTONS: readonly PauseButtonDef[] = [
+export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
   {
     id: 'resume',
     label: 'Resume',
@@ -68,10 +70,69 @@ export const PAUSE_BUTTONS: readonly PauseButtonDef[] = [
   },
 ];
 
+export const SETTINGS_BUTTONS: readonly WallButtonDef[] = [
+  {
+    id: 'setting_volume',
+    label: (store) => `Master Volume: ${Math.round((store?.value.volumeMaster ?? 1) * 100)}%`,
+    yMin: 0.08,
+    yMax: 0.18,
+    xMin: -0.45,
+    xMax: 0.45,
+    canvasY: 180,
+    canvasH: 58,
+    canvasW: 660,
+  },
+  {
+    id: 'setting_music',
+    label: (store) => `Music: ${(store?.value.volumeMusic ?? 1) > 0 ? 'On' : 'Off'}`,
+    yMin: -0.04,
+    yMax: 0.06,
+    xMin: -0.45,
+    xMax: 0.45,
+    canvasY: 260,
+    canvasH: 58,
+    canvasW: 660,
+  },
+  {
+    id: 'setting_contrast',
+    label: (store) => `High Contrast: ${store?.value.highContrast ? 'On' : 'Off'}`,
+    yMin: -0.16,
+    yMax: -0.06,
+    xMin: -0.45,
+    xMax: 0.45,
+    canvasY: 340,
+    canvasH: 58,
+    canvasW: 660,
+  },
+  {
+    id: 'setting_flicker',
+    label: (store) => `Lantern Flicker: ${store?.value.flicker ? 'On' : 'Off'}`,
+    yMin: -0.28,
+    yMax: -0.18,
+    xMin: -0.45,
+    xMax: 0.45,
+    canvasY: 420,
+    canvasH: 58,
+    canvasW: 660,
+  },
+  {
+    id: 'setting_back',
+    label: 'Back',
+    yMin: -0.4,
+    yMax: -0.3,
+    xMin: -0.32,
+    xMax: 0.32,
+    canvasY: 505,
+    canvasH: 58,
+    canvasW: 460,
+  },
+];
+
 const CANVAS_W = 1024;
 const CANVAS_H = 640;
 const WALL_W = 1.45;
 const WALL_H = 0.92;
+export const DWELL_SELECTION_S = 3.0;
 
 export class WallPauseView {
   readonly group = new Group();
@@ -94,12 +155,15 @@ export class WallPauseView {
   private readonly beamMesh: Mesh;
 
   private _visible = false;
+  private _mode: WallMenuMode = 'pause';
   private hoveredButtonIndex = -1;
+  private hoverDwellTime = 0;
   private cursorX = 0;
   private cursorY = 0;
   private cursorVisible = false;
-  private pinchArmed = false;
   private prevControllerTrigger = false;
+
+  private settingsStore: SettingsStore | null = null;
 
   // Scratch vectors for zero allocation beam orientation
   private readonly beamStart = new Vector3();
@@ -176,13 +240,34 @@ export class WallPauseView {
     return this._visible;
   }
 
+  get mode(): WallMenuMode {
+    return this._mode;
+  }
+
+  setSettingsStore(store: SettingsStore): void {
+    this.settingsStore = store;
+  }
+
   show(): void {
     this._visible = true;
+    this._mode = 'pause';
     this.group.visible = true;
     this.hoveredButtonIndex = -1;
+    this.hoverDwellTime = 0;
     this.cursorVisible = false;
     this.beamMesh.visible = false;
-    this.pinchArmed = false;
+    this.prevControllerTrigger = false;
+    this.paint();
+  }
+
+  showSettings(): void {
+    this._visible = true;
+    this._mode = 'settings';
+    this.group.visible = true;
+    this.hoveredButtonIndex = -1;
+    this.hoverDwellTime = 0;
+    this.cursorVisible = false;
+    this.beamMesh.visible = false;
     this.prevControllerTrigger = false;
     this.paint();
   }
@@ -192,25 +277,25 @@ export class WallPauseView {
     this.group.visible = false;
     this.cursorMesh.visible = false;
     this.beamMesh.visible = false;
+    this.hoveredButtonIndex = -1;
+    this.hoverDwellTime = 0;
   }
 
   /**
-   * Updates pointer tracking, hover state, and pinch/poke/dwell selection.
+   * Updates pointer tracking, hover state, and 3-second dwell / trigger selection.
    * Zero per-frame allocations.
    */
   update(
     hands: readonly HandFrame[],
     stage: StagePlane,
     isControllerTriggerPressed = false,
-    _delta = 0.016,
+    delta = 0.016,
   ): PauseMenuAction | null {
     if (!this._visible) return null;
 
     let hitX = 0;
     let hitY = 0;
     let hasPointer = false;
-    let isPinching = false;
-    let isUnpinched = false;
 
     let pointerWorldX = 0;
     let pointerWorldY = 0;
@@ -228,7 +313,6 @@ export class WallPauseView {
       const idx = JOINT['index-finger-tip'] * 3;
       const mcp = JOINT['index-finger-metacarpal'] * 3;
       const wrist = JOINT['wrist'] * 3;
-      const thmb = JOINT['thumb-tip'] * 3;
 
       // Index tip world coordinates
       const tx = p[idx];
@@ -297,19 +381,9 @@ export class WallPauseView {
         pointerWorldZ = tz;
         hasPointer = true;
       }
-
-      // Check pinch gesture (thumb tip to index tip)
-      const pdx = p[idx] - p[thmb];
-      const pdy = p[idx + 1] - p[thmb + 1];
-      const pdz = p[idx + 2] - p[thmb + 2];
-      const pinchDist = Math.hypot(pdx, pdy, pdz);
-      if (pinchDist < 0.038) {
-        isPinching = true;
-      }
-      if (pinchDist > 0.048) {
-        isUnpinched = true;
-      }
     }
+
+    const currentButtons = this._mode === 'settings' ? SETTINGS_BUTTONS : PAUSE_BUTTONS;
 
     if (hasPointer) {
       this.cursorX = hitX;
@@ -341,8 +415,8 @@ export class WallPauseView {
 
       // Check which button is hovered
       let hovered = -1;
-      for (let b = 0; b < PAUSE_BUTTONS.length; b++) {
-        const btn = PAUSE_BUTTONS[b];
+      for (let b = 0; b < currentButtons.length; b++) {
+        const btn = currentButtons[b];
         if (hitX >= btn.xMin && hitX <= btn.xMax && hitY >= btn.yMin && hitY <= btn.yMax) {
           hovered = b;
           break;
@@ -351,13 +425,12 @@ export class WallPauseView {
 
       if (hovered !== this.hoveredButtonIndex) {
         this.hoveredButtonIndex = hovered;
-        this.pinchArmed = false; // Disarm immediately upon entering a new button or moving off
+        this.hoverDwellTime = delta;
         this.paint();
-      }
-
-      // Re-arm when hand is unpinched over a valid button
-      if (this.hoveredButtonIndex >= 0 && (isUnpinched || !isPinching)) {
-        this.pinchArmed = true;
+      } else if (hovered >= 0) {
+        // Accumulate hover time for 3-second selection
+        this.hoverDwellTime += delta;
+        this.paint();
       }
     } else {
       if (this.cursorVisible) {
@@ -367,23 +440,79 @@ export class WallPauseView {
       }
       if (this.hoveredButtonIndex !== -1) {
         this.hoveredButtonIndex = -1;
-        this.pinchArmed = false;
+        this.hoverDwellTime = 0;
         this.paint();
       }
     }
 
-    // Trigger activation on deliberate pinch or controller trigger
+    // Trigger activation on 3-second hover dwell OR immediate controller trigger
     const triggerClicked = isControllerTriggerPressed && !this.prevControllerTrigger;
     this.prevControllerTrigger = isControllerTriggerPressed;
 
-    const pinchClicked = this.pinchArmed && isPinching;
+    const dwellComplete = this.hoveredButtonIndex >= 0 && this.hoverDwellTime >= DWELL_SELECTION_S;
 
-    if ((pinchClicked || triggerClicked) && this.hoveredButtonIndex >= 0) {
-      this.pinchArmed = false;
-      return PAUSE_BUTTONS[this.hoveredButtonIndex].id;
+    if ((dwellComplete || triggerClicked) && this.hoveredButtonIndex >= 0) {
+      const btn = currentButtons[this.hoveredButtonIndex];
+      this.hoverDwellTime = 0;
+
+      if (this._mode === 'settings') {
+        this.handleSettingsAction(btn.id);
+        return null;
+      }
+
+      // Pause mode
+      if (btn.id === 'settings') {
+        this._mode = 'settings';
+        this.hoveredButtonIndex = -1;
+        this.paint();
+        return null;
+      }
+
+      return btn.id as PauseMenuAction;
     }
 
     return null;
+  }
+
+  private handleSettingsAction(btnId: string): void {
+    if (!this.settingsStore) {
+      if (btnId === 'setting_back') {
+        this._mode = 'pause';
+        this.hoveredButtonIndex = -1;
+        this.paint();
+      }
+      return;
+    }
+
+    const store = this.settingsStore;
+    switch (btnId) {
+      case 'setting_volume': {
+        const cur = store.value.volumeMaster;
+        const next = cur <= 0.05 ? 1.0 : cur <= 0.25 ? 0.0 : cur <= 0.5 ? 0.25 : cur <= 0.75 ? 0.5 : 0.75;
+        store.set('volumeMaster', next);
+        break;
+      }
+      case 'setting_music': {
+        const cur = store.value.volumeMusic;
+        store.set('volumeMusic', cur > 0 ? 0 : 1);
+        break;
+      }
+      case 'setting_contrast': {
+        store.set('highContrast', !store.value.highContrast);
+        break;
+      }
+      case 'setting_flicker': {
+        store.set('flicker', !store.value.flicker);
+        break;
+      }
+      case 'setting_back': {
+        this._mode = 'pause';
+        this.hoveredButtonIndex = -1;
+        break;
+      }
+    }
+
+    this.paint();
   }
 
   private paint(): void {
@@ -399,34 +528,40 @@ export class WallPauseView {
     g.lineWidth = 2;
     g.strokeRect(20, 20, CANVAS_W - 40, CANVAS_H - 40);
 
-    // 2. Title: "PAUSED"
+    const isSettings = this._mode === 'settings';
+
+    // 2. Title & Subtitle
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.font = '700 48px "Cinzel", "Cinzel Decorative", Georgia, serif';
     g.fillStyle = '#ffffff';
-    g.fillText('PAUSED', CANVAS_W * 0.5, 120);
+    g.fillText(isSettings ? 'SETTINGS' : 'PAUSED', CANVAS_W * 0.5, isSettings ? 80 : 120);
 
-    // Subtitle
     g.font = '400 20px "Cinzel", sans-serif';
     g.fillStyle = '#9ea8bc';
-    g.fillText('The candle waits.', CANVAS_W * 0.5, 175);
+    g.fillText(isSettings ? 'Sound & Comfort' : 'The candle waits.', CANVAS_W * 0.5, isSettings ? 125 : 175);
 
     // Ornamental thin divider
     g.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     g.lineWidth = 1.5;
     g.beginPath();
-    g.moveTo(CANVAS_W * 0.5 - 140, 210);
-    g.lineTo(CANVAS_W * 0.5 + 140, 210);
+    const dividerY = isSettings ? 150 : 210;
+    g.moveTo(CANVAS_W * 0.5 - 160, dividerY);
+    g.lineTo(CANVAS_W * 0.5 + 160, dividerY);
     g.stroke();
 
-    // 3. Buttons: High-Contrast Black & White
-    for (let b = 0; b < PAUSE_BUTTONS.length; b++) {
-      const btn = PAUSE_BUTTONS[b];
+    // 3. Buttons: High-Contrast Black & White with 3-second golden hover progress
+    const buttons = isSettings ? SETTINGS_BUTTONS : PAUSE_BUTTONS;
+
+    for (let b = 0; b < buttons.length; b++) {
+      const btn = buttons[b];
       const isHovered = b === this.hoveredButtonIndex;
       const bx = (CANVAS_W - btn.canvasW) * 0.5;
       const by = btn.canvasY;
       const bw = btn.canvasW;
       const bh = btn.canvasH;
+
+      const labelText = typeof btn.label === 'function' ? btn.label(this.settingsStore) : btn.label;
 
       if (isHovered) {
         // Inverted: Solid chalk white background, deep black text
@@ -437,9 +572,24 @@ export class WallPauseView {
         g.lineWidth = 3;
         g.strokeRect(bx - 3, by - 3, bw + 6, bh + 6);
 
-        g.font = '700 26px "Cinzel", Georgia, serif';
+        // 3-second hover dwell progress bar
+        const progress = Math.min(1.0, this.hoverDwellTime / DWELL_SELECTION_S);
+        if (progress > 0) {
+          g.fillStyle = '#f5c062'; // Warm golden flame fill
+          g.fillRect(bx, by + bh - 8, bw * progress, 8);
+        }
+
+        g.font = '700 24px "Cinzel", Georgia, serif';
         g.fillStyle = '#0a0a0f';
-        g.fillText(btn.label, CANVAS_W * 0.5, by + bh * 0.5);
+        g.fillText(labelText, CANVAS_W * 0.5, by + (bh - 4) * 0.5);
+
+        // Countdown prompt
+        if (progress > 0.05) {
+          const remaining = Math.max(0, DWELL_SELECTION_S - this.hoverDwellTime).toFixed(1);
+          g.font = '600 13px "Cinzel", sans-serif';
+          g.fillStyle = '#7a5200';
+          g.fillText(`Hold ${remaining}s`, bx + bw - 65, by + (bh - 4) * 0.5);
+        }
       } else {
         // Default: Dark background with crisp white border and white text
         g.fillStyle = '#12151e';
@@ -449,9 +599,9 @@ export class WallPauseView {
         g.lineWidth = 2;
         g.strokeRect(bx, by, bw, bh);
 
-        g.font = '600 24px "Cinzel", Georgia, serif';
+        g.font = '600 23px "Cinzel", Georgia, serif';
         g.fillStyle = '#e8edf6';
-        g.fillText(btn.label, CANVAS_W * 0.5, by + bh * 0.5);
+        g.fillText(labelText, CANVAS_W * 0.5, by + bh * 0.5);
       }
     }
 

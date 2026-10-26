@@ -217,6 +217,7 @@ async function start(): Promise<void> {
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
+  let ignitionHoldTimer = 0;
   const ambientLight = new AmbientLight(0x101422, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
@@ -359,6 +360,7 @@ async function start(): Promise<void> {
     saves.data.settings,
   );
   settings.subscribe(() => saves.setSettings(settings.value));
+  wallPauseView.setSettingsStore(settings);
   // The title screen's SETTINGS item opens the same settings as a page, before the headset is on.
   const settingsPage = createSettingsPage(settings);
   launcherHooks.openSettings = () => settingsPage.open();
@@ -724,6 +726,8 @@ async function start(): Promise<void> {
     }
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
+      ignitionHoldTimer = 0;
+      candleView.ignitionProgress = 0;
       candleView.lit = false;
       candleView.setLocked(false);
       titleLighter.visible = false;
@@ -919,7 +923,7 @@ async function start(): Promise<void> {
           titleLighter.visible = true;
           titleLighter.update(hands.hands.right, cameraQuat, clock);
 
-          let triggerIgnition = false;
+          let handTouchingWick = false;
           if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
             const lfx = titleLighter.flamePosition[0];
             const lfy = titleLighter.flamePosition[1];
@@ -929,23 +933,44 @@ async function start(): Promise<void> {
             const cfz = candleView.flamePosition[2];
             const distLighterToWick = Math.hypot(lfx - cfx, lfy - cfy, lfz - cfz);
             if (distLighterToWick < 0.15) {
-              triggerIgnition = true;
+              handTouchingWick = true;
             }
           }
-          if (!triggerIgnition && (mock || candleView.checkIgnition(handList))) {
-            triggerIgnition = true;
+          if (!handTouchingWick && candleView.checkIgnition(handList)) {
+            handTouchingWick = true;
           }
-          if (!triggerIgnition && frame) {
+          if (!handTouchingWick && frame) {
             for (const source of frame.session.inputSources) {
               if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                triggerIgnition = true;
+                handTouchingWick = true;
                 break;
               }
             }
           }
+          if (!handTouchingWick && mock) {
+            handTouchingWick = true;
+          }
 
-          if (triggerIgnition) {
+          if (handTouchingWick) {
+            ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
+          } else {
+            ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
+          }
+
+          const ignitionProgress = ignitionHoldTimer / 3.0;
+          candleView.ignitionProgress = ignitionProgress;
+
+          // Warm ambient and bedroom light gradually as flame grows from small to big
+          if (ignitionProgress > 0) {
+            ambientLight.intensity = 0.05 + 0.11 * ignitionProgress;
+            bedroomView.update(lanternLight.light, cameraQuat, ignitionProgress);
+          } else {
+            ambientLight.intensity = 0.05;
+          }
+
+          if (ignitionHoldTimer >= 3.0) {
             sessionState = 'opening';
+            candleView.ignitionProgress = 0;
             candleView.lit = true;
             titleLighter.visible = false;
             ambientLight.color.setHex(0x35281e);
@@ -1007,8 +1032,7 @@ async function start(): Promise<void> {
               tutorial.start();
               simWasPaused = true;
             } else if (action === 'settings') {
-              wallPauseView.hide();
-              void openSettings();
+              wallPauseView.showSettings();
             }
           }
         }

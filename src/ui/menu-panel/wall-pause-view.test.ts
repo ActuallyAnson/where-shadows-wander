@@ -17,7 +17,7 @@ describe('WallPauseView', () => {
     view.dispose();
   });
 
-  it('detects hovering button and returns action on pinch', () => {
+  it('detects hovering button and returns action after 3 seconds hover dwell', () => {
     const view = new WallPauseView();
     view.show();
 
@@ -47,17 +47,12 @@ describe('WallPauseView', () => {
     hand.positions[mcp + 1] = 1.0;
     hand.positions[mcp + 2] = -0.9; // Knuckle behind tip, ray points straight -Z towards wall
 
-    // Update with no pinch
-    const action1 = view.update([hand], stage, false);
+    // Hover for 1.0s: still dwelling, should not trigger yet
+    const action1 = view.update([hand], stage, false, 1.0);
     expect(action1).toBeNull();
 
-    // Now pinch (bring thumb tip to index tip)
-    const thmb = JOINT['thumb-tip'] * 3;
-    hand.positions[thmb] = 0;
-    hand.positions[thmb + 1] = 1.0;
-    hand.positions[thmb + 2] = -1.0;
-
-    const action2 = view.update([hand], stage, false);
+    // Hover for an additional 2.1s (total 3.1s >= 3.0s): should trigger selection!
+    const action2 = view.update([hand], stage, false, 2.1);
     expect(action2).toBe('resume');
 
     view.dispose();
@@ -89,6 +84,49 @@ describe('WallPauseView', () => {
 
     const action = view.update([hand], stage, true); // trigger pressed
     expect(action).toBe('restart');
+
+    view.dispose();
+  });
+
+  it('switches to settings mode and toggles high contrast setting on the wall', () => {
+    const view = new WallPauseView();
+    const fakeStore = {
+      value: {
+        volumeMaster: 1.0,
+        volumeMusic: 1.0,
+        highContrast: false,
+        flicker: true,
+      },
+      set: (key: string, val: unknown) => {
+        (fakeStore.value as Record<string, unknown>)[key] = val;
+      },
+    };
+    view.setSettingsStore(fakeStore as never);
+    view.showSettings();
+    expect(view.mode).toBe('settings');
+
+    const stage = createStagePlane();
+    stage.origin.set([0, 1.0, -1.5]);
+    stage.normal.set([0, 0, 1]);
+    stage.right.set([1, 0, 0]);
+    stage.up.set([0, 1, 0]);
+
+    const hand = createHandFrame('right');
+    hand.tracked = true;
+    hand.validJoints = 25;
+
+    // Aim at "High Contrast" button in settings mode (yMin -0.16 to -0.06, stage Y ~ -0.11 => world Y = 0.89)
+    const idx = JOINT['index-finger-tip'] * 3;
+    const mcp = JOINT['index-finger-metacarpal'] * 3;
+    hand.positions[idx] = 0;
+    hand.positions[idx + 1] = 0.89;
+    hand.positions[idx + 2] = -1.0;
+    hand.positions[mcp] = 0;
+    hand.positions[mcp + 1] = 0.89;
+    hand.positions[mcp + 2] = -0.9;
+
+    view.update([hand], stage, true); // Trigger click on High Contrast
+    expect(fakeStore.value.highContrast).toBe(true);
 
     view.dispose();
   });
