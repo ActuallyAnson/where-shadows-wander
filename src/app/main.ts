@@ -217,7 +217,7 @@ async function start(): Promise<void> {
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
-  const ambientLight = new AmbientLight(0x182035, 0.12);
+  const ambientLight = new AmbientLight(0x101422, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
@@ -728,6 +728,11 @@ async function start(): Promise<void> {
       candleView.setLocked(false);
       titleLighter.visible = false;
       wallPauseView.hide();
+      stageRenderer.mesh.visible = false;
+      kindredView.group.visible = false;
+      ghostTarget.mesh.visible = false;
+      ambientLight.color.setHex(0x101422);
+      ambientLight.intensity = 0.05;
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -833,6 +838,7 @@ async function start(): Promise<void> {
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
+      const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
       timings.begin(SLOT.read);
       if (debug?.replay.active) {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
@@ -958,8 +964,8 @@ async function start(): Promise<void> {
               simWasPaused = true;
               candleView.lit = false;
               candleView.resetCover();
-              ambientLight.color.setHex(0x182035);
-              ambientLight.intensity = 0.08;
+              ambientLight.color.setHex(0x101422);
+              ambientLight.intensity = 0.05;
               audio.mixer.setLift(Bus.Ambience, 0.15);
               audio.mixer.setLift(Bus.Music, 0.25);
               wallPauseView.show();
@@ -1008,10 +1014,12 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         try {
-          const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
           shadowRenderer.mesh.visible = shadowsVisible;
           propShadowView.mesh.visible = shadowsVisible;
           propShadows.mesh.visible = shadowsVisible;
+          stageRenderer.mesh.visible = shadowsVisible;
+          kindredView.group.visible = shadowsVisible;
+          ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
 
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
@@ -1081,7 +1089,13 @@ async function start(): Promise<void> {
               openingT += step;
               foxAlpha = openingFoxAlpha(openingT);
             }
-            kindredView.update(kindred, stage, shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha, step);
+            kindredView.update(
+              kindred,
+              stage,
+              shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha : 0,
+              step,
+            );
+            if (!shadowsVisible) kindredView.group.visible = false;
           }
           // Dust: a hand's shadow reaching into a prop's shadow shakes a little off it, with a soft rustle.
           for (let i = 0; i < 2; i++) {
@@ -1205,6 +1219,7 @@ async function start(): Promise<void> {
         try {
           if (rigPlaced) {
             ghostTarget.update(delta, projector.shadows, shapes);
+            ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
             tutorial.update(delta, projector.shadows, shapes);
           }
           // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
@@ -1220,7 +1235,12 @@ async function start(): Promise<void> {
         }
       }
       try {
-        stageRenderer.update(sim.store, sim.alpha);
+        if (shadowsVisible) {
+          stageRenderer.mesh.visible = true;
+          stageRenderer.update(sim.store, sim.alpha);
+        } else {
+          stageRenderer.mesh.visible = false;
+        }
       } catch (e) {
         failures.report('stage renderer', e);
       }

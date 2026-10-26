@@ -274,7 +274,7 @@ export class BedroomView {
     // -------------------------------------------------------------
     // 7. Directional Moonlight (Entering through the Left Window)
     // -------------------------------------------------------------
-    this.moonlight = new DirectionalLight(MOONLIGHT_COLOR, 0.45);
+    this.moonlight = new DirectionalLight(MOONLIGHT_COLOR, 0.05);
     this.moonlight.position.set(-2.4, 2.2, -0.8);
     this.moonlight.target.position.set(0, 0.5, -0.6);
 
@@ -330,19 +330,19 @@ export class BedroomView {
       this.scratchColor.copy(BASE_WALL).lerp(CANDLE_AMBER, brightness * 0.25);
       this.wallMat.color.copy(this.scratchColor);
 
-      this.moonlight.intensity = 0.22; // Soft fill under warm candle
+      this.moonlight.intensity = 0.2; // Soft fill under warm candle
     } else {
-      // Unlit/smothered phase: Room bathed in cold blue moonlight
-      this.scratchColor.copy(BASE_FLOOR).lerp(MOON_BLUE, 0.35);
+      // Unlit/smothered/start phase: Dark, quiet moonlit room matching pause menu
+      this.scratchColor.copy(BASE_FLOOR).lerp(MOON_BLUE, 0.12);
       this.floorMat.color.copy(this.scratchColor);
 
-      this.scratchColor.copy(BASE_RAFTER).lerp(MOON_BLUE, 0.32);
+      this.scratchColor.copy(BASE_RAFTER).lerp(MOON_BLUE, 0.12);
       this.rafterMat.color.copy(this.scratchColor);
 
-      this.scratchColor.copy(BASE_WALL).lerp(MOON_BLUE, 0.3);
+      this.scratchColor.copy(BASE_WALL).lerp(MOON_BLUE, 0.12);
       this.wallMat.color.copy(this.scratchColor);
 
-      this.moonlight.intensity = 0.45; // Moonlight stands out clearly
+      this.moonlight.intensity = 0.05; // Deep quiet darkness
     }
   }
 

@@ -18,7 +18,7 @@ describe('BedroomView', () => {
 
     // Moonlight
     expect(room.moonlight.color.getHex()).toBe(MOONLIGHT_COLOR);
-    expect(room.moonlight.intensity).toBeCloseTo(0.45, 2);
+    expect(room.moonlight.intensity).toBeCloseTo(0.05, 2);
   });
 
   it('aligns with player seated position and yaw and places front wall behind stage', () => {
@@ -44,19 +44,19 @@ describe('BedroomView', () => {
       flicker: 0,
     };
 
-    // Phase 1 (Unlit): Room bathed in moonlight
+    // Phase 1 (Unlit): Room dark in subtle moonlight
     room.update(light, quat);
-    expect(room.moonlight.intensity).toBeCloseTo(0.45, 2);
+    expect(room.moonlight.intensity).toBeCloseTo(0.05, 2);
 
     // Phase 2 (Lit): Room warms with candlelight
     light.lit = true;
     light.intensity = 1.0;
     room.update(light, quat);
-    expect(room.moonlight.intensity).toBeCloseTo(0.22, 2);
+    expect(room.moonlight.intensity).toBeCloseTo(0.2, 2);
 
-    // Phase 3 (Flame Covered/Smothered): Dims back down to moonlight
+    // Phase 3 (Flame Covered/Smothered): Dims back down to dark
     room.update(light, quat, 0.0);
-    expect(room.moonlight.intensity).toBeCloseTo(0.45, 2);
+    expect(room.moonlight.intensity).toBeCloseTo(0.05, 2);
   });
 
   it('disposes resources cleanly', () => {

@@ -98,8 +98,8 @@ export class WallPauseView {
   private cursorX = 0;
   private cursorY = 0;
   private cursorVisible = false;
-  private pinchArmed = true;
-  private hoverDwellTimer = 0;
+  private pinchArmed = false;
+  private prevControllerTrigger = false;
 
   // Scratch vectors for zero allocation beam orientation
   private readonly beamStart = new Vector3();
@@ -182,8 +182,8 @@ export class WallPauseView {
     this.hoveredButtonIndex = -1;
     this.cursorVisible = false;
     this.beamMesh.visible = false;
-    this.pinchArmed = true;
-    this.hoverDwellTimer = 0;
+    this.pinchArmed = false;
+    this.prevControllerTrigger = false;
     this.paint();
   }
 
@@ -202,7 +202,7 @@ export class WallPauseView {
     hands: readonly HandFrame[],
     stage: StagePlane,
     isControllerTriggerPressed = false,
-    delta = 0.016,
+    _delta = 0.016,
   ): PauseMenuAction | null {
     if (!this._visible) return null;
 
@@ -210,7 +210,7 @@ export class WallPauseView {
     let hitY = 0;
     let hasPointer = false;
     let isPinching = false;
-    let isPoking = false;
+    let isUnpinched = false;
 
     let pointerWorldX = 0;
     let pointerWorldY = 0;
@@ -298,18 +298,16 @@ export class WallPauseView {
         hasPointer = true;
       }
 
-      // Direct physical poke detection: index fingertip physically near wall (< 8cm)
-      if (dToWall < 0.08) {
-        isPoking = true;
-      }
-
-      // Check pinch gesture (thumb tip to index tip < 7cm)
+      // Check pinch gesture (thumb tip to index tip)
       const pdx = p[idx] - p[thmb];
       const pdy = p[idx + 1] - p[thmb + 1];
       const pdz = p[idx + 2] - p[thmb + 2];
-      const pinchDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      if (pinchDist < 0.07) {
+      const pinchDist = Math.hypot(pdx, pdy, pdz);
+      if (pinchDist < 0.038) {
         isPinching = true;
+      }
+      if (pinchDist > 0.048) {
+        isUnpinched = true;
       }
     }
 
@@ -341,11 +339,11 @@ export class WallPauseView {
         this.beamMesh.visible = false;
       }
 
-      // Check which button is hovered (with comfortable padding for easy pointing)
+      // Check which button is hovered
       let hovered = -1;
       for (let b = 0; b < PAUSE_BUTTONS.length; b++) {
         const btn = PAUSE_BUTTONS[b];
-        if (hitX >= btn.xMin - 0.03 && hitX <= btn.xMax + 0.03 && hitY >= btn.yMin - 0.02 && hitY <= btn.yMax + 0.02) {
+        if (hitX >= btn.xMin && hitX <= btn.xMax && hitY >= btn.yMin && hitY <= btn.yMax) {
           hovered = b;
           break;
         }
@@ -353,10 +351,13 @@ export class WallPauseView {
 
       if (hovered !== this.hoveredButtonIndex) {
         this.hoveredButtonIndex = hovered;
-        this.hoverDwellTimer = 0;
+        this.pinchArmed = false; // Disarm immediately upon entering a new button or moving off
         this.paint();
-      } else if (hovered >= 0) {
-        this.hoverDwellTimer += delta;
+      }
+
+      // Re-arm when hand is unpinched over a valid button
+      if (this.hoveredButtonIndex >= 0 && (isUnpinched || !isPinching)) {
+        this.pinchArmed = true;
       }
     } else {
       if (this.cursorVisible) {
@@ -366,21 +367,19 @@ export class WallPauseView {
       }
       if (this.hoveredButtonIndex !== -1) {
         this.hoveredButtonIndex = -1;
-        this.hoverDwellTimer = 0;
+        this.pinchArmed = false;
         this.paint();
       }
     }
 
-    // Trigger activation on pinch, controller trigger, physical poke, or 1.2s dwell
-    const isDwellTrigger = this.hoverDwellTimer >= 1.2;
-    const activate = isPinching || isControllerTriggerPressed || isPoking || isDwellTrigger;
-    if (!activate) {
-      this.pinchArmed = true;
-    }
+    // Trigger activation on deliberate pinch or controller trigger
+    const triggerClicked = isControllerTriggerPressed && !this.prevControllerTrigger;
+    this.prevControllerTrigger = isControllerTriggerPressed;
 
-    if (this.pinchArmed && activate && this.hoveredButtonIndex >= 0) {
+    const pinchClicked = this.pinchArmed && isPinching;
+
+    if ((pinchClicked || triggerClicked) && this.hoveredButtonIndex >= 0) {
       this.pinchArmed = false;
-      this.hoverDwellTimer = 0;
       return PAUSE_BUTTONS[this.hoveredButtonIndex].id;
     }
 
