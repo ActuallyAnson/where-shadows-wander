@@ -1281,7 +1281,9 @@ async function start(): Promise<void> {
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0);
-        roomDressing.tick(step);
+        world.camera.getWorldPosition(settingsHead);
+        // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
+        roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
         // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
         moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
         stageView.mood = moodNow;
@@ -1290,7 +1292,7 @@ async function start(): Promise<void> {
           candleView.flamePosition,
           rigPlaced && lanternLight.light.lit ? candleView.occlusion : 0,
           step,
-          !passthrough,
+          !passthrough && sessionState !== 'paused',
         );
         candleView.update(lanternLight.light, cameraQuat);
         lab?.applyLight(lanternLight.light, cameraQuat);

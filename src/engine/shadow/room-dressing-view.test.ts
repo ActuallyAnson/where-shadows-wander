@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
-import { paintBookcase, paintMoonPatch, paintNight, paintRug, paintSill, paintSnow, paintWall } from './room-art';
+import {
+  castShadow,
+  paintBookcase,
+  paintMoonPatch,
+  paintNight,
+  paintQuilt,
+  paintRug,
+  paintSill,
+  paintSnow,
+  paintWall,
+  paintWallThings,
+  paintWood,
+} from './room-art';
 import { RoomDressingView } from './room-dressing-view';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
@@ -28,9 +40,17 @@ const light = (lit: boolean, intensity = 1) => ({ lit, intensity }) as unknown a
 describe('room art painters', () => {
   it.each([
     ['wall', (g: CanvasRenderingContext2D) => paintWall(g, 1024, 640), 100],
-    ['plain wall', (g: CanvasRenderingContext2D) => paintWall(g, 1280, 640, false), 100],
-    ['night', (g: CanvasRenderingContext2D) => paintNight(g, 440, 520), 100],
+    ['side wall', (g: CanvasRenderingContext2D) => paintWall(g, 1280, 640), 100],
+    ['wall pictures', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'pictures'), 40],
+    ['wall shelves', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'shelves'), 40],
+    ['wood', (g: CanvasRenderingContext2D) => paintWood(g, 128, 128), 20],
+    ['night sky', (g: CanvasRenderingContext2D) => paintNight(g, 400, 460, 'sky'), 50],
+    ['night hills', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'hills'), 30],
+    ['night village', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'village'), 30],
+    ['night near ground', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'near'), 20],
+    ['night curtains', (g: CanvasRenderingContext2D) => paintNight(g, 440, 520, 'curtains'), 20],
     ['bookcase', (g: CanvasRenderingContext2D) => paintBookcase(g, 400, 720), 100],
+    ['quilt', (g: CanvasRenderingContext2D) => paintQuilt(g, 256, 256), 100],
     ['rug', (g: CanvasRenderingContext2D) => paintRug(g, 512, 360), 100],
     ['snow', (g: CanvasRenderingContext2D) => paintSnow(g, 256, 256, 3, 34, 5.5), 30],
     ['moon patch', (g: CanvasRenderingContext2D) => paintMoonPatch(g, 256, 256), 30],
@@ -41,19 +61,20 @@ describe('room art painters', () => {
     expect(calls()).toBeGreaterThan(min);
   });
 
-  it('paints the furnished wall with more than the plain one', () => {
-    const a = recordingContext();
-    const b = recordingContext();
-    paintWall(a.g, 1024, 640, true);
-    paintWall(b.g, 1024, 640, false);
-    expect(a.calls()).toBeGreaterThan(b.calls());
+  it('casts a shadow of a layer without drawing the layer on the wall itself', () => {
+    const { g, calls } = recordingContext();
+    const store = g as unknown as { shadowBlur: number; shadowOffsetX: number };
+    castShadow(g, {} as CanvasImageSource, 0, 120, 6, 9, 7, 0.5);
+    expect(calls()).toBeGreaterThan(0);
+    expect(store.shadowBlur).toBe(7);
+    expect(store.shadowOffsetX).toBeGreaterThan(6); // the layer is drawn off to the side, the shadow is brought back
   });
 });
 
 describe('RoomDressingView', () => {
-  it('has the wall, two side walls, the window night with two layers of snow, the sill, the moon patch, the bookcase and the rug', () => {
+  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(10);
+    expect(v.group.children).toHaveLength(17);
     v.dispose();
   });
 
@@ -63,6 +84,17 @@ describe('RoomDressingView', () => {
     expect(v.wall.position.z).toBeCloseTo(-2.35 + 0.012, 3);
     v.place(0.75); // the tabletop stage: the wall stays behind it
     expect(v.wall.position.z).toBeCloseTo(-1.85 + 0.012, 3);
+    v.dispose();
+  });
+
+  it('holds the pictures and then the shelves off the wall, further out each, and moves them with the wall', () => {
+    const v = new RoomDressingView();
+    const [pictures, shelves] = [v.group.children[14], v.group.children[15]];
+    v.place(2.0);
+    expect(pictures.position.z).toBeGreaterThan(v.wall.position.z + 0.02);
+    expect(shelves.position.z).toBeGreaterThan(pictures.position.z + 0.04);
+    v.place(0.75);
+    expect(shelves.position.z).toBeCloseTo(v.wall.position.z + 0.1, 3);
     v.dispose();
   });
 
@@ -85,13 +117,29 @@ describe('RoomDressingView', () => {
     const v = new RoomDressingView();
     const meshes = v.group.children as unknown as { material: { color: { r: number; g: number; b: number } } }[];
     const night = meshes[3].material.color;
-    const patch = meshes[7].material.color;
+    const patch = meshes[11].material.color;
     v.update(light(false), 1);
     const nightDark = { ...night };
     const patchDark = { ...patch };
     v.update(light(true, 1), 1);
     expect({ ...night }).toEqual(nightDark);
     expect(patch.b).toBeLessThan(patchDark.b);
+    v.dispose();
+  });
+
+  it('slides the far outside layers more than the near ones as the head moves, and never past the painted margin', () => {
+    const v = new RoomDressingView();
+    const tex = (v as unknown as { outside: { offset: { x: number; y: number } }[] }).outside;
+    expect(tex).toHaveLength(4);
+    v.tick(0, { x: 0, y: 1.45, z: -0.8 }); // in front of the window's middle: nothing slides
+    const mid = tex.map((t) => t.offset.x);
+    v.tick(0, { x: 0, y: 1.45, z: 0.4 });
+    const moved = tex.map((t, i) => Math.abs(t.offset.x - mid[i]));
+    expect(moved[0]).toBeGreaterThan(moved[1]);
+    expect(moved[1]).toBeGreaterThan(moved[2]);
+    expect(moved[2]).toBeGreaterThan(moved[3]);
+    v.tick(0, { x: 0, y: 1.45, z: 500 }); // far away: stops at the margin
+    for (const t of tex) expect(Math.abs(t.offset.x - 24 / 268)).toBeLessThanOrEqual((24 / 268) * 0.9 + 1e-9);
     v.dispose();
   });
 

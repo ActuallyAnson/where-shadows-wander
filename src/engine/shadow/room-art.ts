@@ -41,10 +41,10 @@ function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fi
 /**
  * The wall behind the stage (4 m by 2.5 m, any canvas of that shape): striped wallpaper with a small repeating motif, a
  * picture rail with paper bunting, framed pictures, two shelves of keepsakes and wooden panelling below. The middle, where
- * the paper stage hangs, is left calm so the shadows read against it. `furnished` false paints the same paper and panelling
- * without the pictures and shelves, for the plain side walls.
+ * the paper stage hangs, is left calm so the shadows read against it. The pictures and shelves are not in it: they are
+ * paintWallThings, held off the wall. Its edges and corners are shaded, so the wall sits in the room rather than on the screen.
  */
-export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, furnished = true): void {
+export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): void {
   const r = rng(11);
   g.save();
   g.scale(W / 1024, H / 640);
@@ -113,7 +113,43 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, fur
     }
   }
 
-  if (furnished) {
+  // Panelling below the chair rail.
+  rect(g, 0, 440, 1024, 200, '#3a2a1e');
+  rect(g, 0, 434, 1024, 12, '#5a4028');
+  rect(g, 0, 446, 1024, 3, 'rgba(0, 0, 0, 0.45)');
+  for (let x = 24; x < 1000; x += 128) {
+    rect(g, x, 470, 100, 130, '#2e2017');
+    rect(g, x + 4, 474, 92, 122, '#33241a');
+    rect(g, x, 470, 100, 3, 'rgba(0, 0, 0, 0.5)');
+    rect(g, x, 596, 100, 3, 'rgba(255, 220, 160, 0.10)');
+  }
+  rect(g, 0, 612, 1024, 28, '#241810'); // skirting
+  rect(g, 0, 612, 1024, 3, 'rgba(255, 220, 160, 0.10)');
+  edgeShade(g);
+  g.restore();
+}
+/** The wall behind the stage is 4 m by 2.5 m on 1024 by 640 units; the things that hang or stand on it live in this band of rows. */
+export const WALL_THINGS_TOP = 120;
+export const WALL_THINGS_ROWS = 320;
+
+/**
+ * What hangs or stands on the wall behind the stage, on a transparent canvas that covers rows 120 to 440 of the wall (any canvas of
+ * that 1024 by 320 shape): the `pictures` layer is the framed bird, moon and hill; the `shelves` layer is the two shelves with their
+ * books, boat, lamp, jar and plant. Each is a quad of its own, held a hand's breadth off the wall, so the things really stand out
+ * from the paper when the head moves; castShadow() paints their shadows onto the wall itself.
+ */
+export function paintWallThings(
+  g: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  layer: 'pictures' | 'shelves',
+): void {
+  g.save();
+  g.scale(W / 1024, H / WALL_THINGS_ROWS);
+  g.translate(0, -WALL_THINGS_TOP);
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  if (layer === 'pictures') {
     // Left: a framed bird in flight, and a small moon picture under it.
     frame(g, 150, 160, 140, 170, '#d8c8a4');
     g.fillStyle = INK;
@@ -156,6 +192,7 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, fur
     star(g, 840, 176, 6, '#f4e8b8');
     star(g, 900, 190, 4, '#f4e8b8');
     star(g, 928, 168, 5, '#f4e8b8');
+  } else {
     rect(g, 700, 330, 250, 12, '#3c2a1c'); // the shelf
     rect(g, 700, 342, 250, 4, 'rgba(0, 0, 0, 0.45)');
     for (const x of [716, 934]) rect(g, x, 340, 8, 28, '#2a1d13'); // brackets
@@ -223,162 +260,217 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, fur
       g.fill();
     }
   }
-
-  // Panelling below the chair rail.
-  rect(g, 0, 440, 1024, 200, '#3a2a1e');
-  rect(g, 0, 434, 1024, 12, '#5a4028');
-  rect(g, 0, 446, 1024, 3, 'rgba(0, 0, 0, 0.45)');
-  for (let x = 24; x < 1000; x += 128) {
-    rect(g, x, 470, 100, 130, '#2e2017');
-    rect(g, x + 4, 474, 92, 122, '#33241a');
-    rect(g, x, 470, 100, 3, 'rgba(0, 0, 0, 0.5)');
-    rect(g, x, 596, 100, 3, 'rgba(255, 220, 160, 0.10)');
-  }
-  rect(g, 0, 612, 1024, 28, '#241810'); // skirting
-  rect(g, 0, 612, 1024, 3, 'rgba(255, 220, 160, 0.10)');
   g.restore();
 }
 
 /**
- * The night seen through the window (a tall rectangle): a deep winter sky with a faint aurora, stars and a large moon in a halo,
- * thin cloud, far mountains, a snowy village of roofs with lit windows and chimney smoke, dark pines and curtains tied back
- * to each side. The snow that falls over it is a separate layer (paintSnow).
+ * Casts the soft shadow of everything drawn on `thing` onto `g`, moved by (dx, dy) and blurred, as if lit from the upper left;
+ * only the shadow lands, `thing` is drawn far off to the side and its shadow is brought back (shadow offsets ignore the
+ * transform). (x, y) is where `thing`'s top left corner sits on `g`.
  */
-export function paintNight(g: CanvasRenderingContext2D, W: number, H: number): void {
-  const r = rng(29);
+export function castShadow(
+  g: CanvasRenderingContext2D,
+  thing: CanvasImageSource,
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  blur: number,
+  alpha: number,
+): void {
+  const FAR = 8192;
   g.save();
-  g.scale(W / 220, H / 260);
+  g.shadowColor = `rgba(8, 4, 2, ${alpha})`;
+  g.shadowBlur = blur;
+  g.shadowOffsetX = FAR + dx;
+  g.shadowOffsetY = dy;
+  g.drawImage(thing, x - FAR, y);
+  g.restore();
+}
+
+/** Darkens a wall toward its edges (the corners, the ceiling, the floor line), so a flat painted wall reads as a room's wall. */
+function edgeShade(g: CanvasRenderingContext2D): void {
+  const side = (x0: number, x1: number, a: number) => {
+    const grad = g.createLinearGradient(x0, 0, x1, 0);
+    grad.addColorStop(0, `rgba(6, 3, 2, ${a})`);
+    grad.addColorStop(1, 'rgba(6, 3, 2, 0)');
+    g.fillStyle = grad;
+    g.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), 640);
+  };
+  side(0, 140, 0.55);
+  side(1024, 884, 0.55);
+  const top = g.createLinearGradient(0, 0, 0, 110);
+  top.addColorStop(0, 'rgba(6, 3, 2, 0.6)');
+  top.addColorStop(1, 'rgba(6, 3, 2, 0)');
+  g.fillStyle = top;
+  g.fillRect(0, 0, 1024, 110);
+  const floor = g.createLinearGradient(0, 640, 0, 560);
+  floor.addColorStop(0, 'rgba(6, 3, 2, 0.5)');
+  floor.addColorStop(1, 'rgba(6, 3, 2, 0)');
+  g.fillStyle = floor;
+  g.fillRect(0, 560, 1024, 80);
+}
+
+/** The outside is painted in five layers that sit one behind the other (see paintNight); a layer is one of these. */
+export type NightLayer = 'sky' | 'hills' | 'village' | 'near' | 'curtains';
+/** Units (of 220 by 260) the outside layers are painted past each edge of the window, so they can slide without a bare edge. */
+export const NIGHT_MARGIN = 24;
+
+/**
+ * The night seen through the window, one layer at a time (each a canvas of the same shape, 220 by 260 units plus the margin on
+ * every side, except the curtains, which are exactly the window): the `sky` is a deep winter sky with a faint aurora, stars, a
+ * large moon in a halo and thin cloud; the `hills` are far mountains and a first row of snowy roofs; the `village` is the
+ * nearer roofs, a steeple, chimneys with smoke and lit windows; `near` is the snowy slope and dark pines; the `curtains` are
+ * tied back to each side. The room view slides the layers by different amounts as the head moves, so the outside has depth.
+ * The snow that falls over it is a separate layer (paintSnow).
+ */
+export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, layer: NightLayer = 'sky'): void {
+  const r = rng(29);
+  const M = layer === 'curtains' ? 0 : NIGHT_MARGIN;
+  g.save();
+  g.scale(W / (220 + 2 * M), H / (260 + 2 * M));
+  g.translate(M, M);
   g.lineJoin = 'round';
   g.lineCap = 'round';
 
-  const sky = g.createLinearGradient(0, 0, 0, 260);
-  sky.addColorStop(0, '#060a20');
-  sky.addColorStop(0.35, '#16215a');
-  sky.addColorStop(0.7, '#34478a');
-  sky.addColorStop(1, '#7a86b8');
-  g.fillStyle = sky;
-  g.fillRect(0, 0, 220, 260);
+  if (layer === 'sky') {
+    const sky = g.createLinearGradient(0, 0, 0, 260);
+    sky.addColorStop(0, '#060a20');
+    sky.addColorStop(0.35, '#16215a');
+    sky.addColorStop(0.7, '#34478a');
+    sky.addColorStop(1, '#7a86b8');
+    g.fillStyle = sky;
+    g.fillRect(-M, -M, 220 + 2 * M, 260 + 2 * M);
 
-  // A faint aurora: two soft bands.
-  for (const [y, c] of [
-    [52, 'rgba(90, 220, 190, 0.16)'],
-    [74, 'rgba(150, 110, 230, 0.12)'],
-  ] as const) {
-    const band = g.createLinearGradient(0, y - 26, 0, y + 26);
-    band.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    band.addColorStop(0.5, c);
-    band.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    g.fillStyle = band;
+    // A faint aurora: two soft bands.
+    for (const [y, c] of [
+      [52, 'rgba(90, 220, 190, 0.16)'],
+      [74, 'rgba(150, 110, 230, 0.12)'],
+    ] as const) {
+      const band = g.createLinearGradient(0, y - 26, 0, y + 26);
+      band.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      band.addColorStop(0.5, c);
+      band.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      g.fillStyle = band;
+      g.beginPath();
+      g.moveTo(-M, y);
+      g.bezierCurveTo(60, y - 30, 120, y + 22, 220 + M, y - 14);
+      g.lineTo(220 + M, y + 40);
+      g.bezierCurveTo(120, y + 52, 60, y + 14, -M, y + 40);
+      g.closePath();
+      g.fill();
+    }
+
+    // Stars: many small, a few large with a glint.
+    for (let i = 0; i < 90; i++) {
+      star(
+        g,
+        -M + r() * (220 + 2 * M),
+        -M + r() * (150 + M),
+        0.5 + r() * 1.1,
+        `rgba(255, 246, 214, ${0.35 + r() * 0.6})`,
+      );
+    }
+    for (let i = 0; i < 7; i++) {
+      const x = 8 + r() * 204,
+        y = 6 + r() * 100;
+      star(g, x, y, 2.4, 'rgba(255, 250, 225, 0.95)');
+      g.strokeStyle = 'rgba(255, 250, 225, 0.5)';
+      g.lineWidth = 0.7;
+      g.beginPath();
+      g.moveTo(x - 5, y);
+      g.lineTo(x + 5, y);
+      g.moveTo(x, y - 5);
+      g.lineTo(x, y + 5);
+      g.stroke();
+    }
+
+    // The moon: a wide halo, a bright disc with soft seas and a lit rim.
+    const halo = g.createRadialGradient(132, 74, 6, 132, 74, 96);
+    halo.addColorStop(0, 'rgba(225, 235, 255, 0.6)');
+    halo.addColorStop(0.35, 'rgba(180, 200, 255, 0.22)');
+    halo.addColorStop(1, 'rgba(180, 200, 255, 0)');
+    g.fillStyle = halo;
+    g.fillRect(20, 0, 200, 170);
+    const disc = g.createRadialGradient(126, 68, 4, 132, 74, 30);
+    disc.addColorStop(0, '#ffffee');
+    disc.addColorStop(1, '#e6e4c6');
+    g.fillStyle = disc;
     g.beginPath();
-    g.moveTo(0, y);
-    g.bezierCurveTo(60, y - 30, 120, y + 22, 220, y - 14);
-    g.lineTo(220, y + 40);
-    g.bezierCurveTo(120, y + 52, 60, y + 14, 0, y + 40);
-    g.closePath();
+    g.arc(132, 74, 28, 0, TWO_PI);
     g.fill();
-  }
-
-  // Stars: many small, a few large with a glint.
-  for (let i = 0; i < 90; i++) {
-    star(g, r() * 220, r() * 150, 0.5 + r() * 1.1, `rgba(255, 246, 214, ${0.35 + r() * 0.6})`);
-  }
-  for (let i = 0; i < 7; i++) {
-    const x = 8 + r() * 204,
-      y = 6 + r() * 100;
-    star(g, x, y, 2.4, 'rgba(255, 250, 225, 0.95)');
-    g.strokeStyle = 'rgba(255, 250, 225, 0.5)';
-    g.lineWidth = 0.7;
+    g.fillStyle = 'rgba(140, 140, 120, 0.3)';
+    for (const [x, y, rx, ry, rot] of [
+      [123, 66, 9, 6, 0.5],
+      [140, 82, 7, 5, -0.3],
+      [136, 60, 4, 3, 0],
+      [120, 84, 5, 4, 0.2],
+      [146, 68, 3, 3, 0],
+    ]) {
+      g.beginPath();
+      g.ellipse(x, y, rx, ry, rot, 0, TWO_PI);
+      g.fill();
+    }
+    g.strokeStyle = 'rgba(255, 255, 240, 0.55)';
+    g.lineWidth = 1.2;
     g.beginPath();
-    g.moveTo(x - 5, y);
-    g.lineTo(x + 5, y);
-    g.moveTo(x, y - 5);
-    g.lineTo(x, y + 5);
+    g.arc(132, 74, 28, -2.4, -0.7);
     g.stroke();
+
+    // Thin cloud across the moon's lower edge, and two more.
+    for (const [x, y, rx, ry, a] of [
+      [112, 96, 56, 6, 0.3],
+      [176, 112, 40, 5, 0.22],
+      [42, 126, 46, 5, 0.18],
+    ]) {
+      const cl = g.createLinearGradient(x, y - ry, x, y + ry);
+      cl.addColorStop(0, `rgba(210, 220, 255, ${a})`);
+      cl.addColorStop(1, `rgba(120, 140, 210, ${a * 0.4})`);
+      g.fillStyle = cl;
+      g.beginPath();
+      g.ellipse(x, y, rx, ry, 0, 0, TWO_PI);
+      g.fill();
+    }
   }
 
-  // The moon: a wide halo, a bright disc with soft seas and a lit rim.
-  const halo = g.createRadialGradient(132, 74, 6, 132, 74, 96);
-  halo.addColorStop(0, 'rgba(225, 235, 255, 0.6)');
-  halo.addColorStop(0.35, 'rgba(180, 200, 255, 0.22)');
-  halo.addColorStop(1, 'rgba(180, 200, 255, 0)');
-  g.fillStyle = halo;
-  g.fillRect(20, 0, 200, 170);
-  const disc = g.createRadialGradient(126, 68, 4, 132, 74, 30);
-  disc.addColorStop(0, '#ffffee');
-  disc.addColorStop(1, '#e6e4c6');
-  g.fillStyle = disc;
-  g.beginPath();
-  g.arc(132, 74, 28, 0, TWO_PI);
-  g.fill();
-  g.fillStyle = 'rgba(140, 140, 120, 0.3)';
-  for (const [x, y, rx, ry, rot] of [
-    [123, 66, 9, 6, 0.5],
-    [140, 82, 7, 5, -0.3],
-    [136, 60, 4, 3, 0],
-    [120, 84, 5, 4, 0.2],
-    [146, 68, 3, 3, 0],
-  ]) {
+  if (layer === 'hills') {
+    // Far mountains, with snow on their ridges.
+    g.fillStyle = '#2b3a78';
     g.beginPath();
-    g.ellipse(x, y, rx, ry, rot, 0, TWO_PI);
-    g.fill();
-  }
-  g.strokeStyle = 'rgba(255, 255, 240, 0.55)';
-  g.lineWidth = 1.2;
-  g.beginPath();
-  g.arc(132, 74, 28, -2.4, -0.7);
-  g.stroke();
-
-  // Thin cloud across the moon's lower edge, and two more.
-  for (const [x, y, rx, ry, a] of [
-    [112, 96, 56, 6, 0.3],
-    [176, 112, 40, 5, 0.22],
-    [42, 126, 46, 5, 0.18],
-  ]) {
-    const cl = g.createLinearGradient(x, y - ry, x, y + ry);
-    cl.addColorStop(0, `rgba(210, 220, 255, ${a})`);
-    cl.addColorStop(1, `rgba(120, 140, 210, ${a * 0.4})`);
-    g.fillStyle = cl;
-    g.beginPath();
-    g.ellipse(x, y, rx, ry, 0, 0, TWO_PI);
-    g.fill();
-  }
-
-  // Far mountains, with snow on their ridges.
-  g.fillStyle = '#2b3a78';
-  g.beginPath();
-  g.moveTo(0, 190);
-  g.lineTo(0, 168);
-  g.lineTo(34, 146);
-  g.lineTo(58, 170);
-  g.lineTo(92, 138);
-  g.lineTo(128, 172);
-  g.lineTo(160, 150);
-  g.lineTo(220, 180);
-  g.lineTo(220, 200);
-  g.closePath();
-  g.fill();
-  g.fillStyle = 'rgba(215, 225, 255, 0.55)';
-  for (const [x, y] of [
-    [34, 146],
-    [92, 138],
-    [160, 150],
-  ]) {
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x - 11, y + 14);
-    g.lineTo(x - 4, y + 11);
-    g.lineTo(x, y + 16);
-    g.lineTo(x + 5, y + 11);
-    g.lineTo(x + 12, y + 15);
+    g.moveTo(-M, 190);
+    g.lineTo(-M, 168);
+    g.lineTo(34, 146);
+    g.lineTo(58, 170);
+    g.lineTo(92, 138);
+    g.lineTo(128, 172);
+    g.lineTo(160, 150);
+    g.lineTo(220 + M, 180);
+    g.lineTo(220 + M, 200);
     g.closePath();
     g.fill();
+    g.fillStyle = 'rgba(215, 225, 255, 0.55)';
+    for (const [x, y] of [
+      [34, 146],
+      [92, 138],
+      [160, 150],
+    ]) {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x - 11, y + 14);
+      g.lineTo(x - 4, y + 11);
+      g.lineTo(x, y + 16);
+      g.lineTo(x + 5, y + 11);
+      g.lineTo(x + 12, y + 15);
+      g.closePath();
+      g.fill();
+    }
   }
 
   // Village roofs, three rows from far to near, each darker, with a snow line along every roof.
   const roofs = (base: number, tone: string, snow: string, seed: number) => {
     const q = rng(seed);
-    let x = -4;
-    while (x < 224) {
+    let x = -M - 6;
+    while (x < 224 + M) {
       const w = 26 + q() * 22,
         h = 7 + q() * 9;
       g.fillStyle = tone;
@@ -404,148 +496,155 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number): v
       x += w - 4;
     }
   };
-  roofs(190, '#1a2252', 'rgba(200, 215, 250, 0.7)', 5);
-  roofs(208, '#10173c', 'rgba(200, 215, 250, 0.75)', 9);
+  if (layer === 'hills') roofs(190, '#1a2252', 'rgba(200, 215, 250, 0.7)', 5);
+  if (layer === 'village') roofs(208, '#10173c', 'rgba(200, 215, 250, 0.75)', 9);
 
-  // The church: a steeple among the roofs.
-  g.fillStyle = '#10173c';
-  g.beginPath();
-  g.moveTo(170, 214);
-  g.lineTo(170, 180);
-  g.lineTo(177, 150);
-  g.lineTo(184, 180);
-  g.lineTo(184, 214);
-  g.closePath();
-  g.fill();
-  g.fillRect(176, 138, 2, 12);
-  g.fillRect(172.5, 143, 9, 2);
-  g.fillStyle = 'rgba(255, 210, 130, 0.9)';
-  g.beginPath();
-  g.arc(177, 188, 3, Math.PI, 0);
-  g.fillRect(174, 188, 6, 8);
-  g.fill();
-
-  // Chimneys with smoke.
-  for (const [x, y] of [
-    [38, 190],
-    [116, 186],
-    [66, 205],
-  ]) {
-    g.fillStyle = '#0b1030';
-    g.fillRect(x, y, 7, 16);
-    g.strokeStyle = 'rgba(190, 200, 230, 0.3)';
-    g.lineWidth = 3.2;
+  if (layer === 'village') {
+    // The church: a steeple among the roofs.
+    g.fillStyle = '#10173c';
     g.beginPath();
-    g.moveTo(x + 3.5, y);
-    g.bezierCurveTo(x - 6, y - 12, x + 14, y - 20, x + 2, y - 34);
-    g.stroke();
-  }
-
-  // Lit windows, with a warm glow round each.
-  for (const [x, y] of [
-    [24, 216],
-    [52, 222],
-    [84, 214],
-    [104, 224],
-    [140, 218],
-    [196, 220],
-    [160, 230],
-  ]) {
-    const glow = g.createRadialGradient(x + 3, y + 4, 0, x + 3, y + 4, 13);
-    glow.addColorStop(0, 'rgba(255, 190, 100, 0.55)');
-    glow.addColorStop(1, 'rgba(255, 190, 100, 0)');
-    g.fillStyle = glow;
-    g.fillRect(x - 11, y - 10, 28, 28);
-    g.fillStyle = '#ffd488';
-    g.fillRect(x, y, 6, 8);
-    g.fillStyle = 'rgba(40, 20, 8, 0.7)';
-    g.fillRect(x + 2.7, y, 0.6, 8);
-    g.fillRect(x, y + 3.7, 6, 0.6);
-  }
-
-  // The near ground: a snowy slope and dark pines on each side.
-  const snow = g.createLinearGradient(0, 232, 0, 260);
-  snow.addColorStop(0, '#9aa8d4');
-  snow.addColorStop(1, '#5a6aa0');
-  g.fillStyle = snow;
-  g.beginPath();
-  g.moveTo(0, 262);
-  g.lineTo(0, 244);
-  g.quadraticCurveTo(60, 232, 120, 242);
-  g.quadraticCurveTo(180, 250, 220, 238);
-  g.lineTo(220, 262);
-  g.closePath();
-  g.fill();
-  const pine = (x: number, base: number, h: number) => {
-    g.fillStyle = '#070b22';
-    for (let t = 0; t < 4; t++) {
-      const y = base - h + t * (h / 4.4);
-      const w = 8 + t * 6;
-      g.beginPath();
-      g.moveTo(x, y - 2);
-      g.lineTo(x - w / 2, y + h / 3.2);
-      g.lineTo(x + w / 2, y + h / 3.2);
-      g.closePath();
-      g.fill();
-    }
-    g.fillRect(x - 1.5, base - 4, 3, 8);
-    g.fillStyle = 'rgba(200, 215, 255, 0.4)';
-    for (let t = 0; t < 4; t++) {
-      const y = base - h + t * (h / 4.4);
-      g.fillRect(x - 2 - t, y + 2 + t * 0.6, 4 + 2 * t, 1.4);
-    }
-  };
-  pine(30, 246, 70);
-  pine(14, 252, 52);
-  pine(196, 244, 62);
-  pine(212, 250, 46);
-
-  // Curtains, tied back with a cord, with folds and a lit edge.
-  for (const side of [0, 1]) {
-    const x0 = side === 0 ? 0 : 220;
-    const dir = side === 0 ? 1 : -1;
-    const grad = g.createLinearGradient(x0, 0, x0 + dir * 60, 0);
-    grad.addColorStop(0, '#6a343a');
-    grad.addColorStop(0.55, '#4a2429');
-    grad.addColorStop(1, '#2e1519');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(x0, 0);
-    g.lineTo(x0 + dir * 62, 0);
-    g.quadraticCurveTo(x0 + dir * 34, 118, x0 + dir * 24, 150);
-    g.quadraticCurveTo(x0 + dir * 50, 196, x0 + dir * 66, 260);
-    g.lineTo(x0, 260);
+    g.moveTo(170, 214);
+    g.lineTo(170, 180);
+    g.lineTo(177, 150);
+    g.lineTo(184, 180);
+    g.lineTo(184, 214);
     g.closePath();
     g.fill();
-    g.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-    g.lineWidth = 1.8;
-    for (let i = 1; i < 6; i++) {
+    g.fillRect(176, 138, 2, 12);
+    g.fillRect(172.5, 143, 9, 2);
+    g.fillStyle = 'rgba(255, 210, 130, 0.9)';
+    g.beginPath();
+    g.arc(177, 188, 3, Math.PI, 0);
+    g.fillRect(174, 188, 6, 8);
+    g.fill();
+
+    // Chimneys with smoke.
+    for (const [x, y] of [
+      [38, 190],
+      [116, 186],
+      [66, 205],
+    ]) {
+      g.fillStyle = '#0b1030';
+      g.fillRect(x, y, 7, 16);
+      g.strokeStyle = 'rgba(190, 200, 230, 0.3)';
+      g.lineWidth = 3.2;
       g.beginPath();
-      g.moveTo(x0 + dir * i * 10, 0);
-      g.quadraticCurveTo(x0 + dir * (i * 6 + 8), 130, x0 + dir * (i * 9 + 4), 260);
+      g.moveTo(x + 3.5, y);
+      g.bezierCurveTo(x - 6, y - 12, x + 14, y - 20, x + 2, y - 34);
       g.stroke();
     }
-    g.strokeStyle = 'rgba(255, 190, 170, 0.28)';
-    g.lineWidth = 1.2;
-    g.beginPath();
-    g.moveTo(x0 + dir * 62, 0);
-    g.quadraticCurveTo(x0 + dir * 34, 118, x0 + dir * 24, 150);
-    g.quadraticCurveTo(x0 + dir * 50, 196, x0 + dir * 66, 260);
-    g.stroke();
-    // the tie
-    g.strokeStyle = '#d8b46a';
-    g.lineWidth = 3;
-    g.beginPath();
-    g.moveTo(x0 + dir * 18, 146);
-    g.quadraticCurveTo(x0 + dir * 36, 154, x0 + dir * 52, 142);
-    g.stroke();
-    g.fillStyle = '#d8b46a';
-    g.beginPath();
-    g.arc(x0 + dir * 54, 152, 3.2, 0, TWO_PI);
-    g.fill();
+
+    // Lit windows, with a warm glow round each.
+    for (const [x, y] of [
+      [24, 216],
+      [52, 222],
+      [84, 214],
+      [104, 224],
+      [140, 218],
+      [196, 220],
+      [160, 230],
+    ]) {
+      const glow = g.createRadialGradient(x + 3, y + 4, 0, x + 3, y + 4, 13);
+      glow.addColorStop(0, 'rgba(255, 190, 100, 0.55)');
+      glow.addColorStop(1, 'rgba(255, 190, 100, 0)');
+      g.fillStyle = glow;
+      g.fillRect(x - 11, y - 10, 28, 28);
+      g.fillStyle = '#ffd488';
+      g.fillRect(x, y, 6, 8);
+      g.fillStyle = 'rgba(40, 20, 8, 0.7)';
+      g.fillRect(x + 2.7, y, 0.6, 8);
+      g.fillRect(x, y + 3.7, 6, 0.6);
+    }
   }
-  rect(g, 0, 0, 220, 9, '#2a1a14'); // the curtain rod
-  rect(g, 0, 7, 220, 2, 'rgba(255, 220, 160, 0.2)');
+
+  if (layer === 'near') {
+    // The near ground: a snowy slope and dark pines on each side.
+    const snow = g.createLinearGradient(0, 232, 0, 260);
+    snow.addColorStop(0, '#9aa8d4');
+    snow.addColorStop(1, '#5a6aa0');
+    g.fillStyle = snow;
+    g.beginPath();
+    g.moveTo(-M, 260 + M);
+    g.lineTo(-M, 244);
+    g.quadraticCurveTo(60, 232, 120, 242);
+    g.quadraticCurveTo(180, 250, 220 + M, 238);
+    g.lineTo(220 + M, 260 + M);
+    g.closePath();
+    g.fill();
+    const pine = (x: number, base: number, h: number) => {
+      g.fillStyle = '#070b22';
+      for (let t = 0; t < 4; t++) {
+        const y = base - h + t * (h / 4.4);
+        const w = 8 + t * 6;
+        g.beginPath();
+        g.moveTo(x, y - 2);
+        g.lineTo(x - w / 2, y + h / 3.2);
+        g.lineTo(x + w / 2, y + h / 3.2);
+        g.closePath();
+        g.fill();
+      }
+      g.fillRect(x - 1.5, base - 4, 3, 8);
+      g.fillStyle = 'rgba(200, 215, 255, 0.4)';
+      for (let t = 0; t < 4; t++) {
+        const y = base - h + t * (h / 4.4);
+        g.fillRect(x - 2 - t, y + 2 + t * 0.6, 4 + 2 * t, 1.4);
+      }
+    };
+    pine(30, 246, 70);
+    pine(14, 252, 52);
+    pine(196, 244, 62);
+    pine(212, 250, 46);
+  }
+
+  if (layer === 'curtains') {
+    // Curtains, tied back with a cord, with folds and a lit edge.
+    for (const side of [0, 1]) {
+      const x0 = side === 0 ? 0 : 220;
+      const dir = side === 0 ? 1 : -1;
+      const grad = g.createLinearGradient(x0, 0, x0 + dir * 60, 0);
+      grad.addColorStop(0, '#6a343a');
+      grad.addColorStop(0.55, '#4a2429');
+      grad.addColorStop(1, '#2e1519');
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(x0, 0);
+      g.lineTo(x0 + dir * 62, 0);
+      g.quadraticCurveTo(x0 + dir * 34, 118, x0 + dir * 24, 150);
+      g.quadraticCurveTo(x0 + dir * 50, 196, x0 + dir * 66, 260);
+      g.lineTo(x0, 260);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+      g.lineWidth = 1.8;
+      for (let i = 1; i < 6; i++) {
+        g.beginPath();
+        g.moveTo(x0 + dir * i * 10, 0);
+        g.quadraticCurveTo(x0 + dir * (i * 6 + 8), 130, x0 + dir * (i * 9 + 4), 260);
+        g.stroke();
+      }
+      g.strokeStyle = 'rgba(255, 190, 170, 0.28)';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(x0 + dir * 62, 0);
+      g.quadraticCurveTo(x0 + dir * 34, 118, x0 + dir * 24, 150);
+      g.quadraticCurveTo(x0 + dir * 50, 196, x0 + dir * 66, 260);
+      g.stroke();
+      // the tie
+      g.strokeStyle = '#d8b46a';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(x0 + dir * 18, 146);
+      g.quadraticCurveTo(x0 + dir * 36, 154, x0 + dir * 52, 142);
+      g.stroke();
+      g.fillStyle = '#d8b46a';
+      g.beginPath();
+      g.arc(x0 + dir * 54, 152, 3.2, 0, TWO_PI);
+      g.fill();
+    }
+    rect(g, 0, 0, 220, 9, '#2a1a14'); // the curtain rod
+    rect(g, 0, 7, 220, 2, 'rgba(255, 220, 160, 0.2)');
+  }
+
   g.restore();
 }
 
@@ -735,6 +834,22 @@ export function paintBookcase(g: CanvasRenderingContext2D, W: number, H: number)
       x += w + 1 + (r() < 0.12 ? 10 + r() * 16 : 0);
     }
     rect(g, 6, top + 54, 188, 6, '#4d3826');
+    // The shelf above shades the books under it, and the sides of the case shade the ends of the row.
+    const under = g.createLinearGradient(0, top, 0, top + 24);
+    under.addColorStop(0, 'rgba(6, 3, 2, 0.6)');
+    under.addColorStop(1, 'rgba(6, 3, 2, 0)');
+    g.fillStyle = under;
+    g.fillRect(6, top, 188, 24);
+    const left = g.createLinearGradient(6, 0, 30, 0);
+    left.addColorStop(0, 'rgba(6, 3, 2, 0.45)');
+    left.addColorStop(1, 'rgba(6, 3, 2, 0)');
+    g.fillStyle = left;
+    g.fillRect(6, top, 24, 54);
+    const right = g.createLinearGradient(194, 0, 170, 0);
+    right.addColorStop(0, 'rgba(6, 3, 2, 0.45)');
+    right.addColorStop(1, 'rgba(6, 3, 2, 0)');
+    g.fillStyle = right;
+    g.fillRect(170, top, 24, 54);
   }
   // the globe
   rect(g, 98, 22, 4, 20, '#4d3826');
@@ -757,8 +872,21 @@ export function paintBookcase(g: CanvasRenderingContext2D, W: number, H: number)
 
 /** A woven rug (any shape of canvas): a deep field, banded borders and a ring of small stars, with fringed ends. */
 export function paintRug(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(83);
   g.save();
   g.scale(W / 512, H / 360);
+  // The rug is drawn a little smaller than its canvas, so a soft shadow under it has room, and so its edge has a lip.
+  g.translate(256, 180);
+  g.scale(0.93, 0.93);
+  g.translate(-256, -180);
+  g.save();
+  g.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  g.shadowBlur = 16;
+  g.shadowOffsetX = 3;
+  g.shadowOffsetY = 7;
+  rect(g, 0, 18, 512, 324, '#241420');
+  g.restore();
+  rect(g, 0, 330, 512, 12, '#1b0f18'); // the rug's thickness along the near edge
   rect(g, 0, 18, 512, 324, '#3a2230');
   rect(g, 10, 28, 492, 304, '#6a3a3a');
   rect(g, 24, 42, 464, 276, '#2f3a5a');
@@ -801,6 +929,20 @@ export function paintRug(g: CanvasRenderingContext2D, W: number, H: number): voi
   ]) {
     star(g, x, y, 11, '#c79a52');
   }
+  // the pile: short tufts, some catching the light
+  for (let i = 0; i < 700; i++) {
+    const x = 12 + r() * 488,
+      y = 28 + r() * 304;
+    rect(g, x, y, 2 + r() * 3, 1.2, r() < 0.5 ? 'rgba(255, 225, 170, 0.12)' : 'rgba(10, 4, 8, 0.2)');
+  }
+  // the edge is a little lighter on the far side and darker on the near, where it dips toward the floor
+  const lip = g.createLinearGradient(0, 28, 0, 332);
+  lip.addColorStop(0, 'rgba(255, 225, 170, 0.14)');
+  lip.addColorStop(0.15, 'rgba(255, 225, 170, 0)');
+  lip.addColorStop(0.85, 'rgba(0, 0, 0, 0)');
+  lip.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+  g.fillStyle = lip;
+  g.fillRect(0, 28, 512, 304);
   // the fringe
   g.strokeStyle = '#d8c8a4';
   g.lineWidth = 2;
@@ -811,6 +953,107 @@ export function paintRug(g: CanvasRenderingContext2D, W: number, H: number): voi
     g.moveTo(x, 342);
     g.lineTo(x - 1, 358);
     g.stroke();
+  }
+  g.restore();
+  g.restore();
+}
+
+/** Dark wood with a long grain (any small canvas): the sides and top of the bookcase, which stands out from the wall. */
+export function paintWood(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(71);
+  rect(g, 0, 0, W, H, '#4a3322');
+  for (let i = 0; i < 26; i++) {
+    const x = r() * W;
+    rect(g, x, 0, 1 + r() * 2, H, r() < 0.5 ? 'rgba(20, 10, 4, 0.35)' : 'rgba(255, 220, 160, 0.10)');
+  }
+  rect(g, 0, 0, W, Math.max(2, H * 0.015), 'rgba(255, 220, 160, 0.18)');
+}
+
+const QUILT_COLOURS = ['#25324d', '#2d3e33', '#583a2d', '#604f35', '#3d2b38', '#302b28'];
+
+/**
+ * A patchwork quilt (a square canvas, four patches by four, laid out like the bed tray's own): every patch is woven cloth with a
+ * small motif (star, diamond, stripes, dots, triangles), puffed in the middle and pinched at the seams, with a dashed thread
+ * stitched round it. The colours are the bed tray's own muted ones.
+ */
+export function paintQuilt(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(97);
+  g.save();
+  g.scale(W / 256, H / 256);
+  const P = 64;
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 4; col++) {
+      const x = col * P;
+      const y = row * P;
+      const base = QUILT_COLOURS[(row * 3 + col * 2 + (row % 2)) % QUILT_COLOURS.length];
+      rect(g, x, y, P, P, base);
+      // woven cloth: fine threads both ways
+      g.fillStyle = 'rgba(255, 235, 200, 0.05)';
+      for (let i = 0; i < P; i += 3) {
+        g.fillRect(x + i, y, 1, P);
+        g.fillRect(x, y + i, P, 1);
+      }
+      // the motif, a shade lighter than the cloth
+      g.fillStyle = 'rgba(255, 235, 200, 0.16)';
+      g.strokeStyle = 'rgba(255, 235, 200, 0.16)';
+      g.lineWidth = 3;
+      const cx = x + P / 2;
+      const cy = y + P / 2;
+      switch ((row + col * 2) % 5) {
+        case 0:
+          star(g, cx, cy, 20, 'rgba(255, 235, 200, 0.18)');
+          break;
+        case 1:
+          g.beginPath();
+          g.moveTo(cx, cy - 20);
+          g.lineTo(cx + 20, cy);
+          g.lineTo(cx, cy + 20);
+          g.lineTo(cx - 20, cy);
+          g.closePath();
+          g.fill();
+          break;
+        case 2:
+          for (let i = 0; i < 4; i++) g.fillRect(x + 12 + i * 12, y + 8, 5, P - 16);
+          break;
+        case 3:
+          for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+              g.beginPath();
+              g.arc(x + 14 + i * 18, y + 14 + j * 18, 3.4, 0, TWO_PI);
+              g.fill();
+            }
+          }
+          break;
+        default:
+          g.beginPath();
+          g.moveTo(x + 6, y + 6);
+          g.lineTo(x + P - 6, y + 6);
+          g.lineTo(x + 6, y + P - 6);
+          g.closePath();
+          g.fill();
+      }
+      // the odd darker tuft of wear
+      if (r() < 0.5) rect(g, x + r() * 40, y + r() * 50, 10 + r() * 14, 2, 'rgba(0, 0, 0, 0.18)');
+      // puffed in the middle, pinched at the seams
+      const puff = g.createRadialGradient(cx - 6, cy - 8, 4, cx, cy, P * 0.72);
+      puff.addColorStop(0, 'rgba(255, 235, 200, 0.2)');
+      puff.addColorStop(0.55, 'rgba(255, 235, 200, 0)');
+      puff.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+      g.fillStyle = puff;
+      g.fillRect(x, y, P, P);
+      // the dashed thread
+      g.strokeStyle = 'rgba(235, 220, 190, 0.55)';
+      g.lineWidth = 1.2;
+      g.setLineDash([3, 2.5]);
+      g.strokeRect(x + 5, y + 5, P - 10, P - 10);
+      g.setLineDash([]);
+    }
+  }
+  // the seams, dark where the patches are pinched together
+  g.fillStyle = 'rgba(8, 4, 4, 0.55)';
+  for (let i = 1; i < 4; i++) {
+    g.fillRect(i * P - 1.2, 0, 2.4, 256);
+    g.fillRect(0, i * P - 1.2, 256, 2.4);
   }
   g.restore();
 }
