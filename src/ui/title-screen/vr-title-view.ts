@@ -16,6 +16,9 @@ import {
 export const VR_TITLE_WIDTH_M = 0.75;
 export const VR_TITLE_HEIGHT_M = 0.4;
 export const DISSOLVE_DURATION_S = 1.0;
+/** How quickly the hint line fades in and out (per second). */
+const HINT_FADE_RATE = 2.5;
+const HINT_TEXT = 'Bring the small flame to the wick';
 
 function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement {
   let canvas = customCanvas;
@@ -76,12 +79,35 @@ function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement 
   return canvas;
 }
 
+function createHintCanvas(): HTMLCanvasElement {
+  let canvas: HTMLCanvasElement | undefined;
+  if (typeof document !== 'undefined') canvas = document.createElement('canvas');
+  if (!canvas) canvas = { width: 512, height: 64, getContext: () => null } as unknown as HTMLCanvasElement;
+  canvas.width = 512;
+  canvas.height = 64;
+  const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'italic 400 26px serif, Georgia';
+    ctx.fillStyle = '#ffd89a';
+    ctx.fillText(HINT_TEXT, 256, 32);
+  }
+  return canvas;
+}
+
 export class VrTitleView {
   readonly group = new Group();
   private readonly geometry: PlaneGeometry;
   private readonly material: MeshBasicMaterial;
   private readonly texture: CanvasTexture;
   private readonly mesh: Mesh;
+  private readonly hintTexture: CanvasTexture;
+  private readonly hintGeometry: PlaneGeometry;
+  private readonly hintMaterial: MeshBasicMaterial;
+  private hintWanted = false;
+  private hintAlpha = 0;
 
   private dissolving = false;
   private dissolveTimer = 0;
@@ -107,12 +133,35 @@ export class VrTitleView {
     this.mesh.frustumCulled = false;
     this.group.add(this.mesh);
 
+    // A line under the title that fades in when lighting the candle stalls (setHint).
+    this.hintTexture = new CanvasTexture(createHintCanvas());
+    this.hintTexture.colorSpace = SRGBColorSpace;
+    this.hintGeometry = new PlaneGeometry(VR_TITLE_WIDTH_M * 0.8, VR_TITLE_WIDTH_M * 0.8 * (64 / 512));
+    this.hintMaterial = new MeshBasicMaterial({
+      map: this.hintTexture,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: DoubleSide,
+      toneMapped: false,
+    });
+    const hint = new Mesh(this.hintGeometry, this.hintMaterial);
+    hint.renderOrder = 2.2;
+    hint.frustumCulled = false;
+    hint.position.set(0, -VR_TITLE_HEIGHT_M * 0.5 - 0.02, 0);
+    this.group.add(hint);
+
     // Floating position in world space: above bed tray at eye level
     this.group.position.set(0, 0.95, -0.55);
   }
 
   get isDissolved(): boolean {
     return this._isDissolved;
+  }
+
+  /** How visible the hint line is (0 to 1). */
+  get hintOpacity(): number {
+    return this.hintMaterial.opacity;
   }
 
   get opacity(): number {
@@ -122,6 +171,11 @@ export class VrTitleView {
   /** Positions the title in world space facing the player. */
   place(x: number, y: number, z: number): void {
     this.group.position.set(x, y, z);
+  }
+
+  /** Shows or hides the line telling the player what to do (it fades). */
+  setHint(show: boolean): void {
+    this.hintWanted = show;
   }
 
   /** Begins the dissolve-into-mist transition upon ignition. */
@@ -139,6 +193,10 @@ export class VrTitleView {
     if (cameraQuat && !this._isDissolved) {
       this.group.quaternion.copy(cameraQuat);
     }
+
+    const goal = this.hintWanted && !this.dissolving && !this._isDissolved ? 1 : 0;
+    this.hintAlpha += (goal - this.hintAlpha) * Math.min(1, dt * HINT_FADE_RATE);
+    this.hintMaterial.opacity = this.hintAlpha < 0.01 ? 0 : this.hintAlpha;
 
     if (!this.dissolving || this._isDissolved) return;
 
@@ -161,5 +219,8 @@ export class VrTitleView {
     this.geometry.dispose();
     this.material.dispose();
     this.texture.dispose();
+    this.hintGeometry.dispose();
+    this.hintMaterial.dispose();
+    this.hintTexture.dispose();
   }
 }

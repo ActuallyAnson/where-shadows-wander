@@ -5,7 +5,7 @@ import { VrTitleView, DISSOLVE_DURATION_S } from './vr-title-view';
 describe('VrTitleView', () => {
   it('initializes visible at default eye-level position', () => {
     const title = new VrTitleView();
-    expect(title.group.children).toHaveLength(1);
+    expect(title.group.children).toHaveLength(2); // the title and its hint line
     expect(title.group.visible).toBe(true);
     expect(title.opacity).toBe(1.0);
     expect(title.isDissolved).toBe(false);
@@ -39,6 +39,22 @@ describe('VrTitleView', () => {
     expect(title.opacity).toBe(0.0);
     expect(title.isDissolved).toBe(true);
     expect(title.group.visible).toBe(false);
+  });
+
+  it('fades the hint in when asked, and out again, and not at all once lit', () => {
+    const title = new VrTitleView();
+    expect(title.hintOpacity).toBe(0);
+    title.setHint(true);
+    for (let i = 0; i < 120; i++) title.update(1 / 60);
+    expect(title.hintOpacity).toBeGreaterThan(0.95);
+    title.setHint(false);
+    for (let i = 0; i < 180; i++) title.update(1 / 60);
+    expect(title.hintOpacity).toBe(0);
+
+    title.setHint(true);
+    title.ignite(); // lighting the candle takes the hint away
+    for (let i = 0; i < 120; i++) title.update(1 / 60);
+    expect(title.hintOpacity).toBe(0);
   });
 
   it('disposes cleanly', () => {

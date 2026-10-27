@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createStagePlane } from '../../engine/shadow/pure/stage-plane';
 import { createHandFrame, JOINT } from '../../engine/hands/hand';
-import { WallPauseView } from './wall-pause-view';
+import { HOVER_GRACE_S, WallPauseView } from './wall-pause-view';
 
 describe('WallPauseView', () => {
   it('creates geometry, canvas and buttons', () => {
@@ -56,6 +56,56 @@ describe('WallPauseView', () => {
     expect(action2).toBe('resume');
 
     view.dispose();
+  });
+
+  describe('a pointer that slips off the button', () => {
+    function setup() {
+      const view = new WallPauseView();
+      view.show();
+      const stage = createStagePlane();
+      stage.origin[0] = 0;
+      stage.origin[1] = 1.0;
+      stage.origin[2] = -1.5;
+      stage.normal[2] = 1;
+      stage.right[0] = 1;
+      stage.up[1] = 1;
+      const hand = createHandFrame('right');
+      hand.tracked = true;
+      hand.validJoints = 25;
+      const idx = JOINT['index-finger-tip'] * 3;
+      const mcp = JOINT['index-finger-metacarpal'] * 3;
+      const aim = (x: number) => {
+        hand.positions[idx] = x;
+        hand.positions[idx + 1] = 1.0;
+        hand.positions[idx + 2] = -1.0;
+        hand.positions[mcp] = x;
+        hand.positions[mcp + 1] = 1.0;
+        hand.positions[mcp + 2] = -0.9;
+      };
+      aim(0);
+      return { view, stage, hand, aim };
+    }
+
+    it('keeps its dwell when it comes back within the grace time', () => {
+      const { view, stage, hand, aim } = setup();
+      expect(view.update([hand], stage, false, 2.0)).toBeNull();
+      aim(2.0); // well off the menu
+      expect(view.update([hand], stage, false, HOVER_GRACE_S * 0.6)).toBeNull();
+      aim(0);
+      expect(view.update([hand], stage, false, 1.05)).toBe('resume'); // 2.0 + 1.05 >= 3
+      view.dispose();
+    });
+
+    it('starts over when it stays away longer than the grace time', () => {
+      const { view, stage, hand, aim } = setup();
+      view.update([hand], stage, false, 2.0);
+      aim(2.0);
+      view.update([hand], stage, false, HOVER_GRACE_S + 0.1);
+      aim(0);
+      expect(view.update([hand], stage, false, 2.0)).toBeNull();
+      expect(view.update([hand], stage, false, 1.05)).toBe('resume');
+      view.dispose();
+    });
   });
 
   it('triggers action on controller trigger press', () => {
