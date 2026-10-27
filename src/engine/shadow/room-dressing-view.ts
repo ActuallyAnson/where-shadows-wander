@@ -3,6 +3,7 @@
 // Its group goes inside BedroomView's group, so it is placed and turned with the room. Candlelight warms it, and in the dark it goes
 // blue and quiet, like the room around it. Textures are drawn once; update() allocates nothing.
 import {
+  AdditiveBlending,
   CanvasTexture,
   Color,
   DoubleSide,
@@ -10,15 +11,22 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  RepeatWrapping,
   SRGBColorSpace,
 } from '@iwsdk/core';
 import type { BufferGeometry, Material } from '@iwsdk/core';
 import type { LanternLight } from './pure/lantern-light';
-import { paintBookcase, paintNight, paintRug, paintWall } from './room-art';
+import { paintBookcase, paintMoonPatch, paintNight, paintRug, paintSill, paintSnow, paintWall } from './room-art';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
 const WALL_ORDER = -11;
+
+/** What the window shows is lit by the moon, not the candle, so it keeps one cool colour. */
+const OUTSIDE_TINT = new Color(0.95, 0.98, 1.0);
+/** Seconds a snowflake takes to fall the height of one tile of each layer, and how far each sways. */
+const SNOW_FALL = [0.075, 0.045] as const;
+const SNOW_SWAY = [0.03, 0.02] as const;
 
 const MOON_TINT = new Color(0.2, 0.25, 0.4);
 const CANDLE_TINT = new Color(1.0, 0.82, 0.6);
@@ -45,6 +53,11 @@ export class RoomDressingView {
 
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
+  /** The window's own pictures (the night, the snow), which keep one cool colour whatever the room does. */
+  private readonly outdoor: MeshBasicMaterial[] = [];
+  private readonly snow: CanvasTexture[] = [];
+  private readonly moonPatch: MeshBasicMaterial;
+  private time = 0;
   private readonly textures: CanvasTexture[] = [];
   private readonly tint = new Color();
 
@@ -67,10 +80,43 @@ export class RoomDressingView {
     right.position.set(1.995, 1.25, -0.4);
     right.renderOrder = WALL_ORDER;
 
-    // The night in the left window (in front of the paper, behind the window's frame).
-    const night = this.quad(1.1, 1.3, this.texture(paintedCanvas(440, 520, paintNight)), false);
+    // The night in the left window (in front of the paper, behind the window's frame), with two layers of snow falling over it.
+    const night = this.quad(1.1, 1.3, this.texture(paintedCanvas(660, 780, paintNight)), false);
     night.rotation.y = Math.PI / 2;
     night.position.set(-1.99, 1.45, -0.8);
+    this.moveToOutdoor(night);
+    const snowLayers: Mesh[] = [];
+    for (let i = 0; i < 2; i++) {
+      const tile = this.texture(
+        paintedCanvas(256, 256, (g, w, h) => paintSnow(g, w, h, 3 + i * 7, i === 0 ? 34 : 70, i === 0 ? 5.5 : 3.2)),
+      );
+      tile.wrapS = tile.wrapT = RepeatWrapping;
+      tile.repeat.set(i === 0 ? 2 : 3.2, i === 0 ? 2.4 : 3.8);
+      this.snow.push(tile);
+      const layer = this.quad(1.1, 1.3, tile, true);
+      layer.rotation.y = Math.PI / 2;
+      layer.position.set(-1.985 + i * 0.002, 1.45, -0.8);
+      layer.renderOrder = 3 + i;
+      this.moveToOutdoor(layer);
+      snowLayers.push(layer);
+    }
+
+    // The sill: a fern, a paper bird on two books, a candle stub (it stands on Damon's sill, whose top is at 0.875 m).
+    const sill = this.quad(0.5, 0.3, this.texture(paintedCanvas(300, 180, paintSill)), true);
+    sill.rotation.y = Math.PI / 2;
+    sill.position.set(-1.9, 0.875 + 0.15, -0.55);
+    sill.renderOrder = 3;
+
+    // The window's light on the floor: a slanted patch of cool moonlight cut by the cross bars, added to the floor.
+    const patch = this.quad(1.7, 1.7, this.texture(paintedCanvas(256, 256, paintMoonPatch)), true);
+    patch.rotation.x = -Math.PI / 2;
+    patch.position.set(-0.95, 0.008, -0.8);
+    patch.renderOrder = 3;
+    this.moonPatch = patch.material as MeshBasicMaterial;
+    this.moonPatch.blending = AdditiveBlending;
+    this.moonPatch.polygonOffset = true;
+    this.moonPatch.polygonOffsetFactor = -3;
+    this.moonPatch.polygonOffsetUnits = -3;
 
     // The bookcase on the right wall.
     const bookcase = this.quad(1.0, 1.8, this.texture(paintedCanvas(400, 720, paintBookcase)), true);
@@ -88,12 +134,20 @@ export class RoomDressingView {
 
     // None of them moves inside the room: their matrices are made once (and `place` makes the wall's again), and they are
     // culled when out of view, so looking away from the bookcase or the window does not draw them.
-    for (const m of [this.wall, left, right, night, bookcase, rug]) {
+    for (const m of [this.wall, left, right, night, ...snowLayers, sill, patch, bookcase, rug]) {
       m.matrixAutoUpdate = false;
       m.updateMatrix();
     }
-    this.group.add(this.wall, left, right, night, bookcase, rug);
+    this.group.add(this.wall, left, right, night, ...snowLayers, sill, patch, bookcase, rug);
     this.update({ lit: false, intensity: 0 } as Readonly<LanternLight>, 0);
+  }
+
+  /** Moves a quad's material from the room's tinted ones to the window's own. */
+  private moveToOutdoor(m: Mesh): void {
+    const mat = m.material as MeshBasicMaterial;
+    const i = this.materials.indexOf(mat);
+    if (i >= 0) this.materials.splice(i, 1);
+    this.outdoor.push(mat);
   }
 
   private texture(canvas: HTMLCanvasElement): CanvasTexture {
@@ -134,11 +188,27 @@ export class RoomDressingView {
     const k = 0.5 + 0.5 * Math.min(1, brightness);
     this.tint.multiplyScalar(warm > 0 ? k : 1);
     for (const m of this.materials) m.color.copy(this.tint);
+    for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
+    // The moonlight on the floor shrinks into the room's light when the candle is bright.
+    const moonK = 0.3 - 0.2 * warm;
+    this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
+  }
+
+  /** Moves the snow outside the window (call once a frame with the frame's seconds). Allocates nothing. */
+  tick(dt: number): void {
+    if (!(dt > 0)) return;
+    this.time += Math.min(dt, 0.1);
+    for (let i = 0; i < this.snow.length; i++) {
+      const t = this.snow[i];
+      t.offset.y += Math.min(dt, 0.1) * SNOW_FALL[i];
+      t.offset.x = Math.sin(this.time * (0.5 + i * 0.3)) * SNOW_SWAY[i];
+    }
   }
 
   dispose(): void {
     for (const t of this.textures) t.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials as Material[]) m.dispose();
+    for (const m of this.outdoor as Material[]) m.dispose();
   }
 }
