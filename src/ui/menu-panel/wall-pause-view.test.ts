@@ -31,7 +31,7 @@ describe('WallPauseView', () => {
     stage.right[0] = 1;
     stage.up[1] = 1;
 
-    // Hand pointing towards the "Resume" button (yMin -0.07 to 0.03, so Y ~ 0.0 in stage = 1.0 in world)
+    // Hand pointing towards the "Light the candle" button (resume) (yMin -0.07 to 0.03, so Y ~ 0.0 in stage = 1.0 in world)
     const hand = createHandFrame('right');
     hand.tracked = true;
     hand.validJoints = 25;
@@ -122,7 +122,7 @@ describe('WallPauseView', () => {
     hand.tracked = true;
     hand.validJoints = 25;
 
-    // Aim at "Begin this puzzle again" (yMin -0.20 to -0.10, Y ~ -0.15 stage = 0.85 world)
+    // Aim at "Begin this part again" (yMin -0.20 to -0.10, Y ~ -0.15 stage = 0.85 world)
     const idx = JOINT['index-finger-tip'] * 3;
     const mcp = JOINT['index-finger-metacarpal'] * 3;
     hand.positions[idx] = 0;

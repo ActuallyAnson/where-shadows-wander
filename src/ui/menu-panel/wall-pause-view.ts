@@ -37,7 +37,7 @@ export interface WallButtonDef {
 export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
   {
     id: 'resume',
-    label: 'Resume',
+    label: 'Light the candle',
     yMin: -0.07,
     yMax: 0.03,
     xMin: -0.38,
@@ -48,7 +48,7 @@ export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
   },
   {
     id: 'restart',
-    label: 'Begin this puzzle again',
+    label: 'Begin this part again',
     yMin: -0.2,
     yMax: -0.1,
     xMin: -0.45,
