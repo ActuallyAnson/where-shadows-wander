@@ -17,6 +17,9 @@ import type { LanternLight } from './pure/lantern-light';
 import { paintBookcase, paintNight, paintRug, paintWall } from './room-art';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
+/** Before everything else in the scene (Damon's plain front wall is -10). */
+const WALL_ORDER = -11;
+
 const MOON_TINT = new Color(0.2, 0.25, 0.4);
 const CANDLE_TINT = new Color(1.0, 0.82, 0.6);
 
@@ -46,33 +49,33 @@ export class RoomDressingView {
   private readonly tint = new Color();
 
   constructor() {
+    // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
+    // to draw; everything on a wall sits a hair in front of it.
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
-    this.wall = this.quad(4, 2.5, this.texture(paintedCanvas(1024, 640, paintWall)), false);
+    this.wall = this.quad(4, 2.5, this.texture(paintedCanvas(1024, 640, paintWall)), false, true);
     this.wall.position.set(0, 1.25, -2.4);
-    this.wall.renderOrder = -9;
+    this.wall.renderOrder = WALL_ORDER;
 
-    // The same paper and panelling on the two side walls (the window, bookcase and the stage's wall have their own art on top).
+    // The same paper and panelling on the two side walls (one material for both).
     const sideTexture = this.texture(paintedCanvas(1280, 640, (g, w, h) => paintWall(g, w, h, false)));
-    const left = this.quad(5, 2.5, sideTexture, false);
+    const left = this.quad(5, 2.5, sideTexture, false, true);
     left.rotation.y = Math.PI / 2;
     left.position.set(-1.995, 1.25, -0.4);
-    left.renderOrder = 1; // after Damon's plain walls (order 0), which would otherwise be drawn over it
-    const right = this.quad(5, 2.5, sideTexture, false);
+    left.renderOrder = WALL_ORDER;
+    const right = this.quad(5, 2.5, sideTexture, false, true, left);
     right.rotation.y = -Math.PI / 2;
     right.position.set(1.995, 1.25, -0.4);
-    right.renderOrder = 1;
+    right.renderOrder = WALL_ORDER;
 
-    // The night in the left window (just in front of its plain sky, behind its frame).
+    // The night in the left window (in front of the paper, behind the window's frame).
     const night = this.quad(1.1, 1.3, this.texture(paintedCanvas(440, 520, paintNight)), false);
     night.rotation.y = Math.PI / 2;
-    night.renderOrder = 2; // over the side wall's paper
-    night.position.set(-2.008, 1.45, -0.8);
+    night.position.set(-1.99, 1.45, -0.8);
 
     // The bookcase on the right wall.
     const bookcase = this.quad(1.0, 1.8, this.texture(paintedCanvas(400, 720, paintBookcase)), true);
     bookcase.rotation.y = -Math.PI / 2;
-    bookcase.renderOrder = 2;
-    bookcase.position.set(1.985, 0.93, -1.25);
+    bookcase.position.set(1.988, 0.93, -1.25);
 
     // The rug under the bed tray, a hair above the floor.
     const rug = this.quad(2.2, 1.55, this.texture(paintedCanvas(512, 360, paintRug)), true);
@@ -83,6 +86,12 @@ export class RoomDressingView {
     rugMat.polygonOffsetFactor = -2;
     rugMat.polygonOffsetUnits = -2;
 
+    // None of them moves inside the room: their matrices are made once (and `place` makes the wall's again), and they are
+    // culled when out of view, so looking away from the bookcase or the window does not draw them.
+    for (const m of [this.wall, left, right, night, bookcase, rug]) {
+      m.matrixAutoUpdate = false;
+      m.updateMatrix();
+    }
     this.group.add(this.wall, left, right, night, bookcase, rug);
     this.update({ lit: false, intensity: 0 } as Readonly<LanternLight>, 0);
   }
@@ -95,25 +104,26 @@ export class RoomDressingView {
     return texture;
   }
 
-  private quad(w: number, h: number, texture: CanvasTexture, alpha: boolean): Mesh {
+  private quad(w: number, h: number, texture: CanvasTexture, alpha: boolean, solid = false, shared?: Mesh): Mesh {
     const geometry = new PlaneGeometry(w, h);
-    const material = new MeshBasicMaterial({
-      map: texture,
-      transparent: alpha,
-      depthWrite: false,
-      side: DoubleSide,
-      toneMapped: false,
-    });
+    const material =
+      (shared?.material as MeshBasicMaterial | undefined) ??
+      new MeshBasicMaterial({
+        map: texture,
+        transparent: alpha,
+        depthWrite: solid,
+        side: DoubleSide,
+        toneMapped: false,
+      });
     this.geometries.push(geometry);
-    this.materials.push(material);
-    const mesh = new Mesh(geometry, material);
-    mesh.frustumCulled = false;
-    return mesh;
+    if (!shared) this.materials.push(material);
+    return new Mesh(geometry, material);
   }
 
   /** Puts the wallpaper wall just in front of Damon's front wall (`stageDist` is how far the stage is from the player). */
   place(stageDist = 2.0): void {
     this.wall.position.set(0, 1.25, -(Math.max(stageDist, 1.5) + 0.35) + 0.012);
+    this.wall.updateMatrix();
   }
 
   /** Lights the art like the room: warm and bright with the candle, dark and blue without. Same arguments as BedroomView.update. */
