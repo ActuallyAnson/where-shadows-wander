@@ -22,6 +22,7 @@ import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
+import { RoomDressingView } from '../engine/shadow/room-dressing-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
 import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
 import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
@@ -214,6 +215,9 @@ async function start(): Promise<void> {
   const titleLighter = new TitleLighterView();
   const bedTray = new BedTrayView();
   const bedroomView = new BedroomView();
+  // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
+  const roomDressing = new RoomDressingView();
+  bedroomView.group.add(roomDressing.group);
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
@@ -448,6 +452,7 @@ async function start(): Promise<void> {
 
     const stageDist = Math.hypot(stage.origin[0] - head[0], stage.origin[2] - head[2]);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
+    roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -964,6 +969,7 @@ async function start(): Promise<void> {
           if (ignitionProgress > 0) {
             ambientLight.intensity = 0.05 + 0.11 * ignitionProgress;
             bedroomView.update(lanternLight.light, cameraQuat, ignitionProgress);
+            roomDressing.update(lanternLight.light, ignitionProgress);
           } else {
             ambientLight.intensity = 0.05;
           }
@@ -1274,6 +1280,7 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
+        roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0);
         // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
         moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
         stageView.mood = moodNow;
@@ -1387,6 +1394,7 @@ async function start(): Promise<void> {
         handVisual,
         bedTray,
         bedroomView,
+        roomDressing,
         vrTitle,
         wallPauseView,
         sessionState: () => sessionState,
