@@ -215,8 +215,9 @@ async function start(): Promise<void> {
   const bedTray = new BedTrayView();
   const bedroomView = new BedroomView();
   const vrTitle = new VrTitleView();
-  /** Seconds on the VR title, with no sign of lighting the candle, before the hint appears. */
+  /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;
+  const TITLE_HINT_PLAIN_AFTER_S = 16;
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
@@ -963,10 +964,10 @@ async function start(): Promise<void> {
             ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
           }
 
-          // Nobody told them what to do: after a few seconds with no progress, a line under the title says it.
+          // Nobody told them what to do: after a few seconds with no progress, a riddle under the title says it, and a plainer line later.
           if (ignitionHoldTimer > 0) titleStallT = 0;
           else titleStallT += step;
-          vrTitle.setHint(titleStallT > TITLE_HINT_AFTER_S);
+          vrTitle.setHint(titleStallT > TITLE_HINT_PLAIN_AFTER_S ? 2 : titleStallT > TITLE_HINT_AFTER_S ? 1 : 0);
 
           const ignitionProgress = ignitionHoldTimer / 3.0;
           candleView.ignitionProgress = ignitionProgress;

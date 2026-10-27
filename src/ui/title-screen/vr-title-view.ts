@@ -18,7 +18,15 @@ export const VR_TITLE_HEIGHT_M = 0.4;
 export const DISSOLVE_DURATION_S = 1.0;
 /** How quickly the hint line fades in and out (per second). */
 const HINT_FADE_RATE = 2.5;
-const HINT_TEXT = 'Bring the small flame to the wick';
+/**
+ * The lines under the title while the candle waits to be lit: a riddle first, then a plainer one if the player is still lost.
+ * Index 0 is unused (no hint).
+ */
+export const HINT_LINES: readonly string[] = [
+  '',
+  'A small light is lost. Where does a flame belong?',
+  'The candle sleeps. Carry the little flame to its wick.',
+];
 
 function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement {
   let canvas = customCanvas;
@@ -79,22 +87,28 @@ function createTitleCanvas(customCanvas?: HTMLCanvasElement): HTMLCanvasElement 
   return canvas;
 }
 
+const HINT_W = 768;
+const HINT_H = 64;
+
 function createHintCanvas(): HTMLCanvasElement {
   let canvas: HTMLCanvasElement | undefined;
   if (typeof document !== 'undefined') canvas = document.createElement('canvas');
-  if (!canvas) canvas = { width: 512, height: 64, getContext: () => null } as unknown as HTMLCanvasElement;
-  canvas.width = 512;
-  canvas.height = 64;
-  const ctx = canvas.getContext ? canvas.getContext('2d') : null;
-  if (ctx) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'italic 400 26px serif, Georgia';
-    ctx.fillStyle = '#ffd89a';
-    ctx.fillText(HINT_TEXT, 256, 32);
-  }
+  if (!canvas) canvas = { width: HINT_W, height: HINT_H, getContext: () => null } as unknown as HTMLCanvasElement;
+  canvas.width = HINT_W;
+  canvas.height = HINT_H;
   return canvas;
+}
+
+/** Writes a hint line on its canvas (done when the line changes, never per frame). */
+function paintHint(canvas: HTMLCanvasElement, text: string): void {
+  const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, HINT_W, HINT_H);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'italic 400 25px serif, Georgia';
+  ctx.fillStyle = '#ffd89a';
+  ctx.fillText(text, HINT_W / 2, HINT_H / 2);
 }
 
 export class VrTitleView {
@@ -106,7 +120,8 @@ export class VrTitleView {
   private readonly hintTexture: CanvasTexture;
   private readonly hintGeometry: PlaneGeometry;
   private readonly hintMaterial: MeshBasicMaterial;
-  private hintWanted = false;
+  private readonly hintCanvas: HTMLCanvasElement;
+  private hintLevel = 0;
   private hintAlpha = 0;
 
   private dissolving = false;
@@ -134,9 +149,10 @@ export class VrTitleView {
     this.group.add(this.mesh);
 
     // A line under the title that fades in when lighting the candle stalls (setHint).
-    this.hintTexture = new CanvasTexture(createHintCanvas());
+    this.hintCanvas = createHintCanvas();
+    this.hintTexture = new CanvasTexture(this.hintCanvas);
     this.hintTexture.colorSpace = SRGBColorSpace;
-    this.hintGeometry = new PlaneGeometry(VR_TITLE_WIDTH_M * 0.8, VR_TITLE_WIDTH_M * 0.8 * (64 / 512));
+    this.hintGeometry = new PlaneGeometry(VR_TITLE_WIDTH_M * 0.9, VR_TITLE_WIDTH_M * 0.9 * (HINT_H / HINT_W));
     this.hintMaterial = new MeshBasicMaterial({
       map: this.hintTexture,
       transparent: true,
@@ -173,9 +189,21 @@ export class VrTitleView {
     this.group.position.set(x, y, z);
   }
 
-  /** Shows or hides the line telling the player what to do (it fades). */
-  setHint(show: boolean): void {
-    this.hintWanted = show;
+  /** The line showing now (0 none, 1 the riddle, 2 the plainer line); a new line fades in afresh. */
+  setHint(level: number): void {
+    const l = Math.max(0, Math.min(HINT_LINES.length - 1, level | 0));
+    if (l === this.hintLevel) return;
+    this.hintLevel = l;
+    if (l > 0) {
+      paintHint(this.hintCanvas, HINT_LINES[l]);
+      this.hintTexture.needsUpdate = true;
+      this.hintAlpha = 0;
+    }
+  }
+
+  /** The hint line's text now (empty when none). */
+  get hintText(): string {
+    return HINT_LINES[this.hintLevel];
   }
 
   /** Begins the dissolve-into-mist transition upon ignition. */
@@ -194,7 +222,7 @@ export class VrTitleView {
       this.group.quaternion.copy(cameraQuat);
     }
 
-    const goal = this.hintWanted && !this.dissolving && !this._isDissolved ? 1 : 0;
+    const goal = this.hintLevel > 0 && !this.dissolving && !this._isDissolved ? 1 : 0;
     this.hintAlpha += (goal - this.hintAlpha) * Math.min(1, dt * HINT_FADE_RATE);
     this.hintMaterial.opacity = this.hintAlpha < 0.01 ? 0 : this.hintAlpha;
 
