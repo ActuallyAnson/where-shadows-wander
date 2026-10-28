@@ -16,15 +16,7 @@ import {
   PlaneGeometry,
   SRGBColorSpace,
 } from '@iwsdk/core';
-
-const PATCH_COLORS = [
-  '#25324d', // flannel navy
-  '#2d3e33', // dusty spruce
-  '#583a2d', // weathered terracotta
-  '#604f35', // muted mustard
-  '#3d2b38', // heather plum
-  '#302b28', // warm charcoal
-];
+import { paintQuilt } from '../../shadow/room-art';
 
 function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   let canvas = customCanvas;
@@ -39,28 +31,10 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
     } as unknown as HTMLCanvasElement;
   }
 
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext ? canvas.getContext('2d') : null;
-  if (ctx) {
-    const cols = 4;
-    const rows = 4;
-    const pw = canvas.width / cols;
-    const ph = canvas.height / rows;
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const colorIdx = (r * 3 + c * 2 + (r % 2)) % PATCH_COLORS.length;
-        ctx.fillStyle = PATCH_COLORS[colorIdx];
-        ctx.fillRect(c * pw, r * ph, pw, ph);
-
-        // Stitched seam lines
-        ctx.strokeStyle = 'rgba(235, 225, 205, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(c * pw + 1, r * ph + 1, pw - 2, ph - 2);
-      }
-    }
-  }
+  if (ctx) paintQuilt(ctx, canvas.width, canvas.height);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;

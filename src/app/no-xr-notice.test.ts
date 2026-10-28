@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { xrSessionSupported, type XrSupport } from './no-xr-notice';
+import { landingHtml, xrSessionSupported, type XrSupport } from './no-xr-notice';
 
 function fakeXr(supported: readonly string[]): XrSupport & { asked: string[] } {
   const asked: string[] = [];
@@ -38,5 +38,20 @@ describe('xrSessionSupported', () => {
       isSessionSupported: () => Promise.reject(new Error('blocked')),
     };
     expect(await xrSessionSupported(xr, '')).toBe(false);
+  });
+});
+
+describe('landingHtml', () => {
+  it('shows the game name, the link to open on a headset, and the Hand Lab way in', () => {
+    const html = landingHtml('https://example.test/game/');
+    expect(html).toContain('Where Shadows Wander');
+    expect(html).toContain('https://example.test/game/');
+    expect(html).toContain('./?mock=1');
+    expect(html).toContain('Meta Quest');
+  });
+
+  it('cannot be broken out of by the link', () => {
+    const html = landingHtml('https://x.test/"><script>alert(1)</script>');
+    expect(html).not.toContain('<script>');
   });
 });
