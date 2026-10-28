@@ -2,7 +2,7 @@
 
 ## Overview
 
-Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid who can't sleep sits up in bed, lights a little lantern, and plays with the shadows on the bedroom wall, where their hands' shadows help a little traveller wander across a landscape of shadows, until the kid drifts off to sleep.
+Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid who can't sleep sits up in bed, lights a candle, and plays with the shadows on the bedroom wall, where their hands' shadows help a little traveller wander across a landscape of shadows, until the kid drifts off to sleep.
 
 | Item | Detail |
 |----|----|
@@ -13,7 +13,7 @@ Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid 
 | Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
 | Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
 | Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
-| Session length | 10–15 minutes: one night, one level |
+| Session length | 5–8 minutes: one night, one level |
 | Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
 
 ### Direction (5 Oct 2026)
@@ -28,11 +28,21 @@ The landscape the traveller walks on (hills, ledges, gaps) is made of **shadows 
 
 We chose invisible props over visible ones (proposal in PR #47) because visible props would have to be rearranged between scenes, which breaks the room's realism, and would sit in the way of the wall. We chose them over shapes drawn straight onto the wall because a prop's shadow comes from the same light as the hands, so it has the same perspective, softness and flicker.
 
+### Direction (28 Oct 2026): a candle, the kindred, and no companions
+
+This section brings the GDD in line with the [design worksheet](DESIGN-WORKSHEET.md), which holds the working draft of the night (puzzle curve, hint ladder, story beats, colour script, playtest script, demo storyboard). The GDD records what is settled; the worksheet is where the night's details are proposed and edited first.
+
+- **The light is a candle,** not a lantern. It stands on the bed tray and the player lights it with a small flame carried in the right hand (the lighting ritual).
+- **Companions are cut from gameplay.** The rabbit and fox no longer break free as helpers with abilities, and no puzzle needs them: their shapes are the most complicated in the set and the classifier is weakest on them, so a puzzle that needed one would fail players for reasons they can't see. Gameplay uses the four verb shapes only: flat, fist, cup and spread.
+- **The kindred** is a small spirit fox made of shadow that lives on the wall. It is a picture only: it flies about, perches, and carries the story beats and hints, but it never touches the puzzle. The rabbit and fox hand shapes are still recognised for a visual flourish (a shadow rabbit hops out of a rabbit hand, a fox hand calls the kindred), with no gameplay role.
+- **The night is five puzzles,** one new idea each, with a kind hint ladder and no failure (see Puzzles). Each has a level document in [`docs/levels/`](levels/night.md).
+- **Wordless story beats and a colour script** frame the night: the room starts cold and warms with each solve, dims once in the middle, and ends warm as the kid falls asleep.
+
 ### Design pillars
 
 1.  **Your hands are the toolkit.** Every action is a hand shape. Nothing on screen needs to be pointed at or pressed.
 
-2.  **One room, one light, one wall.** A small bedroom built so nothing competes with the shadows: a lantern in front of the kid lights the wall, and the wall is the stage.
+2.  **One room, one light, one wall.** A small bedroom built so nothing competes with the shadows: a candle in front of the kid lights the wall, and the wall is the stage.
 
 3.  **Readable at a glance.** Silhouettes, one light source, one surface. A first-time player understands the scene within seconds.
 
@@ -40,25 +50,27 @@ We chose invisible props over visible ones (proposal in PR #47) because visible 
 
 ## Core experience and setup
 
-The player is the kid, sitting up in bed with a bed tray across their lap. They place a lantern on the tray, reach into its beam, and their hand shadows land on the bedroom wall in front of them.
+The player is the kid, sitting up in bed with a bed tray across their lap. A candle stands on the tray; they light it, reach into its light, and their hand shadows land on the bedroom wall in front of them.
 
-### The lantern
+### The candle
 
-The lantern is the game's only light and its pause button. It sits close to the player so the hands are always between the light and the stage, which is how real shadow puppetry works. Placing it on the bed tray is the first action of every session; covering the flame pauses the session.
+The candle is the game's only light and its pause button. It stands on the bed tray close to the player, so the hands are always between the light and the stage, which is how real shadow puppetry works. Lighting it is the first action of every session; covering the flame pauses the session.
 
-Gestures (`src/engine/hands/gesture-detector.ts`, starting values to tune with recordings):
+The current behaviour (`src/engine/render/candle-view.ts`, `title-lighter-view.ts`, starting values to tune in the headset):
 
-- **Pinch and release** places or relights the lantern: the thumb and index tips within about 18 mm (0.2 hand lengths) for at least 150 ms, then opened past about 32 mm. The lantern goes where the fingertips last met. A fist doesn't count (its index finger is curled), and a pinch that closes into a fist is dropped.
-- **Covering the flame** pauses: a closed hand with the palm within 12 cm of the flame for 0.5 s. It fires once, then waits for the hand to leave.
-- Each gesture has a 1 s cooldown across both hands. A closed hand over the flame is also the fist shape; the game can tell the two apart with `nearLantern`.
+- **The lighting ritual:** the room starts cold and dark with the title on the wall. The player's right hand carries a small flame. Holding it, or a fingertip, within about 15 cm of the wick for 3 s grows the flame from a spark to full light, warms the room, dissolves the title and starts the opening.
+- **Covering the flame** pauses: one palm hovering just over the flame, or both hands cupped around it, for 3 s. A ring around the flame fills while the hands are there and drains when they leave.
+- **The pause menu** appears on the wall itself (Resume, Begin this puzzle again, Settings). A button is chosen by holding a hand's shadow over it for 3 s, or with a pinch.
+
+The pinch-to-place and quick cover gestures (`src/engine/hands/gesture-detector.ts`) are still in the code but no longer drive the session.
 
 ### The stage
 
-The stage is a plain, pale patch of the bedroom wall at the foot of the bed, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The lantern stands on the bed tray close to the player, the hands are between the lantern and the wall, and the shadows land on the wall. The invisible props that cast the level stand between the lantern and the wall too, but are never drawn.
+The stage is a plain, pale patch of the bedroom wall at the foot of the bed, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The candle stands on the bed tray close to the player, the hands are between the candle and the wall, and the shadows land on the wall. The invisible props that cast the level stand between the candle and the wall too, but are never drawn.
 
 ### The room and the hands
 
-- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the lantern. The bed with its tray and the lantern, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf where the creature gallery sits, a rug, a few toys). Nothing moves except the flame, a few dust motes and the story. Anything near the shadow area stays light and low-contrast so the black shadows stay readable. The art style is open: flat paper-cut layers, or a richer lit diorama in the manner of Octopath Traveler (without real-time bloom or depth-of-field, which are too costly on a headset).
+- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the candle. The bed with its tray and the candle, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf where the creature gallery sits, a rug, a few toys). Nothing moves except the flame, a few dust motes and the story. Anything near the shadow area stays light and low-contrast so the black shadows stay readable. The art style is open: flat paper-cut layers, or a richer lit diorama in the manner of Octopath Traveler (without real-time bloom or depth-of-field, which are too costly on a headset).
 
 - **The hands:** in VR the player cannot see their real hands, so the game draws a hand for each tracked hand, following the 25 joints. The look is open (a dark paper-cut glove or a simple stylised hand). Rules: always visible while tracked, simple and low-detail rather than realistic, never covering the shadow area, fading out when tracking is lost with a gentle "show me your hands" cue. While no hand is tracked the world holds still, so nothing falls apart while the player's hands are out of view; a dropout shorter than half a second changes nothing. The shadow is cast from the tracked joints, not from the hand model, so the model can look any way without changing the game.
 
@@ -66,7 +78,7 @@ The stage is a plain, pale patch of the bedroom wall at the foot of the bed, abo
 
 ### Light geometry
 
-A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The lantern flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably. The invisible props are projected the same way, so their shadows match the hands'.
+A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The candle flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably. The invisible props are projected the same way, so their shadows match the hands'.
 
 ## Gameplay
 
@@ -74,14 +86,20 @@ The player helps a shadow traveller walk from one side of the stage to the other
 
 ### The traveller
 
-A small silhouette figure with a lantern-lit cloak. It walks on its own and stops at obstacles, then waits and looks back at the player. The player never controls it directly; they change the world around it. (Who the traveller is in the story is still open: one of the kid's toys, his dream self, or a little creature that lives in the wall's shadows.)
+A small silhouette figure with a lantern-lit cloak. It walks on its own and stops at obstacles, then waits and looks back at the player. The player never controls it directly; they change the world around it. (Who the traveller is in the story is still open: one of the kid's toys, his dream self, or a little creature that lives in the wall's shadows. So is whether its little lantern is the story's second light, which would tie the rain puzzle to the candle.)
+
+The traveller never dies and the player never fails. If it falls, it is put back on the last ledge, with no counter and no message (a proposal in the worksheet).
+
+### The kindred
+
+A small spirit fox made of shadow that lives on the wall (`src/engine/shadow/pure/kindred.ts`). It drifts in slow loops, circles the light, perches on a spot and shies away when startled. It is a picture only and never touches the puzzle or the collision solver. It carries the wordless story (it drifts in at the opening, hides during the dimming, returns at the end) and is one rung of the hint ladder (it perches where the wanted shape goes).
 
 ### The landscape: shadows of invisible props
 
 The ground the traveller walks on is the shadow of props that are never drawn.
 
-- **Props are simple 3D shapes** placed in the scene editor between the lantern and the wall, in the shapes of bedroom things: books, toy blocks, a toy castle, a teacup. Their shadows read as a landscape: a stack of books becomes a ledge, two blocks with space between them a gap.
-- **Only the shadow is shown.** A prop's shadow is projected from the lantern onto the wall like a hand's, drawn black, and turned into collision terrain for the traveller when a scene starts. A prop that doesn't move costs nothing per frame.
+- **Props are simple 3D shapes** placed in the scene editor between the candle and the wall, in the shapes of bedroom things: books, toy blocks, a toy castle, a teacup. Their shadows read as a landscape: a stack of books becomes a ledge, two blocks with space between them a gap.
+- **Only the shadow is shown.** A prop's shadow is projected from the candle onto the wall like a hand's, drawn black, and turned into collision terrain for the traveller when a scene starts. A prop that doesn't move costs nothing per frame.
 - **Props can change without breaking the room.** Between scenes the set of props changes, and the wall shows the next part of the landscape. Because the props are invisible, nothing in the room is seen moving. A prop may also move during a scene (a shadow that sways or slides) when a puzzle needs it.
 - **The hands stay the only thing the player changes.** The player never moves a prop.
 - **Level design works backwards:** sketch the shadow landscape the puzzle needs, then place props whose shadows make it. Block-like props (books, blocks, boxes) make most of it; odd shapes are landmarks. Where a shadow is almost right, a scene may add a little invisible terrain.
@@ -96,8 +114,10 @@ Only a fixed set of one-handed shapes is recognised. Two-handed shapes are left 
 | Fist | Closed hand | Becomes a rock that pushes, weighs down, or breaks things |
 | Cup | Palm up, fingers curled | Catches rain, embers, or fireflies and carries them |
 | Spread | Fingers spread wide | Blocks wind, holds back vines, forms a cage |
+| Rabbit | Index and middle up, others pinched to thumb | No gameplay role: a shadow rabbit hops out of the hand |
+| Fox | Fingers together, thumb up as an ear (the thumb out to the side like an L, with the hand turned so it points up) | No gameplay role: calls the kindred |
 
-The rabbit and fox shapes are cut from gameplay (25 Oct 2026, see Companions below). Every shape the game uses is simple and bold; no puzzle needs a fine finger gap or a thin shape.
+The four verb shapes are the whole gameplay vocabulary: simple and bold, so no puzzle needs a fine finger gap or a thin shape. The two animal shapes are a visual flourish to discover; whether they stay is the visual side's call (Anson).
 
 ### How a shape is used
 
@@ -111,46 +131,66 @@ The rabbit and fox shapes are cut from gameplay (25 Oct 2026, see Companions bel
 
 Simple physical roles (bridge, rock) use the shadow's actual outline for collision, so slight variations still work. Special actions (catching, the windbreak) require the exact recognised shape.
 
-### Companions (cut, 25 Oct 2026)
+### Puzzles
 
-The rabbit and fox companions are cut. Their shapes are the most complicated in the set, and the classifier is weakest on them, so a puzzle that needs one would fail players for reasons they can't see. The puzzles they solved now use the four verb shapes:
+The night is five puzzles in the kid's bedroom, each standing on the shadows of a few invisible props. Each puzzle is a single scene of the stage with one obstacle and **one new idea, never two at once**; the last combines two. Every puzzle has one intended solution and one alternative (except the tutorial), a kind hint, and a reward the player can see. Every puzzle can be finished with one hand. Times are targets for a first-time player.
 
-- **The chasm:** two flat-hand bridges end to end, or one flat hand carried across as a ferry with the traveller on it (the rabbit's rope is gone).
-- **Crows:** lure them away with a cup of fireflies, or shoo them with a spread hand swept quickly past (the fox's scare is gone).
-- **The gate:** a fist on the weight plate; the fox's dig under the gate is gone, so it has one solution until the bedroom rework.
+| \# | Puzzle | Obstacle | New idea | Intended solution | Alternative | Target time |
+|----|----|----|----|----|----|----|
+| 1 | **The books** (tutorial) | A gap between two stacks of books | Your shadow is a bridge | Flat-hand bridge | — (ghost outline from the start) | 45 s |
+| 2 | **The ledge** | The books stop short of the bedside table, which is too tall to step up | Shapes can be a step | A fist in the gap, lifted with the traveller standing on it | A flat hand lifted the same way | 60 s |
+| 3 | **The dripping plant** | A freshly watered plant drips on the traveller's lantern | Shapes can shelter | Cup to catch the drips | Flat hand as a roof | 60 s |
+| 4 | **The fan** | A desk fan blows the traveller back | Shapes can block | Spread hand as a windbreak | Fist as an anchor | 60 s |
+| 5 | **The castle** (last) | A moat, and a shut castle gate with a counterweight | Combine what you learned | Flat bridge over the moat and a fist on the counterweight, in either order | (the other order) | 90 s |
 
-Creature discovery (a scenery hint, then finding the animal shape) went with them.
+The layouts (props, positions, triggers, hints and cutscenes) are in the level documents: [the night](levels/night.md) and one per puzzle. The worksheet keeps the reasoning and the questions still open.
 
-### Puzzles (proposal, 25 Oct 2026: for the team to review)
+Hands rest on the tray between puzzles; no puzzle needs a hand held up for long except the drips and the wind, which take about 10 to 15 seconds each.
 
-Five puzzles, one night, about 10 to 15 minutes seated. Each is one scene of the wall with one obstacle, built from the shadows of a few invisible bedroom props. Every puzzle but the tutorial accepts two solutions. They use only the four bold shapes (flat, fist, cup, spread): nothing needs a fine finger gap or a thin shape. An open ring (O) is left out until Anson confirms the classifier can tell it.
+What happened to the earlier ideas:
 
-What happened to the earlier forest ideas:
-
-| Earlier puzzle | Verdict | Why |
+| Earlier idea | Verdict | Why |
 |----|----|----|
-| 1 Gap | Rework: the books | The tutorial, unchanged in play: a gap between two stacks of books |
-| 2 Rain | Rework: the dripping plant | Rain in a bedroom reads oddly; a watered plant dripping off the shelf is the same puzzle |
-| 3 Wind | Rework: the fan | A desk fan is the bedroom's wind |
-| 4 Chasm | Rework: bed to toy box | The gap between the end of the bed and the toy box |
-| 5 Crows | Drop | Crows don't belong indoors, and with the cup already used for the drips it adds little to a short night |
-| 6 Gate | Rework: the castle drawbridge | The last scene: a toy castle whose drawbridge is down only while something heavy sits on its counterweight. The gate's weight plate becomes the counterweight |
+| Gap | The books | The tutorial, unchanged in play |
+| Rain | The dripping plant | Rain in a bedroom reads oddly; a watered plant dripping off the shelf is the same puzzle |
+| Wind | The fan | A desk fan is the bedroom's wind |
+| Wide chasm (rabbit), later bed to toy box | Cut | Without the rabbit it needed two hands (two bridges end to end), against the one-handed rule |
+| Crows (fox) | Cut | Crows don't belong indoors, and the cup is already used for the drips |
+| Gate with a weight plate | The castle | Becomes the finale, combined with a moat |
+| — | The ledge (new) | Teaches the fist before the finale needs it |
 
-Each prop is a box, sphere or cylinder standing a few centimetres in front of the wall, so its shadow is about its own size. Positions are the prop's centre on the wall, in metres from the middle (x to the right, y up). The wall is 1.6 m wide and 1.0 m tall, so x runs from −0.8 to 0.8 and y from −0.5 to 0.5. The props are thin (4 cm deep). "Drawn" props cast a shadow that is only scenery; every other prop is ground.
+### Kind failure: the hint ladder
 
-| \# | Puzzle | Props | The obstacle | Intended solution | Alternative |
-|----|----|----|----|----|----|
-| 1 | **The books** (tutorial) | Books: box 0.69 × 0.14 m at (−0.455, −0.33). Toy block: box 0.69 × 0.14 m at (0.455, −0.33). | A 0.22 m gap between the books and the block | Flat hand as a bridge over the gap (ghost hint after 0.5 s) | — |
-| 2 | **The dripping plant** | Shelf: box 1.62 × 0.14 m at (0, −0.33). Plant pot (drawn): cylinder, radius 0.07 m, 0.12 m tall, at (0.05, 0.38). | Water drips off the plant onto the shelf between x −0.1 and 0.2; the traveller won't walk into it | Cup held over the traveller catches the drips as it walks under | Flat hand held up as a roof |
-| 3 | **The fan** | Shelf as in 2. Fan (drawn): sphere, radius 0.12 m, at (0.72, 0.0), on a stand. | The fan blows from the right over the right half of the shelf, harder than the traveller can walk | Spread hand upright on its windward side as a windbreak | Fist held just above it as an anchor to hold on to |
-| 4 | **Bed to toy box** | Bed: box 0.6 × 0.14 m at (−0.5, −0.33). Toy box: box 0.5 × 0.14 m at (0.55, −0.33). | A 0.5 m gap, wider than one hand's shadow | Two flat hands as bridges end to end | One flat hand as a ferry, carried across with the traveller on it |
-| 5 | **The castle** (last) | Path: box 0.7 × 0.14 m at (−0.45, −0.33). Castle floor: box 0.68 × 0.14 m at (0.46, −0.33). Castle (drawn): box 0.3 × 0.5 m at (0.62, 0.1). | A 0.22 m moat before the castle; its drawbridge is up | Fist on the counterweight (a plate on a shelf at (−0.3, −0.02)) brings the drawbridge down | Flat hand as a bridge over the moat |
+The player is never told they failed, and nothing is ever said in words. If a puzzle stays unsolved, help arrives in steps:
 
-Hands rest on the tray between puzzles; no puzzle needs a hand held up for long except the drips and the wind, which take about 10 to 15 seconds each. The ghost hint appears after the traveller has been stuck for 20 seconds (0.5 s in the tutorial).
+1.  **0–20 s:** nothing; let them try.
+2.  **20 s:** a faint outline of the wanted shape where it goes (the ghost target).
+3.  **40 s:** the kindred flies to the spot and perches on it.
+4.  **70 s:** the traveller waits and looks back at the player.
+5.  **100 s:** the outline pulses and the obstacle eases (the wind drops, the gap narrows).
+
+The tutorial shows the outline from the start, and a puzzle may start a rung later (puzzle 5's outline waits 30 s).
 
 ### The night
 
-The whole game is one small level: one night, the five puzzles above, about 10 to 15 minutes seated. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the lantern dims, and the last scene stays on the wall. There are no further nights or chapters.
+The whole game is one small level: one night of five puzzles, about 5–8 minutes. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the candle burns low, and the room settles into sleep. There are no further nights or chapters.
+
+### Story beats
+
+The story is told without words (only a title and a few short captions), each beat under 15 seconds and skippable.
+
+| Beat | When | What happens |
+|----|----|----|
+| Opening | the candle is lit | The title appears on the wall, the kindred drifts in out of the dark, "Hold your hands to the light". Built (`src/app/opening.ts`); the text is a placeholder. |
+| The dimming | between puzzles 3 and 4 | The light gutters, the kindred hides, the room goes cold. |
+| The return | puzzle 5 solved | The kindred returns, the room fills with light, the traveller reaches the lit window. |
+| The end | after the window | The candle burns low, the kindred flies to the traveller, the kid falls asleep, "The End". Built (`src/app/ending.ts`). |
+
+Still open: what the last scene's lit window is, and whether the kindred leads the traveller there.
+
+### Colour script
+
+The paper wall has a mood value from 0 (cold, blue-grey) to 1 (warm amber) that the game sets. The room is cold when the candle is first lit and warms with each solved puzzle: 0.4 at the start, then 0.55, 0.7 (the dimming takes it back to 0.45), 0.85 and 1.0. During the ending it settles to a dim, quiet 0.3.
 
 ## Player journey
 
@@ -158,39 +198,39 @@ A first-time player should be solving their first puzzle within 60 seconds of la
 
 ### First five minutes
 
-1.  **0–10 s:** The headset fades in on the kid's bedroom at night. The player sits up in bed; an unlit lantern sits on the bed tray in front of them, with a bare wall ahead.
+1.  **0–10 s:** The headset fades in on the kid's bedroom at night, cold and dark, with the title on the wall. The player sits up in bed; an unlit candle stands on the bed tray in front of them, and a small flame glows in their right hand.
 
-2.  **10–20 s:** The player picks the lantern up and sets it down with a pinch-and-release (it settles on the tray). It lights, the wall glows warm, and the first shadow landscape appears on it.
+2.  **10–25 s:** The player brings the flame to the wick and holds it there; over 3 s the candle catches, the room warms and the title dissolves. The opening plays: the kindred drifts in, "Hold your hands to the light", and the first shadow landscape appears.
 
-3.  **20–40 s:** The player's hand shadows appear on the wall. They wave and see their shadow move. No prompt is needed.
+3.  **25–40 s:** The player's hand shadows appear on the wall. They wave and see their shadow move. No prompt is needed.
 
 4.  **40–90 s:** The traveller walks in and stops at a gap. A faint ghost outline of a flat hand appears over the gap. The player matches it, and the traveller crosses.
 
-5.  **90 s–5 min:** Puzzles 2–4. The ghost hint only appears if the player is stuck for more than 20 seconds.
+5.  **90 s–5 min:** Puzzles 2–4, with the dimming between 3 and 4. Help follows the hint ladder: the outline only appears after 20 seconds.
 
 ### Session flow
 
-- **Start:** Place and light the lantern. Returning players resume where they left off.
+- **Start:** Light the candle. Returning players resume where they left off.
 
 - **Play:** Puzzles in sequence; each is a single screen.
 
-- **Pause:** Close the hand over the lantern flame (or remove the headset). Progress saves immediately.
+- **Pause:** Cover the flame with one or both hands for 3 s (or remove the headset). Progress saves immediately. The pause menu appears on the wall.
 
-- **Resume:** Relight with a pinch. The scene fades back in at the same puzzle.
+- **Resume:** Choose Resume on the wall menu. The scene fades back in at the same puzzle; "Begin this puzzle again" restarts it.
 
-- **End:** The kid falls asleep: the night finishes on its last scene and a creature added to the gallery.
+- **End:** The kid falls asleep: the ending plays and "The End" appears, with "Begin again" to start a new night.
 
 ### Reason to come back
 
 The game is one short night, so coming back is about doing it differently, not about new content:
 
-- The room keeps a gallery of the creatures the player has discovered, shown as paper figures on a shelf and saved in the browser.
+- The room keeps a gallery of the creatures the player has discovered, shown as paper figures on a shelf and saved in the browser. (With companions cut, what fills the gallery is open: the shadow animals and the kindred are the candidates.)
 
 - Each puzzle tracks which solutions the player has found, encouraging replays to find the alternative.
 
 ## Art and audio direction
 
-The whole game is black silhouettes on a warm, lantern-lit wall, a style that looks finished with a small team and few assets.
+The whole game is black silhouettes on a warm, candle-lit wall, a style that looks finished with a small team and few assets.
 
 ### Visual style
 
@@ -200,11 +240,11 @@ The whole game is black silhouettes on a warm, lantern-lit wall, a style that lo
 
 - **Motion:** Characters animate like rod puppets, with a little stiffness and bounce rather than smooth realism.
 
-- **Lighting:** The only bright object in the scene is the lantern. Its gentle flicker drives a subtle shimmer across the wall and the room.
+- **Lighting:** The only bright object in the scene is the candle. Its gentle flicker drives a subtle shimmer across the wall and the room.
 
   The flicker (`src/engine/shadow/pure/lantern-flicker.ts`, `lantern-light.ts`) is slow and calm: two sine waves and a little noise, all under 4 Hz, with at most a 0.11 change from one frame to the next at 72 Hz, so it never strobes. At full strength it swings the flame's brightness by plus or minus 8 % and reddens it slightly when it dips; the paper brightens and dims with it and warms toward the flame's colour. Shadows stay pure black, and the point the shadows are cast from stays still, so shadows and collision never shimmer. The flicker amount is a setting (0 to 1, `?flicker=` in the address, 0 is a steady light); it starts at 0.3 when the device asks for reduced motion.
 
-- **Room:** Dark and warm towards the edges so the lit wall and the shadows dominate; scenery near the shadow area stays light and low-contrast so the shadows stay readable.
+- **Room:** Dark and warm towards the edges so the lit wall and the shadows dominate; scenery near the shadow area stays light and low-contrast so the shadows stay readable. Its warmth follows the colour script.
 
 ### Audio
 
@@ -258,11 +298,11 @@ We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pi
 
 2.  Build a 2D coordinate frame on that plane (origin, right axis, up axis, scale).
 
-3.  Each frame, project every hand joint from the lantern position onto the plane, giving 2D points.
+3.  Each frame, project every hand joint from the candle flame onto the plane, giving 2D points.
 
-4.  When a scene starts, project each invisible prop from the lantern onto the plane the same way, and turn its shadow outline into terrain (re-projected only for a prop that moves).
+4.  When a scene starts, project each invisible prop from the candle flame onto the plane the same way, and turn its shadow outline into terrain (re-projected only for a prop that moves).
 
-5.  Run all gameplay (traveller, obstacles, companions, collisions) in this 2D space.
+5.  Run all gameplay (traveller, obstacles, the kindred, collisions) in this 2D space.
 
 6.  Render 2D game objects as flat quads placed on the plane.
 
@@ -274,7 +314,7 @@ Because the wall is fixed there is no detection step and no fallback. A real tab
 
 - The invisible props are flattened the same way, with the same projection, and drawn solid black; the props themselves are never drawn. A prop that doesn't move can be flattened once when its scene starts.
 
-- The projection blends between perspective (from the lantern) and orthographic to keep shadow size stable.
+- The projection blends between perspective (from the candle flame) and orthographic to keep shadow size stable.
 
 - A small blur on the shadow edge, scaled by the hand's distance from the plane, gives a soft, natural edge.
 
@@ -308,7 +348,7 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - Each shape is a set of ranges on these features, hand-tuned and tested on several people. Shapes are worked out on the webcam hand bench, then thresholds are checked against headset recordings, because webcam depth and noise differ from a headset's.
 
-- A shape must match continuously for about 0.4 s to commit (1 s for companions). Each shape emits `candidate` (recognised: the shadow starts sharpening), then `commit` or `cancel`, and later `release`.
+- A shape must match continuously for about 0.4 s to commit (1 s for the animal shapes). Each shape emits `candidate` (recognised: the shadow starts sharpening), then `commit` or `cancel`, and later `release`.
 
 - Hysteresis: once committed, a shape stays active until features move clearly outside its range, preventing flicker. If the hand drifts out of the committed shape's normal range into another shape, the new shape replaces it only when it commits, so there's no gap between roles.
 
@@ -332,13 +372,19 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - [ ] Decide who the traveller is in the bedroom story (one of the kid's toys, his dream self, or a creature of the wall's shadows).
 
-- [ ] Finalise the night's puzzles and how many there are, around the invisible props.
+- [x] How many puzzles the night has: five, one new idea each (see Puzzles and the design worksheet).
+
+- [x] Write a level document per puzzle and the cutscenes between them: [`docs/levels/`](levels/night.md).
+
+- [ ] Is the traveller's lantern the story's second light? What is the last scene's lit window, and does the kindred lead the traveller there?
+
+- [ ] What fills the creature gallery now that companions are cut (the shadow animals, the kindred, or nothing)?
 
 - [ ] Decide how the editor shows a prop's shadow while it is placed, so levels can be designed by eye.
 
 - [ ] Ask the organisers how a VR-only entry (no passthrough, no scene understanding) is scored under Technical implementation, since that criterion names them for entries that use them.
 
-- [ ] Measure cold-start load time on Quest Browser; target under 5 seconds to the lantern.
+- [ ] Measure cold-start load time on Quest Browser; target under 5 seconds to the candle.
 
 ## Accessibility and comfort
 
@@ -352,7 +398,7 @@ Every puzzle can be finished seated, with one hand, within a two-foot radius.
 
 - **Hand calibration:** The player holds each hand flat for 2 seconds and finger curl is measured from their own straight, for fingers that don't fully straighten (`src/engine/hands/hand-calibration.ts`; onboarding can run it).
 
-- **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s (default 0.4 s; companions take 2.5 times as long, so 1 s by default).
+- **Hold time setting:** Commit time adjustable from 0.2 s to 1.0 s (default 0.4 s; the animal shapes take 2.5 times as long, so 1 s by default).
 
 - **Shadow size slider:** Makes shadows larger for low-vision players.
 
@@ -377,7 +423,7 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 | Hands-first, completable without a controller | Hands are the only input; no controller code path is needed |
 | Seated-optimised (airplane seat test) | All play happens seated (the kid sitting up in bed in a virtual bedroom), with the wall in view and the hands within reach |
 | Passthrough (judged for purpose if used) | Not used. The entry leans on hands-first design, the first five minutes, accessibility and polish instead |
-| Easy in and out (one bus stop test) | Lantern pinch to start, cover flame to pause, a 10–15 minute night |
+| Easy in and out (one bus stop test) | Light the candle to start, cover the flame to pause, a 5–8 minute night |
 | Original, not a wrapper (take it away test) | All gameplay is built in-house; no third-party service |
 | New Experience division | Codebase started on or after 24 Sep 2026 |
 
@@ -385,10 +431,10 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 | Award | Why Where Shadows Wander fits |
 |----|----|
-| Boldest Original Concept | Your own hands' shadows as the only controls, in a lantern-lit shadow theatre. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
-| Best First Five Minutes | No instructions; the first puzzle is solved by instinct |
+| Boldest Original Concept | Your own hands' shadows as the only controls, in a candle-lit shadow theatre. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
+| Best First Five Minutes | No instructions; lighting the candle is a ritual, and the first puzzle is solved by instinct |
 | Best Accessibility Forward Experience | One-handed play, tolerance and hold-time settings, high-contrast mode |
-| Best Reason to Come Back | A persistent creature gallery and alternative solutions to find. (A weaker fit now that the game is one night with no further chapters.) |
+| Best Reason to Come Back | A persistent creature gallery and alternative solutions to find. (A weaker fit now that the game is one night with no further chapters and no companions.) |
 
 ### Submission checklist
 
@@ -400,7 +446,7 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 - [ ] The deployed page stays up until the winners are announced (about 11 Dec) and is not changed after 18 Nov 12:00 PM Pacific (19 Nov 4:00 AM Singapore)
 
-- [ ] Demo video under 3 minutes, best shot (the shadow story on the lit wall) in the first 10 seconds
+- [ ] Demo video under 3 minutes, best shot (the shadow story on the lit wall) in the first 10 seconds (storyboard in the design worksheet)
 
 - [ ] Tagline under 140 characters
 
@@ -412,14 +458,14 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000), with Boldes
 
 ## Scope, milestones and risks
 
-v1 is one polished night: a short run of puzzles (to be finalised) and 4 verb shapes (the 2 companions are cut), with features frozen at the start of week 7.
+v1 is one polished night: five puzzles, 4 verb shapes, the kindred as a visual guide, with features frozen at the start of week 7.
 
 ### In scope / out of scope
 
 | In v1                           | Later                               |
 |---------------------------------|-------------------------------------|
-| One night (puzzles to be finalised) | More levels                     |
-| 4 verb shapes                   | Two-handed shapes (bird, butterfly), animal companions |
+| One night of five puzzles       | More levels                         |
+| 4 verb shapes, the kindred (visual only) | Two-handed shapes (bird, butterfly); companions with gameplay abilities |
 | Bedroom with a wall stage and invisible-prop landscape | Multiplayer shadow duets |
 | —                               | Real-room mode (table or wall in passthrough) |
 | Creature gallery                | Player-made shadow stories          |
@@ -435,7 +481,7 @@ v1 is one polished night: a short run of puzzles (to be finalised) and 4 verb sh
 
 4.  **Week 4 (to 29 Oct):** Traveller, invisible-prop shadows as terrain, and the first puzzles of the night, including the wordless tutorial.
 
-5.  **Week 5 (to 5 Nov):** The remaining puzzles, the ending (the kid falls asleep), saved gallery. (The rabbit and fox companions planned here are cut.)
+5.  **Week 5 (to 5 Nov):** The remaining puzzles, the hint ladder, the story beats (the dimming, the return) and the ending (the kid falls asleep), saved gallery.
 
 6.  **Week 6 (to 12 Nov):** The bedroom and hand models, art, audio, onboarding polish, accessibility settings. Feature freeze at end of week.
 
@@ -451,7 +497,7 @@ Everything in the IWSDK spike ran in the emulator only. The rows marked *Device*
 | Judging favours passthrough, scene understanding and anchors, which a VR-only entry does not use | High | Lead with hands-first design, accessibility, polish and the first five minutes; ask the organisers; keep the real-room mode as a possible later addition |
 | IWSDK changes during development (1.0.0 released 24 Sep 2026) | Medium | Pin exact versions; keep gameplay in our own TypeScript so plain three.js with IWSDK's xr-input stays a cheap fallback |
 | Fallback (plain three.js + `@iwsdk/xr-input`) not accepted for submission | Medium | Ask on the forum before relying on it; stay on `@iwsdk/core` by default |
-| Slow cold start in Quest Browser | Medium | Small initial bundle; stream the rest of the assets after the lantern appears |
+| Slow cold start in Quest Browser | Medium | Small initial bundle; stream the rest of the assets after the candle appears |
 | Hand models look wrong or hide the shadows | Medium | Keep them simple, dark and low-detail; the shadow comes from the joints, not the model; check on the headset |
 | Scope creep | Medium | One night only; feature freeze end of week 6 |
 | Designing levels from prop shadows is slow | Medium | Design backwards from the shadow landscape; mostly block-like props; see each prop's shadow while placing it; allow a little invisible terrain where a shadow is almost right; prototype one puzzle first |
