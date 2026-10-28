@@ -18,9 +18,14 @@
 // not mislabelled as the intended one. Credit for an id that isn't one of the puzzle's solutions is
 // ignored, so the runner can credit role names freely.
 //
-// Hint: when the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`
-// (20 s by default; the tutorial sets it near 0), a `hint-show` event names the shape and where;
-// `hint-hide` follows once it moves on or the puzzle is solved.
+// Hint (the hint ladder, docs/levels/night.md): when the traveller has spent `hintDelayS` stuck
+// (blocked, looking back, held or pushed; 20 s by default, the tutorial sets it near 0) without
+// making progress, a `hint-show` event names the shape and where. Progress is reaching PROGRESS_M
+// past the furthest it has been: creeping a few centimetres between drips, or being blown back and
+// walking in again, does not reset the time, or those puzzles would never show a hint. If it stays stuck, `hint-kindred` follows
+// HINT_KINDRED_AFTER_S later (the kindred perches on the same spot), and `hint-ease` after
+// HINT_EASE_AFTER_S (the puzzle's `ease` hook makes the obstacle gentler, for the rest of the
+// puzzle). `hint-hide` follows once it makes progress or the puzzle is solved.
 
 import type { Shape } from '../engine/hands/shapes';
 import { HAND_COUNT, Touch } from '../engine/sim/solver';
@@ -52,6 +57,8 @@ export interface PuzzleDef extends LevelSource {
   afterStep?(ctx: GameContext): void;
   /** Where the ghost hint goes; default: over the gap marker, or a little ahead of the traveller. */
   hintAt?(ctx: GameContext, out: Float64Array): void;
+  /** The last rung of the hint ladder: makes the obstacle gentler until the puzzle is reloaded. */
+  ease?(ctx: GameContext): void;
 }
 
 /** The solution recorded for a win no listed solution got credit for. */
@@ -60,8 +67,11 @@ export const OTHER_SOLUTION = 'other';
 export const HINT_DELAY_S = 20;
 /** Seconds between the win and the next puzzle (the scene holds, the traveller rests). */
 export const OUTRO_S = 2.5;
-/** Seconds the traveller must keep moving before the hint is taken down. */
-const HINT_HIDE_AFTER_S = 0.5;
+/** Seconds after the outline that the kindred perches on its spot, and that the obstacle eases. */
+export const HINT_KINDRED_AFTER_S = 20;
+export const HINT_EASE_AFTER_S = 80;
+/** How far past its furthest point the traveller must get to count as progress (and take the hint down), metres. */
+export const PROGRESS_M = 0.1;
 const MAX_SOLUTIONS = 8;
 
 export type PuzzlePhase = 'playing' | 'outro' | 'done';
@@ -71,14 +81,21 @@ export class PuzzleRunner {
   phase: PuzzlePhase = 'playing';
   /** Seconds in the current phase. */
   phaseT = 0;
-  /** Seconds the traveller has been stuck, continuously. */
+  /** Seconds the traveller has been stuck since it last made progress. */
   stuckT = 0;
   hintVisible = false;
+  /** How far up the hint ladder this stretch of being stuck has gone: 0 none, 1 outline, 2 kindred, 3 eased. */
+  hintRung = 0;
+  /** The obstacle has eased (it stays eased until the puzzle reloads). */
+  eased = false;
   /** The solution recorded at the win. */
   solvedWith = '';
   /** Credit per solution, by index in def.solutions. */
   readonly credits = new Float64Array(MAX_SOLUTIONS);
-  private movingT = 0;
+  /** The furthest the traveller has got along its way (x times its direction), metres. */
+  private furthest = -Infinity;
+  /** It has stopped at least once since it last made progress. */
+  private stopped = false;
   private readonly hintPos = new Float64Array(2);
 
   start(def: PuzzleDef): void {
@@ -88,8 +105,11 @@ export class PuzzleRunner {
     this.phase = 'playing';
     this.phaseT = 0;
     this.stuckT = 0;
-    this.movingT = 0;
+    this.furthest = -Infinity;
+    this.stopped = false;
     this.hintVisible = false;
+    this.hintRung = 0;
+    this.eased = false;
     this.solvedWith = '';
     this.credits.fill(0);
   }
@@ -137,28 +157,47 @@ export class PuzzleRunner {
       return 'solved';
     }
 
-    const stuck = t.state === 'blocked' || t.state === 'look-back' || t.state === 'held' || t.state === 'pushed';
-    if (stuck) {
-      this.stuckT += ctx.dt;
-      this.movingT = 0;
-    } else {
+    const s = t.slot(ctx);
+    const along = s < 0 ? this.furthest : ctx.store.x[s] * t.dir;
+    let progressed = false;
+    if (along >= this.furthest + PROGRESS_M || this.furthest === -Infinity) {
+      this.furthest = along;
       this.stuckT = 0;
-      this.movingT += ctx.dt;
+      this.stopped = false;
+      progressed = true;
+    } else {
+      // From its first stop, every second without progress counts, walking back in after being blown back too.
+      if (t.state === 'blocked' || t.state === 'look-back' || t.state === 'held' || t.state === 'pushed')
+        this.stopped = true;
+      if (this.stopped) this.stuckT += ctx.dt;
     }
-    if (!this.hintVisible && this.stuckT >= (def.hintDelayS ?? HINT_DELAY_S)) {
+    const delay = def.hintDelayS ?? HINT_DELAY_S;
+    const p = this.hintPos;
+    if (!this.hintVisible && this.stuckT >= delay) {
       this.hintVisible = true;
-      const p = this.hintPos;
+      this.hintRung = 1;
       if (def.hintAt) def.hintAt(ctx, p);
       else defaultHintAt(ctx, p);
       ctx.events.push('hint-show', def.hintShapeAt ? def.hintShapeAt(ctx) : def.hintShape, ctx.time, 0, p[0], p[1]);
-    } else if (this.hintVisible && this.movingT >= HINT_HIDE_AFTER_S) {
+    } else if (this.hintVisible && progressed) {
       this.hideHint(ctx);
+    } else if (this.hintVisible && this.hintRung === 1 && this.stuckT >= delay + HINT_KINDRED_AFTER_S) {
+      this.hintRung = 2;
+      ctx.events.push('hint-kindred', '', ctx.time, 0, p[0], p[1]);
+    } else if (this.hintVisible && this.hintRung === 2 && this.stuckT >= delay + HINT_EASE_AFTER_S) {
+      this.hintRung = 3;
+      if (!this.eased) {
+        this.eased = true;
+        def.ease?.(ctx);
+        ctx.events.push('hint-ease', def.id, ctx.time, 0, p[0], p[1]);
+      }
     }
     return null;
   }
 
   private hideHint(ctx: GameContext): void {
     this.hintVisible = false;
+    this.hintRung = 0;
     ctx.events.push('hint-hide', '', ctx.time);
   }
 

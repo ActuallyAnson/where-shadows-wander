@@ -188,6 +188,26 @@ export class Traveller {
     this.state = next;
     this.stateT = 0;
     ctx.events.push('traveller-state', next, ctx.time);
+    const s = this.slot(ctx);
+    if (s >= 0) ctx.store.flags[s] = (ctx.store.flags[s] & ~POSE_FLAGS) | poseOf(next);
+  }
+}
+
+/** The renderer's pose flags (entity-kinds.ts): it draws the traveller from them. */
+const POSE_FLAGS = Flag.WaitPose | Flag.CheerPose | Flag.ShiverPose;
+
+/** Looking back at the player while it waits for help, cheering at the goal, braced against a push. */
+function poseOf(state: TravellerState): number {
+  switch (state) {
+    case 'look-back':
+    case 'held':
+      return Flag.WaitPose;
+    case 'goal':
+      return Flag.CheerPose;
+    case 'pushed':
+      return Flag.ShiverPose;
+    default:
+      return 0;
   }
 }
 
