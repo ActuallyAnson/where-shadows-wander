@@ -53,8 +53,8 @@ After the dimming the room is cooler and the kindred is gone. A desk fan stands 
 |---|---|---|
 | Outline | 20 s | a spread hand where the wind starts, at (−0.1, −0.11) |
 | Kindred | — | skipped: the kindred is hiding after the dimming |
-| Look back | 40 s (brought forward) | the traveller, holding its cloak against the wind, looks back at the player |
-| Ease | 100 s | the fan slows to a gentle breeze the traveller can walk against |
+| Look back | 3 s | the traveller, holding its cloak against the wind, looks back at the player |
+| Ease | 100 s | the fan slows to a breeze (`EASED_WIND_PUSH`, 0.05 m/s) the traveller walks through on its own |
 
 ## Feedback
 

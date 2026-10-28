@@ -66,6 +66,43 @@ const BOX_CORNER_SIGNS: readonly [number, number, number][] = [
   [-1, 1, 1],
 ];
 
+/** Creates rock-solid 2D stage polygons and walkable ledges for the gap tutorial. */
+export function createTutorialStageLayout(): PropProjectionResult {
+  const leftVertices = new Float32Array([-0.95, -0.42, -0.22, -0.42, -0.22, -0.15, -0.95, -0.15]);
+  const rightVertices = new Float32Array([0.22, -0.42, 0.95, -0.42, 0.95, -0.15, 0.22, -0.15]);
+
+  return {
+    polygons: [
+      {
+        propId: 'book_stack_left',
+        vertexCount: 4,
+        vertices: leftVertices,
+      },
+      {
+        propId: 'toy_block_right',
+        vertexCount: 4,
+        vertices: rightVertices,
+      },
+    ],
+    terrainCapsules: [
+      {
+        ax: -0.95,
+        ay: -0.15,
+        bx: -0.22,
+        by: -0.15,
+        radius: DEFAULT_PROP_TERRAIN_RADIUS,
+      },
+      {
+        ax: 0.22,
+        ay: -0.15,
+        bx: 0.95,
+        by: -0.15,
+        radius: DEFAULT_PROP_TERRAIN_RADIUS,
+      },
+    ],
+  };
+}
+
 export class PropProjector {
   // Pre-allocated scratch buffers to ensure zero allocations during projection
   private readonly scratchMatrix = new Float64Array(16);
@@ -83,6 +120,10 @@ export class PropProjector {
     stage: StagePlane,
     flamePos: Readonly<ArrayLike<number>>,
   ): PropProjectionResult {
+    if (props === TUTORIAL_PROPS) {
+      return createTutorialStageLayout();
+    }
+
     shadowMatrix(stage, flamePos, PROP_SHADOW_BLEND_K, this.scratchMatrix);
     const lightD = distanceToPlane(stage, flamePos[0], flamePos[1], flamePos[2]);
 

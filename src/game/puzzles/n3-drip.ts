@@ -3,7 +3,8 @@
 // catches the drips over the traveller as it walks under. Also works: a flat hand held high as a roof.
 //
 // The traveller waits while drops are landing just ahead of it (or hitting it), and walks on as
-// soon as its path is dry. Drops are seeded, so a restart drips the same.
+// soon as its path is dry. Drops are seeded, so a restart drips the same. Eased (the hint ladder's
+// last rung), a third of the drops fall.
 import { Kind } from '../../engine/sim/entity-kinds';
 import { HAND_COUNT, Touch } from '../../engine/sim/solver';
 import { Role } from '../abilities';
@@ -17,6 +18,8 @@ export const DRIP_RIGHT = 0.2;
 const DRIP_Y = 0.3;
 /** Drops a second, their size and starting speed. */
 const DRIP_RATE = 14;
+/** The share of the drops still falling once the hint ladder eases the puzzle. */
+export const EASED_DRIP_SHARE = 1 / 3;
 const DROP_R = 0.01;
 const DROP_VY = -0.9;
 /** The traveller waits if a drop landed in this window around it within the last RECENT_S. */
@@ -29,6 +32,8 @@ const RING = 32;
 /** One game's drips: drops owed, recent landings, and when the traveller was last hit. */
 class DripState {
   acc = 0;
+  /** 1, or EASED_DRIP_SHARE once eased. */
+  rate = 1;
   readonly landX = new Float64Array(RING);
   readonly landT = new Float64Array(RING).fill(-Infinity);
   head = 0;
@@ -36,6 +41,7 @@ class DripState {
 
   reset(): void {
     this.acc = 0;
+    this.rate = 1;
     this.landT.fill(-Infinity);
     this.head = 0;
     this.lastHitT[0] = -Infinity;
@@ -92,7 +98,7 @@ export function createDripPuzzle(): PuzzleDef {
     },
 
     step(ctx) {
-      drip.acc += DRIP_RATE * ctx.dt;
+      drip.acc += DRIP_RATE * drip.rate * ctx.dt;
       while (drip.acc >= 1) {
         drip.acc -= 1;
         const x = ctx.rng.range(DRIP_LEFT + DROP_R, DRIP_RIGHT - DROP_R);
@@ -126,6 +132,11 @@ export function createDripPuzzle(): PuzzleDef {
       for (let s = store.kindStart[Kind.Raindrop]; s < store.kindEnd[Kind.Raindrop]; s++) {
         if (store.alive[s] && store.y[s] < ctx.groundY - 0.3) store.destroy(store.handleAt(s));
       }
+    },
+
+    // The ladder's last rung: the dripping slows, so a cup or a roof held still is enough.
+    ease() {
+      drip.rate = EASED_DRIP_SHARE;
     },
 
     hintAt(ctx, out) {

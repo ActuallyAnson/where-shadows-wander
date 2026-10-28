@@ -52,9 +52,9 @@ Right after the opening: two low stacks of books on the wall, with a gap between
 | Rung | When stuck for | What |
 |---|---|---|
 | Outline | 0.5 s | flat hand over the gap, at (0, −0.26) |
-| Kindred | 40 s | perches over the middle of the gap, at (0, −0.17) |
-| Look back | 70 s | the traveller turns to the player |
-| Ease | 100 s | the outline pulses; the gap does not narrow (the tutorial should stay a bridge lesson) |
+| Kindred | 20.5 s | perches just above the outline, over the gap |
+| Look back | 3 s | the traveller turns to the player |
+| Ease | — | none: the gap does not narrow (the tutorial should stay a bridge lesson) |
 
 ## Feedback
 

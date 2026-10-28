@@ -11,7 +11,7 @@ The whole game is one level: one night in the kid's bedroom, five puzzles, about
 | 4 | The fan | shapes can block | spread | fist anchor | 60 s | [04-fan](04-fan.md) | `n4-fan.ts` |
 | 5 | The castle | combine what you learned | flat + fist, either order | (the other order) | 90 s | [05-castle](05-castle.md) | `n5-castle.ts` |
 
-The puzzles are built and tested headless (`src/game/puzzles/night.test.ts`, each solved every way it should be and failed one way it shouldn't). They are not yet wired into the app, and the cutscenes and the later hint rungs below are not built yet: see "What is left to build".
+The puzzles are built and tested headless (`src/game/puzzles/night.test.ts`, each solved every way it should be and failed one way it shouldn't). The app plays them (`src/app/night-driver.ts` turns the game's events into the room): the props' shadows, the hint ladder, the mood, the dimming, the return and the ending. What is still a first look or missing is under "What is left to build".
 
 ## The flow of the night
 
@@ -31,8 +31,8 @@ Wordless apart from a few short captions, each under 15 s and skippable. Cutscen
 | Beat | Plays | What happens | Mood | Status |
 |---|---|---|---|---|
 | **Opening** | the candle is lit | The title on the wall, the kindred drifts in out of the dark, caption "Hold your hands to the light", the kindred fades. 11.5 s. | 0.4 | Built: `src/app/opening.ts` (captions are placeholders) |
-| **The dimming** | after puzzle 3's outro, before puzzle 4 loads | The candle gutters (the flame shrinks, the flicker deepens for 2–3 s), the kindred darts behind the edge of the wall and hides, the room cools. No caption. Then the fan's scene fades in. The kindred stays away through puzzle 4, so its hint rung there is skipped (the traveller's look-back comes earlier instead). | 0.7 → 0.45 | Not built |
-| **The return** | puzzle 5 solved, the traveller inside the castle | The kindred flies back in from the dark and circles the castle window, which lights; the room fills with warm light. | 0.85 → 1.0 | Not built. The window lighting is built (`window` fixture, lit on the last win) |
+| **The dimming** | after puzzle 3's outro, before puzzle 4 loads | The candle gutters (the flame shrinks, the flicker deepens for 2–3 s), the kindred darts behind the edge of the wall and hides, the room cools. No caption. Then the fan's scene fades in. The kindred stays away through puzzle 4, so its hint rung there is skipped (the traveller's look-back comes earlier instead). | 0.7 → 0.45 | Built simply: the mood drops and the kindred darts off and stays away. The candle's gutter is not built |
+| **The return** | puzzle 5 solved, the traveller inside the castle | The kindred flies back in from the dark and circles the castle window, which lights; the room fills with warm light. | 0.85 → 1.0 | Built: the window lights, the kindred perches by it, the mood goes to 1.0, and the ending follows 3.5 s later |
 | **The end** | after the return | Caption "The candle burns low.", the kindred flies to the traveller, the traveller cheers, "The light found its way home.", "Sleep well.", then the "The End" screen with "Begin again". | 1.0 → 0.3 | Built: `src/app/ending.ts` |
 
 ## Colour script (the wall's mood)
@@ -51,15 +51,15 @@ The paper wall has a mood value from 0 (cold, blue-grey) to 1 (warm amber), set 
 
 ## The hint ladder (every puzzle)
 
-Help comes in steps while the traveller is stuck (blocked, looking back, held or pushed). The timer restarts whenever it moves on. Nothing is ever said in words, and the player never fails.
+Help comes in steps while the traveller is stuck. The time counts from its first stop (blocked, looking back, held or pushed) and restarts only when it gets 10 cm past the furthest it has been, so creeping between drips or being blown back by the fan still adds up. Nothing is ever said in words, and the player never fails.
 
 | Rung | When stuck for | What happens | Status |
 |---|---|---|---|
 | 1 | 0–20 s | nothing | — |
 | 2 | 20 s | the ghost outline of the wanted shape, where it goes (`hint-show` with the shape and a stage position) | Built in the game; the outline view is built (`ghostTarget`) |
-| 3 | 40 s | the kindred flies to the spot and perches on it (`kindred.perchAt`) | Not built: needs a game event for the rung, and the app to perch the kindred |
-| 4 | 70 s | the traveller waits and looks back at the player | Built differently: it looks back after 3 s blocked (`LOOK_BACK_S`). Decide which |
-| 5 | 100 s | the outline pulses, and the obstacle eases (per puzzle: see each page) | Not built |
+| 3 | 40 s | the kindred flies to the spot and perches just above the outline (`hint-kindred`) | Built |
+| 4 | — | the traveller looks back at the player | Built differently: it looks back after 3 s blocked (`LOOK_BACK_S`), well before the outline, so there is no separate rung |
+| 5 | 100 s | the obstacle eases (`hint-ease` and the puzzle's `ease` hook; see each page) | Built for the drips, the fan and the castle gate. The outline doesn't pulse yet |
 
 Exceptions: the tutorial shows its outline after 0.5 s; the castle waits 30 s for its outline (and shifts the later rungs by 10 s). Each puzzle page names its hint spot, its kindred perch spot and how its obstacle eases.
 
@@ -82,8 +82,8 @@ Exceptions: the tutorial shows its outline after 0.5 s; the castle waits 30 s fo
 
 ## What is left to build
 
-1. Wire `Game` into `src/app/main.ts` (Anson's file; the handoff note has the code).
-2. Hint rungs 3–5: game events for each rung (A), the kindred perch and outline pulse (Anson), the per-puzzle easing (A).
-3. The dimming and the return cutscenes (Anson), triggered by the game flow after puzzle 3 and after puzzle 5 (A).
-4. The mood value per puzzle from the colour script (A sets it, B's wall reads it).
-5. Sounds for the new events: the ledge's lift, the gate opening (B).
+1. **Art (B):** the fixtures view (`src/engine/render/fixtures-view.ts`) is a first look: black bars for the gate and plate, a warm rectangle for the window, thin streaks for the wind. The hint outline is one hand drawing for every shape (rotated for flat); fist, cup and spread need their own outlines.
+2. **The dimming (Anson):** the candle guttering for 2–3 s. Today only the mood and the kindred change.
+3. **The outline pulse** at the last rung, and the ledge's drifting outline that shows the lift.
+4. **Sounds (B):** the ledge's lift and the gate opening (today a soft twinkle).
+5. **Headset check:** the night has only been played in the Hand Lab (`?mock=1&stage=real`) and headless tests.

@@ -1,5 +1,6 @@
 // Visual ghost target outline and gesture trigger detector for Where Shadows Wander puzzles.
-// Renders a parchment dashed amber hand silhouette on the wall stage, detects when the
+// Renders a dashed sepia hand silhouette on the wall stage (dark enough to read on the cream paper; lying on
+// its side for the flat shape, as a bridge is), detects when the
 // player's hand shadow overlaps it with the required committed shape, and fires a gameplay trigger.
 //
 // Zero per-frame allocations.
@@ -15,6 +16,8 @@ import { SHADOW_RENDER_ORDER } from '../shadow/shadow-renderer';
 export const GHOST_RENDER_ORDER = SHADOW_RENDER_ORDER + 2; // 4
 export const OVERLAP_RADIUS_M = 0.1; // 10 cm tolerance
 export const DEFAULT_HOLD_DURATION_S = 0.3; // 300 ms dwell to trigger
+/** Dark sepia: a pale amber outline vanished on the cream paper. */
+export const GHOST_COLOR = 0x4a3018;
 
 /**
  * 2D contour polygon of a child hand silhouette (~0.22m tall, ~0.14m wide).
@@ -86,7 +89,7 @@ export class GhostTargetView {
     this.geometry.setAttribute('position', new BufferAttribute(positions, 3));
 
     this.material = new LineDashedMaterial({
-      color: 0xffdf80, // warm golden amber
+      color: GHOST_COLOR,
       dashSize: 0.012,
       gapSize: 0.008,
       transparent: true,
@@ -118,6 +121,8 @@ export class GhostTargetView {
     this.matchedHand = null;
     this.active = true;
     this.mesh.position.set(x, y, 0);
+    // A flat hand is a plank, so its outline lies on its side (fingers to the right); the others stand upright.
+    this.mesh.rotation.z = requiredShape === 'flat' ? -Math.PI / 2 : 0;
     this.mesh.visible = true;
   }
 
@@ -184,7 +189,7 @@ export class GhostTargetView {
       if (!this.triggered) {
         this.holdTimer = Math.max(0, this.holdTimer - delta * 2);
         // Breathing opacity
-        this.material.opacity = 0.4 + 0.2 * Math.sin(this.time * 3);
+        this.material.opacity = 0.6 + 0.2 * Math.sin(this.time * 3);
       }
     }
   }

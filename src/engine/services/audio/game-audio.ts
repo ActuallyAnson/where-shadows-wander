@@ -55,6 +55,18 @@ export class GameAudio {
     }
   }
 
+  /** Plays the ignition whoosh when the candle is lit. */
+  candleIgnited(at?: ArrayLike<number> | { x: number; y: number; z: number }): void {
+    if (at) {
+      const x = 'x' in at ? at.x : at[0];
+      const y = 'y' in at ? at.y : at[1];
+      const z = 'z' in at ? at.z : at[2];
+      this.player.playAt(Sound.Ignite, x, y, z);
+    } else {
+      this.player.playAt(Sound.Ignite, 0, 0.75, -0.45);
+    }
+  }
+
   /** The spirit fox's sparkle, from a point on the wall (stage coordinates). */
   twinkleAt(stage: StagePlane, x: number, y: number): void {
     stagePoint(stage, x, y, WALL_LIFT_M, this.at);

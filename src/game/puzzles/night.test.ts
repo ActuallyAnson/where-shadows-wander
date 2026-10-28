@@ -292,3 +292,44 @@ describe('the whole night', () => {
     expect(h.game.save.solutions['n5-castle']).toEqual(['gate-first']);
   });
 });
+
+describe('the hint ladder', () => {
+  /** Seconds from the start of a puzzle's log entry for `what`, or NaN if it never came. */
+  const firstAt = (h: Headless, what: string) => h.log.find((e) => e.what.startsWith(what))?.t ?? NaN;
+
+  it('climbs on every puzzle with no hands: the outline, the kindred 20 s later, then the obstacle eases', () => {
+    for (let i = 0; i < 5; i++) {
+      const h = at(i);
+      h.run(130);
+      const shown = firstAt(h, 'hint-show');
+      expect(shown, `puzzle ${i + 1} shows its outline`).toBeLessThan(40);
+      expect(firstAt(h, 'hint-kindred') - shown).toBeCloseTo(20, 0);
+      expect(firstAt(h, 'hint-ease') - shown).toBeCloseTo(80, 0);
+    }
+  });
+
+  it('eases the fan to a breeze the traveller walks through on its own', () => {
+    const h = at(3);
+    expect(h.runUntil(solved(h), 140)).toBe(true);
+    expect(h.saw('hint-ease', 'n4-fan')).toBe(true);
+  });
+
+  it('eases the castle by opening the gate once the traveller waits at it', () => {
+    const h = at(4);
+    h.pose('left', 'flat', 0.01, BRIDGE_Y);
+    expect(h.runUntil(() => travellerX(h) > MOAT_RIGHT + 0.1, 30)).toBe(true);
+    h.hide('left');
+    expect(h.runUntil(() => h.saw('puzzle-event', 'gate-open'), 130)).toBe(true);
+    expect(h.saw('hint-ease', 'n5-castle')).toBe(true);
+    expect(h.runUntil(solved(h), 20)).toBe(true);
+  });
+
+  it('takes the hint down once the traveller makes progress, not when it creeps between drips', () => {
+    const h = at(2);
+    expect(h.runUntil(() => h.saw('hint-show'), 40)).toBe(true);
+    h.run(5);
+    expect(h.saw('hint-hide')).toBe(false);
+    h.pose('left', 'flat', 0.05, 0.12);
+    expect(h.runUntil(() => h.saw('hint-hide'), 20)).toBe(true);
+  });
+});
