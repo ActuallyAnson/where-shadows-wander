@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import chapter1 from '../../../public/scenes/chapter-1.iwsdk.scene.json';
+// A small hand-made chapter (copied from the first editor trial), so these tests don't change
+// whenever the real chapter's puzzles are re-authored.
+import chapter1 from './fixtures/sample-chapter.scene.json';
 import { Flag, Kind } from './entity-kinds';
 import { EntityStore, type Handle } from './entity-store';
 import { parseLayout, spawnLayout } from './scene-layout';

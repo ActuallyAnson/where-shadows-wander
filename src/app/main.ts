@@ -22,21 +22,18 @@ import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
+import { FixturesView } from '../engine/render/fixtures-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
-import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
-import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
 import { StageRenderer } from '../engine/render/stage-renderer';
-import { DEFAULT_CAPACITIES } from '../engine/sim/entity-kinds';
-import { EntityStore } from '../engine/sim/entity-store';
-import { Solver } from '../engine/sim/solver';
-import { TutorialFlow } from '../game/tutorial-flow';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
-import type { Prop } from '../engine/shadow/pure/prop-shadow';
+import { createSilhouette, projectProp, type Prop } from '../engine/shadow/pure/prop-shadow';
+import { SIM_HZ } from '../game/game';
+import { NightDriver } from './night-driver';
 import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
@@ -67,7 +64,6 @@ import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-au
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
-import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { StageFrame } from '../engine/stage/stage-frame';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
@@ -98,7 +94,6 @@ import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { showStartFailure } from './start-failure';
 
-const SIM_HZ = 60;
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
@@ -241,14 +236,15 @@ async function start(): Promise<void> {
   let perchT = 0;
   const solveBloom = new SolveBloom();
   const nearGlow = [new Follower(), new Follower()];
-  let lastTutorial = 'IDLE' as string;
   let moodNow = 0.4;
   let moodGoal = 0.4;
-  // The ending: the room cools and dims as the cutscene plays (the game flow calls this after the last puzzle).
-  const playEnding = () => {
-    const problems = cutscenes.play(ENDING);
-    if (problems.length > 0) failures.report('ending', new Error(problems.join('; ')));
-    else moodGoal = ENDING_MOOD;
+  // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
+  const playEnding = (onDone?: () => void) => {
+    const problems = cutscenes.play(ENDING, onDone);
+    if (problems.length > 0) {
+      failures.report('ending', new Error(problems.join('; ')));
+      onDone?.();
+    } else moodGoal = ENDING_MOOD;
   };
   const playSolve = () => {
     moodGoal = 1;
@@ -270,13 +266,13 @@ async function start(): Promise<void> {
       setKindred(kindredWanted);
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.start();
     });
     if (problems.length > 0) {
       failures.report('opening', new Error(problems.join('; ')));
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.start();
       return;
     }
     openingT = 0;
@@ -286,33 +282,18 @@ async function start(): Promise<void> {
   const stageGroup = new Group();
   stageGroup.matrixAutoUpdate = false;
   const stageRenderer = new StageRenderer(stageGroup);
+  // The ghost outline of the wanted shape: the first rung of the hint ladder (the night's hint-show events).
   const ghostTarget = new GhostTargetView(stageGroup, {
-    targetId: 'tutorial_bridge_hint',
+    targetId: 'hint',
     x: 0.0,
     y: -0.15,
     requiredShape: 'flat',
     active: false,
   });
-  const entityStore = new EntityStore(DEFAULT_CAPACITIES);
-  const solver = new Solver(entityStore.capacity);
-  const propProjector = new PropProjector();
-  const propShadowView = new RenderPropShadowView(stageGroup);
+  // The puzzles' gate, counterweight plate, wind and window (the drops are entities the stage renderer draws).
+  const fixturesView = new FixturesView(stageGroup);
   const wallPauseView = new WallPauseView();
   stageGroup.add(wallPauseView.group);
-  const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
-  let propTerrainBaked = false;
-  const bakePropTerrain = (force = false): void => {
-    if (propTerrainBaked && !force) return;
-    const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
-    solver.terrain.clear();
-    for (let i = 0; i < terrainCapsules.length; i++) {
-      const c = terrainCapsules[i];
-      solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
-    }
-    propShadowView.updatePolygons(polygons);
-    propTouch.setPolygons(polygons);
-    propTerrainBaked = true;
-  };
   world.scene.add(
     stageView.group,
     stageGroup,
@@ -344,7 +325,85 @@ async function start(): Promise<void> {
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
   const gameAudio = new GameAudio(audio);
-  const tutorial = new TutorialFlow(entityStore, solver, ghostTarget, gameAudio);
+  // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
+  // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
+  let kindredAway = false;
+  let kindredVisiting = false;
+  const visitKindred = (x: number, y: number) => {
+    if (kindredAway) return;
+    if (!kindredOn) {
+      kindred.x = x + (x >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
+      kindred.y = y + 0.1;
+      kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
+      kindredVisiting = true;
+    }
+    kindred.perchAt(x, y);
+    perchT = Infinity;
+    gameAudio.twinkleAt(stage, x, y);
+  };
+  const endKindredVisit = () => {
+    if (perchT === Infinity) {
+      perchT = 0;
+      kindred.release();
+    }
+    if (kindredVisiting) {
+      kindredVisiting = false;
+      kindredOn = kindredWanted;
+      if (!kindredOn) kindredView.hide();
+    }
+  };
+  // The night (src/game) and what it shows: night-driver.ts turns the game's events into these calls.
+  const propOutline = createSilhouette();
+  const night = new NightDriver({
+    stage,
+    flame: candleView.flamePosition,
+    blend: () => projector.settings.blend,
+    saves,
+    setProps: (list, light, onStage, blend) => {
+      propShadows.setProps(list, light, onStage, blend);
+      // The dust a hand shakes off a prop's shadow needs the outlines too (on puzzle load only, so it may allocate).
+      propTouch.setPolygons(
+        list.map((p) => {
+          const n = projectProp(p, light, onStage, blend, propOutline);
+          return { vertices: propOutline.points.slice(0, n * 2), vertexCount: n };
+        }),
+      );
+    },
+    showHint: (shape, x, y) => {
+      ghostTarget.setTarget('hint', x, y, shape);
+      ghostTarget.active = true;
+    },
+    hideHint: () => {
+      ghostTarget.active = false;
+    },
+    perchKindred: visitKindred,
+    releaseKindred: endKindredVisit,
+    dim: () => {
+      // The room cools with the mood the night sets; the kindred darts off the wall and stays away.
+      if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
+    },
+    setKindredAway: (away) => {
+      kindredAway = away;
+      if (away) {
+        endKindredVisit();
+        kindredOn = false; // not setKindred: the Testing switch's own choice stays
+        kindredView.hide();
+      }
+    },
+    setMood: (goal) => {
+      moodGoal = goal;
+    },
+    solved: () => {
+      // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
+      const mood = moodGoal;
+      playSolve();
+      moodGoal = mood;
+      gameAudio.puzzleSolved(stage);
+    },
+    twinkle: (x, y) => gameAudio.twinkleAt(stage, x, y),
+    playEnding: (onDone) => playEnding(onDone),
+    nightOver: () => void showMenu('end'),
+  });
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
@@ -418,7 +477,12 @@ async function start(): Promise<void> {
       menuChoice = 'off';
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.restart();
+    } else if (screen === 'end' && button === 'again') {
+      menu.hide();
+      menuChoice = 'off';
+      moodGoal = 0.4;
+      night.again();
     }
   };
   const showMenu = (id: MenuScreenId) => {
@@ -483,8 +547,8 @@ async function start(): Promise<void> {
       0, 0, 0, 1,
     );
     stageGroup.matrixWorldNeedsUpdate = true;
-    bakePropTerrain();
-    if (sessionState === 'playing') tutorial.start();
+    // The wall or the flame moved: the props' shadows (and the ground they make) are cast again.
+    night.relight();
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -533,13 +597,6 @@ async function start(): Promise<void> {
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
-  const sim = Object.assign(
-    new FixedStepLoop(SIM_HZ, (dt) => {
-      entityStore.beginStep();
-      solver.step(entityStore, dt);
-    }),
-    { store: entityStore, solver },
-  );
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -586,7 +643,7 @@ async function start(): Promise<void> {
   diagnostics.addSource(() => ({
     ...reportSource({
       simHz: SIM_HZ,
-      simSteps: sim.steps,
+      simSteps: night.steps,
       handReadMethod: hands.method,
       mockSource: mock ? mock.source.name : null,
       capabilities,
@@ -613,17 +670,17 @@ async function start(): Promise<void> {
       drawCalls: 1,
       ghostTargetActive: ghostTarget.active,
     },
-    propTerrain: {
-      propCount: props.length,
-      terrainCapsules: sim.solver.terrain.count,
-      baked: propShadowView.isBaked,
-    },
-    tutorial: {
-      state: tutorial.state,
-      travellerX: tutorial.travellerX,
-      travellerGrounded: tutorial.isGrounded,
-      bridgeActive: tutorial.isBridgeActive,
-    },
+    night: night.game
+      ? {
+          puzzle: night.game.puzzle.id,
+          complete: night.game.complete,
+          traveller: night.game.traveller.state,
+          terrainCapsules: night.game.solver.terrain.count,
+          layoutProblems: night.game.layout.problems.length,
+          hint: night.game.runner.hintRung,
+          waitingForHands: night.game.waitingForHands,
+        }
+      : null,
     shadow: {
       stage: stageChoice,
       placed: rigPlaced,
@@ -910,9 +967,7 @@ async function start(): Promise<void> {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
-            if (candleAction.justPlaced) {
-              bakePropTerrain(true);
-            }
+            if (candleAction.justPlaced) night.relight();
           }
         } catch (e) {
           failures.report('candle pickup', e);
@@ -1029,7 +1084,7 @@ async function start(): Promise<void> {
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);
-              tutorial.start();
+              night.restart();
               simWasPaused = true;
             } else if (action === 'settings') {
               wallPauseView.showSettings();
@@ -1039,8 +1094,8 @@ async function start(): Promise<void> {
         timings.begin(SLOT.shadow);
         try {
           shadowRenderer.mesh.visible = shadowsVisible;
-          propShadowView.mesh.visible = shadowsVisible;
           propShadows.mesh.visible = shadowsVisible;
+          fixturesView.group.visible = shadowsVisible && night.started;
           stageRenderer.mesh.visible = shadowsVisible;
           kindredView.group.visible = shadowsVisible;
           ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
@@ -1065,7 +1120,12 @@ async function start(): Promise<void> {
             }
           }
           propShadows.update(stage, shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
-          propShadowView.material.opacity = shadowsVisible ? 0.88 * candleView.occlusion : 0;
+          if (night.game)
+            fixturesView.update(
+              night.game.fixtures,
+              shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+              paused ? 0 : step,
+            );
           if (kindredOn && rigPlaced) {
             // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
             const f = candleView.flamePosition,
@@ -1165,10 +1225,6 @@ async function start(): Promise<void> {
           // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
           {
             const occ = candleView.occlusion;
-            if (tutorial.state !== lastTutorial) {
-              if (tutorial.state === 'GOAL_REACHED') playSolve();
-              lastTutorial = tutorial.state;
-            }
             solveBloom.update(step);
             audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
             glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
@@ -1242,26 +1298,32 @@ async function start(): Promise<void> {
       else {
         try {
           if (rigPlaced) {
+            // The outline only animates here; the game decides when the puzzle is solved.
             ghostTarget.update(delta, projector.shadows, shapes);
             ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
-            tutorial.update(delta, projector.shadows, shapes);
           }
-          // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
-          // replay it (docs/SIMULATION.md).
-          if (simWasPaused) {
-            simWasPaused = false;
-            sim.reset();
-          }
-          if (debug) debug.time.advance(sim, delta);
-          else sim.advance(delta);
+          // Back from a pause (the flame covered, the headset off, the system menu): one held frame lets the game
+          // drop the time that passed, so nothing jumps (docs/SIMULATION.md).
+          const held = simWasPaused;
+          simWasPaused = false;
+          const shadows = projector.shadows;
+          night.frame(
+            delta,
+            held,
+            shadows.left.active ? shadows.left : null,
+            shadows.right.active ? shadows.right : null,
+            shapes.events,
+            hands.hands.left.tracked,
+            hands.hands.right.tracked,
+          );
         } catch (e) {
           failures.report('simulation', e);
         }
       }
       try {
-        if (shadowsVisible) {
+        if (shadowsVisible && night.game) {
           stageRenderer.mesh.visible = true;
-          stageRenderer.update(sim.store, sim.alpha);
+          stageRenderer.update(night.game.store, night.alpha);
         } else {
           stageRenderer.mesh.visible = false;
         }
@@ -1373,16 +1435,11 @@ async function start(): Promise<void> {
         stageGroup,
         stageRenderer,
         ghostTarget,
-        propProjector,
-        propShadowView,
-        props,
-        solver,
-        tutorial,
-        entityStore,
+        fixturesView,
+        night,
         audio,
         gameAudio,
         debug,
-        sim,
         getRecorder: () => recorder,
         handVisual,
         bedTray,
