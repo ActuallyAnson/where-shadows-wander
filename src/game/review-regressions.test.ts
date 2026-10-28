@@ -20,19 +20,20 @@ const opts = (puzzle = 0, seed = 1) => {
 const tx = (h: Headless) => h.game.store.x[h.game.traveller.slot(h.game)];
 
 describe('review regressions', () => {
-  it('a restart forgets which bridges the traveller stood on', () => {
-    const h = new Headless(opts(3));
-    h.pose('left', 'flat', -0.1, -0.27);
-    expect(h.runUntil(() => h.game.traveller.standingOnId(h.game) === 0, 15)).toBe(true);
+  it('a restart shuts the castle gate again and forgets which came first', () => {
+    // (This guarded the bed puzzle's remembered bridges; the castle is the puzzle with state now.)
+    const h = new Headless(opts(4));
+    h.pose('right', 'fist', -0.3, 0.07);
+    expect(h.runUntil(() => h.saw('puzzle-event', 'gate-open'), 5)).toBe(true);
     h.game.restart();
-    h.hide('left').pose('right', 'flat', -0.1, -0.27);
-    const ferry = () => {
-      const x = tx(h);
-      if (x > -0.25) h.move('right', Math.min(x, 0.2), -0.27);
-    };
-    expect(h.runUntil(() => h.saw('puzzle-solved'), 40, ferry)).toBe(true);
-    expect(h.saw('puzzle-solved', 'ferry')).toBe(true);
-    expect(h.saw('puzzle-solved', 'two-bridges')).toBe(false);
+    h.run(0.1);
+    expect(h.game.fixtures.find('gate')?.active).toBe(true);
+    // Bridge first this time: the opening before the restart must not count as gate first.
+    h.hide('right').pose('left', 'flat', 0.01, -0.27);
+    expect(h.runUntil(() => tx(h) > 0.25, 30)).toBe(true);
+    h.hide('left').pose('right', 'fist', -0.3, 0.07);
+    expect(h.runUntil(() => h.saw('puzzle-solved'), 40)).toBe(true);
+    expect(h.saw('puzzle-solved', 'bridge-first')).toBe(true);
   });
 
   it('a shape committed while paused takes its role on resume', () => {
@@ -67,7 +68,7 @@ describe('review regressions', () => {
       g.frame(input);
       q.clear();
     }
-    expect(g.fixtures.find('drawbridge')?.active).toBe(false);
+    expect(g.fixtures.find('gate')?.active).toBe(true);
     expect(g.fixtures.find('plate')?.value).toBe(0);
   });
 
@@ -83,7 +84,7 @@ describe('review regressions', () => {
   it('a shape held through the outro keeps its role in the next puzzle', () => {
     const h = new Headless(opts(0));
     h.pose('right', 'flat', 0, -0.27);
-    expect(h.runUntil(() => h.game.puzzle.id === 'n2-drip', 30)).toBe(true);
+    expect(h.runUntil(() => h.game.puzzle.id === 'n2-ledge', 30)).toBe(true);
     h.run(0.2);
     expect(h.game.abilities.of('right').role).toBe(Role.Bridge);
   });
@@ -103,7 +104,7 @@ describe('review regressions', () => {
     expect(o.save.puzzle).toBe(0);
     const g = new Game({ ...o, puzzles: createNight() });
     replay(rec, g);
-    expect(g.puzzle.id).toBe('n3-fan');
+    expect(g.puzzle.id).toBe('n3-drip');
     expect(new Uint8Array(g.store.x.buffer)).toEqual(new Uint8Array(h.game.store.x.buffer));
   });
 });

@@ -1,4 +1,4 @@
-// Puzzle 2, the dripping plant: a freshly watered plant on the shelf above drips onto the path, and
+// Puzzle 3, the dripping plant: a freshly watered plant on the shelf above drips onto the path, and
 // the drips would put out the traveller's lantern, so it will not walk into them. Intended: a cup
 // catches the drips over the traveller as it walks under. Also works: a flat hand held high as a roof.
 //
@@ -73,7 +73,7 @@ function creditCover(ctx: GameContext, s: number): void {
 export function createDripPuzzle(): PuzzleDef {
   const drip = new DripState();
   return {
-    id: 'n2-drip',
+    id: 'n3-drip',
     title: 'The dripping plant',
     layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
     props: [

@@ -16,15 +16,15 @@ const opts = (puzzle = 0) => {
 
 describe('debug snapshot', () => {
   it('copies the state a debug panel shows', () => {
-    const h = new Headless(opts(1));
+    const h = new Headless(opts(2));
     h.pose('left', 'cup', 0.05, 0).run(2);
     const snap = fillSnapshot(h.game, new DebugSnapshot());
-    expect(snap.puzzleId).toBe('n2-drip');
+    expect(snap.puzzleId).toBe('n3-drip');
     expect(snap.counts[Kind.Raindrop]).toBeGreaterThan(0);
     expect(snap.roles[0]).toBe(Role.Catcher);
     expect(snap.water[0]).toBeGreaterThan(0);
     const lines = describeSnapshot(snap, h.game);
-    expect(lines[0]).toContain('n2-drip');
+    expect(lines[0]).toContain('n3-drip');
     expect(lines.join('\n')).toContain('catcher');
   });
 });
@@ -35,7 +35,7 @@ describe('replay', () => {
     const rec = new InputRecorder(72 * 30);
     h.recorder = rec;
     h.run(3).pose('right', 'flat', 0, -0.27);
-    expect(h.runUntil(() => h.game.puzzle.id === 'n2-drip', 25)).toBe(true);
+    expect(h.runUntil(() => h.game.puzzle.id === 'n2-ledge', 25)).toBe(true);
     h.pose('right', 'cup', -0.2, -0.05).run(3);
     expect(rec.full).toBe(false);
 
@@ -43,7 +43,7 @@ describe('replay', () => {
     replay(rec, g);
     const a = h.game.store,
       b = g.store;
-    expect(g.puzzle.id).toBe('n2-drip');
+    expect(g.puzzle.id).toBe('n2-ledge');
     expect(g.time).toBe(h.game.time);
     expect(b.count).toBe(a.count);
     expect(new Uint8Array(b.x.buffer)).toEqual(new Uint8Array(a.x.buffer));

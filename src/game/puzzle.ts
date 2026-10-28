@@ -41,6 +41,8 @@ export interface PuzzleDef extends LevelSource {
   readonly solutions: readonly string[];
   /** The shape the ghost hint shows. */
   readonly hintShape: Shape;
+  /** The shape the hint shows now, for a puzzle with more than one obstacle (default hintShape). */
+  hintShapeAt?(ctx: GameContext): Shape;
   /** Seconds stuck before the hint (default HINT_DELAY_S). */
   readonly hintDelayS?: number;
   /** Top of the ground (default GROUND_Y). */
@@ -148,7 +150,7 @@ export class PuzzleRunner {
       const p = this.hintPos;
       if (def.hintAt) def.hintAt(ctx, p);
       else defaultHintAt(ctx, p);
-      ctx.events.push('hint-show', def.hintShape, ctx.time, 0, p[0], p[1]);
+      ctx.events.push('hint-show', def.hintShapeAt ? def.hintShapeAt(ctx) : def.hintShape, ctx.time, 0, p[0], p[1]);
     } else if (this.hintVisible && this.movingT >= HINT_HIDE_AFTER_S) {
       this.hideHint(ctx);
     }
