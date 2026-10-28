@@ -52,9 +52,9 @@ A long shelf with a freshly watered plant hanging above it. Water drips steadily
 | Rung | When stuck for | What |
 |---|---|---|
 | Outline | 20 s | a cup just before the drips, at (−0.15, −0.06) |
-| Kindred | 40 s | perches where the cup would go, just above the traveller's head, at (−0.1, −0.05) |
-| Look back | 70 s | the traveller holds its lantern up toward the player |
-| Ease | 100 s | the dripping slows to about a third, so a roof or a cup held still is enough |
+| Kindred | 40 s | perches just above the outline, where the cup would go |
+| Look back | 3 s | the traveller holds its lantern up toward the player |
+| Ease | 100 s | the dripping slows to a third (`EASED_DRIP_SHARE`), so a roof or a cup held still is enough |
 
 ## Feedback
 
