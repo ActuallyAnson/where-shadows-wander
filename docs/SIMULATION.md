@@ -35,7 +35,7 @@ Game.frame(input)                                   once per display frame
            creatures / traveller think                       speeds
            solver.step
            abilities.afterSolve                              catching, splashes on hands
-           puzzle.afterStep                                  contacts, drawbridge, credit
+           puzzle.afterStep                                  contacts, the gate, credit
            traveller / creatures after                       goal, falls, crows leaving
            runner.update                                     credit, hint, win, outro -> next puzzle
   return alpha                                      renderer draws px + (x - px) * alpha
@@ -111,7 +111,7 @@ The reasoning is in [ADR 0007](adr/0007-custom-2d-solver.md). The solver is a sm
 | Thing | Shape | Who sets it |
 |---|---|---|
 | Entities | circles in the `EntityStore`. `Static` ones never move. `Sensor` ones report overlaps and push nothing. | gameplay, layouts |
-| Terrain | `solver.terrain`: 64 capsules by default (the game's has 128), each with a `tag` and an `enabled` switch | puzzle load (props' shadows, ground, a drawbridge) |
+| Terrain | `solver.terrain`: 64 capsules by default (the game's has 128), each with a `tag` and an `enabled` switch | puzzle load (props' shadows, ground, a gate) |
 | Hands | `solver.hands[LEFT/RIGHT]`: 28 capsules copied from `HandShadow` each frame, with `mask` (bit `1 << kind` per kind the hand is solid to) and the hand's velocity `vx`, `vy` | gameplay (abilities) |
 
 `config` holds:
@@ -174,7 +174,7 @@ A puzzle's layout comes from one of two places:
 ### What lives where
 
 - **The scene file** holds the pieces (the traveller's start, crows, fireflies) and the markers (`gap`, `goal`, `plate`). No puzzle of the night reads it any more; it stays as the loader's test input for the editor path.
-- **Puzzle code** in `src/game/puzzles/` holds everything that moves or reacts: drips, wind, the drawbridge.
+- **Puzzle code** in `src/game/puzzles/` holds everything that moves or reacts: drips, wind, the castle gate.
 - **`content/levels` stays unused,** per ADR 0006.
 - **Adding a marker tag or a `Kind`** needs a stand-in asset in `src/app/assets.ts`. That file is Anson's, and a test enforces it.
 
@@ -255,7 +255,7 @@ const alpha = game.frame({ dt, paused, left: shadows.left, right: shadows.right,
 |---|---|
 | `alpha` and `store` (`x/y/px/py/radius/kind/flags`) | the sprite renderer (B) |
 | `events` (`GameEventQueue`): one frame of events, cleared at the next `frame()` | audio, saves, UI, effects |
-| `fixtures` | the renderer: drip, wind, drawbridge, plate, window |
+| `fixtures` | the renderer: drip, wind, gate, plate, window |
 | `traveller.state`/`stateT`, `abilities.hands[h].role` | animation (B) |
 | `save` (`SaveState`), changed on `puzzle-solved` and `chapter-complete` | the save service (B) |
 
@@ -311,7 +311,7 @@ The tracking flags are recorded in replays (bits 1 and 2 of the per-frame `pause
 | `hint-show` / `hint-hide` | the shape to make (show) | `x`, `y`: where |
 | `caught` | `raindrop` / `firefly` | how many the cup holds |
 | `splash` | `ground` / `hand` / `traveller` | |
-| `puzzle-event` | `drawbridge-down`, `cup-overflow` (and `crows-flee`, from crows no puzzle uses now) | |
+| `puzzle-event` | `gate-open`, `cup-overflow` (and `crows-flee`, from crows no puzzle uses now) | |
 
 ## The traveller: `src/game/traveller.ts`
 
@@ -393,7 +393,7 @@ A `PuzzleDef` has:
   - The puzzle calls `ctx.credit(id)` with evidence while the player plays. The runner adds credit for the role of the hand the traveller stands on.
   - At the win, the solution with the most credit is recorded. A win nothing was credited for is a way nobody designed (for example, two fists side by side as stepping stones over the tutorial's gap). It is recorded as `other` (`OTHER_SOLUTION`), not mislabelled as the intended solution.
   - Credit for an id that isn't a solution is ignored.
-- **Hint.** After the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`, `hint-show` names the shape and a stage position. The default is 20 s (GDD); the tutorial uses 0.5 s. `hint-hide` follows once it has walked for 0.5 s.
+- **Hint.** After the traveller has been stuck (blocked, looking back, held or pushed) for `hintDelayS`, `hint-show` names the shape and a stage position. The default is 20 s (GDD); the tutorial uses 0.5 s and the castle 30 s. A puzzle with two obstacles can change the shape with `hintShapeAt` (the castle: flat for the moat, then fist for the gate). `hint-hide` follows once it has walked for 0.5 s.
 - **Win and outro.** The traveller reaching the goal emits `puzzle-solved` and saves the solution. After a 2.5 s outro the next puzzle loads, between frames. After the last puzzle comes `chapter-complete`, with the window lit.
 
 ### The night: `src/game/puzzles/`
@@ -403,12 +403,12 @@ Five puzzles in a kid's bedroom (GDD "Puzzles"), each standing on the shadows of
 | # | Puzzle | Props (ground, and drawn only) | Obstacle | Solutions (intended first) | How the code decides |
 |---|---|---|---|---|---|
 | 1 | `n1-books` (tutorial) | books, toy block | a 0.22 m gap | `bridge` | standing on a bridge hand |
-| 2 | `n2-drip` | shelf; plant (drawn) | drips fall from the plant onto the path between x −0.1 and 0.2 (seeded drops); the traveller waits while drops land just ahead or hit it | `cup`, `roof` | which cover is over it under the drips |
-| 3 | `n3-fan` | shelf; fan head and stand (drawn) | the fan's wind from the right, stronger than its stride | `wall` (a spread hand on its windward side), `anchor` (a fist above it) | sheltered by `wallShelters`, or a rock hand within 0.25 m above its centre |
-| 4 | `n4-bed` | bed, toy box | a 0.5 m gap, wider than one hand | `two-bridges`, `ferry` (one flat hand carried across with the traveller on it) | standing on both bridge hands, or on a bridge hand moving at 4 cm/s or more |
-| 5 | `n5-castle` | path, castle floor; castle (drawn) | a 0.22 m moat; the drawbridge is up | `drawbridge` (a fist resting 0.3 s on the counterweight brings it down for good), `bridge` (a flat hand over the moat) | standing on the drawbridge, or on a bridge hand |
+| 2 | `n2-ledge` | books, bedside table | a 0.12 m gap, and the table's top 0.12 m above the books' (the traveller steps 0.03 m) | `rock` (a fist in the gap, lifted with the traveller on it), `bridge` (a flat hand lifted the same way) | which role's hand it stood on |
+| 3 | `n3-drip` | shelf; plant (drawn) | drips fall from the plant onto the path between x −0.1 and 0.2 (seeded drops); the traveller waits while drops land just ahead or hit it | `cup`, `roof` | which cover is over it under the drips |
+| 4 | `n4-fan` | shelf; fan head and stand (drawn) | the fan's wind from the right, stronger than its stride | `wall` (a spread hand on its windward side), `anchor` (a fist above it) | sheltered by `wallShelters`, or a rock hand within 0.25 m above its centre |
+| 5 | `n5-castle` | path, castle floor; castle (drawn) | a 0.22 m moat, and a shut gate at the castle door (x 0.44) | both are needed: a flat hand over the moat, and a fist resting 0.3 s on the counterweight, which opens the gate for good. `gate-first` or `bridge-first` | which side of the moat the traveller was on when the gate opened |
 
-Each puzzle's test (`night.test.ts`) also checks one way that should not work: an animal shape over the gap, a cup beside the drips, a windbreak on the sheltered side, one bridge held still over the gap, a flat hand on the counterweight. Another test plays the whole night start to finish.
+Each puzzle's test (`night.test.ts`) also checks one way that should not work: an animal shape over the gap, a fist held still below the bedside table, a cup beside the drips, a windbreak on the sheltered side, the castle's bridge or counterweight alone, a flat hand on the counterweight. Another test plays the whole night start to finish.
 
 The fist anchor's reach was widened from 0.15 to 0.25 m: a fist lower than about 0.13 m above the traveller's centre stands in its way, so the old reach left a band only 2 cm tall to hold it in.
 
@@ -492,7 +492,7 @@ Puzzle objects that aren't entities, for the renderer. Each has a `kind`, centre
 |---|---|---|
 | `drip` | | |
 | `wind` | | how hard it reaches the traveller (1, or 0.2 when sheltered) |
-| `drawbridge` | down | 1 once down |
+| `gate` | shut | 1 once open |
 | `plate` | | 1 while pressed |
 | `window` | lit (chapter end) | |
 
@@ -561,7 +561,7 @@ The GDD doesn't specify these, so A's code makes them. They are flagged here so 
 - **A hand with no role is not solid.** Only a committed shape's shadow touches the world. It still always mirrors the hand visually.
 - **The traveller won't walk into the drips.** In puzzle 2 it is the traveller's caution, not damage, that makes the obstacle.
 - **Puzzle 3 anchor:** the GDD's "fist rock as an anchor" is read as a fist held above the traveller, which it holds on to.
-- **Puzzle 5 counterweight:** the plate sits on a shelf above the path, so a fist resting on it doesn't block the traveller, and the drawbridge stays down once lowered, so the player can rest their arm.
+- **Puzzle 5 counterweight:** the plate sits on a shelf above the path, so a fist resting on it doesn't block the traveller, and the gate stays open once opened, so the player can rest their arm and use the same hand for the bridge.
 - **No ground line in the bedroom:** the props' shadows are all the ground. A traveller off the end of a prop falls and is put back at its start.
 - **A custom 2D solver rather than a library:** see [ADR 0007](adr/0007-custom-2d-solver.md).
 - **`content/levels` stays unused.** Per ADR 0006, layouts live in the scene file and puzzle logic in `src/game/puzzles/`.

@@ -96,13 +96,13 @@ describe('save bridge', () => {
     const disk = new Disk();
     const a = open(disk);
     a.h.pose('right', 'flat', 0, BRIDGE_Y);
-    expect(a.h.runUntil(() => a.h.game.puzzle.id === 'n2-drip', 30, a.each)).toBe(true);
+    expect(a.h.runUntil(() => a.h.game.puzzle.id === 'n2-ledge', 30, a.each)).toBe(true);
     // A few seconds into the drips, then the headset comes off: the service's hooks flush.
     a.h.hide('right').run(3, a.each);
     a.store.flush();
 
     const b = open(disk);
-    expect(b.h.game.puzzle.id).toBe('n2-drip');
+    expect(b.h.game.puzzle.id).toBe('n2-ledge');
     expect(b.h.game.save.solutions).toEqual({ 'n1-books': ['bridge'] });
     expect(b.store.data.puzzles['n1-books']).toEqual({ solved: true, solutions: ['bridge'] });
   });
@@ -133,7 +133,9 @@ describe('save bridge', () => {
     store.data.progress.puzzle = 4;
     const h = new Headless({ puzzles: createNight(), save: saveStateFrom(store, ids) });
     const bridge = new SaveBridge(store, h.game);
-    h.pose('right', 'fist', -0.3, 0.07);
+    // The castle: the counterweight, then a bridge over the moat.
+    h.pose('right', 'fist', -0.3, 0.07).run(1.5, () => bridge.update());
+    h.hide('right').pose('left', 'flat', 0.01, BRIDGE_Y);
     expect(
       h.runUntil(
         () => h.saw('chapter-complete'),
@@ -151,7 +153,7 @@ describe('save bridge', () => {
     const a = open(new Disk());
     a.store.failWrites = true;
     a.h.pose('right', 'flat', 0, BRIDGE_Y);
-    expect(a.h.runUntil(() => a.h.game.puzzle.id === 'n2-drip', 30, a.each)).toBe(true);
+    expect(a.h.runUntil(() => a.h.game.puzzle.id === 'n2-ledge', 30, a.each)).toBe(true);
     expect(a.bridge.failedWrites).toBe(1);
   });
 

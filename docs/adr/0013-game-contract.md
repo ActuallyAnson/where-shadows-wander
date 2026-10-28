@@ -36,7 +36,7 @@ The game copies what it needs. Shape events go through `InputLatch`, so each eve
 
 **Outputs** are plain data, read after `frame()` returns:
 - **`game.store`** (the `EntityStore` columns) plus `alpha`, for sprites: draw kind `k` from `kindStart[k]` to `kindEnd[k]` at `px + (x - px) * alpha`.
-- **`game.fixtures`:** puzzle objects that aren't entities (drip, wind, drawbridge, plate, window).
+- **`game.fixtures`:** puzzle objects that aren't entities (drip, wind, gate, plate, window).
 - **`game.events`:** a `GameEventQueue` of one frame's events with constant-string ids. It is cleared at the start of the next `frame()`. Its consumers are audio, effects, the save service and the hint UI.
 - **Readable state for animation:**
   - `game.traveller.state` and `stateT`

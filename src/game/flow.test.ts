@@ -2,6 +2,7 @@
 // actions the app must run, and a whole night driven through the flow.
 import { describe, expect, it } from 'vitest';
 import { GestureEventQueue } from '../engine/hands/gesture-events';
+import { Touch } from '../engine/sim/solver';
 import {
   FLOW_STATES,
   FLOW_TRANSITIONS,
@@ -14,6 +15,7 @@ import {
 import { GameEventQueue } from './game-events';
 import { Headless } from './headless';
 import { LEDGE_TOP } from './puzzles/bedroom';
+import { TABLE_RISE } from './puzzles/n2-ledge';
 import { createNight } from './puzzles/index';
 
 const STATES = Object.keys(FLOW_STATES) as FlowState[];
@@ -200,12 +202,29 @@ describe('driven by the game', () => {
     expect(play.runUntil(() => flow.state === 'playing', 5, tick)).toBe(true);
     play.hide('right');
     // The rest of the night with the second solutions where they are quick to script.
-    play.pose('left', 'flat', 0.05, 0.12);
-    expect(play.runUntil(() => g.puzzle.id === 'n3-fan' && flow.state === 'playing', 50, tick)).toBe(true);
-    play.hide('left');
+    // 2: a flat hand in the gap, lifted to the bedside table with the traveller on it.
+    let y = bridge;
+    play.pose('right', 'flat', 0, y);
     expect(
       play.runUntil(
-        () => g.puzzle.id === 'n4-bed' && flow.state === 'playing',
+        () => g.puzzle.id === 'n3-drip' && flow.state === 'playing',
+        50,
+        () => {
+          if (g.traveller.standingOn(g) === Touch.Hand && y < LEDGE_TOP + TABLE_RISE)
+            play.move('right', 0, (y += 0.002));
+          tick();
+        },
+      ),
+    ).toBe(true);
+    play.hide('right');
+    // 3: a roof over the drips.
+    play.pose('left', 'flat', 0.05, 0.12);
+    expect(play.runUntil(() => g.puzzle.id === 'n4-fan' && flow.state === 'playing', 50, tick)).toBe(true);
+    play.hide('left');
+    // 4: a windbreak walked along with the traveller.
+    expect(
+      play.runUntil(
+        () => g.puzzle.id === 'n5-castle' && flow.state === 'playing',
         50,
         () => {
           play.pose('right', 'spread', tx() + 0.15, LEDGE_TOP + 0.19);
@@ -214,9 +233,10 @@ describe('driven by the game', () => {
       ),
     ).toBe(true);
     play.hide('right');
-    play.pose('left', 'flat', -0.1, bridge).pose('right', 'flat', 0.18, bridge);
-    expect(play.runUntil(() => g.puzzle.id === 'n5-castle' && flow.state === 'playing', 50, tick)).toBe(true);
-    play.hide('left').hide('right').pose('left', 'flat', 0.01, bridge);
+    // 5: the bridge over the moat first, then the counterweight.
+    play.pose('left', 'flat', 0.01, bridge);
+    expect(play.runUntil(() => tx() > 0.25, 30, tick)).toBe(true);
+    play.hide('left').pose('right', 'fist', -0.3, 0.07);
     expect(play.runUntil(() => flow.state === 'night-complete', 50, tick)).toBe(true);
     expect(h.actions).toEqual(['play-ending']);
     flow.send('ending-done');

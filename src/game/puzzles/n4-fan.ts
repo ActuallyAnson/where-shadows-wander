@@ -1,4 +1,4 @@
-// Puzzle 3, the fan: a desk fan at the end of the shelf blows across its right half and pushes the
+// Puzzle 4, the fan: a desk fan at the end of the shelf blows across its right half and pushes the
 // traveller back. Intended: a spread hand stands upright on its windward side as a windbreak. Also
 // works: a fist held just above the traveller as a rock to hold on to (an anchor), carried along
 // with it.
@@ -23,7 +23,7 @@ const ANCHORED_SHARE = 0.25;
 const ANCHOR_REACH = 0.25;
 
 // The wind is stronger than the traveller's stride: on its own it never gets through.
-if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n3-fan: the wind must out-push the traveller');
+if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n4-fan: the wind must out-push the traveller');
 
 /** Whether a rock-role hand is close above the traveller for it to hold on to. */
 function anchored(ctx: GameContext, x: number, y: number): boolean {
@@ -41,7 +41,7 @@ function anchored(ctx: GameContext, x: number, y: number): boolean {
 export function createFanPuzzle(): PuzzleDef {
   const state: { wind: Fixture | null } = { wind: null };
   return {
-    id: 'n3-fan',
+    id: 'n4-fan',
     title: 'The fan',
     layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
     props: [

@@ -20,9 +20,9 @@ interface Pose {
 const SCENES: Record<BusySceneName, { puzzle: number; left: Pose; right: Pose }> = {
   // A cup sweeping the far half of the drips and a roof off to the side: the drips keep falling on
   // the path, so the traveller waits.
-  drip: { puzzle: 1, left: { shape: 'cup', x: 0.12, y: 0 }, right: { shape: 'flat', x: 0.5, y: 0.15 } },
+  drip: { puzzle: 2, left: { shape: 'cup', x: 0.12, y: 0 }, right: { shape: 'flat', x: 0.5, y: 0.15 } },
   // A windbreak and an anchor both behind the traveller: the wind keeps it from the goal.
-  fan: { puzzle: 2, left: { shape: 'spread', x: -0.5, y: -0.07 }, right: { shape: 'fist', x: -0.7, y: 0.0 } },
+  fan: { puzzle: 3, left: { shape: 'spread', x: -0.5, y: -0.07 }, right: { shape: 'fist', x: -0.7, y: 0.0 } },
   // A fist swaying just above the counterweight (never resting on it) and a flat hand off the moat.
   castle: { puzzle: 4, left: { shape: 'fist', x: -0.3, y: 0.2 }, right: { shape: 'flat', x: 0.5, y: 0.2 } },
 };

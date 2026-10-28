@@ -28,7 +28,7 @@ describe('Game', () => {
   it('resumes at the saved puzzle', () => {
     const save = newSave();
     save.puzzle = 2;
-    expect(new Game({ ...opts(), save }).puzzle.id).toBe('n3-fan');
+    expect(new Game({ ...opts(), save }).puzzle.id).toBe('n3-drip');
   });
 
   it('steps at 60 Hz whatever the display rate, and returns an interpolation factor', () => {
@@ -60,7 +60,7 @@ describe('Game', () => {
     expect(g.events.has('puzzle-start')).toBe(false);
     g.goto(2);
     g.frame(input());
-    expect(g.events.has('puzzle-start', 'n3-fan')).toBe(true);
+    expect(g.events.has('puzzle-start', 'n3-drip')).toBe(true);
   });
 
   it('gives a committed flat hand the bridge role, solid to the traveller, until released', () => {
@@ -94,9 +94,9 @@ describe('Game', () => {
   it('moves on to the next puzzle after the outro and saves progress', () => {
     const h = new Headless(opts());
     h.pose('right', 'flat', 0, -0.27);
-    expect(h.runUntil(() => h.game.puzzle.id === 'n2-drip', 30)).toBe(true);
+    expect(h.runUntil(() => h.game.puzzle.id === 'n2-ledge', 30)).toBe(true);
     expect(h.game.save.puzzle).toBe(1);
-    expect(h.saw('puzzle-start', 'n2-drip')).toBe(true);
+    expect(h.saw('puzzle-start', 'n2-ledge')).toBe(true);
   });
 
   it('restart and goto reload a puzzle from its layout', () => {
@@ -108,7 +108,7 @@ describe('Game', () => {
     expect(g.store.x[g.traveller.slot(g)]).toBeCloseTo(start, 9);
     g.goto(4);
     expect(g.puzzle.id).toBe('n5-castle');
-    expect(g.fixtures.find('drawbridge')?.active).toBe(false);
+    expect(g.fixtures.find('gate')?.active).toBe(true);
   });
 
   it('puts a fallen traveller back at its start, unhurt', () => {
