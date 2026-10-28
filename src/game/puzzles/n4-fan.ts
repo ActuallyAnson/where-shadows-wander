@@ -14,6 +14,8 @@ import { goalOn, LEDGE_TOP, ledge, PROP_DEPTH, startOn } from './bedroom';
 /** Where the fan's wind blows (from this stage x to the right edge), and how hard, m/s against the traveller. */
 export const WIND_FROM_X = -0.25;
 export const WIND_PUSH = -0.22;
+/** Once the hint ladder eases the puzzle: a breeze the traveller can walk against. */
+export const EASED_WIND_PUSH = -0.05;
 /** An anchored traveller still feels this share of the wind (it leans in, but makes way). */
 const ANCHORED_SHARE = 0.25;
 /**
@@ -24,6 +26,7 @@ const ANCHOR_REACH = 0.25;
 
 // The wind is stronger than the traveller's stride: on its own it never gets through.
 if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n4-fan: the wind must out-push the traveller');
+if (EASED_WIND_PUSH + WALK_SPEED <= 0) throw new Error('n4-fan: the eased breeze must let the traveller through');
 
 /** Whether a rock-role hand is close above the traveller for it to hold on to. */
 function anchored(ctx: GameContext, x: number, y: number): boolean {
@@ -39,7 +42,7 @@ function anchored(ctx: GameContext, x: number, y: number): boolean {
 
 /** A fresh puzzle with its own state: one per Game, so two games never share it. */
 export function createFanPuzzle(): PuzzleDef {
-  const state: { wind: Fixture | null } = { wind: null };
+  const state: { wind: Fixture | null; push: number } = { wind: null, push: WIND_PUSH };
   return {
     id: 'n4-fan',
     title: 'The fan',
@@ -56,6 +59,7 @@ export function createFanPuzzle(): PuzzleDef {
     hintShape: 'spread',
 
     setup(ctx) {
+      state.push = WIND_PUSH;
       const right = WALL_WIDTH_M / 2;
       state.wind = ctx.fixtures.add(
         'wind',
@@ -87,10 +91,16 @@ export function createFanPuzzle(): PuzzleDef {
       }
       if (anchored(ctx, x, y)) {
         ctx.credit('anchor', ctx.dt);
-        t.push = WIND_PUSH * ANCHORED_SHARE;
+        t.push = state.push * ANCHORED_SHARE;
         return;
       }
-      t.push = WIND_PUSH;
+      t.push = state.push;
+    },
+
+    // The ladder's last rung: the fan slows to a breeze.
+    ease() {
+      state.push = EASED_WIND_PUSH;
+      if (state.wind) state.wind.value = EASED_WIND_PUSH / WIND_PUSH;
     },
 
     hintAt(ctx, out) {

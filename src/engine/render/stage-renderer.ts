@@ -140,7 +140,11 @@ export class StageRenderer {
       // Determine animation frame & tile
       let animFrame = 0;
       if (kind === Kind.Traveller) {
-        if ((store.flags[s] & Flag.WaitPose) !== 0) {
+        if ((store.flags[s] & Flag.CheerPose) !== 0) {
+          animFrame = 4; // cheer pose: celebration with arms raised!
+        } else if ((store.flags[s] & Flag.ShiverPose) !== 0) {
+          animFrame = 5; // shiver pose: trembling in cold / darkness
+        } else if ((store.flags[s] & Flag.WaitPose) !== 0) {
           animFrame = 3; // wait pose: looking back toward player
         } else {
           const speed = Math.hypot(vx, vy);

@@ -25,7 +25,11 @@ export type GameEventType =
   | 'traveller-fell'
   /** Show the ghost hint (id: the shape to make, x, y: where on the stage). */
   | 'hint-show'
-  /** Hide the ghost hint. */
+  /** The hint's next rung: the kindred perches on the hint's spot (x, y). */
+  | 'hint-kindred'
+  /** The hint's last rung: the obstacle eased (id: puzzle id, x, y: the hint's spot). */
+  | 'hint-ease'
+  /** Hide the ghost hint (and send the kindred off its perch). */
   | 'hint-hide'
   /** The cup caught something (id: raindrop or firefly, value: how many it holds, hand). */
   | 'caught'

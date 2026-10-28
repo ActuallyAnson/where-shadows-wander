@@ -61,9 +61,9 @@ The hint follows what the traveller needs next (`hintShapeAt`): the moat's bridg
 | Rung | When stuck for | Before the moat | At the gate |
 |---|---|---|---|
 | Outline | 30 s | flat hand over the moat, at (0.01, −0.26) | fist on the counterweight, at (−0.3, 0.06) |
-| Kindred | 50 s | perches over the moat | perches on the counterweight plate |
-| Look back | 80 s | the traveller looks back at the player | it looks back, then up at the plate |
-| Ease | 110 s | the moat narrows to a step | the gate creaks half open and swings fully open on the next touch of any shape on the plate |
+| Kindred | — | skipped: the kindred is away from the dimming until the return | skipped |
+| Look back | 3 s | the traveller looks back at the player | it looks back, then up at the plate |
+| Ease | 110 s | none: the outline is the help | the gate swings open by itself |
 
 ## Feedback
 

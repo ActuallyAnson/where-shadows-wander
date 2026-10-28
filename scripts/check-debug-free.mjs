@@ -29,10 +29,24 @@ const jsIn = (dir) =>
 function build(mode) {
   const dir = mkdtempSync(join(tmpdir(), `wsw-${mode}-`));
   const env = { ...process.env, NODE_ENV: 'production' };
-  execFileSync('npx', ['vite', 'build', '--mode', mode, '--outDir', dir, '--emptyOutDir', '--logLevel', 'error'], {
-    env,
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
+  execFileSync(
+    process.execPath,
+    [
+      './node_modules/vite/bin/vite.js',
+      'build',
+      '--mode',
+      mode,
+      '--outDir',
+      dir,
+      '--emptyOutDir',
+      '--logLevel',
+      'error',
+    ],
+    {
+      env,
+      stdio: ['ignore', 'ignore', 'inherit'],
+    },
+  );
   const text = jsIn(dir);
   rmSync(dir, { recursive: true, force: true });
   return text;

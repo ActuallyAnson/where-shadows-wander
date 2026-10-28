@@ -62,6 +62,15 @@ export function createCastlePuzzle(): PuzzleDef {
   const gateOpen = (ctx: GameContext) => state.gate < 0 || ctx.solver.terrain.enabled[state.gate] === 0;
   /** What the traveller needs next: the bridge until it is over the moat, then the gate. */
   const needsGate = (ctx: GameContext) => pastMoat(ctx) && !gateOpen(ctx);
+  const open = (ctx: GameContext) => {
+    ctx.solver.terrain.enabled[state.gate] = 0;
+    if (state.gateFixture) {
+      state.gateFixture.active = false;
+      state.gateFixture.value = 1;
+    }
+    ctx.events.push('puzzle-event', 'gate-open', ctx.time, 0, GATE_X, LEDGE_TOP);
+    ctx.credit(pastMoat(ctx) ? 'bridge-first' : 'gate-first', 1);
+  };
   return {
     id: 'n5-castle',
     title: 'The castle',
@@ -114,14 +123,12 @@ export function createCastlePuzzle(): PuzzleDef {
       if (state.plateFixture) state.plateFixture.value = down ? 1 : 0;
       if (gateOpen(ctx)) return;
       state.heldT = down ? state.heldT + ctx.dt : 0;
-      if (state.heldT < OPEN_S) return;
-      ctx.solver.terrain.enabled[state.gate] = 0;
-      if (state.gateFixture) {
-        state.gateFixture.active = false;
-        state.gateFixture.value = 1;
-      }
-      ctx.events.push('puzzle-event', 'gate-open', ctx.time, 0, GATE_X, LEDGE_TOP);
-      ctx.credit(pastMoat(ctx) ? 'bridge-first' : 'gate-first', 1);
+      if (state.heldT >= OPEN_S) open(ctx);
+    },
+
+    // The ladder's last rung: at the gate, it swings open by itself. (At the moat, the outline is the help.)
+    ease(ctx) {
+      if (needsGate(ctx)) open(ctx);
     },
 
     hintShapeAt(ctx): Shape {

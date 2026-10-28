@@ -56,9 +56,9 @@ The table's top is 0.12 m above the books'; the traveller steps up at most 0.03 
 | Rung | When stuck for | What |
 |---|---|---|
 | Outline | 20 s | a fist in the gap, at (0, −0.26) |
-| Kindred | 40 s | perches on the corner of the bedside table, at (0.08, −0.10), looking down at the traveller |
-| Look back | 70 s | the traveller looks back, then up at the table |
-| Ease | 100 s | the outline drifts upward from the gap to the table's top and back, showing the lift |
+| Kindred | 40 s | perches just above the outline, in the gap |
+| Look back | 3 s | the traveller looks back, then up at the table |
+| Ease | 100 s | not built yet: the outline should drift up from the gap to the table's top and back, showing the lift |
 
 The outline only shows the shape and where; rung 5's drifting outline is what shows the lifting motion. If playtests show players don't think of lifting, bring the drift forward to rung 2.
 

@@ -121,6 +121,23 @@ export async function mountEnterArButtonIfNeeded(
     statusLine.style.color = '#e3b341';
     appendLog(`Requesting ${mode} session (forceWebGLLayer: ${forceWebGLLayer})...`, '#e3b341');
 
+    // Stash original createProjectionLayer so we can restore it on failure or session end
+    const origCreateProjLayer =
+      typeof XRWebGLBinding !== 'undefined'
+        ? (XRWebGLBinding.prototype as unknown as { createProjectionLayer?: unknown }).createProjectionLayer
+        : undefined;
+
+    const restoreProjectionLayer = () => {
+      if (
+        origCreateProjLayer &&
+        typeof XRWebGLBinding !== 'undefined' &&
+        !('createProjectionLayer' in XRWebGLBinding.prototype)
+      ) {
+        (XRWebGLBinding.prototype as unknown as { createProjectionLayer?: unknown }).createProjectionLayer =
+          origCreateProjLayer;
+      }
+    };
+
     try {
       const w = world as unknown as { sessionRequestPending?: boolean; session?: XRSession };
       w.sessionRequestPending = false;
@@ -132,9 +149,39 @@ export async function mountEnterArButtonIfNeeded(
         }
       }
 
-      const session = await xr.requestSession(mode, {
-        optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
-      });
+      // Feature ladder: Wolvic on Pico can reject optional features (like bounded-floor or hand-tracking)
+      // if controllers are connected, boundary is unconfigured/stationary, or after a session reset.
+      const configs: Array<{ label: string; init: XRSessionInit }> = [
+        { label: 'hands + boundary', init: { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] } },
+        { label: 'hands only', init: { optionalFeatures: ['local-floor', 'hand-tracking'] } },
+        { label: 'basic floor', init: { optionalFeatures: ['local-floor'] } },
+        { label: 'minimal', init: {} },
+      ];
+
+      let session: XRSession | null = null;
+      let lastErr: unknown = null;
+
+      for (let i = 0; i < configs.length; i++) {
+        const cfg = configs[i];
+        try {
+          appendLog(`Requesting ${mode} (${cfg.label})...`, '#e3b341');
+          session = await xr.requestSession(mode, cfg.init);
+          appendLog(`Session granted (${cfg.label})!`, '#7ee787');
+          break;
+        } catch (e: unknown) {
+          lastErr = e;
+          const msg = e instanceof Error ? e.message : String(e);
+          appendLog(`Config (${cfg.label}) rejected: ${msg}`, '#e3b341');
+          if (i < configs.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 60));
+          }
+        }
+      }
+
+      if (!session) {
+        throw lastErr;
+      }
+
       const sessInfo = session as unknown as { mode?: string; enabledFeatures?: Iterable<string> };
       appendLog(`Session granted! Mode: ${sessInfo.mode || mode}`, '#7ee787');
 
@@ -171,7 +218,12 @@ export async function mountEnterArButtonIfNeeded(
       statusLine.textContent = `● XR Session Running (${mode})`;
       statusLine.style.color = '#7ee787';
       appendLog('Session successfully running! Presenting virtual scene.', '#7ee787');
+
+      session.addEventListener('end', () => {
+        restoreProjectionLayer();
+      });
     } catch (err: unknown) {
+      restoreProjectionLayer();
       statusLine.textContent = `✕ Session Failed`;
       statusLine.style.color = '#ff7b72';
       const name = err instanceof Error ? err.name : 'Error';
@@ -179,7 +231,9 @@ export async function mountEnterArButtonIfNeeded(
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
       title?.setBusy(false);
-      showNote("Couldn't start VR. Try again, or use one of the other ways in below.");
+      showNote(
+        "Couldn't start VR. The headset runtime rejected the session.\nTry 'Reload page' below, or restart Wolvic.",
+      );
       openOtherWays();
     }
   };
@@ -283,6 +337,15 @@ export async function mountEnterArButtonIfNeeded(
   );
   waysTarget.append(iwsdkBtn);
 
+  const reloadBtn = makeWayBtn(
+    DEBUG_TOOLS ? '🔄 Reload Page' : 'Reload page',
+    ['#3d1f24', '#f85149', '#da3633'],
+    () => {
+      location.reload();
+    },
+  );
+  waysTarget.append(reloadBtn);
+
   // Copy logs button: a debug tool, not in the judges' build.
   if (DEBUG_TOOLS) {
     const copyBtn = makeBtn('📋 Copy Logs', '#21262d', '#c9d1d9', '#30363d', async () => {
@@ -329,8 +392,13 @@ export async function mountEnterArButtonIfNeeded(
   world.renderer.xr.addEventListener('sessionend', () => {
     uiContainer.style.display = 'flex';
     title?.setVisible(true);
+    title?.setBusy(false);
     statusLine.textContent = '● XR Session Ended';
     statusLine.style.color = '#8b949e';
     appendLog('XR session ended.', '#8b949e');
+    const w = world as unknown as { sessionRequestPending?: boolean; session?: XRSession };
+    w.session = undefined;
+    w.sessionRequestPending = false;
+    world.renderer.xr.enabled = false;
   });
 }
