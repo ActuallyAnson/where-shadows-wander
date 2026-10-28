@@ -30,4 +30,8 @@ export const Flag = {
   Hidden: 1 << 3,
   /** Wait pose: traveller looks back toward player. */
   WaitPose: 1 << 8,
+  /** Cheer pose: traveller celebrates victory with arms raised. */
+  CheerPose: 1 << 9,
+  /** Shiver pose: traveller shivers in fear or cold shadow. */
+  ShiverPose: 1 << 10,
 } as const;
