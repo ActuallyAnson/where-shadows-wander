@@ -213,6 +213,8 @@ async function start(): Promise<void> {
   // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
   const roomDressing = new RoomDressingView();
   bedroomView.group.add(roomDressing.group);
+  bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
+  bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
   const vrTitle = new VrTitleView();
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
@@ -1024,7 +1026,7 @@ async function start(): Promise<void> {
           if (ignitionProgress > 0) {
             ambientLight.intensity = 0.05 + 0.11 * ignitionProgress;
             bedroomView.update(lanternLight.light, cameraQuat, ignitionProgress);
-            roomDressing.update(lanternLight.light, ignitionProgress);
+            roomDressing.update(lanternLight.light, ignitionProgress, candleView.flamePosition);
           } else {
             ambientLight.intensity = 0.05;
           }
@@ -1342,7 +1344,7 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
-        roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0);
+        roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
         world.camera.getWorldPosition(settingsHead);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);

@@ -128,25 +128,42 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): vo
   edgeShade(g);
   g.restore();
 }
-/** The wall behind the stage is 4 m by 2.5 m on 1024 by 640 units; the things that hang or stand on it live in this band of rows. */
-export const WALL_THINGS_TOP = 120;
-export const WALL_THINGS_ROWS = 320;
+/** A rectangle of the wall behind the stage, in its 1024 by 640 units (4 m by 2.5 m, so 256 units to the metre). */
+export interface WallArea {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+/** The band of the wall the hung things are in, which is the area the painter paints when it is given none. */
+export const WALL_THINGS_BAND: WallArea = { x: 0, y: 120, w: 1024, h: 320 };
+/**
+ * Where the hung things are: each cluster is a quad of its own, as small as its things, so the see-through space between them
+ * costs nothing to draw (two quads the width of the wall cost a fifth of the frame in a software renderer).
+ */
+export const WALL_THINGS: readonly { readonly layer: 'pictures' | 'shelves'; readonly area: WallArea }[] = [
+  { layer: 'pictures', area: { x: 130, y: 140, w: 180, h: 295 } }, // the bird and the moon
+  { layer: 'pictures', area: { x: 785, y: 135, w: 180, h: 150 } }, // the hill
+  { layer: 'shelves', area: { x: 695, y: 262, w: 260, h: 110 } }, // books, boat and lamp
+  { layer: 'shelves', area: { x: 55, y: 205, w: 130, h: 105 } }, // jar and plant
+];
 
 /**
- * What hangs or stands on the wall behind the stage, on a transparent canvas that covers rows 120 to 440 of the wall (any canvas of
- * that 1024 by 320 shape): the `pictures` layer is the framed bird, moon and hill; the `shelves` layer is the two shelves with their
- * books, boat, lamp, jar and plant. Each is a quad of its own, held a hand's breadth off the wall, so the things really stand out
- * from the paper when the head moves; castShadow() paints their shadows onto the wall itself.
+ * What hangs or stands on the wall behind the stage, on a transparent canvas that covers `area` of the wall (the whole band of rows
+ * 120 to 440 when none is given): the `pictures` layer is the framed bird, moon and hill; the `shelves` layer is the two shelves
+ * with their books, boat, lamp, jar and plant. Each cluster is a quad of its own, held a hand's breadth off the wall, so the things
+ * really stand out from the paper when the head moves; castShadow() paints their shadows onto the wall itself.
  */
 export function paintWallThings(
   g: CanvasRenderingContext2D,
   W: number,
   H: number,
   layer: 'pictures' | 'shelves',
+  area: WallArea = WALL_THINGS_BAND,
 ): void {
   g.save();
-  g.scale(W / 1024, H / WALL_THINGS_ROWS);
-  g.translate(0, -WALL_THINGS_TOP);
+  g.scale(W / area.w, H / area.h);
+  g.translate(-area.x, -area.y);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   if (layer === 'pictures') {
@@ -1054,6 +1071,90 @@ export function paintQuilt(g: CanvasRenderingContext2D, W: number, H: number): v
   for (let i = 1; i < 4; i++) {
     g.fillRect(i * P - 1.2, 0, 2.4, 256);
     g.fillRect(0, i * P - 1.2, 256, 2.4);
+  }
+  g.restore();
+}
+
+/** A straw mattress under a ticking cover (any canvas, seen from above): stripes of cloth, a seam round the edge, loose straw sticking out. */
+export function paintStraw(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(131);
+  g.save();
+  g.scale(W / 128, H / 256);
+  rect(g, 0, 0, 128, 256, '#8a7448');
+  for (let x = 0; x < 128; x += 16) {
+    rect(g, x, 0, 8, 256, 'rgba(255, 235, 190, 0.12)');
+    rect(g, x + 8, 0, 8, 256, 'rgba(20, 10, 2, 0.12)');
+  }
+  // loose straw
+  for (let i = 0; i < 260; i++) {
+    const x = r() * 128;
+    const y = r() * 256;
+    g.strokeStyle = r() < 0.5 ? 'rgba(255, 235, 150, 0.45)' : 'rgba(60, 40, 10, 0.4)';
+    g.lineWidth = 0.9;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (r() - 0.5) * 16, y + (r() - 0.5) * 7);
+    g.stroke();
+  }
+  // buttons that pinch the mattress, with a dimple round each
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 2; col++) {
+      const x = 40 + col * 48;
+      const y = 28 + row * 50;
+      const dimple = g.createRadialGradient(x, y, 1, x, y, 16);
+      dimple.addColorStop(0, 'rgba(10, 5, 0, 0.5)');
+      dimple.addColorStop(1, 'rgba(10, 5, 0, 0)');
+      g.fillStyle = dimple;
+      g.fillRect(x - 16, y - 16, 32, 32);
+      g.fillStyle = '#3a2a18';
+      g.beginPath();
+      g.arc(x, y, 2.4, 0, TWO_PI);
+      g.fill();
+    }
+  }
+  // the seam
+  g.strokeStyle = 'rgba(30, 18, 6, 0.6)';
+  g.lineWidth = 1.6;
+  g.setLineDash([4, 3]);
+  g.strokeRect(5, 5, 118, 246);
+  g.restore();
+}
+
+/** A plump linen pillow (any canvas, seen from above): pale cloth with creases, a stitched edge and a tassel at each end. */
+export function paintPillow(g: CanvasRenderingContext2D, W: number, H: number): void {
+  g.save();
+  g.scale(W / 128, H / 64);
+  rect(g, 0, 0, 128, 64, '#a89878');
+  const puff = g.createRadialGradient(64, 30, 4, 64, 32, 76);
+  puff.addColorStop(0, 'rgba(255, 245, 220, 0.3)');
+  puff.addColorStop(0.5, 'rgba(255, 245, 220, 0)');
+  puff.addColorStop(1, 'rgba(20, 10, 2, 0.55)');
+  g.fillStyle = puff;
+  g.fillRect(0, 0, 128, 64);
+  g.strokeStyle = 'rgba(60, 40, 16, 0.3)';
+  g.lineWidth = 1.2;
+  for (const [x, y, x2, y2] of [
+    [30, 14, 58, 26],
+    [74, 38, 102, 24],
+    [40, 48, 70, 40],
+  ]) {
+    g.beginPath();
+    g.moveTo(x, y);
+    g.quadraticCurveTo((x + x2) / 2, (y + y2) / 2 - 5, x2, y2);
+    g.stroke();
+  }
+  g.strokeStyle = 'rgba(70, 50, 20, 0.55)';
+  g.lineWidth = 1.2;
+  g.setLineDash([3, 2.4]);
+  g.strokeRect(4, 4, 120, 56);
+  g.setLineDash([]);
+  g.fillStyle = '#7a4a3a';
+  for (const x of [2, 126]) {
+    for (const y of [2, 62]) {
+      g.beginPath();
+      g.arc(x, y, 3, 0, TWO_PI);
+      g.fill();
+    }
   }
   g.restore();
 }
