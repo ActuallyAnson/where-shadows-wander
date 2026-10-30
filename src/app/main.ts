@@ -22,21 +22,19 @@ import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
+import { RoomDressingView } from '../engine/shadow/room-dressing-view';
+import { FixturesView } from '../engine/render/fixtures-view';
 import { GhostTargetView } from '../engine/render/ghost-target-view';
-import { PropProjector, TUTORIAL_PROPS, type InvisibleProp } from '../engine/render/props/prop-projector';
-import { PropShadowView as RenderPropShadowView } from '../engine/render/props/prop-shadow-view';
 import { StageRenderer } from '../engine/render/stage-renderer';
-import { DEFAULT_CAPACITIES } from '../engine/sim/entity-kinds';
-import { EntityStore } from '../engine/sim/entity-store';
-import { Solver } from '../engine/sim/solver';
-import { TutorialFlow } from '../game/tutorial-flow';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
-import type { Prop } from '../engine/shadow/pure/prop-shadow';
+import { createSilhouette, projectProp, type Prop } from '../engine/shadow/pure/prop-shadow';
+import { SIM_HZ } from '../game/game';
+import { NightDriver } from './night-driver';
 import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
@@ -49,6 +47,8 @@ import { ENDING, ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
+import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
+import { StickerView } from '../engine/shadow/sticker-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
 import { RabbitView } from '../engine/shadow/rabbit-view';
@@ -67,7 +67,6 @@ import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-au
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
-import { FixedStepLoop } from '../engine/sim/fixed-step';
 import { StageFrame } from '../engine/stage/stage-frame';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
@@ -98,7 +97,6 @@ import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { showStartFailure } from './start-failure';
 
-const SIM_HZ = 60;
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
@@ -180,6 +178,11 @@ async function start(): Promise<void> {
   if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
   const stageChoice: 'real' | StageMode =
     !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
+  // The Hand Lab's stand-in stage can be switched between the tabletop theatre and a wall-sized one (the Stage button).
+  let mockStage: StageMode = stageChoice === 'real' ? 'table' : stageChoice;
+  const lastHead = new Float64Array(3);
+  const saucerPos = new Float64Array(3);
+  let lastYaw = 0;
   const stageFrame = new StageFrame();
   const standInStage = createStagePlane();
   const stage: StagePlane = stageChoice === 'real' ? stageFrame : standInStage;
@@ -214,10 +217,19 @@ async function start(): Promise<void> {
   const titleLighter = new TitleLighterView();
   const bedTray = new BedTrayView();
   const bedroomView = new BedroomView();
+  // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
+  const roomDressing = new RoomDressingView();
+  bedroomView.group.add(roomDressing.group);
+  bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
+  bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
   const vrTitle = new VrTitleView();
+  /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
+  const TITLE_HINT_AFTER_S = 6;
+  const TITLE_HINT_PLAIN_AFTER_S = 16;
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
+  let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
   const ambientLight = new AmbientLight(0x101422, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
@@ -229,6 +241,20 @@ async function start(): Promise<void> {
   const kindredStartX = 0.4;
   const spot = new Float64Array(2);
   const kindredView = new KindredView();
+  // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
+  const travellerMood = new TravellerMood();
+  const stickerView = new StickerView();
+  /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
+  const travellerAt = { x: 0, y: 0 };
+  const readTraveller = (): boolean => {
+    const game = night.game;
+    if (!game) return false;
+    const slot = game.traveller.slot(game);
+    travellerAt.x = game.store.x[slot];
+    travellerAt.y = game.store.y[slot];
+    return true;
+  };
+  let stickerNext = 0;
   // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
   const glow = new GlowView();
   const air = new AirView();
@@ -241,14 +267,15 @@ async function start(): Promise<void> {
   let perchT = 0;
   const solveBloom = new SolveBloom();
   const nearGlow = [new Follower(), new Follower()];
-  let lastTutorial = 'IDLE' as string;
   let moodNow = 0.4;
   let moodGoal = 0.4;
-  // The ending: the room cools and dims as the cutscene plays (the game flow calls this after the last puzzle).
-  const playEnding = () => {
-    const problems = cutscenes.play(ENDING);
-    if (problems.length > 0) failures.report('ending', new Error(problems.join('; ')));
-    else moodGoal = ENDING_MOOD;
+  // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
+  const playEnding = (onDone?: () => void) => {
+    const problems = cutscenes.play(ENDING, onDone);
+    if (problems.length > 0) {
+      failures.report('ending', new Error(problems.join('; ')));
+      onDone?.();
+    } else moodGoal = ENDING_MOOD;
   };
   const playSolve = () => {
     moodGoal = 1;
@@ -270,13 +297,13 @@ async function start(): Promise<void> {
       setKindred(kindredWanted);
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.start();
     });
     if (problems.length > 0) {
       failures.report('opening', new Error(problems.join('; ')));
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.start();
       return;
     }
     openingT = 0;
@@ -286,33 +313,18 @@ async function start(): Promise<void> {
   const stageGroup = new Group();
   stageGroup.matrixAutoUpdate = false;
   const stageRenderer = new StageRenderer(stageGroup);
+  // The ghost outline of the wanted shape: the first rung of the hint ladder (the night's hint-show events).
   const ghostTarget = new GhostTargetView(stageGroup, {
-    targetId: 'tutorial_bridge_hint',
+    targetId: 'hint',
     x: 0.0,
     y: -0.15,
     requiredShape: 'flat',
     active: false,
   });
-  const entityStore = new EntityStore(DEFAULT_CAPACITIES);
-  const solver = new Solver(entityStore.capacity);
-  const propProjector = new PropProjector();
-  const propShadowView = new RenderPropShadowView(stageGroup);
+  // The puzzles' gate, counterweight plate, wind and window (the drops are entities the stage renderer draws).
+  const fixturesView = new FixturesView(stageGroup);
   const wallPauseView = new WallPauseView();
   stageGroup.add(wallPauseView.group);
-  const props: readonly InvisibleProp[] = TUTORIAL_PROPS;
-  let propTerrainBaked = false;
-  const bakePropTerrain = (force = false): void => {
-    if (propTerrainBaked && !force) return;
-    const { polygons, terrainCapsules } = propProjector.project(props, stage, candleView.flamePosition);
-    solver.terrain.clear();
-    for (let i = 0; i < terrainCapsules.length; i++) {
-      const c = terrainCapsules[i];
-      solver.terrain.add(c.ax, c.ay, c.bx, c.by, c.radius);
-    }
-    propShadowView.updatePolygons(polygons);
-    propTouch.setPolygons(polygons);
-    propTerrainBaked = true;
-  };
   world.scene.add(
     stageView.group,
     stageGroup,
@@ -325,6 +337,7 @@ async function start(): Promise<void> {
     dust.mesh,
     air.group,
     kindredView.group,
+    stickerView.group,
     candleView.group,
     titleLighter.group,
     bedTray.group,
@@ -344,7 +357,85 @@ async function start(): Promise<void> {
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
   const gameAudio = new GameAudio(audio);
-  const tutorial = new TutorialFlow(entityStore, solver, ghostTarget, gameAudio);
+  // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
+  // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
+  let kindredAway = false;
+  let kindredVisiting = false;
+  const visitKindred = (x: number, y: number) => {
+    if (kindredAway) return;
+    if (!kindredOn) {
+      kindred.x = x + (x >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
+      kindred.y = y + 0.1;
+      kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
+      kindredVisiting = true;
+    }
+    kindred.perchAt(x, y);
+    perchT = Infinity;
+    gameAudio.twinkleAt(stage, x, y);
+  };
+  const endKindredVisit = () => {
+    if (perchT === Infinity) {
+      perchT = 0;
+      kindred.release();
+    }
+    if (kindredVisiting) {
+      kindredVisiting = false;
+      kindredOn = kindredWanted;
+      if (!kindredOn) kindredView.hide();
+    }
+  };
+  // The night (src/game) and what it shows: night-driver.ts turns the game's events into these calls.
+  const propOutline = createSilhouette();
+  const night = new NightDriver({
+    stage,
+    flame: candleView.flamePosition,
+    blend: () => projector.settings.blend,
+    saves,
+    setProps: (list, light, onStage, blend) => {
+      propShadows.setProps(list, light, onStage, blend);
+      // The dust a hand shakes off a prop's shadow needs the outlines too (on puzzle load only, so it may allocate).
+      propTouch.setPolygons(
+        list.map((p) => {
+          const n = projectProp(p, light, onStage, blend, propOutline);
+          return { vertices: propOutline.points.slice(0, n * 2), vertexCount: n };
+        }),
+      );
+    },
+    showHint: (shape, x, y) => {
+      ghostTarget.setTarget('hint', x, y, shape);
+      ghostTarget.active = true;
+    },
+    hideHint: () => {
+      ghostTarget.active = false;
+    },
+    perchKindred: visitKindred,
+    releaseKindred: endKindredVisit,
+    dim: () => {
+      // The room cools with the mood the night sets; the kindred darts off the wall and stays away.
+      if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
+    },
+    setKindredAway: (away) => {
+      kindredAway = away;
+      if (away) {
+        endKindredVisit();
+        kindredOn = false; // not setKindred: the Testing switch's own choice stays
+        kindredView.hide();
+      }
+    },
+    setMood: (goal) => {
+      moodGoal = goal;
+    },
+    solved: () => {
+      // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
+      const mood = moodGoal;
+      playSolve();
+      moodGoal = mood;
+      gameAudio.puzzleSolved(stage);
+    },
+    twinkle: (x, y) => gameAudio.twinkleAt(stage, x, y),
+    playEnding: (onDone) => playEnding(onDone),
+    nightOver: () => void showMenu('end'),
+  });
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
@@ -418,7 +509,12 @@ async function start(): Promise<void> {
       menuChoice = 'off';
       sessionState = 'playing';
       candleView.setLocked(true);
-      tutorial.start();
+      night.restart();
+    } else if (screen === 'end' && button === 'again') {
+      menu.hide();
+      menuChoice = 'off';
+      moodGoal = 0.4;
+      night.again();
     }
   };
   const showMenu = (id: MenuScreenId) => {
@@ -441,13 +537,20 @@ async function start(): Promise<void> {
       return false;
     }
     headY = head[1];
+    lastHead[0] = head[0];
+    lastHead[1] = head[1];
+    lastHead[2] = head[2];
+    lastYaw = yaw;
     if (stageChoice === 'real') {
       stageFrame.placeInFront(head, yaw);
       placeLantern(head, yaw, lantern);
-    } else placeTestRig(stageChoice, head, yaw, standInStage, lantern);
+    } else placeTestRig(mockStage, head, yaw, standInStage, lantern);
 
-    const stageDist = Math.hypot(stage.origin[0] - head[0], stage.origin[2] - head[2]);
+    const sdx = stage.origin[0] - head[0],
+      sdz = stage.origin[2] - head[2];
+    const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
+    roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -456,7 +559,6 @@ async function start(): Promise<void> {
     const trayZ = head[2] - Math.cos(yaw) * trayDist;
     bedTray.place(trayX, trayY, trayZ, yaw);
 
-    const saucerPos = new Float64Array(3);
     bedTray.getCandleSaucerPosition(saucerPos);
     lantern[0] = saucerPos[0];
     lantern[1] = saucerPos[1];
@@ -483,8 +585,8 @@ async function start(): Promise<void> {
       0, 0, 0, 1,
     );
     stageGroup.matrixWorldNeedsUpdate = true;
-    bakePropTerrain();
-    if (sessionState === 'playing') tutorial.start();
+    // The wall or the flame moved: the props' shadows (and the ground they make) are cast again.
+    night.relight();
     // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
     // lantern: a guessed spot near the chest would read a resting fist as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -525,6 +627,23 @@ async function start(): Promise<void> {
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
+      stage:
+        stageChoice === 'real'
+          ? undefined
+          : {
+              toggle: () => {
+                mockStage = mockStage === 'table' ? 'wall' : 'table';
+                if (rigPlaced) placeRig(lastHead, lastYaw);
+              },
+              label: () => mockStage,
+            },
+      sticker: {
+        // Shows the next sticker over the traveller, to see them all.
+        next: () => {
+          if (readTraveller()) travellerMood.show(stickerNext as StickerId, travellerAt.x, travellerAt.y);
+          stickerNext = (stickerNext + 1) % STICKER_COUNT;
+        },
+      },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -533,13 +652,6 @@ async function start(): Promise<void> {
   const demoKey = new Float64Array(6).fill(NaN);
   if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
   let simWasPaused = false;
-  const sim = Object.assign(
-    new FixedStepLoop(SIM_HZ, (dt) => {
-      entityStore.beginStep();
-      solver.step(entityStore, dt);
-    }),
-    { store: entityStore, solver },
-  );
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -586,7 +698,7 @@ async function start(): Promise<void> {
   diagnostics.addSource(() => ({
     ...reportSource({
       simHz: SIM_HZ,
-      simSteps: sim.steps,
+      simSteps: night.steps,
       handReadMethod: hands.method,
       mockSource: mock ? mock.source.name : null,
       capabilities,
@@ -613,17 +725,17 @@ async function start(): Promise<void> {
       drawCalls: 1,
       ghostTargetActive: ghostTarget.active,
     },
-    propTerrain: {
-      propCount: props.length,
-      terrainCapsules: sim.solver.terrain.count,
-      baked: propShadowView.isBaked,
-    },
-    tutorial: {
-      state: tutorial.state,
-      travellerX: tutorial.travellerX,
-      travellerGrounded: tutorial.isGrounded,
-      bridgeActive: tutorial.isBridgeActive,
-    },
+    night: night.game
+      ? {
+          puzzle: night.game.puzzle.id,
+          complete: night.game.complete,
+          traveller: night.game.traveller.state,
+          terrainCapsules: night.game.solver.terrain.count,
+          layoutProblems: night.game.layout.problems.length,
+          hint: night.game.runner.hintRung,
+          waitingForHands: night.game.waitingForHands,
+        }
+      : null,
     shadow: {
       stage: stageChoice,
       placed: rigPlaced,
@@ -727,6 +839,7 @@ async function start(): Promise<void> {
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
+      titleStallT = 0;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
       candleView.setLocked(false);
@@ -815,6 +928,17 @@ async function start(): Promise<void> {
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
+  /** True while any controller button is down. Indexed loops, so no iterator or closure is made in the frame. */
+  const controllerPressed = (frame: XRFrame): boolean => {
+    const sources = frame.session.inputSources;
+    for (let i = 0; i < sources.length; i++) {
+      const buttons = sources[i].gamepad?.buttons;
+      if (!buttons) continue;
+      for (let j = 0; j < buttons.length; j++) if (buttons[j].pressed) return true;
+    }
+    return false;
+  };
+
   class FrameDriverSystem extends createSystem({}) {
     update(delta: number) {
       // Nothing in the frame may throw out of here: the browser and IWSDK do not catch it, and the next frame
@@ -843,6 +967,8 @@ async function start(): Promise<void> {
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
       const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
+      // The ledges' shadows wait until the opening is over, or they sit over its captions.
+      const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
       if (debug?.replay.active) {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
@@ -910,9 +1036,7 @@ async function start(): Promise<void> {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
-            if (candleAction.justPlaced) {
-              bakePropTerrain(true);
-            }
+            if (candleAction.justPlaced) night.relight();
           }
         } catch (e) {
           failures.report('candle pickup', e);
@@ -931,22 +1055,17 @@ async function start(): Promise<void> {
             const cfx = candleView.flamePosition[0];
             const cfy = candleView.flamePosition[1];
             const cfz = candleView.flamePosition[2];
-            const distLighterToWick = Math.hypot(lfx - cfx, lfy - cfy, lfz - cfz);
-            if (distLighterToWick < 0.15) {
+            const dlx = lfx - cfx,
+              dly = lfy - cfy,
+              dlz = lfz - cfz;
+            if (dlx * dlx + dly * dly + dlz * dlz < 0.15 * 0.15) {
               handTouchingWick = true;
             }
           }
           if (!handTouchingWick && candleView.checkIgnition(handList)) {
             handTouchingWick = true;
           }
-          if (!handTouchingWick && frame) {
-            for (const source of frame.session.inputSources) {
-              if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                handTouchingWick = true;
-                break;
-              }
-            }
-          }
+          if (!handTouchingWick && frame && controllerPressed(frame)) handTouchingWick = true;
           if (!handTouchingWick && mock) {
             handTouchingWick = true;
           }
@@ -957,6 +1076,11 @@ async function start(): Promise<void> {
             ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
           }
 
+          // Nobody told them what to do: after a few seconds with no progress, a riddle under the title says it, and a plainer line later.
+          if (ignitionHoldTimer > 0) titleStallT = 0;
+          else titleStallT += step;
+          vrTitle.setHint(titleStallT > TITLE_HINT_PLAIN_AFTER_S ? 2 : titleStallT > TITLE_HINT_AFTER_S ? 1 : 0);
+
           const ignitionProgress = ignitionHoldTimer / 3.0;
           candleView.ignitionProgress = ignitionProgress;
 
@@ -964,6 +1088,7 @@ async function start(): Promise<void> {
           if (ignitionProgress > 0) {
             ambientLight.intensity = 0.05 + 0.11 * ignitionProgress;
             bedroomView.update(lanternLight.light, cameraQuat, ignitionProgress);
+            roomDressing.update(lanternLight.light, ignitionProgress, candleView.flamePosition);
           } else {
             ambientLight.intensity = 0.05;
           }
@@ -996,15 +1121,7 @@ async function start(): Promise<void> {
               wallPauseView.show();
             }
           } else if (sessionState === 'paused') {
-            let isControllerTrigger = false;
-            if (frame) {
-              for (const source of frame.session.inputSources) {
-                if (source.gamepad?.buttons.some((b) => b.pressed)) {
-                  isControllerTrigger = true;
-                  break;
-                }
-              }
-            }
+            const isControllerTrigger = frame ? controllerPressed(frame) : false;
             const action = wallPauseView.update(handList, stage, isControllerTrigger, step);
             if (action === 'resume') {
               wallPauseView.hide();
@@ -1029,7 +1146,7 @@ async function start(): Promise<void> {
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);
-              tutorial.start();
+              night.restart();
               simWasPaused = true;
             } else if (action === 'settings') {
               wallPauseView.showSettings();
@@ -1039,8 +1156,8 @@ async function start(): Promise<void> {
         timings.begin(SLOT.shadow);
         try {
           shadowRenderer.mesh.visible = shadowsVisible;
-          propShadowView.mesh.visible = shadowsVisible;
-          propShadows.mesh.visible = shadowsVisible;
+          propShadows.mesh.visible = propsVisible;
+          fixturesView.group.visible = propsVisible && night.started;
           stageRenderer.mesh.visible = shadowsVisible;
           kindredView.group.visible = shadowsVisible;
           ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
@@ -1064,8 +1181,13 @@ async function start(): Promise<void> {
               demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
             }
           }
-          propShadows.update(stage, shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
-          propShadowView.material.opacity = shadowsVisible ? 0.88 * candleView.occlusion : 0;
+          propShadows.update(stage, propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
+          if (night.game)
+            fixturesView.update(
+              night.game.fixtures,
+              propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+              paused ? 0 : step,
+            );
           if (kindredOn && rigPlaced) {
             // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
             const f = candleView.flamePosition,
@@ -1165,11 +1287,8 @@ async function start(): Promise<void> {
           // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
           {
             const occ = candleView.occlusion;
-            if (tutorial.state !== lastTutorial) {
-              if (tutorial.state === 'GOAL_REACHED') playSolve();
-              lastTutorial = tutorial.state;
-            }
             solveBloom.update(step);
+            stickerView.update(travellerMood, stage, shadowRenderer.baseOpacity * occ);
             audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
             glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
             const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
@@ -1242,26 +1361,50 @@ async function start(): Promise<void> {
       else {
         try {
           if (rigPlaced) {
+            // The outline only animates here; the game decides when the puzzle is solved.
             ghostTarget.update(delta, projector.shadows, shapes);
             ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
-            tutorial.update(delta, projector.shadows, shapes);
+            // The traveller's mood: how near is the nearer hand's shadow?
+            if (readTraveller()) {
+              let gap = 1e9;
+              for (let i = 0; i < 2; i++) {
+                const hs = projector.shadows[i === 0 ? 'left' : 'right'];
+                if (hs.active && hs.onStage)
+                  gap = Math.min(gap, nearestJointGap(hs.joints, hs.joints.length / 2, travellerAt.x, travellerAt.y));
+              }
+              const state = night.game!.traveller.state;
+              travellerMood.update(
+                delta,
+                travellerAt.x,
+                travellerAt.y,
+                state === 'blocked' || state === 'look-back' || state === 'held',
+                state === 'goal',
+                gap,
+              );
+            }
           }
-          // Back from a pause (headset off, system menu): drop the stale remainder, so the first frame back does not
-          // replay it (docs/SIMULATION.md).
-          if (simWasPaused) {
-            simWasPaused = false;
-            sim.reset();
-          }
-          if (debug) debug.time.advance(sim, delta);
-          else sim.advance(delta);
+          // Back from a pause (the flame covered, the headset off, the system menu): one held frame lets the game
+          // drop the time that passed, so nothing jumps (docs/SIMULATION.md).
+          const held = simWasPaused;
+          simWasPaused = false;
+          const shadows = projector.shadows;
+          night.frame(
+            delta,
+            held,
+            shadows.left.active ? shadows.left : null,
+            shadows.right.active ? shadows.right : null,
+            shapes.events,
+            hands.hands.left.tracked,
+            hands.hands.right.tracked,
+          );
         } catch (e) {
           failures.report('simulation', e);
         }
       }
       try {
-        if (shadowsVisible) {
+        if (shadowsVisible && night.game) {
           stageRenderer.mesh.visible = true;
-          stageRenderer.update(sim.store, sim.alpha);
+          stageRenderer.update(night.game.store, night.alpha);
         } else {
           stageRenderer.mesh.visible = false;
         }
@@ -1274,6 +1417,10 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
+        roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
+        world.camera.getWorldPosition(settingsHead);
+        // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
+        roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
         // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
         moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
         stageView.mood = moodNow;
@@ -1282,7 +1429,7 @@ async function start(): Promise<void> {
           candleView.flamePosition,
           rigPlaced && lanternLight.light.lit ? candleView.occlusion : 0,
           step,
-          !passthrough,
+          !passthrough && sessionState !== 'paused',
         );
         candleView.update(lanternLight.light, cameraQuat);
         lab?.applyLight(lanternLight.light, cameraQuat);
@@ -1360,6 +1507,7 @@ async function start(): Promise<void> {
         cutscenes,
         kindred,
         kindredView,
+        stickerView,
         openSettings,
         shapes,
         gestures,
@@ -1373,20 +1521,16 @@ async function start(): Promise<void> {
         stageGroup,
         stageRenderer,
         ghostTarget,
-        propProjector,
-        propShadowView,
-        props,
-        solver,
-        tutorial,
-        entityStore,
+        fixturesView,
+        night,
         audio,
         gameAudio,
         debug,
-        sim,
         getRecorder: () => recorder,
         handVisual,
         bedTray,
         bedroomView,
+        roomDressing,
         vrTitle,
         wallPauseView,
         sessionState: () => sessionState,

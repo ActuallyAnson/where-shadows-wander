@@ -47,6 +47,10 @@ export interface LabView {
   solve?: { play(): void };
   /** The ending cutscene (the fox flies to the traveller, the room settles): the Ending button plays it. */
   ending?: { play(): void };
+  /** The traveller's stickers (sad, happy, surprised, puzzled): the Sticker button shows the next one over them. */
+  sticker?: { next(): void };
+  /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
+  stage?: { toggle(): void; label(): string };
 }
 
 export class HandLab {
@@ -298,6 +302,8 @@ export class HandLab {
       else if (act === 'kindred') this.view.kindred?.toggle();
       else if (act === 'solve') this.view.solve?.play();
       else if (act === 'ending') this.view.ending?.play();
+      else if (act === 'sticker') this.view.sticker?.next();
+      else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -358,6 +364,8 @@ export class HandLab {
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show the pause, solved and end screens, one after the other') : ''}
         ${this.view.kindred ? btn('kindred', '', 'Kindred', this.view.kindred.isOn(), 'A shadow bird that flies about the wall and circles the light') : ''}
+        ${this.view.stage ? btn('stage', '', `Stage: ${this.view.stage.label()}`, false, 'Switch the stand-in stage between the tabletop theatre and a wall-sized one (the tutorial needs the wall)') : ''}
+        ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
         ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}
         ${this.view.solve ? btn('solve', '', 'Solve', false, 'Play the solve moment: the wall glows and light bursts out') : ''}
         ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the opening: the title, and the fox drifts in') : ''}

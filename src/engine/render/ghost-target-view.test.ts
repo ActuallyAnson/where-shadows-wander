@@ -54,8 +54,8 @@ describe('ghost-target-view', () => {
     target.update(0.5, emptyShadows, emptyShapes);
     const op2 = target.material.opacity;
 
-    expect(op1).toBeGreaterThanOrEqual(0.2);
-    expect(op1).toBeLessThanOrEqual(0.65);
+    expect(op1).toBeGreaterThanOrEqual(0.4);
+    expect(op1).toBeLessThanOrEqual(0.8);
     expect(op2).not.toBe(op1);
   });
 

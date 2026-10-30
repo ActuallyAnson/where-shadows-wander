@@ -37,7 +37,7 @@ export interface WallButtonDef {
 export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
   {
     id: 'resume',
-    label: 'Resume',
+    label: 'Light the candle',
     yMin: -0.07,
     yMax: 0.03,
     xMin: -0.38,
@@ -48,7 +48,7 @@ export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
   },
   {
     id: 'restart',
-    label: 'Begin this puzzle again',
+    label: 'Begin this part again',
     yMin: -0.2,
     yMax: -0.1,
     xMin: -0.45,
@@ -133,6 +133,8 @@ const CANVAS_H = 640;
 const WALL_W = 1.45;
 const WALL_H = 0.92;
 export const DWELL_SELECTION_S = 3.0;
+/** A pointer that slips off a button for less than this (hand jitter, tracking dropping a frame) keeps the dwell it had built up. */
+export const HOVER_GRACE_S = 0.5;
 
 export class WallPauseView {
   readonly group = new Group();
@@ -158,6 +160,9 @@ export class WallPauseView {
   private _mode: WallMenuMode = 'pause';
   private hoveredButtonIndex = -1;
   private hoverDwellTime = 0;
+  /** Seconds the pointer has been off the hovered button (it keeps the hover until this passes HOVER_GRACE_S). */
+  private hoverAwayTime = 0;
+  private lastPaintKey = -1;
   private cursorX = 0;
   private cursorY = 0;
   private cursorVisible = false;
@@ -253,6 +258,7 @@ export class WallPauseView {
     this._mode = 'pause';
     this.group.visible = true;
     this.hoveredButtonIndex = -1;
+    this.hoverAwayTime = 0;
     this.hoverDwellTime = 0;
     this.cursorVisible = false;
     this.beamMesh.visible = false;
@@ -265,6 +271,7 @@ export class WallPauseView {
     this._mode = 'settings';
     this.group.visible = true;
     this.hoveredButtonIndex = -1;
+    this.hoverAwayTime = 0;
     this.hoverDwellTime = 0;
     this.cursorVisible = false;
     this.beamMesh.visible = false;
@@ -278,7 +285,36 @@ export class WallPauseView {
     this.cursorMesh.visible = false;
     this.beamMesh.visible = false;
     this.hoveredButtonIndex = -1;
+    this.hoverAwayTime = 0;
     this.hoverDwellTime = 0;
+  }
+
+  /**
+   * Follows what the pointer is over. Moving to another button starts its dwell over; slipping off the button for a moment
+   * (under HOVER_GRACE_S) keeps the dwell, so a jittery hand does not have to start the three seconds again. Repaints only
+   * when the highlighted button or the countdown's tenth of a second changes.
+   */
+  private trackHover(hovered: number, delta: number): void {
+    if (hovered === this.hoveredButtonIndex && hovered >= 0) {
+      this.hoverAwayTime = 0;
+      this.hoverDwellTime += delta;
+    } else if (hovered < 0 && this.hoveredButtonIndex >= 0) {
+      this.hoverAwayTime += delta;
+      if (this.hoverAwayTime >= HOVER_GRACE_S) {
+        this.hoveredButtonIndex = -1;
+        this.hoverAwayTime = 0;
+        this.hoverDwellTime = 0;
+      }
+    } else if (hovered !== this.hoveredButtonIndex) {
+      this.hoveredButtonIndex = hovered;
+      this.hoverDwellTime = hovered >= 0 ? delta : 0;
+      this.hoverAwayTime = 0;
+    }
+    const key = this.hoveredButtonIndex * 1000 + Math.floor(this.hoverDwellTime * 10);
+    if (key !== this.lastPaintKey) {
+      this.lastPaintKey = key;
+      this.paint();
+    }
   }
 
   /**
@@ -423,26 +459,14 @@ export class WallPauseView {
         }
       }
 
-      if (hovered !== this.hoveredButtonIndex) {
-        this.hoveredButtonIndex = hovered;
-        this.hoverDwellTime = delta;
-        this.paint();
-      } else if (hovered >= 0) {
-        // Accumulate hover time for 3-second selection
-        this.hoverDwellTime += delta;
-        this.paint();
-      }
+      this.trackHover(hovered, delta);
     } else {
       if (this.cursorVisible) {
         this.cursorVisible = false;
         this.cursorMesh.visible = false;
         this.beamMesh.visible = false;
       }
-      if (this.hoveredButtonIndex !== -1) {
-        this.hoveredButtonIndex = -1;
-        this.hoverDwellTime = 0;
-        this.paint();
-      }
+      this.trackHover(-1, delta);
     }
 
     // Trigger activation on 3-second hover dwell OR immediate controller trigger
@@ -464,6 +488,7 @@ export class WallPauseView {
       if (btn.id === 'settings') {
         this._mode = 'settings';
         this.hoveredButtonIndex = -1;
+        this.hoverAwayTime = 0;
         this.paint();
         return null;
       }
@@ -479,6 +504,7 @@ export class WallPauseView {
       if (btnId === 'setting_back') {
         this._mode = 'pause';
         this.hoveredButtonIndex = -1;
+        this.hoverAwayTime = 0;
         this.paint();
       }
       return;
@@ -508,6 +534,7 @@ export class WallPauseView {
       case 'setting_back': {
         this._mode = 'pause';
         this.hoveredButtonIndex = -1;
+        this.hoverAwayTime = 0;
         break;
       }
     }
