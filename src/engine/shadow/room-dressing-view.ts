@@ -26,13 +26,11 @@ import {
   NIGHT_MARGIN,
   type NightLayer,
   paintBookcase,
-  paintMist,
   paintMoonPatch,
   paintNight,
   paintPillow,
   paintQuilt,
   paintRug,
-  paintShaft,
   paintSill,
   paintSnow,
   paintStraw,
@@ -81,14 +79,6 @@ const FLAME_REACH = 0.85;
 /** The most of its brightness the room art has at full candlelight (the paper stage is the brightest thing), and how far the flame's flicker moves it. */
 const LIT_PEAK = 0.8;
 const FLICKER = 0.1;
-/** The colour the room goes far from the flame (cool teal-blue shadow, against the warm light near it). */
-const COOL = new Color(0.42, 0.68, 1.0);
-/** The glow round the flame: its size (m) and how bright at most. */
-const HALO_SIZE = 1.5;
-const HALO_GAIN = 0.3;
-/** Mist along the foot of the walls: how fast it drifts (texture widths a second) and how bright. */
-const MIST_SPEED = [0.006, 0.0035] as const;
-const MIST_GAIN = 0.16;
 /** The flame has to move this far (m) before the walls' light is worked out again. */
 const FLAME_MOVE = 0.02;
 
@@ -120,8 +110,8 @@ interface GlowSpec {
  */
 const GLOWS: readonly GlowSpec[] = [
   { wonder: 0, wall: [889, 292, 0.12], size: [0.5, 0.5], facing: 'z', colour: [1, 0.72, 0.36] },
-  { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [1, 0.7, 0.35] },
-  { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [1, 0.7, 0.35] },
+  { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
+  { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
   { wonder: 2, wall: [220, 391, 0.06], size: [0.55, 0.45], facing: 'z', colour: [0.7, 0.8, 1] },
   { wonder: 2, wall: [875, 210, 0.06], size: [0.72, 0.58], facing: 'z', colour: [0.5, 0.65, 1] },
   { wonder: 3, at: [1.8, 1.76, -1.25], size: [0.42, 0.42], facing: '-x', colour: [0.45, 0.95, 0.75] },
@@ -169,25 +159,16 @@ export class RoomDressingView {
   /** The walls, lit per vertex by the candle, and the rest of the room art, lit by how far its middle is from the flame. */
   private readonly vertexLit: Mesh[] = [];
   private readonly centreLit: Mesh[] = [];
-  private readonly falloff = new Map<MeshBasicMaterial, Color>();
+  private readonly falloff = new Map<MeshBasicMaterial, number>();
   /** Where in the flicker each piece is, so the light seems to dance across the room rather than blink all at once. */
   private readonly phase = new Map<MeshBasicMaterial, number>();
   private readonly flame = new Vector3();
   private readonly spot = new Vector3();
   private flameOn = false;
-  private readonly toneScratch = new Color();
   /** The wonders' glow: how lit each is (0..1), how many should be lit, and the one mesh that draws them all. */
   private readonly levels = new Float32Array(WONDERS);
   private awakeCount = 0;
   private wondersWereOn = false;
-  /** The glow round the flame, the mist along the walls' feet, and the moonbeam from the window. */
-  private readonly glowMaterials: MeshBasicMaterial[] = [];
-  private readonly halo: Mesh;
-  private readonly haloMat: MeshBasicMaterial;
-  private readonly mists: Mesh[] = [];
-  private readonly mistTextures: CanvasTexture[] = [];
-  private readonly mistMat: MeshBasicMaterial;
-  private readonly shaftMat: MeshBasicMaterial;
   private warmNow = 0;
   private wonders: Mesh;
   private readonly wonderMat: MeshBasicMaterial;
@@ -429,72 +410,8 @@ export class RoomDressingView {
     this.wonders.frustumCulled = false; // its glows are spread over the whole room
     this.wonders.matrixAutoUpdate = false;
     this.group.add(this.wonders);
-    // The look: a glow round the flame, mist along the walls' feet, and a beam of moonlight from the window.
-    this.haloMat = new MeshBasicMaterial({
-      map: this.wonderTexture,
-      color: new Color(1, 0.72, 0.38),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-      opacity: 0,
-    });
-    this.halo = new Mesh(new PlaneGeometry(HALO_SIZE, HALO_SIZE), this.haloMat);
-    this.halo.renderOrder = WONDER_ORDER + 1;
-    this.halo.visible = false;
-    this.group.add(this.halo);
-    const mistTexture = this.texture(paintedCanvas(512, 128, paintMist));
-    mistTexture.wrapS = RepeatWrapping;
-    this.mistMat = new MeshBasicMaterial({
-      map: mistTexture,
-      color: new Color(0.45, 0.72, 0.85),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-      opacity: 0,
-    });
-    // One texture each (they scroll at their own speeds); the two share a material.
-    const mistA = new Mesh(new PlaneGeometry(3.9, 0.75), this.mistMat);
-    const mistB = new Mesh(new PlaneGeometry(4.8, 0.75), this.mistMat);
-    mistB.rotation.y = Math.PI / 2;
-    mistB.position.set(-1.95, 0.5, -0.4);
-    mistB.updateMatrix();
-    for (const m of [mistA, mistB]) {
-      m.renderOrder = WONDER_ORDER - 1;
-      m.matrixAutoUpdate = false;
-      this.mists.push(m);
-    }
-    this.mistTextures.push(mistTexture);
-    this.group.add(mistA, mistB);
-    const shaftGeo = new BufferGeometry();
-    // A slanted beam in the plane z = -0.8, from the window's glass (x = -1.97, y 0.9 to 2.02) down to the floor.
-    shaftGeo.setAttribute(
-      'position',
-      new Float32BufferAttribute([-1.97, 2.02, -0.8, -1.97, 0.9, -0.8, -1.35, 0.01, -0.8, -0.35, 0.01, -0.8], 3),
-    );
-    shaftGeo.setAttribute('uv', new Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
-    shaftGeo.setIndex([0, 1, 2, 0, 2, 3]);
-    this.geometries.push(shaftGeo);
-    this.shaftMat = new MeshBasicMaterial({
-      map: this.texture(paintedCanvas(64, 128, paintShaft)),
-      color: new Color(0.5, 0.65, 0.85),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-      side: DoubleSide,
-      opacity: 0.4,
-    });
-    const shaft = new Mesh(shaftGeo, this.shaftMat);
-    shaft.renderOrder = WONDER_ORDER - 1;
-    shaft.matrixAutoUpdate = false;
-    shaft.updateMatrix();
-    this.group.add(shaft);
-    for (const m of [this.haloMat, this.mistMat, this.shaftMat]) this.glowMaterials.push(m);
     this.vertexLit.push(this.wall, left, right);
     this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed);
-    for (const m of this.centreLit) this.falloff.set(m.material as MeshBasicMaterial, new Color(1, 1, 1));
     for (const m of [...this.vertexLit, ...this.centreLit]) {
       this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
     }
@@ -564,8 +481,6 @@ export class RoomDressingView {
       );
       m.updateMatrix();
     });
-    this.mists[0]?.position.set(0, 0.52, z + 0.04);
-    this.mists[0]?.updateMatrix();
     this.buildWonders(z);
     this.relight();
   }
@@ -604,22 +519,9 @@ export class RoomDressingView {
               0.3 * Math.sin(time * 9.7 + 1.7 * p) +
               0.2 * Math.sin(time * 2.3 + 0.6 * p))
         : 1;
-      m.color.copy(this.tint);
-      const tone = this.falloff.get(m);
-      if (tone) m.color.multiply(tone);
-      m.color.multiplyScalar(flicker);
+      m.color.copy(this.tint).multiplyScalar((this.falloff.get(m) ?? 1) * flicker);
     }
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
-    // The glow round the flame (it flickers with it), the mist along the walls' feet (cooler and fainter in the candlelight) and
-    // the moonbeam (it fades as the candle takes over).
-    this.halo.visible = this.flameOn;
-    if (this.flameOn) {
-      this.halo.position.set(this.flame.x, this.flame.y + 0.02, this.flame.z - 0.05);
-      this.halo.updateMatrix();
-      this.haloMat.opacity = HALO_GAIN * warm * (0.9 + 0.1 * Math.sin(time * 9.1) + 0.05 * Math.sin(time * 5.3));
-    }
-    this.mistMat.opacity = MIST_GAIN * (0.5 + 0.5 * (1 - warm)) * (this.flameOn ? 0.9 : 1);
-    this.shaftMat.opacity = 0.42 - 0.26 * warm;
     // The moonlight on the floor shrinks into the room's light when the candle is bright.
     const moonK = 0.3 - 0.2 * warm;
     this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
@@ -630,38 +532,26 @@ export class RoomDressingView {
     return FLAME_AMBIENT + (1 - FLAME_AMBIENT) / (1 + d2 / (FLAME_REACH * FLAME_REACH));
   }
 
-  /** The colour of the room at a point the light reaches by `f`: teal-blue and dark far from the flame, neutral and bright near it. */
-  private static tone(f: number, out: Color): Color {
-    const u = Math.min(1, Math.max(0, (f - FLAME_AMBIENT) / (1 - FLAME_AMBIENT)));
-    const w = u * u * (3 - 2 * u);
-    return out.setRGB(
-      (COOL.r + (1 - COOL.r) * w) * f,
-      (COOL.g + (1 - COOL.g) * w) * f,
-      (COOL.b + (1 - COOL.b) * w) * f,
-    );
-  }
-
   /** Works out the candle's light on every wall vertex and on the middle of each other piece (when the flame moves or goes out). */
   private relight(): void {
-    const c = this.toneScratch;
     for (const mesh of this.vertexLit) {
       const position = mesh.geometry.attributes.position;
       const color = mesh.geometry.attributes.color;
       for (let i = 0; i < position.count; i++) {
+        let f = 1;
         if (this.flameOn) {
           this.spot.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
-          RoomDressingView.tone(RoomDressingView.reach(this.spot.distanceToSquared(this.flame)), c);
-          color.setXYZ(i, c.r, c.g, c.b);
-        } else color.setXYZ(i, 1, 1, 1);
+          f = RoomDressingView.reach(this.spot.distanceToSquared(this.flame));
+        }
+        color.setXYZ(i, f, f, f);
       }
       color.needsUpdate = true;
     }
     for (const mesh of this.centreLit) {
-      const into = this.falloff.get(mesh.material as MeshBasicMaterial);
-      if (!into) continue;
-      if (this.flameOn)
-        RoomDressingView.tone(RoomDressingView.reach(mesh.position.distanceToSquared(this.flame)), into);
-      else into.setRGB(1, 1, 1);
+      this.falloff.set(
+        mesh.material as MeshBasicMaterial,
+        this.flameOn ? RoomDressingView.reach(mesh.position.distanceToSquared(this.flame)) : 1,
+      );
     }
   }
 
@@ -720,7 +610,6 @@ export class RoomDressingView {
     if (!(dt > 0)) return;
     this.time += Math.min(dt, 0.1);
     this.easeWonders(Math.min(dt, 0.1));
-    for (const tex of this.mistTextures) tex.offset.x = (tex.offset.x + Math.min(dt, 0.1) * MIST_SPEED[0]) % 1;
     for (let i = 0; i < this.snow.length; i++) {
       const t = this.snow[i];
       t.offset.y += Math.min(dt, 0.1) * SNOW_FALL[i];
@@ -765,9 +654,6 @@ export class RoomDressingView {
   dispose(): void {
     this.wonders.geometry.dispose();
     this.wonderMat.dispose();
-    for (const m of this.mists) m.geometry.dispose();
-    this.halo.geometry.dispose();
-    for (const m of this.glowMaterials) m.dispose();
     for (const t of this.textures) t.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials as Material[]) m.dispose();
