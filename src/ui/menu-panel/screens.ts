@@ -19,9 +19,9 @@ export const MENU_SCREENS: Readonly<Record<MenuScreenId, MenuScreen>> = {
     title: 'Paused',
     line: 'The candle waits.',
     buttons: [
-      { id: 'resume', label: 'Resume' },
+      { id: 'resume', label: 'Light the candle' },
       { id: 'settings', label: 'Settings' },
-      { id: 'restart', label: 'Begin this puzzle again' },
+      { id: 'restart', label: 'Begin this part again' },
     ],
   },
   solved: {
@@ -30,13 +30,13 @@ export const MENU_SCREENS: Readonly<Record<MenuScreenId, MenuScreen>> = {
     line: 'The shadows found their way.',
     buttons: [
       { id: 'next', label: 'Onward' },
-      { id: 'replay', label: 'Play it again' },
+      { id: 'replay', label: 'Walk it again' },
     ],
   },
   end: {
     id: 'end',
     title: 'The End',
     line: 'The light is yours to keep.',
-    buttons: [{ id: 'again', label: 'Begin again' }],
+    buttons: [{ id: 'again', label: 'Begin another night' }],
   },
 };

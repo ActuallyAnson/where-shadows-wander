@@ -216,9 +216,13 @@ async function start(): Promise<void> {
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
   bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
   const vrTitle = new VrTitleView();
+  /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
+  const TITLE_HINT_AFTER_S = 6;
+  const TITLE_HINT_PLAIN_AFTER_S = 16;
   type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
+  let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
   const ambientLight = new AmbientLight(0x101422, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
@@ -791,6 +795,7 @@ async function start(): Promise<void> {
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
+      titleStallT = 0;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
       candleView.setLocked(false);
@@ -907,6 +912,8 @@ async function start(): Promise<void> {
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
       const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
+      // The ledges' shadows wait until the opening is over, or they sit over its captions.
+      const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
       if (debug?.replay.active) {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
@@ -1019,6 +1026,11 @@ async function start(): Promise<void> {
             ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
           }
 
+          // Nobody told them what to do: after a few seconds with no progress, a riddle under the title says it, and a plainer line later.
+          if (ignitionHoldTimer > 0) titleStallT = 0;
+          else titleStallT += step;
+          vrTitle.setHint(titleStallT > TITLE_HINT_PLAIN_AFTER_S ? 2 : titleStallT > TITLE_HINT_AFTER_S ? 1 : 0);
+
           const ignitionProgress = ignitionHoldTimer / 3.0;
           candleView.ignitionProgress = ignitionProgress;
 
@@ -1102,8 +1114,8 @@ async function start(): Promise<void> {
         timings.begin(SLOT.shadow);
         try {
           shadowRenderer.mesh.visible = shadowsVisible;
-          propShadows.mesh.visible = shadowsVisible;
-          fixturesView.group.visible = shadowsVisible && night.started;
+          propShadows.mesh.visible = propsVisible;
+          fixturesView.group.visible = propsVisible && night.started;
           stageRenderer.mesh.visible = shadowsVisible;
           kindredView.group.visible = shadowsVisible;
           ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
@@ -1127,11 +1139,11 @@ async function start(): Promise<void> {
               demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
             }
           }
-          propShadows.update(stage, shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
+          propShadows.update(stage, propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
           if (night.game)
             fixturesView.update(
               night.game.fixtures,
-              shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+              propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
               paused ? 0 : step,
             );
           if (kindredOn && rigPlaced) {
