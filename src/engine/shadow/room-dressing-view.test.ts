@@ -74,7 +74,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(24);
+    expect(v.group.children).toHaveLength(28);
     v.dispose();
   });
 
@@ -115,8 +115,15 @@ describe('RoomDressingView', () => {
 
   it('lights the room from the flame: bright near it, dark far from it, and evenly when there is no flame', () => {
     const v = new RoomDressingView();
-    const vertexColour = (i: number) =>
-      (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
+    // How bright the wall's first vertex is lit (the mean of its three channels).
+    const vertexColour = (i: number) => {
+      const c = v.wall.geometry.attributes.color as unknown as {
+        getX(n: number): number;
+        getY(n: number): number;
+        getZ(n: number): number;
+      };
+      return (c.getX(i) + c.getY(i) + c.getZ(i)) / 3;
+    };
     v.update(light(true, 1), 1, [0, 1.2, -1.9]); // the flame just in front of the wall
     const near = vertexColour(0);
     v.update(light(true, 1), 1, [0, 1.2, 3]); // the flame far behind the player
@@ -154,7 +161,7 @@ describe('RoomDressingView', () => {
   it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
     const v = new RoomDressingView();
     const glow = () => {
-      const mesh = v.group.children[v.group.children.length - 1] as unknown as {
+      const mesh = v.group.children[23] as unknown as {
         geometry: { attributes: { color: { array: Float32Array } } };
       };
       return Array.from(mesh.geometry.attributes.color.array).reduce((a, b) => a + b, 0);

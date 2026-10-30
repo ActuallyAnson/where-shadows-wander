@@ -82,6 +82,13 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): vo
     g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
   }
 
+  // Fine grain, like paint on cloth: a few thousand specks, light and dark.
+  for (let i = 0; i < 2600; i++) {
+    const x = r() * 1024;
+    const y = r() * 640;
+    rect(g, x, y, 1 + r() * 2.5, 1 + r() * 1.5, r() < 0.5 ? 'rgba(255, 235, 200, 0.035)' : 'rgba(10, 5, 2, 0.05)');
+  }
+
   // Picture rail and bunting.
   rect(g, 0, 58, 1024, 10, '#33241a');
   rect(g, 0, 68, 1024, 3, 'rgba(0, 0, 0, 0.35)');
@@ -350,6 +357,9 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
   g.lineJoin = 'round';
   g.lineCap = 'round';
 
+  // What is far away is soft: the sky and the hills are blurred a touch, as the eye would (where the canvas can).
+  if ('filter' in g && (layer === 'sky' || layer === 'hills'))
+    g.filter = layer === 'sky' ? 'blur(0.9px)' : 'blur(1.3px)';
   if (layer === 'sky') {
     const sky = g.createLinearGradient(0, 0, 0, 260);
     sky.addColorStop(0, '#060a20');
@@ -514,6 +524,15 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
     }
   };
   if (layer === 'hills') roofs(190, '#1a2252', 'rgba(200, 215, 250, 0.7)', 5);
+  if (layer === 'hills') {
+    // A band of haze lying between the hills and the roofs.
+    const haze = g.createLinearGradient(0, 168, 0, 214);
+    haze.addColorStop(0, 'rgba(150, 175, 230, 0)');
+    haze.addColorStop(0.55, 'rgba(150, 175, 230, 0.3)');
+    haze.addColorStop(1, 'rgba(150, 175, 230, 0)');
+    g.fillStyle = haze;
+    g.fillRect(-M, 168, 220 + 2 * M, 46);
+  }
   if (layer === 'village') roofs(208, '#10173c', 'rgba(200, 215, 250, 0.75)', 9);
 
   if (layer === 'village') {
@@ -1157,4 +1176,46 @@ export function paintPillow(g: CanvasRenderingContext2D, W: number, H: number): 
     }
   }
   g.restore();
+}
+
+/** Soft drifting mist (any canvas; it wraps at the sides): overlapping pale clouds, so it can scroll without a seam. */
+export function paintMist(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(211);
+  g.clearRect(0, 0, W, H);
+  for (let i = 0; i < 46; i++) {
+    const cx = r() * W;
+    const cy = H * (0.25 + r() * 0.55);
+    const rx = W * (0.08 + r() * 0.16);
+    const ry = H * (0.14 + r() * 0.24);
+    const a = 0.1 + r() * 0.16;
+    for (const dx of [-W, 0, W]) {
+      const x = cx + dx;
+      const grad = g.createRadialGradient(x, cy, 0, x, cy, rx);
+      grad.addColorStop(0, `rgba(255, 255, 255, ${a})`);
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      g.save();
+      g.translate(x, cy);
+      g.scale(1, ry / rx);
+      g.translate(-x, -cy);
+      g.fillStyle = grad;
+      g.fillRect(x - rx, cy - rx, rx * 2, rx * 2);
+      g.restore();
+    }
+  }
+}
+
+/** A beam of moonlight (any canvas): soft at the sides, bright toward the top and fading toward the bottom, with faint streaks. */
+export function paintShaft(g: CanvasRenderingContext2D, W: number, H: number): void {
+  const r = rng(307);
+  g.clearRect(0, 0, W, H);
+  for (let x = 0; x < W; x++) {
+    const across = Math.sin((x / (W - 1)) * Math.PI); // 0 at the sides, 1 in the middle
+    const streak = 0.7 + 0.3 * Math.sin(x * 0.45 + r() * 0.8);
+    const grad = g.createLinearGradient(0, 0, 0, H);
+    const a = across * across * streak;
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.9 * a})`);
+    grad.addColorStop(1, `rgba(255, 255, 255, ${0.05 * a})`);
+    g.fillStyle = grad;
+    g.fillRect(x, 0, 1, H);
+  }
 }
