@@ -1,35 +1,39 @@
 // Procedural in-memory sprite atlas for Where Shadows Wander entities.
-// Generates a 512x512 CanvasTexture divided into a 4x4 grid of 128x128 sprite cells.
+// Generates a 1024x1024 CanvasTexture divided into a 4x4 grid of 256x256 sprite cells.
 // Zero external file dependencies (0 ms download delay, 0 bundle bytes).
 //
 // Grid layout:
 // Row 0: [0,0] Traveller Idle  | [1,0] Traveller Walk 1 | [2,0] Traveller Walk 2 | [3,0] Traveller Wait
 // Row 1: [0,1] Raindrop        | [1,1] Jagged Rock      | [2,1] Flying Crow      | [3,1] Rabbit
-// Row 2: [0,2] Fox             | [1,2] Firefly          | [2,2] Reserved         | [3,2] Reserved
-// Row 3: Reserved
+// Row 2: [0,2] Fox             | [1,2] Firefly          | [2,2] Traveller Cheer  | [3,2] Traveller Shiver
+// Row 3: [0,3] Traveller Walk 3 | [1,3] Traveller Walk 4 | [2,3] Traveller Blink  | [3,3] Reserved
+// The traveller is drawn at full resolution by shadow/traveller-art.ts; the other sprites are drawn on a 128 grid and scaled up.
 
 import { CanvasTexture, LinearFilter } from '@iwsdk/core';
 import { Kind } from '../sim/entity-kinds';
 import { paintTraveller, Pose } from '../shadow/traveller-art';
 
-export const ATLAS_SIZE = 512;
+export const ATLAS_SIZE = 1024;
 export const GRID_COLS = 4;
 export const GRID_ROWS = 4;
-export const CELL_SIZE = 128; // 512 / 4
+export const CELL_SIZE = 256; // 1024 / 4
 
 export const SpriteTile = {
   TravellerIdle: { col: 0, row: 0 },
   TravellerWalk1: { col: 1, row: 0 },
   TravellerWalk2: { col: 2, row: 0 },
   TravellerWait: { col: 3, row: 0 },
+  TravellerCheer: { col: 2, row: 2 },
+  TravellerShiver: { col: 3, row: 2 },
+  TravellerWalk3: { col: 0, row: 3 },
+  TravellerWalk4: { col: 1, row: 3 },
+  TravellerBlink: { col: 2, row: 3 },
   Raindrop: { col: 0, row: 1 },
   Rock: { col: 1, row: 1 },
   Crow: { col: 2, row: 1 },
   Rabbit: { col: 3, row: 1 },
   Fox: { col: 0, row: 2 },
   Firefly: { col: 1, row: 2 },
-  TravellerCheer: { col: 0, row: 3 },
-  TravellerShiver: { col: 1, row: 3 },
 } as const;
 
 /**
@@ -51,16 +55,26 @@ export function getSpriteUvBounds(
   return out;
 }
 
+const TRAVELLER_TILES = [
+  SpriteTile.TravellerIdle,
+  SpriteTile.TravellerWalk1,
+  SpriteTile.TravellerWalk2,
+  SpriteTile.TravellerWait,
+  SpriteTile.TravellerCheer,
+  SpriteTile.TravellerShiver,
+  SpriteTile.TravellerWalk3,
+  SpriteTile.TravellerWalk4,
+  SpriteTile.TravellerBlink,
+] as const;
+
 /**
  * Selects the sprite tile for a given Entity Kind and optional animation frame.
  */
 export function getTileForKind(kind: number, animFrame = 0): { col: number; row: number } {
   switch (kind) {
     case Kind.Traveller:
-      // animFrame: 0 = idle, 1 = walk1, 2 = walk2, 3 = wait, 4 = cheer, 5 = shiver
-      if (animFrame === 4) return SpriteTile.TravellerCheer;
-      if (animFrame === 5) return SpriteTile.TravellerShiver;
-      return { col: Math.abs(animFrame | 0) % 4, row: 0 };
+      // animFrame is a pose number from shadow/traveller-art.ts (idle, walk 1, walk 2, wait, cheer, shiver, walk 3, walk 4, blink)
+      return TRAVELLER_TILES[Math.max(0, Math.min(TRAVELLER_TILES.length - 1, animFrame | 0))];
     case Kind.Rock:
       return SpriteTile.Rock;
     case Kind.Raindrop:
@@ -89,11 +103,19 @@ export function renderSpriteAtlasToCanvas(canvas: HTMLCanvasElement): void {
   canvas.height = ATLAS_SIZE;
   ctx.clearRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-  // Row 0: Traveller animation frames (drawn via full expressive character artist)
-  drawCell(ctx, 0, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Idle));
-  drawCell(ctx, 1, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Walk1));
-  drawCell(ctx, 2, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Walk2));
-  drawCell(ctx, 3, 0, (c) => paintTraveller(c, CELL_SIZE, Pose.Wait));
+  // The traveller's poses (shadow/traveller-art.ts), each in its own cell at full resolution.
+  const poses: readonly [number, number, number][] = [
+    [0, 0, Pose.Idle],
+    [1, 0, Pose.Walk1],
+    [2, 0, Pose.Walk2],
+    [3, 0, Pose.Wait],
+    [2, 2, Pose.Cheer],
+    [3, 2, Pose.Shiver],
+    [0, 3, Pose.Walk3],
+    [1, 3, Pose.Walk4],
+    [2, 3, Pose.Blink],
+  ];
+  for (const [col, row, pose] of poses) drawCell(ctx, col, row, (c) => paintTraveller(c, CELL_SIZE, pose), false);
 
   // Row 1: Environmental props & animals
   drawCell(ctx, 0, 1, drawRaindrop);
@@ -104,10 +126,6 @@ export function renderSpriteAtlasToCanvas(canvas: HTMLCanvasElement): void {
   // Row 2: Fox & Firefly
   drawCell(ctx, 0, 2, drawFox);
   drawCell(ctx, 1, 2, drawFirefly);
-
-  // Row 3: Emotional Traveller Poses
-  drawCell(ctx, 0, 3, (c) => paintTraveller(c, CELL_SIZE, Pose.Cheer));
-  drawCell(ctx, 1, 3, (c) => paintTraveller(c, CELL_SIZE, Pose.Shiver));
 }
 
 function drawCell(
@@ -115,9 +133,12 @@ function drawCell(
   col: number,
   row: number,
   drawFn: (ctx: CanvasRenderingContext2D) => void,
+  /** Sprites drawn on the original 128 grid are scaled up to fill the cell. */
+  legacy = true,
 ): void {
   ctx.save();
   ctx.translate(col * CELL_SIZE, row * CELL_SIZE);
+  if (legacy) ctx.scale(CELL_SIZE / 128, CELL_SIZE / 128);
   drawFn(ctx);
   ctx.restore();
 }
