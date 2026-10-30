@@ -282,6 +282,9 @@ export async function mountEnterArButtonIfNeeded(
         },
       },
     );
+    // The title covers the whole page, so the 3D scene behind it is not drawn until the session starts (it used to be drawn
+    // every frame behind the title, which doubled the title's frame time in a desktop test).
+    world.scene.visible = false;
     const choice = loadCaptureChoice();
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
@@ -388,11 +391,13 @@ export async function mountEnterArButtonIfNeeded(
   world.renderer.xr.addEventListener('sessionstart', () => {
     uiContainer.style.display = 'none';
     title?.setVisible(false);
+    world.scene.visible = true;
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     uiContainer.style.display = 'flex';
     title?.setVisible(true);
     title?.setBusy(false);
+    if (title) world.scene.visible = false;
     statusLine.textContent = '● XR Session Ended';
     statusLine.style.color = '#8b949e';
     appendLog('XR session ended.', '#8b949e');
