@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LEAD_IN_S, PROLOGUE_PAGES, Prologue, prologueSeconds, type PageWriter } from './prologue';
+import { FINALE_PAGES, LEAD_IN_S, PROLOGUE_PAGES, Prologue, prologueSeconds, type PageWriter } from './prologue';
 
 /** A page writer that "plays" each page for its write and hold time plus a second of fade. */
 function fakeWriter() {
@@ -48,6 +48,29 @@ describe('PROLOGUE_PAGES', () => {
   it('takes about half a minute in all, so it is skippable but not a chore', () => {
     expect(prologueSeconds()).toBeGreaterThan(20);
     expect(prologueSeconds()).toBeLessThan(45);
+  });
+});
+
+describe('FINALE_PAGES', () => {
+  it('ends on the lullaby line, with short pages and a finale of about half a minute or less', () => {
+    expect(FINALE_PAGES.length).toBeGreaterThanOrEqual(4);
+    expect(FINALE_PAGES[FINALE_PAGES.length - 1].text).toBe('Sleep well.');
+    for (const p of FINALE_PAGES) expect(p.text.length).toBeLessThanOrEqual(60);
+    expect(prologueSeconds(FINALE_PAGES)).toBeLessThan(40);
+  });
+
+  it('plays through the same player as the prologue, page by page', () => {
+    const writer = fakeWriter();
+    const calls: string[] = [];
+    const finale = new Prologue(
+      writer,
+      { enter: () => calls.push('enter'), leave: () => calls.push('leave') },
+      FINALE_PAGES,
+    );
+    finale.start();
+    for (let t = 0; t < prologueSeconds(FINALE_PAGES) + 2; t += 0.05) finale.update(0.05);
+    expect(writer.shown).toEqual(FINALE_PAGES.map((p) => p.text));
+    expect(calls).toEqual(['enter', 'leave']);
   });
 });
 

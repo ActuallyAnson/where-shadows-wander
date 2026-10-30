@@ -44,13 +44,14 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
-import { ENDING, ENDING_MOOD } from './ending';
+import { ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
-import { Prologue } from './prologue';
+import { FINALE_PAGES, Prologue, type PrologueHost } from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
+import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
@@ -254,11 +255,12 @@ async function start(): Promise<void> {
   const cinematic = new CinematicScene();
   const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
   let backgroundBeforePrologue: typeof world.scene.background = null;
-  const prologue = new Prologue(cinematic, {
+  /** What a full-view scene does to the app: the room hidden and the background black while it plays, put back after. */
+  const voidHost = (scene: CinematicScene): PrologueHost => ({
     enter: () => {
       hiddenForPrologue.length = 0;
       for (const child of world.scene.children) {
-        if (child === cinematic.group) continue;
+        if (child === cinematic.group || child === hall.group) continue;
         hiddenForPrologue.push({ object: child, visible: child.visible });
         child.visible = false;
       }
@@ -267,15 +269,19 @@ async function start(): Promise<void> {
       // The scene is built around the head, facing the way it faces now.
       world.camera.getWorldPosition(prologueHead);
       world.camera.getWorldDirection(prologueAhead);
-      cinematic.enter(prologueHead, prologueAhead.x, prologueAhead.z);
+      scene.enter(prologueHead, prologueAhead.x, prologueAhead.z);
     },
     leave: () => {
       for (const h of hiddenForPrologue) h.object.visible = h.visible;
       hiddenForPrologue.length = 0;
       world.scene.background = backgroundBeforePrologue;
-      cinematic.leave();
+      scene.leave();
     },
   });
+  // The finale plays in the hall of the great crystal, the last thing the night shows.
+  const hall = new CinematicScene(CRYSTAL, 'hall');
+  const prologue = new Prologue(cinematic, voidHost(cinematic));
+  const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES);
   const prologueHead = new Vector3();
   const prologueAhead = new Vector3();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
@@ -305,12 +311,9 @@ async function start(): Promise<void> {
   let moodGoal = 0.4;
   // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
   const playEnding = (onDone?: () => void) => {
-    storyLine.clear(); // the ending speaks for itself
-    const problems = cutscenes.play(ENDING, onDone);
-    if (problems.length > 0) {
-      failures.report('ending', new Error(problems.join('; ')));
-      onDone?.();
-    } else moodGoal = ENDING_MOOD;
+    storyLine.clear(); // the finale speaks for itself
+    moodGoal = ENDING_MOOD;
+    finale.start(onDone);
   };
   const playSolve = () => {
     moodGoal = 1;
@@ -369,6 +372,7 @@ async function start(): Promise<void> {
     cutsceneView.group,
     storyLine.group,
     cinematic.group,
+    hall.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -1007,7 +1011,11 @@ async function start(): Promise<void> {
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
       const shadowsVisible =
-        candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr' && !prologue.playing;
+        candleView.lit &&
+        sessionState !== 'paused' &&
+        sessionState !== 'title_vr' &&
+        !prologue.playing &&
+        !finale.playing;
       // The ledges' shadows wait until the opening is over, or they sit over its captions.
       const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
@@ -1351,6 +1359,7 @@ async function start(): Promise<void> {
             }
           }
           prologue.update(step);
+          finale.update(step);
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
           storyLine.update(
             paused || sessionState !== 'playing' ? 0 : step,

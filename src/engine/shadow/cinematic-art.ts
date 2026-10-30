@@ -244,3 +244,130 @@ export function paintCaption(g: CanvasRenderingContext2D, W: number, H: number, 
   g.shadowBlur = 0;
   g.fillText(text, W / 2, H / 2);
 }
+
+/** A great faceted crystal standing on its point (a tall canvas): a bright core, planes of gold, and a glow round it all. */
+export function paintCrystal(g: CanvasRenderingContext2D, W: number, H: number, p: CinematicPalette): void {
+  g.clearRect(0, 0, W, H);
+  const r = rng(61);
+  const cx = W / 2;
+  const cy = H * 0.5;
+  const halo = g.createRadialGradient(cx, cy, 0, cx, cy, W * 0.62);
+  halo.addColorStop(0, p.body + 'aa');
+  halo.addColorStop(0.5, p.glow + '44');
+  halo.addColorStop(1, p.glow + '00');
+  g.fillStyle = halo;
+  g.fillRect(0, 0, W, H);
+  // the body: a long diamond, cut into facets that catch the light differently
+  const top = [cx, H * 0.04];
+  const bottom = [cx, H * 0.96];
+  const left = [cx - W * 0.27, cy];
+  const right = [cx + W * 0.27, cy];
+  const body = g.createLinearGradient(left[0], 0, right[0], 0);
+  body.addColorStop(0, p.glow);
+  body.addColorStop(0.5, p.body);
+  body.addColorStop(1, p.glow);
+  g.fillStyle = body;
+  g.beginPath();
+  g.moveTo(top[0], top[1]);
+  g.lineTo(right[0], right[1]);
+  g.lineTo(bottom[0], bottom[1]);
+  g.lineTo(left[0], left[1]);
+  g.closePath();
+  g.fill();
+  g.save();
+  g.clip();
+  for (let i = 0; i < 26; i++) {
+    const x = cx + (r() - 0.5) * W * 0.5;
+    const y = H * (0.06 + r() * 0.88);
+    g.fillStyle = r() < 0.5 ? 'rgba(255, 252, 220, 0.28)' : 'rgba(160, 90, 0, 0.22)';
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (r() - 0.5) * W * 0.3, y + r() * H * 0.12);
+    g.lineTo(x + (r() - 0.5) * W * 0.3, y + r() * H * 0.12);
+    g.closePath();
+    g.fill();
+  }
+  const core = g.createRadialGradient(cx, cy, 0, cx, cy, W * 0.24);
+  core.addColorStop(0, p.core);
+  core.addColorStop(0.35, p.core + 'cc');
+  core.addColorStop(1, p.body + '00');
+  g.fillStyle = core;
+  g.fillRect(0, 0, W, H);
+  g.restore();
+}
+
+/** A fluted stone column (a tall canvas), dark, with a rim of light on its right edge (the side toward the crystal). */
+export function paintColumn(
+  g: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  p: CinematicPalette,
+  seed: number,
+): void {
+  g.clearRect(0, 0, W, H);
+  const r = rng(seed);
+  const stone = g.createLinearGradient(0, 0, W, 0);
+  stone.addColorStop(0, '#13130d');
+  stone.addColorStop(0.55, '#2a2a1f');
+  stone.addColorStop(1, '#3a3826');
+  g.fillStyle = stone;
+  g.fillRect(W * 0.16, 0, W * 0.68, H);
+  // the flutes
+  g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  for (let x = W * 0.2; x < W * 0.82; x += W * 0.09) g.fillRect(x, 0, W * 0.012, H);
+  g.fillStyle = 'rgba(255, 240, 180, 0.07)';
+  for (let x = W * 0.25; x < W * 0.82; x += W * 0.09) g.fillRect(x, 0, W * 0.012, H);
+  // a capital and a base, and cracks
+  g.fillStyle = '#1a1a12';
+  g.fillRect(W * 0.08, 0, W * 0.84, H * 0.05);
+  g.fillRect(W * 0.1, H * 0.95, W * 0.8, H * 0.05);
+  g.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+  g.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    const y = H * (0.2 + r() * 0.6);
+    g.beginPath();
+    g.moveTo(W * (0.2 + r() * 0.5), y);
+    g.lineTo(W * (0.2 + r() * 0.6), y + H * 0.05);
+    g.stroke();
+  }
+  // the dark toward the top, and the rim of light
+  const dark = g.createLinearGradient(0, 0, 0, H);
+  dark.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+  dark.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
+  g.fillStyle = dark;
+  g.fillRect(0, 0, W, H);
+  const rim = g.createLinearGradient(W * 0.7, 0, W * 0.86, 0);
+  rim.addColorStop(0, p.rim + '00');
+  rim.addColorStop(1, p.rim + 'bb');
+  g.fillStyle = rim;
+  g.globalCompositeOperation = 'source-atop';
+  g.fillRect(W * 0.7, 0, W * 0.2, H);
+  g.globalCompositeOperation = 'source-over';
+}
+
+/** A tall soft beam of light (a tall canvas): bright at the middle, fading at the sides and the top. */
+export function paintBeam(g: CanvasRenderingContext2D, W: number, H: number, p: CinematicPalette): void {
+  g.clearRect(0, 0, W, H);
+  for (let x = 0; x < W; x++) {
+    const across = Math.max(0, Math.sin((x / (W - 1)) * Math.PI));
+    const grad = g.createLinearGradient(0, 0, 0, H);
+    const a = across * across;
+    grad.addColorStop(0, p.body + '00');
+    grad.addColorStop(
+      0.5,
+      p.body +
+        Math.round(a * 120)
+          .toString(16)
+          .padStart(2, '0'),
+    );
+    grad.addColorStop(
+      1,
+      p.core +
+        Math.round(a * 200)
+          .toString(16)
+          .padStart(2, '0'),
+    );
+    g.fillStyle = grad;
+    g.fillRect(x, 0, 1, H);
+  }
+}

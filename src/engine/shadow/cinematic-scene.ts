@@ -21,8 +21,11 @@ import {
 } from '@iwsdk/core';
 import {
   DUSK,
+  paintBeam,
   paintCaption,
   paintCastle,
+  paintColumn,
+  paintCrystal,
   paintFloorTile,
   paintPillar,
   paintStreak,
@@ -97,6 +100,9 @@ function paintedTexture(
   return t;
 }
 
+/** Which scene to build: the burning dusk with a castle on the horizon, or the hall with a great crystal. */
+export type SceneKind = 'dusk' | 'hall';
+
 export class CinematicScene {
   readonly group = new Group();
   private readonly textures: CanvasTexture[] = [];
@@ -112,7 +118,10 @@ export class CinematicScene {
   private line = -1;
   private hold = 0;
 
-  constructor(private readonly palette: CinematicPalette = DUSK) {
+  constructor(
+    private readonly palette: CinematicPalette = DUSK,
+    kind: SceneKind = 'dusk',
+  ) {
     const p = palette;
     const make = (
       w: number,
@@ -144,21 +153,38 @@ export class CinematicScene {
       return t;
     };
 
-    // The sky, then the sun on the horizon with the castle before it.
+    // The sky, then the big light on the horizon: the sun with the castle before it, or the crystal in the hall.
     make(
       420,
       160,
       tex(8, 256, (g, w, h) => paintSky(g, w, h, p)),
       ORDER.sky,
     ).position.set(0, FLOOR_Y + 76, -80);
-    make(
-      34,
-      34,
-      tex(256, 256, (g, w, h) => paintSun(g, w, h, p)),
-      ORDER.sun,
-      { additive: true },
-    ).position.set(2, FLOOR_Y + 4.5, -78);
-    make(30, 12, tex(512, 205, paintCastle), ORDER.castle).position.set(2, FLOOR_Y + 6, -76);
+    if (kind === 'dusk') {
+      make(
+        34,
+        34,
+        tex(256, 256, (g, w, h) => paintSun(g, w, h, p)),
+        ORDER.sun,
+        { additive: true },
+      ).position.set(2, FLOOR_Y + 4.5, -78);
+      make(30, 12, tex(512, 205, paintCastle), ORDER.castle).position.set(2, FLOOR_Y + 6, -76);
+    } else {
+      make(
+        22,
+        33,
+        tex(256, 384, (g, w, h) => paintCrystal(g, w, h, p)),
+        ORDER.sun,
+        { additive: true },
+      ).position.set(0, FLOOR_Y + 13, -46);
+      make(
+        10,
+        36,
+        tex(64, 256, (g, w, h) => paintBeam(g, w, h, p)),
+        ORDER.castle,
+        { additive: true },
+      ).position.set(0, FLOOR_Y + 18, -45);
+    }
 
     // The floor: dark tiles, a glow lying along the horizon, and the sun's streak running toward you.
     const tile = tex(256, 256, (g, w, h) => paintFloorTile(g, w, h, p));
@@ -193,21 +219,31 @@ export class CinematicScene {
       },
     );
     streak.rotation.x = -Math.PI / 2;
-    streak.position.set(2, FLOOR_Y + 0.02, -41);
+    streak.position.set(kind === 'dusk' ? 2 : 0, FLOOR_Y + 0.02, -41);
 
-    // Black pillars with a rim of light on the side toward the sun, at different depths so the layers shift as the head moves.
-    for (const [x, z, h, seed, flip] of [
-      [-8.5, -13, 9, 41, 1],
-      [-15, -23, 13, 43, 1],
-      [8, -15, 10, 47, -1],
-      [16, -27, 14, 53, -1],
-    ] as const) {
-      const pillar = make(
-        h * 0.3,
-        h,
-        tex(128, 512, (g, w, hh) => paintPillar(g, w, hh, p, seed)),
-        ORDER.pillar,
-      );
+    // Pillars (black, rim lit) or fluted columns (stone, rim lit) at different depths, so the layers shift as the head moves.
+    const pillars: ReadonlyArray<readonly [number, number, number, number, number]> =
+      kind === 'dusk'
+        ? [
+            [-8.5, -13, 9, 41, 1],
+            [-15, -23, 13, 43, 1],
+            [8, -15, 10, 47, -1],
+            [16, -27, 14, 53, -1],
+          ]
+        : [
+            [-5.5, -10, 12, 71, 1],
+            [5.5, -10, 12, 73, -1],
+            [-8, -19, 14, 79, 1],
+            [8, -19, 14, 83, -1],
+            [-10.5, -30, 16, 89, 1],
+            [10.5, -30, 16, 97, -1],
+          ];
+    for (const [x, z, h, seed, flip] of pillars) {
+      const paint =
+        kind === 'dusk'
+          ? (g: CanvasRenderingContext2D, w: number, hh: number) => paintPillar(g, w, hh, p, seed)
+          : (g: CanvasRenderingContext2D, w: number, hh: number) => paintColumn(g, w, hh, p, seed);
+      const pillar = make(h * (kind === 'dusk' ? 0.3 : 0.24), h, tex(128, 512, paint), ORDER.pillar);
       pillar.position.set(x, FLOOR_Y + h / 2, z);
       pillar.scale.x = flip;
     }
