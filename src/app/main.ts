@@ -1470,6 +1470,8 @@ async function start(): Promise<void> {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        world.camera.getWorldPosition(settingsHead);
+        stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
         world.camera.getWorldPosition(settingsHead);
