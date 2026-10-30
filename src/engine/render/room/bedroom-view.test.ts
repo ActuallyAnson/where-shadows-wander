@@ -12,7 +12,7 @@ describe('BedroomView', () => {
     expect(room.floorMesh).toBeDefined();
     expect(room.ceilingMesh).toBeDefined();
     expect(room.frontWallMesh).toBeDefined();
-    expect(room.windowGroup.children.length).toBeGreaterThan(5);
+    expect(room.windowGroup.children.length).toBeGreaterThanOrEqual(3); // the merged frame, the sky, the moon wash
     expect(room.strawPalletGroup.children.length).toBe(3);
     expect(room.tinCanGroup.children.length).toBe(2);
 

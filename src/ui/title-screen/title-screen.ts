@@ -60,6 +60,28 @@ export function createTitleScreen(
     });
   });
 
+  // The film grain over the backdrop is a small noise tile drawn once here. (It used to be an SVG feTurbulence filter inside the
+  // animated backdrop, which was worked out again at full-screen size every time the bird, the flame or the steam moved.)
+  const grain = element.querySelector<HTMLElement>('.wsw-grain');
+  if (grain && typeof document !== 'undefined') {
+    const tile = document.createElement('canvas');
+    tile.width = tile.height = 128;
+    const g = tile.getContext ? tile.getContext('2d') : null;
+    if (g) {
+      const image = g.createImageData(128, 128);
+      let s = 4;
+      for (let i = 0; i < image.data.length; i += 4) {
+        s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+        image.data[i] = 255;
+        image.data[i + 1] = 220;
+        image.data[i + 2] = 178;
+        image.data[i + 3] = (s >>> 24) % 22;
+      }
+      g.putImageData(image, 0, 0);
+      grain.style.backgroundImage = `url(${tile.toDataURL()})`;
+    }
+  }
+
   // Five taps within three seconds on the emblem.
   const taps: number[] = [];
   element.querySelector('.wsw-emblem')?.addEventListener('click', () => {
