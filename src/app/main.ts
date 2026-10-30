@@ -960,6 +960,9 @@ async function start(): Promise<void> {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       if (t.cutscene) setTimeout(() => playOpening(), 1000);
+      // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
+      if (t.story === 'prologue') setTimeout(() => prologue.start(), 1000);
+      if (t.story === 'finale') setTimeout(() => finale.start(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
     });

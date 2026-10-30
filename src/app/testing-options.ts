@@ -7,6 +7,9 @@ export type RecordChoice = 'off' | 'free' | 'shapes';
 /** Which menu screen to show in the room (menu-panel), or none. */
 export type MenuChoice = 'off' | 'pause' | 'solved' | 'end';
 export const MENU_CHOICES: readonly MenuChoice[] = ['off', 'pause', 'solved', 'end'];
+/** A story scene to play a second after the headset session starts: the prologue (the burning dusk) or the finale (the crystal hall). */
+export type StoryChoice = 'off' | 'prologue' | 'finale';
+export const STORY_CHOICES: readonly StoryChoice[] = ['off', 'prologue', 'finale'];
 
 export interface TestingOptions {
   /** A dot on every tracked hand joint (?debug=joints). */
@@ -23,6 +26,8 @@ export interface TestingOptions {
   record: RecordChoice;
   /** A menu screen showing in the room, to look at it (set in the Testing panel; there is no address form). */
   menu: MenuChoice;
+  /** A story scene plays a second after the headset session starts (set in the Testing panel; no address form). */
+  story: StoryChoice;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
@@ -33,6 +38,7 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   kindred: false,
   record: 'off',
   menu: 'off',
+  story: 'off',
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
@@ -50,6 +56,7 @@ export function parseTesting(search: string): TestingOptions {
     kindred: false,
     record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
     menu: 'off',
+    story: 'off',
   };
 }
 
@@ -89,6 +96,7 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
   if (o.menu !== 'off') on.push(`${o.menu} screen`);
+  if (o.story !== 'off') on.push(`${o.story} scene on entry`);
   return on;
 }
 
@@ -128,6 +136,7 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       kindred: raw.kindred === true,
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
       menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
+      story: (STORY_CHOICES as readonly string[]).includes(raw.story ?? '') ? (raw.story as StoryChoice) : 'off',
     };
   } catch {
     return { ...DEFAULT_TESTING };

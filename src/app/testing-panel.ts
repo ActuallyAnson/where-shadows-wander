@@ -10,6 +10,7 @@ import {
   loadTesting,
   MENU_CHOICES,
   nextChoice,
+  STORY_CHOICES,
   RECORD_CHOICES,
   saveTesting,
   TESTING_EVENT,
@@ -73,6 +74,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     capture.textContent = `Capture mode (demo video; press reloads): ${loadCaptureChoice()}`;
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
     menu.textContent = `Menu screen showing: ${options.menu}`;
+    story.textContent = `Story scene when VR starts: ${options.story} (the prologue, or the finale)`;
     for (const [b, isOn] of [
       [joints, options.joints],
       [shadow, options.shadow],
@@ -81,6 +83,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
       [kindred, options.kindred],
       [record, options.record !== 'off'],
       [menu, options.menu !== 'off'],
+      [story, options.story !== 'off'],
     ] as const) {
       b.style.background = isOn ? '#163824' : '#21262d';
       b.style.borderColor = isOn ? '#2ea043' : '#30363d';
@@ -95,6 +98,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   const cutscene = button(() => set({ ...options, cutscene: !options.cutscene }));
   const record = button(() => set({ ...options, record: nextChoice(RECORD_CHOICES, options.record) }));
   const menu = button(() => set({ ...options, menu: nextChoice(MENU_CHOICES, options.menu) }));
+  const story = button(() => set({ ...options, story: nextChoice(STORY_CHOICES, options.story) }));
   const capture = button(() => {
     saveCaptureChoice(nextCapture(loadCaptureChoice()));
     location.reload(); // the eye buffers' size is set when the page starts
@@ -103,7 +107,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   clear.textContent = 'Clear all switches';
   clear.style.cssText += 'background:#2d1b1b;color:#ff7b72;border-color:#6e2f2f;';
 
-  element.append(title, active, joints, shadow, settings, cutscene, kindred, record, menu, capture, hint, clear);
+  element.append(title, active, joints, shadow, settings, cutscene, kindred, record, menu, story, capture, hint, clear);
   refresh();
   return {
     element,
