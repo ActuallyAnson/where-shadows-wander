@@ -13,6 +13,7 @@ import {
   World,
   createSystem,
 } from '@iwsdk/core';
+import type { Object3D } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
@@ -45,10 +46,12 @@ import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '..
 import { CutsceneHost } from './cutscene-host';
 import { ENDING, ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
+import { Prologue } from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
+import { CalligraphyView } from '../engine/shadow/calligraphy-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
@@ -246,6 +249,40 @@ async function start(): Promise<void> {
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
   const storyLine = new StoryLineView();
+  // The prologue: a black void with the story drawn in white calligraphy. While it plays, everything else in the scene is
+  // hidden (and put back after), and the pages float where the player was facing.
+  const calligraphy = new CalligraphyView();
+  const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
+  let backgroundBeforePrologue: typeof world.scene.background = null;
+  const prologue = new Prologue(calligraphy, {
+    enter: () => {
+      hiddenForPrologue.length = 0;
+      for (const child of world.scene.children) {
+        if (child === calligraphy.group) continue;
+        hiddenForPrologue.push({ object: child, visible: child.visible });
+        child.visible = false;
+      }
+      backgroundBeforePrologue = world.scene.background;
+      world.scene.background = new Color(0x000000);
+      // Two and a half metres ahead of where the head faces now, at the head's height, turned toward it.
+      world.camera.getWorldPosition(prologueHead);
+      world.camera.getWorldDirection(prologueAhead);
+      const yaw = Math.atan2(prologueAhead.x, prologueAhead.z);
+      calligraphy.group.position.set(
+        prologueHead.x + Math.sin(yaw) * 2.5,
+        prologueHead.y,
+        prologueHead.z + Math.cos(yaw) * 2.5,
+      );
+      calligraphy.group.rotation.set(0, yaw + Math.PI, 0);
+    },
+    leave: () => {
+      for (const h of hiddenForPrologue) h.object.visible = h.visible;
+      hiddenForPrologue.length = 0;
+      world.scene.background = backgroundBeforePrologue;
+    },
+  });
+  const prologueHead = new Vector3();
+  const prologueAhead = new Vector3();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
   const travellerAt = { x: 0, y: 0 };
   const readTraveller = (): boolean => {
@@ -336,6 +373,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     storyLine.group,
+    calligraphy.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -630,6 +668,7 @@ async function start(): Promise<void> {
         label: () => menuChoice,
       },
       cutscene: { play: () => playOpening() },
+      prologue: { play: () => prologue.start() },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
@@ -1315,6 +1354,7 @@ async function start(): Promise<void> {
               );
             }
           }
+          prologue.update(step);
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
           storyLine.update(
             paused || sessionState !== 'playing' ? 0 : step,
