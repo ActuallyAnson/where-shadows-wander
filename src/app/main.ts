@@ -49,6 +49,7 @@ import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindr
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
+import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
 import { RabbitView } from '../engine/shadow/rabbit-view';
@@ -244,6 +245,7 @@ async function start(): Promise<void> {
   // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
+  const storyLine = new StoryLineView();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
   const travellerAt = { x: 0, y: 0 };
   const readTraveller = (): boolean => {
@@ -271,6 +273,7 @@ async function start(): Promise<void> {
   let moodGoal = 0.4;
   // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
   const playEnding = (onDone?: () => void) => {
+    storyLine.clear(); // the ending speaks for itself
     const problems = cutscenes.play(ENDING, onDone);
     if (problems.length > 0) {
       failures.report('ending', new Error(problems.join('; ')));
@@ -332,6 +335,7 @@ async function start(): Promise<void> {
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
+    storyLine.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -425,6 +429,8 @@ async function start(): Promise<void> {
     setMood: (goal) => {
       moodGoal = goal;
     },
+    say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
+    setAwake: (count) => roomDressing.setAwake(count),
     solved: () => {
       // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
       const mood = moodGoal;
@@ -1309,6 +1315,14 @@ async function start(): Promise<void> {
               );
             }
           }
+          // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
+          storyLine.update(
+            paused || sessionState !== 'playing' ? 0 : step,
+            stage,
+            shadowsVisible && !menu.group.visible && !cutscenes.playing
+              ? shadowRenderer.baseOpacity * candleView.occlusion
+              : 0,
+          );
           if (menu.group.visible || cutscenes.playing) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
@@ -1508,6 +1522,7 @@ async function start(): Promise<void> {
         kindred,
         kindredView,
         stickerView,
+        storyLine,
         openSettings,
         shapes,
         gestures,

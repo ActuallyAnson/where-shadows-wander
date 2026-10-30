@@ -74,7 +74,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(23);
+    expect(v.group.children).toHaveLength(24);
     v.dispose();
   });
 
@@ -148,6 +148,35 @@ describe('RoomDressingView', () => {
       v.tick(0.05);
     }
     expect(seen.size).toBe(1);
+    v.dispose();
+  });
+
+  it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
+    const v = new RoomDressingView();
+    const glow = () => {
+      const mesh = v.group.children[v.group.children.length - 1] as unknown as {
+        geometry: { attributes: { color: { array: Float32Array } } };
+      };
+      return Array.from(mesh.geometry.attributes.color.array).reduce((a, b) => a + b, 0);
+    };
+    v.update(light(true, 1), 1, [0, 1.2, -1]);
+    v.tick(0.1);
+    expect(glow()).toBe(0); // nothing is lit yet
+    v.setAwake(1);
+    for (let i = 0; i < 80; i++) v.tick(0.05);
+    const one = glow();
+    expect(one).toBeGreaterThan(0);
+    v.setAwake(3);
+    for (let i = 0; i < 80; i++) v.tick(0.05);
+    const three = glow();
+    expect(three).toBeGreaterThan(one * 1.5);
+    v.setAwake(99); // more than there are: all of them
+    for (let i = 0; i < 200; i++) v.tick(0.05);
+    expect(glow()).toBeGreaterThan(three);
+    v.setAwake(0);
+    for (let i = 0; i < 200; i++) v.tick(0.05);
+    expect(glow()).toBeCloseTo(0, 5);
+    v.setAwake(NaN);
     v.dispose();
   });
 

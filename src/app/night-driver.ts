@@ -15,6 +15,16 @@ import { createSceneProp, propToScene, type PropCaster } from '../game/props';
 import { createNight } from '../game/puzzles/index';
 import { SaveBridge, saveStateFrom, type SaveStore } from '../game/save-bridge';
 import { newSave } from '../game/save-state';
+import {
+  DIMMING_LINE,
+  LINE_DELAY_S,
+  LINE_HOLD_S,
+  lineForPuzzle,
+  RETURN_LINE,
+  WAKE_DELAY_S,
+  WAKE_HOLD_S,
+  wakeLineFor,
+} from './story';
 
 /** The wall's mood (0 cold .. 1 warm) on each puzzle: the colour script (docs/levels/night.md). */
 export const NIGHT_MOOD: readonly number[] = [0.4, 0.55, 0.7, 0.45, 0.85];
@@ -47,6 +57,10 @@ export interface NightHost {
   /** The kindred stays away (true from the dimming until the return). */
   setKindredAway(away: boolean): void;
   setMood(goal: number): void;
+  /** One short line of the story on the wall: after `delay` seconds, for `hold` seconds. */
+  say(text: string, delay: number, hold: number, after?: boolean): void;
+  /** How many things in the room are lit (one more each puzzle solved: 0 .. the number of puzzles). */
+  setAwake(count: number): void;
   /** The solve moment: the chime, the bloom. */
   solved(): void;
   /** A soft sound and sparkle at (x, y): a puzzle object changed, or the obstacle eased. */
@@ -183,6 +197,8 @@ export class NightDriver {
           break;
         case 'puzzle-solved': {
           host.solved();
+          host.setAwake(e.value + 1); // the room lights one more thing
+          if (e.value + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(e.value), WAKE_DELAY_S, WAKE_HOLD_S);
           // Each solve warms the wall one step, except into the fan: the dimming cools it instead.
           const next = e.value + 1;
           if (next < NIGHT_MOOD.length && next !== DIMMING_AT) host.setMood(NIGHT_MOOD[next]);
@@ -191,6 +207,8 @@ export class NightDriver {
         case 'chapter-complete': {
           // The return: the room fills with light, the kindred comes back to the lit window.
           host.setMood(RETURN_MOOD);
+          host.setAwake(NIGHT_MOOD.length);
+          host.say(RETURN_LINE, 0.5, 3);
           host.setKindredAway(false);
           const w = game.fixtures.find('window');
           if (w) host.perchKindred(w.x, w.y + w.h / 2 + 0.04);
@@ -223,6 +241,9 @@ export class NightDriver {
     const host = this.host;
     if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.dim();
     host.setKindredAway(index >= DIMMING_AT);
+    host.setAwake(index);
+    if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.say(DIMMING_LINE, 1.5, 4);
+    else host.say(lineForPuzzle(index), LINE_DELAY_S, LINE_HOLD_S, true); // after the last wake line has been written
     host.setMood(NIGHT_MOOD[Math.min(index, NIGHT_MOOD.length - 1)]);
     host.hideHint();
     host.releaseKindred();

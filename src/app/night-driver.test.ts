@@ -1,3 +1,4 @@
+import { DIMMING_LINE, PUZZLE_LINES, RETURN_LINE, WAKE_LINES } from './story';
 import { describe, expect, it } from 'vitest';
 import { createHandShadow, type HandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
@@ -23,7 +24,16 @@ function setup(flameAt?: readonly number[]) {
   if (flameAt) flame.set(flameAt);
   else placeLantern(head, 0, flame);
   const calls: string[] = [];
-  const state = { mood: 0, props: 0, hint: '' as Shape | '', perched: false, away: false, ended: false };
+  const state = {
+    awake: -1,
+    said: [] as string[],
+    mood: 0,
+    props: 0,
+    hint: '' as Shape | '',
+    perched: false,
+    away: false,
+    ended: false,
+  };
   const saves = new SaveManager({ store: new MemoryStore(), prefix: 'test' });
   saves.load();
   const host: NightHost = {
@@ -42,6 +52,8 @@ function setup(flameAt?: readonly number[]) {
     dim: () => void calls.push('dim'),
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
+    say: (text) => void state.said.push(text),
+    setAwake: (count) => void (state.awake = count),
     solved: () => void calls.push('solved'),
     twinkle: () => void calls.push('twinkle'),
     playEnding: (onDone) => {
@@ -88,6 +100,8 @@ describe('NightDriver', () => {
     expect(driver.game?.puzzle.id).toBe('n1-books');
     expect(state.props).toBe(2);
     expect(state.mood).toBe(NIGHT_MOOD[0]);
+    expect(state.awake).toBe(0); // nothing in the room is lit yet
+    expect(state.said).toEqual([PUZZLE_LINES[0]]);
   });
 
   // The candle on the bed tray, as main.ts places it for eyes at 1.2 m: 0.45 m ahead, its flame at 0.805 m.
@@ -115,6 +129,8 @@ describe('NightDriver', () => {
     pose('right', 'flat', 0, LEDGE_TOP - 0.01);
     expect(run(25, () => calls.includes('solved'))).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[1]);
+    expect(state.awake).toBe(1); // the room lights its first thing
+    expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
   });
 
@@ -138,6 +154,7 @@ describe('NightDriver', () => {
     expect(calls).toContain('dim');
     expect(state.away).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[DIMMING_AT]);
+    expect(state.said).toContain(DIMMING_LINE);
   });
 
   it('ends the night: the return, then the ending, then the end screen', () => {
@@ -151,6 +168,8 @@ describe('NightDriver', () => {
     pose('left', 'flat', 0.01, LEDGE_TOP - 0.01);
     expect(run(40, () => driver.game!.complete)).toBe(true);
     expect(state.mood).toBe(RETURN_MOOD);
+    expect(state.awake).toBe(NIGHT_MOOD.length); // everything in the room is lit
+    expect(state.said).toContain(RETURN_LINE);
     expect(state.away).toBe(false);
     expect(state.perched).toBe(true);
     expect(calls).not.toContain('ending');
