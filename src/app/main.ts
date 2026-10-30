@@ -51,7 +51,7 @@ import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindr
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
-import { CalligraphyView } from '../engine/shadow/calligraphy-view';
+import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
@@ -251,34 +251,29 @@ async function start(): Promise<void> {
   const storyLine = new StoryLineView();
   // The prologue: a black void with the story drawn in white calligraphy. While it plays, everything else in the scene is
   // hidden (and put back after), and the pages float where the player was facing.
-  const calligraphy = new CalligraphyView();
+  const cinematic = new CinematicScene();
   const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
   let backgroundBeforePrologue: typeof world.scene.background = null;
-  const prologue = new Prologue(calligraphy, {
+  const prologue = new Prologue(cinematic, {
     enter: () => {
       hiddenForPrologue.length = 0;
       for (const child of world.scene.children) {
-        if (child === calligraphy.group) continue;
+        if (child === cinematic.group) continue;
         hiddenForPrologue.push({ object: child, visible: child.visible });
         child.visible = false;
       }
       backgroundBeforePrologue = world.scene.background;
       world.scene.background = new Color(0x000000);
-      // Two and a half metres ahead of where the head faces now, at the head's height, turned toward it.
+      // The scene is built around the head, facing the way it faces now.
       world.camera.getWorldPosition(prologueHead);
       world.camera.getWorldDirection(prologueAhead);
-      const yaw = Math.atan2(prologueAhead.x, prologueAhead.z);
-      calligraphy.group.position.set(
-        prologueHead.x + Math.sin(yaw) * 2.5,
-        prologueHead.y,
-        prologueHead.z + Math.cos(yaw) * 2.5,
-      );
-      calligraphy.group.rotation.set(0, yaw + Math.PI, 0);
+      cinematic.enter(prologueHead, prologueAhead.x, prologueAhead.z);
     },
     leave: () => {
       for (const h of hiddenForPrologue) h.object.visible = h.visible;
       hiddenForPrologue.length = 0;
       world.scene.background = backgroundBeforePrologue;
+      cinematic.leave();
     },
   });
   const prologueHead = new Vector3();
@@ -373,7 +368,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     storyLine.group,
-    calligraphy.group,
+    cinematic.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -1011,7 +1006,8 @@ async function start(): Promise<void> {
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
-      const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
+      const shadowsVisible =
+        candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr' && !prologue.playing;
       // The ledges' shadows wait until the opening is over, or they sit over its captions.
       const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
