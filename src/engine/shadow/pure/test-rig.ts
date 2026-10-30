@@ -5,7 +5,8 @@
 // table: the tabletop theatre (GDD): a 50 × 42 cm paper screen standing on the
 //   table about 75 cm ahead, tall enough for hands turned up toward it, the
 //   lantern on the near edge of the table, the hands in between.
-// wall: a larger screen 1.5 m ahead, as on a wall.
+// wall: a larger screen 2 m ahead, as on a wall: 1.6 m wide (the width the tutorial's walk and the cutscenes are drawn for),
+//   behind the tutorial's props (1.2 m ahead) so their shadows fall on it.
 import type { Vec3 } from '../../hands/hand';
 import type { MutableStagePlane } from './stage-plane';
 
@@ -46,7 +47,7 @@ export function placeTestRig(
   const table = head[1] - TABLE_BELOW_EYES_M;
   placeLantern(head, yawRad, lantern);
   const [ahead, width, height, centreY] =
-    mode === 'table' ? [0.75, 0.5, 0.42, table + 0.24] : [1.5, 0.9, 0.7, head[1] - 0.2];
+    mode === 'table' ? [0.75, 0.5, 0.42, table + 0.24] : [2, 1.6, 0.9, head[1] - 0.02];
   stage.origin[0] = head[0] + fx * ahead;
   stage.origin[1] = centreY;
   stage.origin[2] = head[2] + fz * ahead;
