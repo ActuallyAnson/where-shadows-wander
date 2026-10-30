@@ -8,6 +8,7 @@ import {
   CanvasTexture,
   Color,
   DoubleSide,
+  Float32BufferAttribute,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -17,6 +18,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { BufferGeometry, Material } from '@iwsdk/core';
+import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
   castShadow,
@@ -25,14 +27,16 @@ import {
   paintBookcase,
   paintMoonPatch,
   paintNight,
+  paintPillow,
+  paintQuilt,
   paintRug,
   paintSill,
   paintSnow,
+  paintStraw,
   paintWall,
   paintWallThings,
   paintWood,
-  WALL_THINGS_ROWS,
-  WALL_THINGS_TOP,
+  WALL_THINGS,
 } from './room-art';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
@@ -49,7 +53,8 @@ const SNOW_SWAY = [0.03, 0.02] as const;
 const PICTURES_OUT = 0.03;
 const SHELVES_OUT = 0.1;
 /** How deep the bookcase is, front to wall. */
-const CASE_DEPTH = 0.3;
+/** (Slim, so it stands clear of the bed, whose edge is 2 cm from it.) */
+const CASE_DEPTH = 0.14;
 
 /** The window opening, in metres, and where it is in the room (the centre of the left wall's window). */
 const WINDOW_W = 1.1;
@@ -66,6 +71,15 @@ const OUTSIDE_LAYERS: readonly { layer: NightLayer; slide: number; w: number; h:
 ];
 /** Share of a painted margin a layer may slide into, so a bare edge never shows. */
 const SLIDE_LIMIT = 0.9;
+
+/** Candlelight on the room: what is left of the colour far from the flame, and the distance (m) at which the light is half gone. */
+const FLAME_AMBIENT = 0.08;
+const FLAME_REACH = 0.85;
+/** The most of its brightness the room art has at full candlelight (the paper stage is the brightest thing), and how far the flame's flicker moves it. */
+const LIT_PEAK = 0.8;
+const FLICKER = 0.1;
+/** The flame has to move this far (m) before the walls' light is worked out again. */
+const FLAME_MOVE = 0.02;
 
 const MOON_TINT = new Color(0.2, 0.25, 0.4);
 const CANDLE_TINT = new Color(1.0, 0.82, 0.6);
@@ -89,9 +103,8 @@ export class RoomDressingView {
   readonly group = new Group();
   /** The wallpaper wall behind the stage, kept to move it when the stage's distance is known. */
   readonly wall: Mesh;
-  /** The pictures and the shelves, held off the wall; `place` keeps them in front of it. */
-  private readonly pictures: Mesh;
-  private readonly shelves: Mesh;
+  /** The hung pictures and shelves, held off the wall (one quad per cluster, as in WALL_THINGS); `place` keeps them in front of it. */
+  private readonly things: Mesh[] = [];
 
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
@@ -105,33 +118,55 @@ export class RoomDressingView {
   private time = 0;
   private readonly textures: CanvasTexture[] = [];
   private readonly tint = new Color();
+  /** The walls, lit per vertex by the candle, and the rest of the room art, lit by how far its middle is from the flame. */
+  private readonly vertexLit: Mesh[] = [];
+  private readonly centreLit: Mesh[] = [];
+  private readonly falloff = new Map<MeshBasicMaterial, number>();
+  /** Where in the flicker each piece is, so the light seems to dance across the room rather than blink all at once. */
+  private readonly phase = new Map<MeshBasicMaterial, number>();
+  private readonly flame = new Vector3();
+  private readonly spot = new Vector3();
+  private flameOn = false;
 
   constructor() {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
     // to draw; everything on a wall sits a hair in front of it.
     // What hangs on the wall behind the stage stands out from it, in two layers (frames, then shelves with their keepsakes); their
     // shadows are painted onto the paper, so the gap between them shows when the head moves.
-    const picturesCanvas = paintedCanvas(1024, WALL_THINGS_ROWS, (g, w, h) => paintWallThings(g, w, h, 'pictures'));
-    const shelvesCanvas = paintedCanvas(1024, WALL_THINGS_ROWS, (g, w, h) => paintWallThings(g, w, h, 'shelves'));
+    const thingCanvases = WALL_THINGS.map((spec) =>
+      paintedCanvas(spec.area.w, spec.area.h, (g, w, h) => paintWallThings(g, w, h, spec.layer, spec.area)),
+    );
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
       paintWall(g, w, h);
-      castShadow(g, picturesCanvas, 0, WALL_THINGS_TOP, 6, 9, 7, 0.5);
-      castShadow(g, shelvesCanvas, 0, WALL_THINGS_TOP, 16, 22, 16, 0.55);
+      WALL_THINGS.forEach((spec, i) => {
+        const far = spec.layer === 'shelves';
+        castShadow(
+          g,
+          thingCanvases[i],
+          spec.area.x,
+          spec.area.y,
+          far ? 16 : 6,
+          far ? 22 : 9,
+          far ? 16 : 7,
+          far ? 0.55 : 0.5,
+        );
+      });
     });
-    this.wall = this.quad(4, 2.5, this.texture(wallCanvas), false, true);
+    this.wall = this.quad(4, 2.5, this.texture(wallCanvas), false, true, undefined, [16, 10]);
     this.wall.position.set(0, 1.25, -2.4);
     this.wall.renderOrder = WALL_ORDER;
-    this.pictures = this.quad(4, 1.25, this.texture(picturesCanvas), true);
-    this.shelves = this.quad(4, 1.25, this.texture(shelvesCanvas), true);
+    WALL_THINGS.forEach((spec, i) => {
+      this.things.push(this.quad(spec.area.w / 256, spec.area.h / 256, this.texture(thingCanvases[i]), true));
+    });
 
     // The same paper and panelling on the two side walls (one material for both).
     const sideTexture = this.texture(paintedCanvas(1280, 640, (g, w, h) => paintWall(g, w, h)));
-    const left = this.quad(5, 2.5, sideTexture, false, true);
+    const left = this.quad(5, 2.5, sideTexture, false, true, undefined, [20, 10]);
     left.rotation.y = Math.PI / 2;
     left.position.set(-1.995, 1.25, -0.4);
     left.renderOrder = WALL_ORDER;
-    const right = this.quad(5, 2.5, sideTexture, false, true, left);
+    const right = this.quad(5, 2.5, sideTexture, false, true, left, [20, 10]);
     right.rotation.y = -Math.PI / 2;
     right.position.set(1.995, 1.25, -0.4);
     right.renderOrder = WALL_ORDER;
@@ -193,6 +228,7 @@ export class RoomDressingView {
     patch.rotation.x = -Math.PI / 2;
     patch.position.set(-0.95, 0.008, -0.8);
     patch.renderOrder = 3;
+    (patch.material as MeshBasicMaterial).map!.anisotropy = 4; // the floor is seen at a slant
     this.moonPatch = patch.material as MeshBasicMaterial;
     this.moonPatch.blending = AdditiveBlending;
     this.moonPatch.polygonOffset = true;
@@ -214,11 +250,58 @@ export class RoomDressingView {
     bookcase.rotation.y = -Math.PI / 2;
     bookcase.position.set(1.988 - CASE_DEPTH - 0.002, 0.93, -1.25);
 
+    // The bed on the right, in place of Damon's plain pallet (hidden by the caller): a wooden frame with posts and a headboard, a
+    // straw mattress with buttons, a patchwork quilt folded over its foot and a linen pillow. Same spot, same size, much more to see.
+    const wood = this.texture(paintedCanvas(128, 128, paintWood));
+    const woodMat = (): MeshBasicMaterial => new MeshBasicMaterial({ map: wood, toneMapped: false });
+    const post = new BoxGeometry(0.06, 0.3, 0.06);
+    const rail = new BoxGeometry(0.04, 0.09, 1.66);
+    const board = new BoxGeometry(0.9, 0.46, 0.05);
+    const foot = new BoxGeometry(0.9, 0.2, 0.04);
+    const frameGeo = mergeBoxes([
+      { geo: post, x: 0.96, y: 0.15, z: -1.62 },
+      { geo: post, x: 1.84, y: 0.15, z: -1.62 },
+      { geo: post, x: 0.96, y: 0.15, z: 0.02 },
+      { geo: post, x: 1.84, y: 0.15, z: 0.02 },
+      { geo: rail, x: 0.97, y: 0.09, z: -0.8 },
+      { geo: rail, x: 1.83, y: 0.09, z: -0.8 },
+      { geo: board, x: 1.4, y: 0.25, z: -1.665 },
+      { geo: foot, x: 1.4, y: 0.12, z: 0.045 },
+    ]);
+    for (const g of [post, rail, board, foot]) g.dispose();
+    frameGeo.translate(-1.4, -0.12, 0.8); // so the mesh's own position is its middle (the candle's light is worked out from it)
+    const frame = new Mesh(frameGeo, woodMat());
+    frame.position.set(1.4, 0.12, -0.8);
+    const mattressGeo = new BoxGeometry(0.8, 0.12, 1.62);
+    const mattress = new Mesh(
+      mattressGeo,
+      new MeshBasicMaterial({ map: this.texture(paintedCanvas(128, 256, paintStraw)), toneMapped: false }),
+    );
+    mattress.position.set(1.4, 0.13, -0.8);
+    const quiltGeo = new BoxGeometry(0.82, 0.05, 1.0);
+    const quilt = new Mesh(
+      quiltGeo,
+      new MeshBasicMaterial({ map: this.texture(paintedCanvas(205, 256, paintQuilt)), toneMapped: false }),
+    );
+    quilt.position.set(1.4, 0.215, -0.35);
+    const pillowGeo = new BoxGeometry(0.62, 0.1, 0.34);
+    const pillow = new Mesh(
+      pillowGeo,
+      new MeshBasicMaterial({ map: this.texture(paintedCanvas(128, 64, paintPillow)), toneMapped: false }),
+    );
+    pillow.position.set(1.4, 0.25, -1.4);
+    for (const m of [frame, mattress, quilt, pillow]) {
+      this.geometries.push(m.geometry);
+      this.materials.push(m.material as MeshBasicMaterial);
+    }
+    const bed = [frame, mattress, quilt, pillow];
+
     // The rug under the bed tray, a hair above the floor.
     const rug = this.quad(2.2, 1.55, this.texture(paintedCanvas(512, 360, paintRug)), true);
     rug.rotation.x = -Math.PI / 2;
     rug.position.set(0.1, 0.004, -0.4);
     const rugMat = rug.material as MeshBasicMaterial;
+    rugMat.map!.anisotropy = 4;
     rugMat.polygonOffset = true;
     rugMat.polygonOffsetFactor = -2;
     rugMat.polygonOffsetUnits = -2;
@@ -235,9 +318,9 @@ export class RoomDressingView {
       patch,
       bookcase,
       rug,
-      this.pictures,
-      this.shelves,
+      ...this.things,
       caseBox,
+      ...bed,
     ]) {
       m.matrixAutoUpdate = false;
       m.updateMatrix();
@@ -252,10 +335,15 @@ export class RoomDressingView {
       patch,
       bookcase,
       rug,
-      this.pictures,
-      this.shelves,
+      ...this.things,
       caseBox,
+      ...bed,
     );
+    this.vertexLit.push(this.wall, left, right);
+    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed);
+    for (const m of [...this.vertexLit, ...this.centreLit]) {
+      this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
+    }
     this.place();
     this.update({ lit: false, intensity: 0 } as Readonly<LanternLight>, 0);
   }
@@ -271,13 +359,28 @@ export class RoomDressingView {
   private texture(canvas: HTMLCanvasElement): CanvasTexture {
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;
-    texture.anisotropy = 4;
+    texture.anisotropy = 1;
     this.textures.push(texture);
     return texture;
   }
 
-  private quad(w: number, h: number, texture: CanvasTexture, alpha: boolean, solid = false, shared?: Mesh): Mesh {
-    const geometry = new PlaneGeometry(w, h);
+  private quad(
+    w: number,
+    h: number,
+    texture: CanvasTexture,
+    alpha: boolean,
+    solid = false,
+    shared?: Mesh,
+    segments?: readonly [number, number],
+  ): Mesh {
+    const geometry = new PlaneGeometry(w, h, segments?.[0] ?? 1, segments?.[1] ?? 1);
+    if (segments) {
+      // Lit per vertex by the candle (see relight); white until then.
+      geometry.setAttribute(
+        'color',
+        new Float32BufferAttribute(new Float32Array(geometry.attributes.position.count * 3).fill(1), 3),
+      );
+    }
     const material =
       (shared?.material as MeshBasicMaterial | undefined) ??
       new MeshBasicMaterial({
@@ -286,6 +389,7 @@ export class RoomDressingView {
         depthWrite: solid,
         side: DoubleSide,
         toneMapped: false,
+        vertexColors: segments !== undefined,
       });
     this.geometries.push(geometry);
     if (!shared) this.materials.push(material);
@@ -297,26 +401,85 @@ export class RoomDressingView {
     const z = -(Math.max(stageDist, 1.5) + 0.35) + 0.012;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
-    // The band of wall the things cover: rows 120 to 440 of 640, so its middle is row 280.
-    const y = 2.5 - ((WALL_THINGS_TOP + WALL_THINGS_ROWS / 2) / 640) * 2.5;
-    this.pictures.position.set(0, y, z + PICTURES_OUT);
-    this.pictures.updateMatrix();
-    this.shelves.position.set(0, y, z + SHELVES_OUT);
-    this.shelves.updateMatrix();
+    WALL_THINGS.forEach((spec, i) => {
+      const m = this.things[i];
+      m.position.set(
+        ((spec.area.x + spec.area.w / 2) / 1024) * 4 - 2,
+        2.5 - ((spec.area.y + spec.area.h / 2) / 640) * 2.5,
+        z + (spec.layer === 'shelves' ? SHELVES_OUT : PICTURES_OUT),
+      );
+      m.updateMatrix();
+    });
+    this.relight();
   }
 
-  /** Lights the art like the room: warm and bright with the candle, dark and blue without. Same arguments as BedroomView.update. */
-  update(light: Readonly<LanternLight>, occlusion = 1): void {
+  /**
+   * Lights the art like the room: dark and blue by moonlight, and by candlelight warm near the flame and dark far from it (`flame` is
+   * the flame's world position; without it the candle lights everything evenly). Same other arguments as BedroomView.update.
+   */
+  update(light: Readonly<LanternLight>, occlusion = 1, flame?: ArrayLike<number>): void {
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
     const warm = Math.min(1, Math.max(0, (brightness - 0.04) / 0.5));
     this.tint.copy(MOON_TINT).lerp(CANDLE_TINT, warm);
     const k = 0.5 + 0.5 * Math.min(1, brightness);
-    this.tint.multiplyScalar(warm > 0 ? k : 1);
-    for (const m of this.materials) m.color.copy(this.tint);
+    this.tint.multiplyScalar(warm > 0 ? k * LIT_PEAK : 1);
+    // Where the flame is (in the room's own space), and whether it lights the room at all.
+    if (light.lit && flame) {
+      this.group.worldToLocal(this.spot.set(flame[0], flame[1], flame[2]));
+      if (!this.flameOn || this.spot.distanceToSquared(this.flame) > FLAME_MOVE * FLAME_MOVE) {
+        this.flame.copy(this.spot);
+        this.flameOn = true;
+        this.relight();
+      }
+    } else if (this.flameOn) {
+      this.flameOn = false;
+      this.relight();
+    }
+    // The flame's flicker: a few sines of different speeds, a different moment for each piece, only when the candle lights the room.
+    const time = this.time;
+    for (const m of this.materials) {
+      const p = this.phase.get(m) ?? 0;
+      const flicker = this.flameOn
+        ? 1 +
+          FLICKER *
+            (0.5 * Math.sin(time * 6.1 + p) +
+              0.3 * Math.sin(time * 9.7 + 1.7 * p) +
+              0.2 * Math.sin(time * 2.3 + 0.6 * p))
+        : 1;
+      m.color.copy(this.tint).multiplyScalar((this.falloff.get(m) ?? 1) * flicker);
+    }
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
     // The moonlight on the floor shrinks into the room's light when the candle is bright.
     const moonK = 0.3 - 0.2 * warm;
     this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
+  }
+
+  /** How much of the candle's light reaches a point `d2` (squared metres) from the flame: all of it close by, little far away. */
+  private static reach(d2: number): number {
+    return FLAME_AMBIENT + (1 - FLAME_AMBIENT) / (1 + d2 / (FLAME_REACH * FLAME_REACH));
+  }
+
+  /** Works out the candle's light on every wall vertex and on the middle of each other piece (when the flame moves or goes out). */
+  private relight(): void {
+    for (const mesh of this.vertexLit) {
+      const position = mesh.geometry.attributes.position;
+      const color = mesh.geometry.attributes.color;
+      for (let i = 0; i < position.count; i++) {
+        let f = 1;
+        if (this.flameOn) {
+          this.spot.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
+          f = RoomDressingView.reach(this.spot.distanceToSquared(this.flame));
+        }
+        color.setXYZ(i, f, f, f);
+      }
+      color.needsUpdate = true;
+    }
+    for (const mesh of this.centreLit) {
+      this.falloff.set(
+        mesh.material as MeshBasicMaterial,
+        this.flameOn ? RoomDressingView.reach(mesh.position.distanceToSquared(this.flame)) : 1,
+      );
+    }
   }
 
   /**

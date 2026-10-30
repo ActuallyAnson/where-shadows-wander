@@ -74,7 +74,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(17);
+    expect(v.group.children).toHaveLength(23);
     v.dispose();
   });
 
@@ -89,7 +89,7 @@ describe('RoomDressingView', () => {
 
   it('holds the pictures and then the shelves off the wall, further out each, and moves them with the wall', () => {
     const v = new RoomDressingView();
-    const [pictures, shelves] = [v.group.children[14], v.group.children[15]];
+    const [pictures, shelves] = [v.group.children[14], v.group.children[16]];
     v.place(2.0);
     expect(pictures.position.z).toBeGreaterThan(v.wall.position.z + 0.02);
     expect(shelves.position.z).toBeGreaterThan(pictures.position.z + 0.04);
@@ -110,6 +110,44 @@ describe('RoomDressingView', () => {
     expect(warm.r).toBeGreaterThan(warm.b); // warm by candlelight
     v.update(light(true, 1), 0); // the flame covered: back to the dark
     expect(colour().r).toBeLessThan(warm.r);
+    v.dispose();
+  });
+
+  it('lights the room from the flame: bright near it, dark far from it, and evenly when there is no flame', () => {
+    const v = new RoomDressingView();
+    const vertexColour = (i: number) =>
+      (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
+    v.update(light(true, 1), 1, [0, 1.2, -1.9]); // the flame just in front of the wall
+    const near = vertexColour(0);
+    v.update(light(true, 1), 1, [0, 1.2, 3]); // the flame far behind the player
+    const far = vertexColour(0);
+    expect(near).toBeGreaterThan(far * 1.5);
+    expect(far).toBeGreaterThan(0.05); // never pitch black
+    v.update(light(false), 0);
+    expect(vertexColour(0)).toBe(1);
+    v.dispose();
+  });
+
+  it('flickers with the flame, differently from piece to piece, and holds steady without one', () => {
+    const v = new RoomDressingView();
+    const wallColour = () => (v.wall.material as unknown as { color: { r: number } }).color.r;
+    const seen = new Set<number>();
+    for (let i = 0; i < 30; i++) {
+      v.update(light(true, 1), 1, [0, 1.2, -1.9]);
+      seen.add(Math.round(wallColour() * 1000));
+      v.tick(0.05);
+    }
+    expect(seen.size).toBeGreaterThan(5); // it moves
+    const lo = Math.min(...seen) / 1000;
+    const hi = Math.max(...seen) / 1000;
+    expect(hi / lo).toBeLessThan(1.4); // but only a little
+    seen.clear();
+    for (let i = 0; i < 10; i++) {
+      v.update(light(false), 0);
+      seen.add(Math.round(wallColour() * 1000));
+      v.tick(0.05);
+    }
+    expect(seen.size).toBe(1);
     v.dispose();
   });
 
