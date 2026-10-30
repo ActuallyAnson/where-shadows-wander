@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { FINALE_PAGES, LEAD_IN_S, PROLOGUE_PAGES, Prologue, prologueSeconds, type PageWriter } from './prologue';
+import {
+  FINALE_PAGES,
+  hasSeenPrologue,
+  LEAD_IN_S,
+  markPrologueSeen,
+  PROLOGUE_PAGES,
+  Prologue,
+  prologueSeconds,
+  type PageWriter,
+} from './prologue';
 
 /** A page writer that "plays" each page for its write and hold time plus a second of fade. */
 function fakeWriter() {
@@ -113,5 +122,32 @@ describe('Prologue', () => {
     expect(calls).toEqual(['enter']);
     run(LEAD_IN_S + 0.3);
     expect(writer.shown[before]).toBe(PROLOGUE_PAGES[0].text);
+  });
+});
+
+describe('the prologue is seen once', () => {
+  it('is not seen until it is marked, and then is', () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    };
+    expect(hasSeenPrologue(storage)).toBe(false);
+    markPrologueSeen(storage);
+    expect(hasSeenPrologue(storage)).toBe(true);
+  });
+
+  it('plays every time, without throwing, when the storage is blocked', () => {
+    const blocked = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(hasSeenPrologue(blocked)).toBe(false);
+    expect(() => markPrologueSeen(blocked)).not.toThrow();
+    expect(hasSeenPrologue(null)).toBe(false);
   });
 });

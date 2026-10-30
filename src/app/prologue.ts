@@ -38,6 +38,41 @@ export const FINALE_PAGES: readonly ProloguePage[] = [
   page('Sleep well.'),
 ];
 
+/** Where the browser remembers that the prologue has played once (so it comes only the first time a headset starts the game). */
+export const PROLOGUE_SEEN_KEY = 'wsw.prologueSeen';
+
+/** The part of localStorage this uses. */
+export interface SeenStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function browserStorage(): SeenStorage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage; // reading the property can throw when blocked
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the prologue has played in this browser before (false if the storage is blocked: it plays then, every time). */
+export function hasSeenPrologue(storage: SeenStorage | null = browserStorage()): boolean {
+  try {
+    return storage?.getItem(PROLOGUE_SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Remembers that it has played. */
+export function markPrologueSeen(storage: SeenStorage | null = browserStorage()): void {
+  try {
+    storage?.setItem(PROLOGUE_SEEN_KEY, '1');
+  } catch {
+    // blocked storage: it just plays again next time
+  }
+}
+
 /** Seconds of black between two pages. */
 export const PAGE_GAP_S = 0.5;
 /** Seconds of black before the first page, and after the last. */

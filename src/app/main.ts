@@ -46,7 +46,8 @@ import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '..
 import { CutsceneHost } from './cutscene-host';
 import { ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
-import { FINALE_PAGES, Prologue, type PrologueHost } from './prologue';
+import { SkipTouch } from '../engine/shadow/pure/skip-touch';
+import { FINALE_PAGES, hasSeenPrologue, markPrologueSeen, Prologue, type PrologueHost } from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
@@ -282,6 +283,9 @@ async function start(): Promise<void> {
   const hall = new CinematicScene(CRYSTAL, 'hall');
   const prologue = new Prologue(cinematic, voidHost(cinematic));
   const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES);
+  /** The Skip poke for each (a fingertip held on the ring for a moment). */
+  const prologueSkip = new SkipTouch();
+  const finaleSkip = new SkipTouch();
   const prologueHead = new Vector3();
   const prologueAhead = new Vector3();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
@@ -865,6 +869,13 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
+    // The first time a headset starts the game, the prologue plays before the candle (once; the Testing switch plays it again).
+    if (session && !mock && !hasSeenPrologue()) {
+      guard('sessionstart: prologue', () => {
+        markPrologueSeen();
+        setTimeout(() => prologue.start(), 800);
+      });
+    }
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
@@ -880,6 +891,10 @@ async function start(): Promise<void> {
         placeRig([0, 1.2, 0], 0);
       });
     }
+    guard('sessionend: story', () => {
+      prologue.skip();
+      finale.skip();
+    });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
@@ -1121,6 +1136,8 @@ async function start(): Promise<void> {
           if (!handTouchingWick && mock) {
             handTouchingWick = true;
           }
+          // Not while a story scene is playing: the room is hidden and the hands are somewhere else.
+          if (prologue.playing || finale.playing) handTouchingWick = false;
 
           if (handTouchingWick) {
             ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
@@ -1371,7 +1388,7 @@ async function start(): Promise<void> {
               ? shadowRenderer.baseOpacity * candleView.occlusion
               : 0,
           );
-          if (menu.group.visible || cutscenes.playing) {
+          if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
@@ -1383,6 +1400,14 @@ async function start(): Promise<void> {
               tips++;
             }
             if (menu.group.visible) menu.update(step, menuTips, tips);
+            if (prologue.playing) {
+              if (prologueSkip.update(step, menuTips, tips, cinematic.skipPlane)) prologue.skip();
+              cinematic.setSkipProgress(prologueSkip.progress);
+            }
+            if (finale.playing) {
+              if (finaleSkip.update(step, menuTips, tips, hall.skipPlane)) finale.skip();
+              hall.setSkipProgress(finaleSkip.progress);
+            }
             if (cutscenes.playing)
               cutscenes.update(step, stage, menuTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
           }

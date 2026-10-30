@@ -33,11 +33,15 @@ import {
   paintSun,
   type CinematicPalette,
 } from './cinematic-art';
+import { SKIP_RADIUS_M } from './pure/skip-touch';
+import { createStagePlane, type MutableStagePlane } from './pure/stage-plane';
 import { paintTraveller, Pose } from './traveller-art';
 
 /** The floor is this far below the eyes (a seated player's eyes are about 1.2 m up). */
 const FLOOR_Y = -1.25;
 const MOTES = 170;
+/** Where the Skip button is, in the scene's own space: a little to the right, low and near. */
+const SKIP_LOCAL = [0.28, -0.5, -0.6] as const;
 const FADE_IN_S = 1.3;
 const FADE_OUT_S = 1;
 /** The orders things draw in: the far backdrop first, the floor over it, then the lights, then the words on top. */
@@ -113,6 +117,10 @@ export class CinematicScene {
   private readonly text: Mesh;
   private readonly textMat: MeshBasicMaterial;
   private textTexture: CanvasTexture | null = null;
+  /** The Skip button: a ring in front of the lap, where a fingertip can poke it (it is a StagePlane for SkipTouch, centred on the button). */
+  readonly skipPlane: MutableStagePlane = createStagePlane();
+  private readonly skipButton: Mesh;
+  private readonly skipMat: MeshBasicMaterial;
   private time = 0;
   /** Seconds into the line of words, and how long it holds; negative when there is none. */
   private line = -1;
@@ -307,6 +315,34 @@ export class CinematicScene {
     this.textMat.depthTest = false;
     this.textMat.opacity = 0;
     this.text.visible = false;
+
+    // The Skip button, low and near, where the hands rest: a ring with its word.
+    this.skipButton = make(
+      SKIP_RADIUS_M * 2.4,
+      SKIP_RADIUS_M * 2.4,
+      tex(128, 128, (g, w, h) => {
+        g.clearRect(0, 0, w, h);
+        g.strokeStyle = 'rgba(255, 238, 205, 0.9)';
+        g.lineWidth = 6;
+        g.beginPath();
+        g.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2);
+        g.stroke();
+        g.fillStyle = 'rgba(255, 238, 205, 0.95)';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.font = `700 ${Math.round(w * 0.2)}px 'Cinzel Decorative', Georgia, serif`;
+        g.fillText('SKIP', w / 2, h / 2 + 2);
+      }),
+      ORDER.text + 1,
+    );
+    this.skipPlane.right[0] = 1;
+    this.skipPlane.up[1] = 1;
+    this.skipPlane.normal[2] = 1;
+    this.skipPlane.width = this.skipPlane.height = 0.14;
+    this.skipButton.position.set(SKIP_LOCAL[0], SKIP_LOCAL[1], SKIP_LOCAL[2]);
+    this.skipMat = this.skipButton.material as MeshBasicMaterial;
+    this.skipMat.depthTest = false;
+    this.skipMat.opacity = 0.55;
     this.group.visible = false;
   }
 
@@ -315,7 +351,26 @@ export class CinematicScene {
     this.group.position.set(head.x, head.y, head.z);
     this.group.rotation.set(0, Math.atan2(-dirX, -dirZ), 0);
     this.time = 0;
+    // The Skip button's plane, in the world: centred on the button, turned with the scene.
+    const yaw = this.group.rotation.y;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    const sp = this.skipPlane;
+    sp.origin[0] = head.x + SKIP_LOCAL[0] * c + SKIP_LOCAL[2] * s;
+    sp.origin[1] = head.y + SKIP_LOCAL[1];
+    sp.origin[2] = head.z - SKIP_LOCAL[0] * s + SKIP_LOCAL[2] * c;
+    sp.right[0] = c;
+    sp.right[2] = -s;
+    sp.normal[0] = s;
+    sp.normal[2] = c;
     this.group.visible = true;
+  }
+
+  /** How far the Skip poke has got (0..1): the ring brightens as it fills. */
+  setSkipProgress(progress: number): void {
+    this.skipMat.opacity = 0.55 + 0.45 * Math.min(1, Math.max(0, progress));
+    const k = 1 + 0.25 * Math.min(1, Math.max(0, progress));
+    this.skipButton.scale.set(k, k, 1);
   }
 
   /** Hides the scene and takes its words away. */
