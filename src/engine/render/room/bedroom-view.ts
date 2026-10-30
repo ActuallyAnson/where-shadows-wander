@@ -11,6 +11,8 @@ import {
   DirectionalLight,
   DoubleSide,
   Group,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -18,6 +20,7 @@ import {
   SRGBColorSpace,
 } from '@iwsdk/core';
 import type { BufferGeometry, Material, Quaternion } from '@iwsdk/core';
+import { mergeBoxes } from '../../shadow/merge-boxes';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
@@ -81,6 +84,9 @@ export class BedroomView {
   readonly strawPalletGroup = new Group();
   readonly tinCanGroup = new Group();
   readonly frontWallMesh: Mesh;
+  private readonly leftWallMesh: Mesh;
+  private readonly rightWallMesh: Mesh;
+  private readonly skyMesh: Mesh;
 
   private readonly floorTexture: CanvasTexture;
   private readonly geometries: BufferGeometry[] = [];
@@ -122,11 +128,12 @@ export class BedroomView {
     this.rafterMat = new MeshBasicMaterial({ color: BASE_RAFTER });
     this.register(rafterGeo, this.rafterMat);
     const rafterZ = [-2.2, -1.4, -0.6, 0.2, 1.0];
-    for (const rz of rafterZ) {
-      const rafter = new Mesh(rafterGeo, this.rafterMat);
-      rafter.position.set(0, 2.44, rz);
-      this.group.add(rafter);
-    }
+    const rafters = new InstancedMesh(rafterGeo, this.rafterMat, rafterZ.length);
+    const rafterMatrix = new Matrix4();
+    rafterZ.forEach((rz, i) => rafters.setMatrixAt(i, rafterMatrix.makeTranslation(0, 2.44, rz)));
+    rafters.instanceMatrix.needsUpdate = true;
+    rafters.matrixAutoUpdate = false;
+    this.group.add(rafters); // five beams, one draw call
 
     // -------------------------------------------------------------
     // 3. Walls Framing (Left, Right, Back, Front Safely Behind Stage)
@@ -140,14 +147,14 @@ export class BedroomView {
     // Left Wall (X = -2.0m)
     const leftWallGeo = new PlaneGeometry(5.0, 2.5);
     leftWallGeo.rotateY(Math.PI / 2);
-    const leftWall = new Mesh(leftWallGeo, this.wallMat);
+    const leftWall = (this.leftWallMesh = new Mesh(leftWallGeo, this.wallMat));
     leftWall.position.set(-2.0, 1.25, -0.4);
     this.register(leftWallGeo);
 
     // Right Wall (X = +2.0m)
     const rightWallGeo = new PlaneGeometry(5.0, 2.5);
     rightWallGeo.rotateY(-Math.PI / 2);
-    const rightWall = new Mesh(rightWallGeo, this.wallMat);
+    const rightWall = (this.rightWallMesh = new Mesh(rightWallGeo, this.wallMat));
     rightWall.position.set(2.0, 1.25, -0.4);
     this.register(rightWallGeo);
 
@@ -171,43 +178,30 @@ export class BedroomView {
     const frameWoodMat = new MeshBasicMaterial({ color: 0x2e2318 });
     this.materials.push(frameWoodMat);
 
-    // Vertical frame sides
+    // The frame (two posts, top and bottom bars, the cross mullions and the sill) is one mesh: they share a material.
     const wPostGeo = new BoxGeometry(0.06, 1.2, 0.06);
-    this.register(wPostGeo);
-    const wPostL = new Mesh(wPostGeo, frameWoodMat);
-    wPostL.position.set(-1.97, 1.45, -1.25);
-    const wPostR = new Mesh(wPostGeo, frameWoodMat);
-    wPostR.position.set(-1.97, 1.45, -0.35);
-
-    // Horizontal frame top & bottom
     const wBarGeo = new BoxGeometry(0.06, 0.06, 0.96);
-    this.register(wBarGeo);
-    const wBarT = new Mesh(wBarGeo, frameWoodMat);
-    wBarT.position.set(-1.97, 2.02, -0.8);
-    const wBarB = new Mesh(wBarGeo, frameWoodMat);
-    wBarB.position.set(-1.97, 0.88, -0.8);
-
-    // Window Mullions (cross)
     const mullionVGeo = new BoxGeometry(0.03, 1.08, 0.03);
     const mullionHGeo = new BoxGeometry(0.03, 0.03, 0.84);
-    this.register(mullionVGeo);
-    this.register(mullionHGeo);
-    const mullionV = new Mesh(mullionVGeo, frameWoodMat);
-    mullionV.position.set(-1.97, 1.45, -0.8);
-    const mullionH = new Mesh(mullionHGeo, frameWoodMat);
-    mullionH.position.set(-1.97, 1.45, -0.8);
-
-    // Window Sill
     const sillGeo = new BoxGeometry(0.16, 0.05, 1.1);
-    const sill = new Mesh(sillGeo, frameWoodMat);
-    sill.position.set(-1.94, 0.85, -0.8);
-    this.register(sillGeo);
+    const frameGeo = mergeBoxes([
+      { geo: wPostGeo, x: -1.97, y: 1.45, z: -1.25 },
+      { geo: wPostGeo, x: -1.97, y: 1.45, z: -0.35 },
+      { geo: wBarGeo, x: -1.97, y: 2.02, z: -0.8 },
+      { geo: wBarGeo, x: -1.97, y: 0.88, z: -0.8 },
+      { geo: mullionVGeo, x: -1.97, y: 1.45, z: -0.8 },
+      { geo: mullionHGeo, x: -1.97, y: 1.45, z: -0.8 },
+      { geo: sillGeo, x: -1.94, y: 0.85, z: -0.8 },
+    ]);
+    for (const g of [wPostGeo, wBarGeo, mullionVGeo, mullionHGeo, sillGeo]) g.dispose();
+    this.register(frameGeo);
+    const frame = new Mesh(frameGeo, frameWoodMat);
 
     // Midnight Sky Quad outside the window
     const skyGeo = new PlaneGeometry(1.1, 1.3);
     skyGeo.rotateY(Math.PI / 2);
     const skyMat = new MeshBasicMaterial({ color: 0x050811 });
-    const skyMesh = new Mesh(skyGeo, skyMat);
+    const skyMesh = (this.skyMesh = new Mesh(skyGeo, skyMat));
     skyMesh.position.set(-2.02, 1.45, -0.8);
     this.register(skyGeo, skyMat);
 
@@ -225,7 +219,7 @@ export class BedroomView {
     moonWash.position.set(-1.96, 1.45, -0.8);
     this.register(moonWashGeo, moonWashMat);
 
-    this.windowGroup.add(wPostL, wPostR, wBarT, wBarB, mullionV, mullionH, sill, skyMesh, moonWash);
+    this.windowGroup.add(frame, skyMesh, moonWash);
 
     // -------------------------------------------------------------
     // 5. Straw Pallet (Bed) on Floor Against Right Wall (X = 1.4m)
@@ -294,6 +288,17 @@ export class BedroomView {
     );
   }
 
+  /**
+   * Hides the plain left, right and front walls and the sky quad behind the window, for when something painted covers them (the
+   * room dressing's own walls sit just in front of them and are drawn first): they would be drawn only to fail the depth test.
+   */
+  setWallsCovered(covered: boolean): void {
+    this.leftWallMesh.visible = !covered;
+    this.rightWallMesh.visible = !covered;
+    this.frontWallMesh.visible = !covered;
+    this.skyMesh.visible = !covered;
+  }
+
   private register(geo: BufferGeometry, mat?: Material): void {
     this.geometries.push(geo);
     if (mat) this.materials.push(mat);
@@ -321,10 +326,10 @@ export class BedroomView {
 
     if (light.lit && brightness > 0.05) {
       // Lit phase: Warm timber glow
-      this.scratchColor.copy(BASE_FLOOR).lerp(CANDLE_AMBER, brightness * 0.32);
+      this.scratchColor.copy(BASE_FLOOR).lerp(CANDLE_AMBER, brightness * 0.2);
       this.floorMat.color.copy(this.scratchColor);
 
-      this.scratchColor.copy(BASE_RAFTER).lerp(CANDLE_AMBER, brightness * 0.28);
+      this.scratchColor.copy(BASE_RAFTER).lerp(CANDLE_AMBER, brightness * 0.035);
       this.rafterMat.color.copy(this.scratchColor);
 
       this.scratchColor.copy(BASE_WALL).lerp(CANDLE_AMBER, brightness * 0.25);

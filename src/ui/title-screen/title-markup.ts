@@ -36,7 +36,7 @@ export function titleMarkup(items: readonly TitleItem[]): string {
         )}<span class="wsw-mark wsw-r"></span></button>`,
     )
     .join('');
-  return `${SCENE_SVG}<div class="wsw-fog wsw-fog-a"></div><div class="wsw-fog wsw-fog-b"></div>
+  return `${SCENE_SVG}<div class="wsw-grain"></div><div class="wsw-fog wsw-fog-a"></div><div class="wsw-fog wsw-fog-b"></div>
 <span class="wsw-dust" style="left:21%;animation-duration:9s"></span><span class="wsw-dust" style="left:43%;animation-duration:12s;animation-delay:3s"></span><span class="wsw-dust" style="left:60%;animation-duration:10s;animation-delay:5s"></span><span class="wsw-dust" style="left:76%;animation-duration:13s;animation-delay:1s"></span><span class="wsw-dust" style="left:33%;animation-duration:11s;animation-delay:7s"></span>
 <header class="wsw-head">${EMBLEM}<p class="wsw-kicker">WHERE</p><h1 class="wsw-title">SHADOWS WANDER</h1>${DIVIDER}<p class="wsw-hint">SEATED · HANDS ONLY</p></header>
 <nav class="wsw-menu" aria-label="Menu">${buttons}</nav>
@@ -74,7 +74,8 @@ export const TITLE_CSS = `
 .wsw-item:active{transform:scale(.97);color:#ffd89a}
 .wsw-note{margin:0;max-width:30rem;text-align:center;font-size:clamp(13px,2.4vmin,18px);line-height:1.5;color:#b5bfd0;letter-spacing:.06em;position:relative;z-index:1}
 .wsw-hint{margin:1.6vmin 0 0;font-size:clamp(11px,1.9vmin,14px);letter-spacing:.4em;padding-left:.4em;color:#8a7e6e;position:relative;z-index:1}
-.wsw-glow{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;background:radial-gradient(circle 32vmin at var(--gx,50%) var(--gy,68%),rgba(255,196,110,.30),rgba(255,196,110,.10) 50%,rgba(255,196,110,0) 100%);animation:wsw-flicker 4s ease-in-out infinite}
+.wsw-grain{position:absolute;inset:0;pointer-events:none;background-size:128px 128px}
+.wsw-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle 32vmin at var(--gx,50%) var(--gy,68%),rgba(255,196,110,.30),rgba(255,196,110,.10) 50%,rgba(255,196,110,0) 100%);animation:wsw-flicker 4s ease-in-out infinite}
 .wsw-vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(0,0,0,.85) 100%)}
 .wsw-fog{position:absolute;left:-20%;width:140%;pointer-events:none;background:radial-gradient(ellipse at center,rgba(170,140,115,.15),rgba(170,140,115,0) 65%)}
 .wsw-fog-a{top:62%;height:30%;animation:wsw-drift 26s ease-in-out infinite}

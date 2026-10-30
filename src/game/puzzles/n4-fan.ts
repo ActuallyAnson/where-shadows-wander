@@ -1,0 +1,111 @@
+// Puzzle 4, the fan: a desk fan at the end of the shelf blows across its right half and pushes the
+// traveller back. Intended: a spread hand stands upright on its windward side as a windbreak. Also
+// works: a fist held just above the traveller as a rock to hold on to (an anchor), carried along
+// with it.
+import { HAND_COUNT } from '../../engine/sim/solver';
+import { WALL_WIDTH_M } from '../../engine/stage/stage-frame';
+import { Role } from '../abilities';
+import type { GameContext } from '../context';
+import type { Fixture } from '../fixtures';
+import type { PuzzleDef } from '../puzzle';
+import { WALK_SPEED } from '../traveller';
+import { goalOn, LEDGE_TOP, ledge, PROP_DEPTH, startOn } from './bedroom';
+
+/** Where the fan's wind blows (from this stage x to the right edge), and how hard, m/s against the traveller. */
+export const WIND_FROM_X = -0.25;
+export const WIND_PUSH = -0.22;
+/** Once the hint ladder eases the puzzle: a breeze the traveller can walk against. */
+export const EASED_WIND_PUSH = -0.05;
+/** An anchored traveller still feels this share of the wind (it leans in, but makes way). */
+const ANCHORED_SHARE = 0.25;
+/**
+ * How close the rock must be to anchor the traveller, metres. A fist lower than about 0.13 m above
+ * the traveller's centre stands in its way, so this leaves a band about 12 cm tall to hold it in.
+ */
+const ANCHOR_REACH = 0.25;
+
+// The wind is stronger than the traveller's stride: on its own it never gets through.
+if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n4-fan: the wind must out-push the traveller');
+if (EASED_WIND_PUSH + WALK_SPEED <= 0) throw new Error('n4-fan: the eased breeze must let the traveller through');
+
+/** Whether a rock-role hand is close above the traveller for it to hold on to. */
+function anchored(ctx: GameContext, x: number, y: number): boolean {
+  for (let h = 0; h < HAND_COUNT; h++) {
+    if (!ctx.abilities.has(h, Role.Rock)) continue;
+    const a = ctx.abilities.hands[h];
+    const dx = a.cx - x,
+      dy = a.cy - y;
+    if (dx * dx + dy * dy <= ANCHOR_REACH * ANCHOR_REACH && a.cy >= y) return true;
+  }
+  return false;
+}
+
+/** A fresh puzzle with its own state: one per Game, so two games never share it. */
+export function createFanPuzzle(): PuzzleDef {
+  const state: { wind: Fixture | null; push: number } = { wind: null, push: WIND_PUSH };
+  return {
+    id: 'n4-fan',
+    title: 'The fan',
+    layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
+    props: [
+      ledge('shelf', -0.81, 0.81),
+      // The fan is scenery, standing above the end of the shelf: its head and its stand.
+      { id: 'fan-head', shape: 'sphere', x: 0.72, y: 0.0, size: [0.12], depth: 0.06, solid: false },
+      { id: 'fan-stand', shape: 'cylinder', x: 0.72, y: -0.17, size: [0.015, 0.18, PROP_DEPTH], solid: false },
+    ],
+    ground: false,
+    groundY: LEDGE_TOP,
+    solutions: ['wall', 'anchor'],
+    hintShape: 'spread',
+
+    setup(ctx) {
+      state.push = WIND_PUSH;
+      const right = WALL_WIDTH_M / 2;
+      state.wind = ctx.fixtures.add(
+        'wind',
+        (WIND_FROM_X + right) / 2,
+        ctx.groundY + 0.25,
+        right - WIND_FROM_X,
+        0.5,
+        true,
+        1,
+      );
+    },
+
+    step(ctx) {
+      const t = ctx.traveller;
+      const s = t.slot(ctx);
+      const wind = state.wind;
+      if (s < 0 || t.state === 'goal' || !wind) return;
+      const { store } = ctx;
+      const x = store.x[s],
+        y = store.y[s],
+        r = store.radius[s];
+      // value: how hard the wind reaches the traveller (1 full, low when sheltered), for the renderer.
+      wind.value = 1;
+      if (x < WIND_FROM_X) return;
+      if (ctx.abilities.wallShelters(ctx, x, y, r, 1)) {
+        ctx.credit('wall', ctx.dt);
+        wind.value = 0.2;
+        return;
+      }
+      if (anchored(ctx, x, y)) {
+        ctx.credit('anchor', ctx.dt);
+        t.push = state.push * ANCHORED_SHARE;
+        return;
+      }
+      t.push = state.push;
+    },
+
+    // The ladder's last rung: the fan slows to a breeze.
+    ease() {
+      state.push = EASED_WIND_PUSH;
+      if (state.wind) state.wind.value = EASED_WIND_PUSH / WIND_PUSH;
+    },
+
+    hintAt(ctx, out) {
+      out[0] = WIND_FROM_X + 0.15;
+      out[1] = ctx.groundY + 0.15;
+    },
+  };
+}
