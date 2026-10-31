@@ -686,6 +686,8 @@ async function start(): Promise<void> {
     } else if (Math.random() < 1 - 0.16 * sleepersAwake) gameAudio.snowTick();
   };
   // The traveller's footsteps: one soft step for every stride of ground it walks (not while it waits, and not across a jump).
+  /** How close (metres on the paper) a hand's shadow must come to the traveller for it to glance at it. */
+  const GLANCE_M = 0.13;
   const STEP_M = 0.045;
   let stepLastX = 0;
   let stepWalked = 0;
@@ -1618,13 +1620,15 @@ async function start(): Promise<void> {
             ghostTarget.update(delta, projector.shadows, shapes);
             ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
             // The traveller's mood: how near is the nearer hand's shadow?
-            if (readTraveller()) {
+            if (!readTraveller()) stageRenderer.glance = false;
+            else {
               let gap = 1e9;
               for (let i = 0; i < 2; i++) {
                 const hs = projector.shadows[i === 0 ? 'left' : 'right'];
                 if (hs.active && hs.onStage)
                   gap = Math.min(gap, nearestJointGap(hs.joints, hs.joints.length / 2, travellerAt.x, travellerAt.y));
               }
+              stageRenderer.glance = gap < GLANCE_M; // it glances back at a hand that reaches close to it
               const state = night.game!.traveller.state;
               travellerMood.update(
                 delta,

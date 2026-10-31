@@ -110,4 +110,26 @@ describe('stage-renderer', () => {
     const renderer = new StageRenderer();
     expect(() => renderer.dispose()).not.toThrow();
   });
+
+  it('glances back toward a close hand only while standing still', () => {
+    const store = new EntityStore(DEFAULT_CAPACITIES);
+    const renderer = new StageRenderer();
+    const h = store.create(Kind.Traveller, 0, 0, 0.1);
+    const slot = store.slotOf(h);
+    const tileU = () => (renderer.mesh.geometry.attributes.aAtlasUv.array as Float32Array)[0];
+    renderer.update(store, 0);
+    const idle = tileU();
+    renderer.glance = true;
+    renderer.update(store, 0);
+    const glancing = tileU();
+    expect(glancing).not.toBe(idle); // the looking-back tile
+    store.vx[slot] = 0.12; // walking: no glance, the walk tile
+    renderer.update(store, 0);
+    expect(tileU()).not.toBe(glancing);
+    expect(tileU()).not.toBe(idle);
+    store.vx[slot] = 0;
+    renderer.glance = false;
+    renderer.update(store, 0);
+    expect(tileU()).toBe(idle);
+  });
 });
