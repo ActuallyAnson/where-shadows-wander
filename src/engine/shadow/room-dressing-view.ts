@@ -209,7 +209,7 @@ export class RoomDressingView {
     });
 
     // The same paper and panelling on the two side walls (one material for both).
-    const sideTexture = this.texture(paintedCanvas(1280, 640, (g, w, h) => paintWall(g, w, h)));
+    const sideTexture = this.texture(paintedCanvas(800, 400, (g, w, h) => paintWall(g, w, h)));
     const left = this.quad(5, 2.5, sideTexture, false, true, undefined, [20, 10]);
     left.rotation.y = Math.PI / 2;
     left.position.set(-1.995, 1.25, -0.4);

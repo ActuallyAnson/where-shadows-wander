@@ -216,11 +216,12 @@ export class TestStageView {
   private layerTexture(layer: BackdropLayer, wrap = false): CanvasTexture {
     let canvas: HTMLCanvasElement | undefined;
     if (typeof document !== 'undefined') canvas = document.createElement('canvas');
-    if (!canvas) canvas = { width: 1024, height: 576, getContext: () => null } as unknown as HTMLCanvasElement;
-    canvas.width = 1024;
-    canvas.height = 576;
+    if (!canvas) canvas = { width: 640, height: 360, getContext: () => null } as unknown as HTMLCanvasElement;
+    // The scenery is soft and pale, so a modest size does it (a quarter the memory of 1024 by 576 for each of the five layers).
+    canvas.width = 640;
+    canvas.height = 360;
     const g = canvas.getContext ? canvas.getContext('2d') : null;
-    if (g) paintBackdrop(g, 1024, 576, layer);
+    if (g) paintBackdrop(g, 640, 360, layer);
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;
     if (wrap) texture.wrapS = RepeatWrapping;
