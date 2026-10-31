@@ -63,6 +63,7 @@ import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { FadeView } from '../engine/shadow/fade-view';
+import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
@@ -262,6 +263,7 @@ async function start(): Promise<void> {
   const stickerView = new StickerView();
   const storyLine = new StoryLineView();
   const spark = new SparkFlightView();
+  const handTrail = new HandTrailView();
   const sparkFrom = new Vector3();
   const sparkTo = new Vector3();
   const sparkStart = { x: 0, y: 0, z: 0 };
@@ -419,6 +421,7 @@ async function start(): Promise<void> {
     cutsceneView.group,
     storyLine.group,
     spark.group,
+    handTrail.group,
     cinematic.group,
     fade.group,
     hall.group,
@@ -1352,7 +1355,10 @@ async function start(): Promise<void> {
           ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
 
           projector.update(hands.hands, stage, candleView.flamePosition);
-          if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
+          if (!paused) {
+            gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
+            handTrail.onShapeEvents(shapes.events, projector.shadows);
+          }
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
@@ -1499,6 +1505,12 @@ async function start(): Promise<void> {
             }
           }
           spark.update(paused ? 0 : step);
+          handTrail.update(
+            paused ? 0 : step,
+            stage,
+            projector.shadows,
+            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
           world.camera.getWorldPosition(settingsHead);
           fade.update(step, settingsHead);
           prologue.update(step);
