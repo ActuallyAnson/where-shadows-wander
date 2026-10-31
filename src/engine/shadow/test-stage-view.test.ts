@@ -17,7 +17,7 @@ describe('TestStageView set change', () => {
   it('puts the first puzzle scenery up at once, then slides one set off and the next on, ending still', () => {
     const v = new TestStageView();
     v.setTheme(0);
-    expect(shift(v)).toBe(0);
+    expect(Math.abs(shift(v))).toBe(0);
     v.setTheme(1);
     let peak = 0;
     for (let i = 0; i < 40; i++) {
@@ -28,7 +28,7 @@ describe('TestStageView set change', () => {
     expect(Math.abs(shift(v))).toBe(0); // and came to rest
     v.setTheme(1); // the same set again changes nothing
     v.applyLight(light, quat, 1, undefined, 0.03);
-    expect(shift(v)).toBe(0);
+    expect(Math.abs(shift(v))).toBe(0);
     v.setTheme(99); // a number past the last is the last
     v.setTheme(-5);
     v.dispose();
