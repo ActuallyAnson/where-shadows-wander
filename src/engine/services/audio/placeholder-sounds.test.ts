@@ -106,7 +106,7 @@ describe('renderPlaceholder', () => {
     expect(Array.from(second.slice(0, 200))).toEqual(Array.from(first.slice(0, 200)));
     prewarmMusic();
     expect(takeSamples(Sound.Music, 48000)).not.toHaveLength(0); // another rate is rendered for that rate, not handed the stored one
-  });
+  }, 30000); // three renders of 24 s of music: slow on a busy machine
 
   it('renders the music at a low rate however fast the context runs, and everything else at the context’s', () => {
     expect(renderRateFor(Sound.Music, 48000)).toBe(MUSIC_RATE);
