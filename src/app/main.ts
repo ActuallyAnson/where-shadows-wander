@@ -45,7 +45,7 @@ import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
 import { ENDING_MOOD } from './ending';
-import { OPENING, openingFoxAlpha } from './opening';
+import { OPENING, OPENING_S, openingFoxAlpha } from './opening';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
 import { stagePoint } from '../engine/services/audio/stage-point';
 import {
@@ -64,6 +64,7 @@ import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
+import { ReadingPageView } from '../engine/shadow/reading-page-view';
 import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
@@ -265,6 +266,7 @@ async function start(): Promise<void> {
   const storyLine = new StoryLineView();
   const spark = new SparkFlightView();
   const handTrail = new HandTrailView();
+  const readingPage = new ReadingPageView();
   const rewards = new RewardBurstView();
   const sparkFrom = new Vector3();
   const sparkTo = new Vector3();
@@ -387,6 +389,7 @@ async function start(): Promise<void> {
   };
   const playOpening = () => {
     const problems = cutscenes.play(OPENING, () => {
+      readingPage.clear();
       openingT = -1;
       setKindred(kindredWanted);
       sessionState = 'playing';
@@ -401,6 +404,10 @@ async function start(): Promise<void> {
       return;
     }
     openingT = 0;
+    // The first page of the book, low in front of the player while the night begins: the flat hand that makes the first bridge.
+    world.camera.getWorldPosition(prologueHead);
+    world.camera.getWorldDirection(prologueAhead);
+    readingPage.show(prologueHead, prologueAhead.x, prologueAhead.z, OPENING_S);
     kindred.x = -kindredStartX; // enters from the left edge
     setKindred(true);
   };
@@ -430,6 +437,7 @@ async function start(): Promise<void> {
     spark.group,
     handTrail.group,
     rewards.group,
+    readingPage.group,
     cinematic.group,
     fade.group,
     hall.group,
@@ -1525,6 +1533,7 @@ async function start(): Promise<void> {
             }
           }
           spark.update(paused ? 0 : step);
+          readingPage.update(step);
           rewards.update(
             paused ? 0 : step,
             stage,
