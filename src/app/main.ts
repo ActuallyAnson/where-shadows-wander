@@ -712,6 +712,7 @@ async function start(): Promise<void> {
         stepWalked -= STEP_M;
         stepAlternate = !stepAlternate;
         gameAudio.stepAt(stage, travellerAt.x, travellerAt.y, stepAlternate);
+        rewards.play('puff', travellerAt.x, travellerAt.y - 0.035); // a little dust at its feet
       }
     } else stepWalked = 0;
     stepLastX = travellerAt.x;

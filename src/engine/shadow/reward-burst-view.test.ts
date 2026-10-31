@@ -14,6 +14,16 @@ const run = (v: RewardBurstView, seconds: number) => {
 };
 
 describe('RewardBurstView', () => {
+  it('kicks up a small short puff of dust for a footstep', () => {
+    const v = new RewardBurstView();
+    v.play('puff', 0, 0);
+    run(v, 0.1);
+    expect(v.alive).toBe(4);
+    run(v, 1);
+    expect(v.alive).toBe(0);
+    v.dispose();
+  });
+
   it('is hidden and empty until a reward plays', () => {
     const v = new RewardBurstView();
     v.update(0.05, stage, 1);

@@ -19,7 +19,8 @@ const LIFT_M = 0.008;
 
 /** The kinds of reward, one for each puzzle of the night in order. */
 export const REWARDS = ['dust', 'sparks', 'drops', 'leaves', 'light'] as const;
-export type RewardKind = (typeof REWARDS)[number];
+/** The five rewards, and the small puff of dust a footstep kicks up. */
+export type RewardKind = (typeof REWARDS)[number] | 'puff';
 
 const VERTEX = /* glsl */ `
 uniform float uScale;
@@ -122,6 +123,21 @@ const LOOKS: Readonly<Record<RewardKind, Look>> = {
       [1, 0.85, 0.4],
     ],
     lift: 0.02,
+  },
+  puff: {
+    count: 4,
+    life: [0.35, 0.6],
+    spread: [0.012, 0.004],
+    vx: [-0.05, 0.05],
+    vy: [0.01, 0.07],
+    gravity: 0.08,
+    swirl: [0, 0],
+    size: [0.035, 0.06],
+    colours: [
+      [1, 0.9, 0.7],
+      [0.95, 0.85, 0.7],
+    ],
+    lift: 0,
   },
   light: {
     count: 72,
