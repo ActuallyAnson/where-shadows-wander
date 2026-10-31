@@ -21,7 +21,13 @@ import {
 } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
 import { LanternGlow } from './lantern-glow';
-import { paintBackdrop, type BackdropLayer } from './stage-backdrop-art';
+import {
+  BACKDROP_THEMES,
+  paintBackdrop,
+  paintBackdropTheme,
+  type BackdropLayer,
+  type BackdropTheme,
+} from './stage-backdrop-art';
 import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 
@@ -54,6 +60,7 @@ const fragment = /* glsl */ `
   uniform sampler2D uClouds;
   uniform vec2 uHead;      // the head's place across and up from the stage's centre, metres (the scenery's layers shift with it)
   uniform float uBackdrop; // how much of the paper the painted scenery replaces, 0..1
+  uniform float uMidShift; // how far the near scenery has slid sideways (a set change), in widths of the paper
   varying vec2 vUv;
 
   float hash(vec2 p) {
@@ -107,8 +114,8 @@ const fragment = /* glsl */ `
       bg = mix(bg, far.rgb, far.a);
       vec4 cl = texture2D(uClouds, vec2(base.x - head.x * 0.02 + uTime * 0.005, base.y - head.y * 0.02));
       bg = mix(bg, vec3(1.0), cl.a * 0.5);
-      vec4 mid = texture2D(uMid, base + head * 0.004);
-      bg = mix(bg, mid.rgb, mid.a);
+      vec4 mid = texture2D(uMid, base + head * 0.004 + vec2(uMidShift, 0.0));
+      bg = mix(bg, mid.rgb, mid.a * (1.0 - smoothstep(0.0, 0.9, abs(uMidShift))));
       vec4 nr = texture2D(uNear, base + head * 0.08);
       bg = mix(bg, nr.rgb, nr.a);
       for (int i = 0; i < 7; i++) {
@@ -156,6 +163,11 @@ export class TestStageView {
   private _highContrast = false;
   private _mood = 0.75;
   private readonly textures: CanvasTexture[] = [];
+  /** The near scenery for each puzzle, and the set change in progress: which one is up, which is wanted, and how far along. */
+  private readonly themeTextures: (CanvasTexture | null)[] = [];
+  private themeUp = -1;
+  private themeWanted = -1;
+  private slide = 1;
   private readonly headLocal = new Vector3();
 
   constructor() {
@@ -176,6 +188,7 @@ export class TestStageView {
         uClouds: { value: this.layerTexture('clouds', true) },
         uHead: { value: new Vector2(0, 0) },
         uBackdrop: { value: BACKDROP },
+        uMidShift: { value: 0 },
       },
       vertexShader: vertex,
       fragmentShader: fragment,
@@ -246,6 +259,41 @@ export class TestStageView {
     for (const t of this.textures) t.dispose();
     this.paper.geometry.dispose();
     this.paperMaterial.dispose();
+  }
+
+  /**
+   * Changes the near scenery to puzzle `index`'s: the old set slides off one side of the paper (half a second) and the new one slides
+   * in from the other (another half). The first call just puts the scenery up.
+   */
+  setTheme(index: number): void {
+    const wanted = Math.max(0, Math.min(BACKDROP_THEMES - 1, Math.floor(index) || 0));
+    if (wanted === this.themeWanted) return;
+    this.themeWanted = wanted;
+    if (this.themeUp < 0) {
+      this.themeUp = wanted;
+      this.paperMaterial.uniforms.uMid.value = this.themeTexture(wanted);
+      return;
+    }
+    this.slide = 0; // goes 0..0.5 out, 0.5..1 in
+  }
+
+  /** The painted near scenery for a puzzle (made the first time it is wanted, then kept). */
+  private themeTexture(theme: number): CanvasTexture {
+    let t = this.themeTextures[theme];
+    if (!t) {
+      let canvas: HTMLCanvasElement | undefined;
+      if (typeof document !== 'undefined') canvas = document.createElement('canvas');
+      if (!canvas) canvas = { width: 512, height: 288, getContext: () => null } as unknown as HTMLCanvasElement;
+      canvas.width = 512;
+      canvas.height = 288;
+      const g = canvas.getContext ? canvas.getContext('2d') : null;
+      if (g) paintBackdropTheme(g, 512, 288, theme as BackdropTheme);
+      t = new CanvasTexture(canvas);
+      t.colorSpace = SRGBColorSpace;
+      this.textures.push(t);
+      this.themeTextures[theme] = t;
+    }
+    return t;
   }
 
   /** Places the paper on the stage and the flame at the lantern. Call when either moves. */
@@ -330,6 +378,17 @@ export class TestStageView {
     if (flame) this.setFlameOnWall(flame);
     this.time += dt > 0 ? Math.min(dt, 0.1) : 0;
     const u = this.paperMaterial.uniforms;
+    // A set change: the old scenery slides off, the new one is swapped in out of sight, and slides on.
+    if (this.slide < 1) {
+      this.slide = Math.min(1, this.slide + (dt > 0 ? Math.min(dt, 0.1) : 0) * 1);
+      if (this.slide >= 0.5 && this.themeUp !== this.themeWanted) {
+        this.themeUp = this.themeWanted;
+        u.uMid.value = this.themeTexture(this.themeUp);
+      }
+      const k = this.slide < 0.5 ? this.slide * 2 : (this.slide - 0.5) * 2;
+      const ease = k * k * (3 - 2 * k);
+      u.uMidShift.value = this.slide < 0.5 ? ease * 1.0 : -(1 - ease) * 1.0;
+    }
     u.uTime.value = this.time;
     u.uBright.value = light.lit ? Math.max(0.04, occlusion * (0.15 + 0.85 * light.intensity)) : 0.04;
     this.flame.update(light, cameraQuaternion);

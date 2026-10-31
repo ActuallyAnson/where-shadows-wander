@@ -28,6 +28,7 @@ function setup(flameAt?: readonly number[]) {
     awake: -1,
     woke: [] as number[],
     rewards: [] as number[],
+    scenery: [] as number[],
     said: [] as string[],
     mood: 0,
     props: 0,
@@ -55,6 +56,7 @@ function setup(flameAt?: readonly number[]) {
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
     say: (text) => void state.said.push(text),
+    scenery: (index) => void state.scenery.push(index),
     reward: (index) => void state.rewards.push(index),
     wake: (index) => void state.woke.push(index),
     setAwake: (count) => void (state.awake = count),
@@ -105,6 +107,7 @@ describe('NightDriver', () => {
     expect(state.props).toBe(2);
     expect(state.mood).toBe(NIGHT_MOOD[0]);
     expect(state.awake).toBe(0); // nothing in the room is lit yet
+    expect(state.scenery).toEqual([0]); // the first puzzle's scenery is up
     expect(state.said).toEqual([PUZZLE_LINES[0]]);
   });
 

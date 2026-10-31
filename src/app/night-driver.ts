@@ -59,6 +59,8 @@ export interface NightHost {
   setMood(goal: number): void;
   /** One short line of the story on the wall: after `delay` seconds, for `hold` seconds. */
   say(text: string, delay: number, hold: number, after?: boolean): void;
+  /** Puzzle `index`'s scenery comes up on the paper (the last one slides away). */
+  scenery(index: number): void;
   /** The reward for solving puzzle `index` plays where the traveller stands (gold dust, sparks, drops, leaves, light). */
   reward(index: number): void;
   /** The spark flies from the paper to sleeper `index` (0 = the lamp .. 4 = the window); the room lights it when it lands. */
@@ -246,6 +248,7 @@ export class NightDriver {
     if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.dim();
     host.setKindredAway(index >= DIMMING_AT);
     host.setAwake(index);
+    host.scenery(index);
     if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.say(DIMMING_LINE, 1.5, 4);
     else host.say(lineForPuzzle(index), LINE_DELAY_S, LINE_HOLD_S, true); // after the last wake line has been written
     host.setMood(NIGHT_MOOD[Math.min(index, NIGHT_MOOD.length - 1)]);

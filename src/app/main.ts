@@ -546,6 +546,7 @@ async function start(): Promise<void> {
       moodGoal = goal;
     },
     say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
+    scenery: (index) => stageView.setTheme(index),
     reward: (index) => {
       // The puzzle's own reward, on the paper where the traveller stands.
       if (readTraveller()) rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);

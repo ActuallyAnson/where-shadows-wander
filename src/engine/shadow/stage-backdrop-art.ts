@@ -165,3 +165,174 @@ export function paintBackdrop(g: CanvasRenderingContext2D, W: number, H: number,
     }
   }
 }
+
+/** Which puzzle's scenery: 0 the books, 1 the ledge, 2 the drip, 3 the fan, 4 the castle. */
+export type BackdropTheme = 0 | 1 | 2 | 3 | 4;
+export const BACKDROP_THEMES = 5;
+
+/**
+ * The near scenery for one puzzle, in the same pale colours as the rest (an RGBA canvas, 16 by 9): giant books piled like hills, a
+ * bedside table with a glowing lamp, a great plant with dripping leaves, wind curling leaves round a distant fan, a castle on a hill.
+ * It replaces the 'mid' layer while that puzzle is up, and slides away when the next one comes.
+ */
+export function paintBackdropTheme(g: CanvasRenderingContext2D, W: number, H: number, theme: BackdropTheme): void {
+  g.clearRect(0, 0, W, H);
+  const r = rng(theme * 131 + 7);
+  const ground = (base: number, rise: number, seed: number, fill: string) =>
+    fillRidge(g, W, H, ridge(W, base, rise, seed, 0.04), fill);
+  if (theme === 0) {
+    // Giant books, tipped and stacked, with spines and page edges.
+    const book = (x: number, y: number, w: number, h: number, tilt: number, cover: string) => {
+      g.save();
+      g.translate(x, y);
+      g.rotate(tilt);
+      g.fillStyle = cover;
+      g.fillRect(0, -h, w, h);
+      g.fillStyle = 'rgba(255, 244, 220, 0.85)';
+      g.fillRect(w * 0.04, -h * 0.9, w * 0.92, h * 0.12);
+      g.fillStyle = 'rgba(80, 50, 40, 0.35)';
+      g.fillRect(0, -h, w * 0.06, h);
+      g.restore();
+    };
+    ground(0.86, 0.04, 3, '#a9b79c');
+    book(W * 0.08, H * 0.88, W * 0.26, H * 0.09, -0.03, '#b0786a');
+    book(W * 0.1, H * 0.79, W * 0.22, H * 0.08, 0.04, '#7f9a94');
+    book(W * 0.64, H * 0.9, W * 0.3, H * 0.1, 0.02, '#c4a46a');
+    book(W * 0.7, H * 0.8, W * 0.2, H * 0.09, -0.05, '#9a86a6');
+    book(W * 0.43, H * 0.9, W * 0.12, H * 0.07, -0.02, '#b8826a');
+    return;
+  }
+  if (theme === 1) {
+    // A bedside table with a drawer and a lamp that glows.
+    ground(0.88, 0.03, 5, '#a9b39e');
+    g.fillStyle = '#b6a088';
+    g.fillRect(W * 0.58, H * 0.62, W * 0.3, H * 0.3);
+    g.fillStyle = '#a28b72';
+    g.fillRect(W * 0.6, H * 0.68, W * 0.26, H * 0.09);
+    g.fillRect(W * 0.6, H * 0.8, W * 0.26, H * 0.09);
+    g.fillStyle = '#cdbca4';
+    g.fillRect(W * 0.55, H * 0.6, W * 0.36, H * 0.03);
+    const lx = W * 0.72;
+    const glow = g.createRadialGradient(lx, H * 0.44, 0, lx, H * 0.44, H * 0.3);
+    glow.addColorStop(0, 'rgba(255, 224, 150, 0.7)');
+    glow.addColorStop(1, 'rgba(255, 224, 150, 0)');
+    g.fillStyle = glow;
+    g.fillRect(lx - H * 0.3, H * 0.14, H * 0.6, H * 0.6);
+    g.fillStyle = '#8f8a82';
+    g.fillRect(lx - W * 0.006, H * 0.46, W * 0.012, H * 0.14);
+    g.fillStyle = '#f3dba0';
+    g.beginPath();
+    g.moveTo(lx - W * 0.05, H * 0.46);
+    g.lineTo(lx + W * 0.05, H * 0.46);
+    g.lineTo(lx + W * 0.03, H * 0.32);
+    g.lineTo(lx - W * 0.03, H * 0.32);
+    g.closePath();
+    g.fill();
+    return;
+  }
+  if (theme === 2) {
+    // A great plant in a pot: broad leaves, with drops hanging from their tips.
+    ground(0.9, 0.03, 9, '#a6b49a');
+    g.fillStyle = '#b98a6c';
+    g.beginPath();
+    g.moveTo(W * 0.66, H * 0.74);
+    g.lineTo(W * 0.84, H * 0.74);
+    g.lineTo(W * 0.81, H * 0.92);
+    g.lineTo(W * 0.69, H * 0.92);
+    g.closePath();
+    g.fill();
+    const leaf = (cx: number, cy: number, a: number, len: number) => {
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(a);
+      g.fillStyle = '#8fae86';
+      g.beginPath();
+      g.ellipse(len / 2, 0, len / 2, len * 0.17, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = 'rgba(70, 100, 70, 0.4)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(len, 0);
+      g.stroke();
+      g.restore();
+    };
+    for (let i = 0; i < 7; i++) leaf(W * 0.75, H * 0.74, -2.5 + i * 0.42, H * (0.34 + 0.08 * r()));
+    g.fillStyle = 'rgba(190, 225, 255, 0.9)';
+    for (const [x, y] of [
+      [0.6, 0.5],
+      [0.66, 0.44],
+      [0.88, 0.5],
+      [0.93, 0.58],
+    ]) {
+      g.beginPath();
+      g.moveTo(W * x, H * (y - 0.03));
+      g.quadraticCurveTo(W * (x + 0.012), H * y, W * x, H * (y + 0.02));
+      g.quadraticCurveTo(W * (x - 0.012), H * y, W * x, H * (y - 0.03));
+      g.fill();
+    }
+    return;
+  }
+  if (theme === 3) {
+    // A fan in the distance and wind curling leaves across the paper.
+    ground(0.88, 0.04, 11, '#a9b6a0');
+    g.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    g.lineWidth = Math.max(2, W / 200);
+    g.lineCap = 'round';
+    for (let i = 0; i < 6; i++) {
+      const y = H * (0.3 + i * 0.1);
+      g.beginPath();
+      g.moveTo(W * (0.5 + 0.03 * i), y);
+      g.bezierCurveTo(W * 0.65, y - H * 0.08, W * 0.78, y + H * 0.08, W * (0.95 - 0.02 * i), y - H * 0.02);
+      g.stroke();
+    }
+    const fx = W * 0.2;
+    const fy = H * 0.55;
+    g.fillStyle = '#b8b2a8';
+    g.beginPath();
+    g.arc(fx, fy, H * 0.2, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#d6d0c6';
+    for (let i = 0; i < 5; i++) {
+      g.beginPath();
+      g.ellipse(fx, fy, H * 0.17, H * 0.045, (i * Math.PI) / 5, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = '#9a9488';
+    g.fillRect(fx - W * 0.012, fy + H * 0.2, W * 0.024, H * 0.17);
+    g.fillStyle = 'rgba(160, 190, 110, 0.9)';
+    for (let i = 0; i < 9; i++) {
+      g.beginPath();
+      g.ellipse(W * (0.55 + 0.4 * r()), H * (0.2 + 0.6 * r()), W * 0.014, H * 0.03, r() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    return;
+  }
+  // The castle on its hill, with a lit window and a gate.
+  ground(0.84, 0.07, 13, '#a9b8a0');
+  const cx = W * 0.62;
+  const base = H * 0.8;
+  g.fillStyle = '#b7aeb8';
+  g.fillRect(cx - W * 0.17, base - H * 0.14, W * 0.34, H * 0.14);
+  const tower = (x: number, w: number, h: number) => {
+    g.fillStyle = '#b7aeb8';
+    g.fillRect(x, base - h, w, h);
+    g.fillStyle = '#9d94a8';
+    g.beginPath();
+    g.moveTo(x - w * 0.12, base - h);
+    g.lineTo(x + w / 2, base - h - w * 1.1);
+    g.lineTo(x + w * 1.12, base - h);
+    g.closePath();
+    g.fill();
+  };
+  tower(cx - W * 0.2, W * 0.06, H * 0.3);
+  tower(cx - W * 0.07, W * 0.14, H * 0.46);
+  tower(cx + W * 0.14, W * 0.06, H * 0.34);
+  g.fillStyle = 'rgba(255, 214, 130, 0.95)';
+  g.fillRect(cx - W * 0.015, base - H * 0.34, W * 0.03, H * 0.06);
+  g.fillStyle = '#7d7488';
+  g.beginPath();
+  g.arc(cx, base - H * 0.04, W * 0.024, Math.PI, 0);
+  g.fillRect(cx - W * 0.024, base - H * 0.04, W * 0.048, H * 0.04);
+  g.fill();
+}
