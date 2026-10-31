@@ -62,6 +62,7 @@ import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '.
 import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
+import { FadeView } from '../engine/shadow/fade-view';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
@@ -269,27 +270,42 @@ async function start(): Promise<void> {
   const cinematic = new CinematicScene();
   const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
   let backgroundBeforePrologue: typeof world.scene.background = null;
-  /** What a full-view scene does to the app: the room hidden and the background black while it plays, put back after. */
+  /**
+   * What a full-view scene does to the app: the screen fades to black, the room is hidden and the background made black while the
+   * scene plays, and the room is put back through another fade after (so neither way is a hard cut).
+   */
+  const fade = new FadeView();
+  let inVoid = false;
   const voidHost = (scene: CinematicScene): PrologueHost => ({
     enter: () => {
-      hiddenForPrologue.length = 0;
-      for (const child of world.scene.children) {
-        if (child === cinematic.group || child === hall.group) continue;
-        hiddenForPrologue.push({ object: child, visible: child.visible });
-        child.visible = false;
-      }
-      backgroundBeforePrologue = world.scene.background;
-      world.scene.background = new Color(0x000000);
-      // The scene is built around the head, facing the way it faces now.
-      world.camera.getWorldPosition(prologueHead);
-      world.camera.getWorldDirection(prologueAhead);
-      scene.enter(prologueHead, prologueAhead.x, prologueAhead.z);
+      fade.fadeTo(1, 0.6, () => {
+        hiddenForPrologue.length = 0;
+        for (const child of world.scene.children) {
+          if (child === cinematic.group || child === hall.group || child === fade.group) continue;
+          hiddenForPrologue.push({ object: child, visible: child.visible });
+          child.visible = false;
+        }
+        backgroundBeforePrologue = world.scene.background;
+        world.scene.background = new Color(0x000000);
+        inVoid = true;
+        // The scene is built around the head, facing the way it faces now.
+        world.camera.getWorldPosition(prologueHead);
+        world.camera.getWorldDirection(prologueAhead);
+        scene.enter(prologueHead, prologueAhead.x, prologueAhead.z);
+        fade.fadeTo(0, 0.9);
+      });
     },
     leave: () => {
-      for (const h of hiddenForPrologue) h.object.visible = h.visible;
-      hiddenForPrologue.length = 0;
-      world.scene.background = backgroundBeforePrologue;
-      scene.leave();
+      fade.fadeTo(1, 0.5, () => {
+        if (inVoid) {
+          for (const h of hiddenForPrologue) h.object.visible = h.visible;
+          hiddenForPrologue.length = 0;
+          world.scene.background = backgroundBeforePrologue;
+          inVoid = false;
+        }
+        scene.leave();
+        fade.fadeTo(0, 0.9);
+      });
     },
   });
   // The finale plays in the hall of the great crystal, the last thing the night shows.
@@ -404,6 +420,7 @@ async function start(): Promise<void> {
     storyLine.group,
     spark.group,
     cinematic.group,
+    fade.group,
     hall.group,
     glow.group,
     rabbits.group,
@@ -1080,7 +1097,8 @@ async function start(): Promise<void> {
         sessionState !== 'paused' &&
         sessionState !== 'title_vr' &&
         !prologue.playing &&
-        !finale.playing;
+        !finale.playing &&
+        !inVoid;
       // The ledges' shadows wait until the opening is over, or they sit over its captions.
       const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
@@ -1426,6 +1444,8 @@ async function start(): Promise<void> {
             }
           }
           spark.update(paused ? 0 : step);
+          world.camera.getWorldPosition(settingsHead);
+          fade.update(step, settingsHead);
           prologue.update(step);
           finale.update(step);
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
@@ -1647,6 +1667,8 @@ async function start(): Promise<void> {
         stickerView,
         storyLine,
         wakeSleeper,
+        prologue,
+        finale,
         openSettings,
         shapes,
         gestures,
