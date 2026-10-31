@@ -65,6 +65,7 @@ import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { ReadingPageView } from '../engine/shadow/reading-page-view';
+import { PropSketchView } from '../engine/shadow/prop-sketch-view';
 import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
@@ -266,6 +267,7 @@ async function start(): Promise<void> {
   const storyLine = new StoryLineView();
   const spark = new SparkFlightView();
   const handTrail = new HandTrailView();
+  const propSketch = new PropSketchView();
   const readingPage = new ReadingPageView();
   const rewards = new RewardBurstView();
   const sparkFrom = new Vector3();
@@ -436,6 +438,7 @@ async function start(): Promise<void> {
     storyLine.group,
     spark.group,
     handTrail.group,
+    propSketch.group,
     rewards.group,
     readingPage.group,
     cinematic.group,
@@ -517,6 +520,7 @@ async function start(): Promise<void> {
     saves,
     setProps: (list, light, onStage, blend) => {
       propShadows.setProps(list, light, onStage, blend);
+      propSketch.setProps(list, light, onStage, blend); // and a faint painting of each prop, toward the light
       // The dust a hand shakes off a prop's shadow needs the outlines too (on puzzle load only, so it may allocate).
       propTouch.setPolygons(
         list.map((p) => {
@@ -1539,6 +1543,7 @@ async function start(): Promise<void> {
             stage,
             shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
           );
+          propSketch.update(propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
           handTrail.update(
             paused ? 0 : step,
             stage,
