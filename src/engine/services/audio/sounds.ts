@@ -36,6 +36,17 @@ export const Sound = {
   Note2: 17,
   Note3: 18,
   Note4: 19,
+  /** The room's slow wooden clock, a loop (ambience). */
+  Clock: 20,
+  /** Wind outside the window, a loop (ambience). */
+  Wind: 21,
+  /** A beam creaking somewhere above, now and then. */
+  Creak: 22,
+  /** A few flakes of snow ticking on the window glass. */
+  Snowtick: 23,
+  /** The traveller's footsteps: two soft steps, alternated. */
+  Step0: 24,
+  Step1: 25,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -257,6 +268,66 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     minGapS: 0.05,
     refDistance: 1.5,
     maxDistance: 12,
+  },
+  {
+    name: 'clock',
+    bus: Bus.Ambience,
+    gain: 0.4,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    refDistance: 1.5,
+    maxDistance: 8,
+  },
+  {
+    name: 'wind',
+    bus: Bus.Ambience,
+    gain: 0.45,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    refDistance: 2,
+    maxDistance: 10,
+  },
+  {
+    name: 'creak',
+    bus: Bus.Ambience,
+    gain: 0.5,
+    loop: false,
+    priority: 1,
+    minGapS: 2,
+    refDistance: 1.5,
+    maxDistance: 10,
+  },
+  {
+    name: 'snowtick',
+    bus: Bus.Ambience,
+    gain: 0.35,
+    loop: false,
+    priority: 0,
+    minGapS: 0.1,
+    refDistance: 1,
+    maxDistance: 6,
+  },
+  {
+    name: 'step0',
+    bus: Bus.Effects,
+    gain: 0.45,
+    loop: false,
+    priority: 0,
+    minGapS: 0.12,
+    refDistance: 0.6,
+    maxDistance: 4,
+  },
+  {
+    name: 'step1',
+    bus: Bus.Effects,
+    gain: 0.45,
+    loop: false,
+    priority: 0,
+    minGapS: 0.12,
+    refDistance: 0.6,
+    maxDistance: 4,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

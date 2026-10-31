@@ -21,6 +21,9 @@ const WALL_LIFT_M = 0.05;
 export class GameAudio {
   private readonly at = { x: 0, y: 0, z: 0 };
   private flameLit = false;
+  /** Where the room's ambient sounds sit (scene space): the clock at the back of the room, the wind at the window. */
+  private readonly clockAt = { x: -1.4, y: 1.9, z: 0.8 };
+  private readonly windAt = { x: -1.95, y: 1.4, z: -0.8 };
 
   constructor(private readonly player: SoundPlayer) {}
 
@@ -89,6 +92,38 @@ export class GameAudio {
   setRoom(on: boolean): void {
     this.player.setLoop(Sound.Hum, on, 0, 1.5, 0);
     this.player.setLoop(Sound.Music, on, 0, 1.5, 0);
+    this.player.setLoop(Sound.Clock, on, this.clockAt.x, this.clockAt.y, this.clockAt.z);
+    this.player.setLoop(Sound.Wind, on, this.windAt.x, this.windAt.y, this.windAt.z);
+  }
+
+  /** Puts the clock and the wind where they are in the room now (the room moves when it is placed round the player). */
+  placeAmbient(
+    clock: Readonly<{ x: number; y: number; z: number }>,
+    wind: Readonly<{ x: number; y: number; z: number }>,
+  ): void {
+    this.clockAt.x = clock.x;
+    this.clockAt.y = clock.y;
+    this.clockAt.z = clock.z;
+    this.windAt.x = wind.x;
+    this.windAt.y = wind.y;
+    this.windAt.z = wind.z;
+    this.player.moveLoop(Sound.Clock, clock.x, clock.y, clock.z);
+    this.player.moveLoop(Sound.Wind, wind.x, wind.y, wind.z);
+  }
+
+  /** The window's flakes of snow, ticking on the glass (at the wind's place), or a beam creaking (above the room, `x` metres to the side). */
+  snowTick(): void {
+    this.player.playAt(Sound.Snowtick, this.windAt.x, this.windAt.y, this.windAt.z);
+  }
+
+  creak(x: number, z: number): void {
+    this.player.playAt(Sound.Creak, x, 2.4, z);
+  }
+
+  /** One footstep of the traveller at a point on the wall (stage coordinates); `alternate` picks the other of the two steps. */
+  stepAt(stage: StagePlane, x: number, y: number, alternate: boolean): void {
+    stagePoint(stage, x, y, WALL_LIFT_M, this.at);
+    this.player.playAt(alternate ? Sound.Step1 : Sound.Step0, this.at.x, this.at.y, this.at.z);
   }
 
   /** The candle lifted or set down, from the flame (`flame` is its scene position). Call with the frame's two flags. */

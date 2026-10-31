@@ -533,6 +533,7 @@ async function start(): Promise<void> {
     say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
     wake: (index) => wakeSleeper(index),
     setAwake: (count) => {
+      sleepersAwake = count;
       if (count === 0) spark.clear(); // a restart: nothing in flight
       roomDressing.setAwake(count);
     },
@@ -636,6 +637,51 @@ async function start(): Promise<void> {
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
+  // The room's ambient sounds: the clock at the back and the wind at the window follow the room when it is placed round the player;
+  // a few flakes tick on the glass and a beam creaks now and then, less as the sleepers wake, and never over a story scene.
+  const clockPoint = new Vector3();
+  const windPoint = new Vector3();
+  const creakPoint = new Vector3();
+  const placeAmbientSounds = () => {
+    roomDressing.group.updateWorldMatrix(true, false);
+    roomDressing.group.localToWorld(clockPoint.set(-1.4, 1.9, 0.8));
+    roomDressing.group.localToWorld(windPoint.set(-1.95, 1.4, -0.8));
+    gameAudio.placeAmbient(clockPoint, windPoint);
+  };
+  let ambientOn = false;
+  let ambientTimer: ReturnType<typeof setTimeout> | undefined;
+  let sleepersAwake = 0;
+  const ambientTick = () => {
+    ambientTimer = setTimeout(ambientTick, 3500 + Math.random() * 7000);
+    if (!ambientOn || inVoid || visibility.paused || sessionState !== 'playing') return;
+    if (Math.random() < 0.15) {
+      roomDressing.group.localToWorld(creakPoint.set((Math.random() - 0.5) * 3, 2.4, -1.6 + Math.random() * 2));
+      gameAudio.creak(creakPoint.x, creakPoint.z);
+    } else if (Math.random() < 1 - 0.16 * sleepersAwake) gameAudio.snowTick();
+  };
+  // The traveller's footsteps: one soft step for every stride of ground it walks (not while it waits, and not across a jump).
+  const STEP_M = 0.045;
+  let stepLastX = 0;
+  let stepWalked = 0;
+  let stepSeen = false;
+  let stepAlternate = false;
+  const footsteps = () => {
+    if (!readTraveller()) {
+      stepSeen = false;
+      return;
+    }
+    const dx = Math.abs(travellerAt.x - stepLastX);
+    if (stepSeen && night.game!.traveller.state === 'walk' && dx < 0.1) {
+      stepWalked += dx;
+      if (stepWalked >= STEP_M) {
+        stepWalked -= STEP_M;
+        stepAlternate = !stepAlternate;
+        gameAudio.stepAt(stage, travellerAt.x, travellerAt.y, stepAlternate);
+      }
+    } else stepWalked = 0;
+    stepLastX = travellerAt.x;
+    stepSeen = true;
+  };
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
     if (!(Number.isFinite(yaw) && Number.isFinite(head[0]) && Number.isFinite(head[1]) && Number.isFinite(head[2]))) {
@@ -662,6 +708,7 @@ async function start(): Promise<void> {
     const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
     roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
+    placeAmbientSounds();
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -913,6 +960,11 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: room sound', () => gameAudio.setRoom(true));
+    guard('sessionstart: ambient', () => {
+      placeAmbientSounds();
+      ambientOn = true;
+      if (ambientTimer === undefined) ambientTimer = setTimeout(ambientTick, 6000);
+    });
     if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
     if (session)
@@ -943,6 +995,9 @@ async function start(): Promise<void> {
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
+    guard('sessionend: ambient', () => {
+      ambientOn = false;
+    });
     guard('sessionend: display', () => {
       world.scene.background = null;
       world.renderer.setClearColor(0x000000, 0);
@@ -1552,6 +1607,7 @@ async function start(): Promise<void> {
             hands.hands.left.tracked,
             hands.hands.right.tracked,
           );
+          footsteps();
         } catch (e) {
           failures.report('simulation', e);
         }

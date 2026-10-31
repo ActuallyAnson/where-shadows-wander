@@ -115,15 +115,19 @@ describe('GameAudio.puzzleSolved and setFlame', () => {
 });
 
 describe('GameAudio.setRoom and candleMoved', () => {
-  it('starts the room tone and the music together, and stops them together', () => {
+  it('starts the room tone, the music, the clock and the wind together, and stops them together', () => {
     const { audio, rec } = setup();
     audio.setRoom(true);
     audio.setRoom(false);
     expect(rec.loops.map((l) => [l.id, l.on])).toEqual([
       [Sound.Hum, true],
       [Sound.Music, true],
+      [Sound.Clock, true],
+      [Sound.Wind, true],
       [Sound.Hum, false],
       [Sound.Music, false],
+      [Sound.Clock, false],
+      [Sound.Wind, false],
     ]);
   });
 
@@ -151,5 +155,20 @@ describe('GameAudio.lullabyNote', () => {
     audio.lullabyNote(99, 0, 0, 0);
     audio.lullabyNote(NaN, 0, 0, 0);
     expect(player.plays.map((p) => p.id)).toEqual([Sound.Note0, Sound.Note4, Sound.Note0]);
+  });
+});
+
+describe('GameAudio ambient and steps', () => {
+  it('moves the clock and the wind to where the room is, plays a window tick and a beam creak from the room, and alternates steps', () => {
+    const { audio, rec, stage } = setup();
+    audio.placeAmbient({ x: 1, y: 2, z: 3 }, { x: 4, y: 5, z: 6 });
+    expect(rec.moves).toBe(2);
+    audio.snowTick();
+    audio.creak(0.5, -1);
+    audio.stepAt(stage, 0, 0, false);
+    audio.stepAt(stage, 0, 0, true);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Snowtick, Sound.Creak, Sound.Step0, Sound.Step1]);
+    expect(rec.plays[0]).toMatchObject({ x: 4, y: 5, z: 6 });
+    expect(rec.plays[1].y).toBeGreaterThan(2);
   });
 });

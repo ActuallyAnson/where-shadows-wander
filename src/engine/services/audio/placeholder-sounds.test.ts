@@ -20,7 +20,18 @@ describe('renderPlaceholder', () => {
       const rate = renderRateFor(id, SR);
       const a = renderPlaceholder(id, rate);
       const b = renderPlaceholder(id, rate);
-      const peak = id === Sound.Crackle ? 0.35 : id === Sound.Hum ? 0.3 : id === Sound.Music ? 0.5 : 0.8;
+      const peaks: Partial<Record<number, number>> = {
+        [Sound.Crackle]: 0.35,
+        [Sound.Hum]: 0.3,
+        [Sound.Music]: 0.5,
+        [Sound.Clock]: 0.5,
+        [Sound.Wind]: 0.35,
+        [Sound.Creak]: 0.7,
+        [Sound.Snowtick]: 0.6,
+        [Sound.Step0]: 0.6,
+        [Sound.Step1]: 0.6,
+      };
+      const peak = peaks[id] ?? 0.8;
       expect(a.length).toBeGreaterThan(rate * 0.05);
       expect(a.every((x) => Number.isFinite(x))).toBe(true);
       expect(a.reduce((m, v) => Math.max(m, Math.abs(v)), 0)).toBeCloseTo(peak, 5);
