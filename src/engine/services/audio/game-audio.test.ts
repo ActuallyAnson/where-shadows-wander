@@ -139,3 +139,17 @@ describe('GameAudio.setRoom and candleMoved', () => {
     ]);
   });
 });
+
+describe('GameAudio.lullabyNote', () => {
+  it('plays the lullaby note for each sleeper from where it is, and keeps a bad number to the five notes', () => {
+    const { audio, rec: player } = setup();
+    for (let i = 0; i < 5; i++) audio.lullabyNote(i, 1 + i, 1.5, -2);
+    expect(player.plays.map((p) => p.id)).toEqual([Sound.Note0, Sound.Note1, Sound.Note2, Sound.Note3, Sound.Note4]);
+    expect(player.plays[3].x).toBe(4);
+    player.plays.length = 0;
+    audio.lullabyNote(-3, 0, 0, 0);
+    audio.lullabyNote(99, 0, 0, 0);
+    audio.lullabyNote(NaN, 0, 0, 0);
+    expect(player.plays.map((p) => p.id)).toEqual([Sound.Note0, Sound.Note4, Sound.Note0]);
+  });
+});

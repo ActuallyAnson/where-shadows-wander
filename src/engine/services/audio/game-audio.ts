@@ -79,6 +79,12 @@ export class GameAudio {
     this.player.playAt(Sound.Hop, this.at.x, this.at.y, this.at.z);
   }
 
+  /** One of the lullaby's five notes (0..4), from a point in the room (`x`, `y`, `z`, scene space): the sleeper it wakes. */
+  lullabyNote(index: number, x: number, y: number, z: number): void {
+    const i = index < 0 ? 0 : index > 4 ? 4 : Math.floor(index) || 0;
+    this.player.playAt((Sound.Note0 + i) as SoundId, x, y, z);
+  }
+
   /** The room tone and the music play under everything while `on` (a headset session is running). Where they sit does not matter: they are the room's. */
   setRoom(on: boolean): void {
     this.player.setLoop(Sound.Hum, on, 0, 1.5, 0);

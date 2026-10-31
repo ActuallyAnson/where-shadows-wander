@@ -26,6 +26,7 @@ function setup(flameAt?: readonly number[]) {
   const calls: string[] = [];
   const state = {
     awake: -1,
+    woke: [] as number[],
     said: [] as string[],
     mood: 0,
     props: 0,
@@ -53,6 +54,7 @@ function setup(flameAt?: readonly number[]) {
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
     say: (text) => void state.said.push(text),
+    wake: (index) => void state.woke.push(index),
     setAwake: (count) => void (state.awake = count),
     solved: () => void calls.push('solved'),
     twinkle: () => void calls.push('twinkle'),
@@ -129,7 +131,7 @@ describe('NightDriver', () => {
     pose('right', 'flat', 0, LEDGE_TOP - 0.01);
     expect(run(25, () => calls.includes('solved'))).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[1]);
-    expect(state.awake).toBe(1); // the room lights its first thing
+    expect(state.woke).toEqual([0]); // the spark goes to the lamp
     expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
   });
@@ -168,7 +170,7 @@ describe('NightDriver', () => {
     pose('left', 'flat', 0.01, LEDGE_TOP - 0.01);
     expect(run(40, () => driver.game!.complete)).toBe(true);
     expect(state.mood).toBe(RETURN_MOOD);
-    expect(state.awake).toBe(NIGHT_MOOD.length); // everything in the room is lit
+    expect(state.woke).toContain(4); // the last spark goes to the window
     expect(state.said).toContain(RETURN_LINE);
     expect(state.away).toBe(false);
     expect(state.perched).toBe(true);

@@ -47,13 +47,22 @@ import { CutsceneHost } from './cutscene-host';
 import { ENDING_MOOD } from './ending';
 import { OPENING, openingFoxAlpha } from './opening';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
-import { FINALE_PAGES, hasSeenPrologue, markPrologueSeen, Prologue, type PrologueHost } from './prologue';
+import { stagePoint } from '../engine/services/audio/stage-point';
+import {
+  FINALE_PAGES,
+  hasSeenPrologue,
+  markPrologueSeen,
+  PROLOGUE_PAGES,
+  Prologue,
+  type PrologueHost,
+} from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
+import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
@@ -251,6 +260,10 @@ async function start(): Promise<void> {
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
   const storyLine = new StoryLineView();
+  const spark = new SparkFlightView();
+  const sparkFrom = new Vector3();
+  const sparkTo = new Vector3();
+  const sparkStart = { x: 0, y: 0, z: 0 };
   // The prologue: a black void with the story drawn in white calligraphy. While it plays, everything else in the scene is
   // hidden (and put back after), and the pages float where the player was facing.
   const cinematic = new CinematicScene();
@@ -281,8 +294,22 @@ async function start(): Promise<void> {
   });
   // The finale plays in the hall of the great crystal, the last thing the night shows.
   const hall = new CinematicScene(CRYSTAL, 'hall');
-  const prologue = new Prologue(cinematic, voidHost(cinematic));
-  const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES);
+  /** One lullaby note, from ahead of where the head faced as a scene began (the sun, or the crystal). */
+  const storyNote = (index: number) =>
+    gameAudio.lullabyNote(
+      index,
+      prologueHead.x + prologueAhead.x * 4.5,
+      prologueHead.y + 0.3,
+      prologueHead.z + prologueAhead.z * 4.5,
+    );
+  // The prologue plays only the first note, alone, as it says one spark is left; the finale adds a note a page and ends on all five.
+  const prologue = new Prologue(cinematic, voidHost(cinematic), PROLOGUE_PAGES, (page) => {
+    if (page === 2) storyNote(0);
+  });
+  const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES, (page) => {
+    if (page < FINALE_PAGES.length - 1) storyNote(page);
+    else for (let k = 0; k < 5; k++) setTimeout(() => storyNote(k), k * 240);
+  });
   /** The Skip poke for each (a fingertip held on the ring for a moment). */
   const prologueSkip = new SkipTouch();
   const finaleSkip = new SkipTouch();
@@ -375,6 +402,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     storyLine.group,
+    spark.group,
     cinematic.group,
     hall.group,
     glow.group,
@@ -431,6 +459,21 @@ async function start(): Promise<void> {
   };
   // The night (src/game) and what it shows: night-driver.ts turns the game's events into these calls.
   const propOutline = createSilhouette();
+  const wakeSleeper = (index: number): void => {
+    // The spark leaves the traveller (where it stands on the paper), flies across the room to the sleeper, and the room lights it
+    // and plays its note when it lands.
+    if (!readTraveller()) {
+      travellerAt.x = 0;
+      travellerAt.y = 0;
+    }
+    stagePoint(stage, travellerAt.x, travellerAt.y + 0.05, 0.06, sparkStart);
+    sparkFrom.set(sparkStart.x, sparkStart.y, sparkStart.z);
+    roomDressing.wakePoint(index, sparkTo);
+    spark.launch(sparkFrom, sparkTo, () => {
+      roomDressing.setAwake(index + 1);
+      gameAudio.lullabyNote(index, sparkTo.x, sparkTo.y, sparkTo.z);
+    });
+  };
   const night = new NightDriver({
     stage,
     flame: candleView.flamePosition,
@@ -471,7 +514,11 @@ async function start(): Promise<void> {
       moodGoal = goal;
     },
     say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
-    setAwake: (count) => roomDressing.setAwake(count),
+    wake: (index) => wakeSleeper(index),
+    setAwake: (count) => {
+      if (count === 0) spark.clear(); // a restart: nothing in flight
+      roomDressing.setAwake(count);
+    },
     solved: () => {
       // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
       const mood = moodGoal;
@@ -1378,6 +1425,7 @@ async function start(): Promise<void> {
               );
             }
           }
+          spark.update(paused ? 0 : step);
           prologue.update(step);
           finale.update(step);
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
@@ -1598,6 +1646,7 @@ async function start(): Promise<void> {
         kindredView,
         stickerView,
         storyLine,
+        wakeSleeper,
         openSettings,
         shapes,
         gestures,

@@ -59,6 +59,8 @@ export interface NightHost {
   setMood(goal: number): void;
   /** One short line of the story on the wall: after `delay` seconds, for `hold` seconds. */
   say(text: string, delay: number, hold: number, after?: boolean): void;
+  /** The spark flies from the paper to sleeper `index` (0 = the lamp .. 4 = the window); the room lights it when it lands. */
+  wake(index: number): void;
   /** How many things in the room are lit (one more each puzzle solved: 0 .. the number of puzzles). */
   setAwake(count: number): void;
   /** The solve moment: the chime, the bloom. */
@@ -197,7 +199,7 @@ export class NightDriver {
           break;
         case 'puzzle-solved': {
           host.solved();
-          host.setAwake(e.value + 1); // the room lights one more thing
+          host.wake(e.value); // the spark flies to the sleeper, and the room lights it when it lands
           if (e.value + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(e.value), WAKE_DELAY_S, WAKE_HOLD_S);
           // Each solve warms the wall one step, except into the fan: the dimming cools it instead.
           const next = e.value + 1;
@@ -207,7 +209,6 @@ export class NightDriver {
         case 'chapter-complete': {
           // The return: the room fills with light, the kindred comes back to the lit window.
           host.setMood(RETURN_MOOD);
-          host.setAwake(NIGHT_MOOD.length);
           host.say(RETURN_LINE, 0.5, 3);
           host.setKindredAway(false);
           const w = game.fixtures.find('window');

@@ -169,6 +169,8 @@ export class RoomDressingView {
   private readonly levels = new Float32Array(WONDERS);
   private awakeCount = 0;
   private wondersWereOn = false;
+  /** How far in front of the player the wall behind the stage is (z in the room's space), set by `place`. */
+  private wallZ = -2.35;
   private warmNow = 0;
   private wonders: Mesh;
   private readonly wonderMat: MeshBasicMaterial;
@@ -470,6 +472,7 @@ export class RoomDressingView {
   /** Puts the wallpaper wall just in front of Damon's front wall, and the pictures and shelves in front of that (`stageDist` is how far the stage is from the player). */
   place(stageDist = 2.0): void {
     const z = -(Math.max(stageDist, 1.5) + 0.35) + 0.012;
+    this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
     WALL_THINGS.forEach((spec, i) => {
@@ -553,6 +556,16 @@ export class RoomDressingView {
         this.flameOn ? RoomDressingView.reach(mesh.position.distanceToSquared(this.flame)) : 1,
       );
     }
+  }
+
+  /** Where the sleeper `index` (0 = the lamp .. 4 = the window) is, in the world: the point the spark flies to. Writes into `out` and returns it. */
+  wakePoint(index: number, out: Vector3): Vector3 {
+    const i = Math.max(0, Math.min(WONDERS - 1, Math.floor(index) || 0));
+    const spec = GLOWS.find((g) => g.wonder === i) ?? GLOWS[0];
+    if (spec.wall) out.set((spec.wall[0] / 1024) * 4 - 2, 2.5 - (spec.wall[1] / 640) * 2.5, this.wallZ + spec.wall[2]);
+    else out.set(spec.at![0], spec.at![1], spec.at![2]);
+    this.group.updateWorldMatrix(true, false);
+    return this.group.localToWorld(out);
   }
 
   /** Lights the room's wonders up to `count` of them, in order (each eases on over a couple of seconds; fewer than before puts the later ones out). */

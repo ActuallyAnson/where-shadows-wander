@@ -30,6 +30,12 @@ export const Sound = {
   Twinkle: 13,
   /** A rabbit's soft landing. */
   Hop: 14,
+  /** The lullaby's five music-box notes, one for each sleeper the spark wakes (a rising pentatonic phrase, in the music's key). */
+  Note0: 15,
+  Note1: 16,
+  Note2: 17,
+  Note3: 18,
+  Note4: 19,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -201,6 +207,56 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     minGapS: 0.2,
     refDistance: 1,
     maxDistance: 8,
+  },
+  {
+    name: 'note0',
+    bus: Bus.Effects,
+    gain: 0.65,
+    loop: false,
+    priority: 3,
+    minGapS: 0.05,
+    refDistance: 1.5,
+    maxDistance: 12,
+  },
+  {
+    name: 'note1',
+    bus: Bus.Effects,
+    gain: 0.65,
+    loop: false,
+    priority: 3,
+    minGapS: 0.05,
+    refDistance: 1.5,
+    maxDistance: 12,
+  },
+  {
+    name: 'note2',
+    bus: Bus.Effects,
+    gain: 0.65,
+    loop: false,
+    priority: 3,
+    minGapS: 0.05,
+    refDistance: 1.5,
+    maxDistance: 12,
+  },
+  {
+    name: 'note3',
+    bus: Bus.Effects,
+    gain: 0.65,
+    loop: false,
+    priority: 3,
+    minGapS: 0.05,
+    refDistance: 1.5,
+    maxDistance: 12,
+  },
+  {
+    name: 'note4',
+    bus: Bus.Effects,
+    gain: 0.65,
+    loop: false,
+    priority: 3,
+    minGapS: 0.05,
+    refDistance: 1.5,
+    maxDistance: 12,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

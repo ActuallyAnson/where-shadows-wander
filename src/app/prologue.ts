@@ -112,6 +112,8 @@ export class Prologue {
     private readonly writer: PageWriter,
     private readonly host: PrologueHost,
     private readonly pages: readonly ProloguePage[] = PROLOGUE_PAGES,
+    /** Called as each page starts, with its number (a note to play with it, say). */
+    private readonly onPage?: (index: number) => void,
   ) {}
 
   get playing(): boolean {
@@ -153,6 +155,7 @@ export class Prologue {
     }
     const p = this.pages[this.index];
     this.writer.show(p.text, { write: p.write, hold: p.hold, maxEm: 15 });
+    this.onPage?.(this.index);
     this.wait = PAGE_GAP_S;
   }
 
