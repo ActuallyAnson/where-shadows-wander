@@ -362,7 +362,12 @@ async function start(): Promise<void> {
   const playEnding = (onDone?: () => void) => {
     storyLine.clear(); // the finale speaks for itself
     moodGoal = ENDING_MOOD;
-    finale.start(onDone);
+    // When the hall fades away the room stands there, every sleeper awake: a moment on that picture (with one last line) before the
+    // end screen comes.
+    finale.start(() => {
+      storyLine.say('The room dreams on.', 1.6, 3.2);
+      setTimeout(() => onDone?.(), 6500);
+    });
   };
   const playSolve = () => {
     moodGoal = 1;
@@ -519,8 +524,12 @@ async function start(): Promise<void> {
     perchKindred: visitKindred,
     releaseKindred: endKindredVisit,
     dim: () => {
-      // The room cools with the mood the night sets; the kindred darts off the wall and stays away.
+      // The room cools with the mood the night sets; the kindred darts off the wall and stays away. The candle gutters: the whole
+      // view dims for a moment (a slow fade to half dark, held, then back up) and a beam creaks overhead.
       if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
+      fade.fadeTo(0.55, 1.0, () => setTimeout(() => fade.fadeTo(0, 1.8), 1600));
+      roomDressing.group.localToWorld(creakPoint.set(0, 2.4, -0.4));
+      gameAudio.creak(creakPoint.x, creakPoint.z);
     },
     setKindredAway: (away) => {
       kindredAway = away;
