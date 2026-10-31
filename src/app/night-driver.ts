@@ -59,6 +59,8 @@ export interface NightHost {
   setMood(goal: number): void;
   /** One short line of the story on the wall: after `delay` seconds, for `hold` seconds. */
   say(text: string, delay: number, hold: number, after?: boolean): void;
+  /** The reward for solving puzzle `index` plays where the traveller stands (gold dust, sparks, drops, leaves, light). */
+  reward(index: number): void;
   /** The spark flies from the paper to sleeper `index` (0 = the lamp .. 4 = the window); the room lights it when it lands. */
   wake(index: number): void;
   /** How many things in the room are lit (one more each puzzle solved: 0 .. the number of puzzles). */
@@ -199,6 +201,7 @@ export class NightDriver {
           break;
         case 'puzzle-solved': {
           host.solved();
+          host.reward(e.value);
           host.wake(e.value); // the spark flies to the sleeper, and the room lights it when it lands
           if (e.value + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(e.value), WAKE_DELAY_S, WAKE_HOLD_S);
           // Each solve warms the wall one step, except into the fan: the dimming cools it instead.

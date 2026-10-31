@@ -64,6 +64,7 @@ import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
+import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
@@ -264,6 +265,7 @@ async function start(): Promise<void> {
   const storyLine = new StoryLineView();
   const spark = new SparkFlightView();
   const handTrail = new HandTrailView();
+  const rewards = new RewardBurstView();
   const sparkFrom = new Vector3();
   const sparkTo = new Vector3();
   const sparkStart = { x: 0, y: 0, z: 0 };
@@ -427,6 +429,7 @@ async function start(): Promise<void> {
     storyLine.group,
     spark.group,
     handTrail.group,
+    rewards.group,
     cinematic.group,
     fade.group,
     hall.group,
@@ -543,10 +546,17 @@ async function start(): Promise<void> {
       moodGoal = goal;
     },
     say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
+    reward: (index) => {
+      // The puzzle's own reward, on the paper where the traveller stands.
+      if (readTraveller()) rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
+    },
     wake: (index) => wakeSleeper(index),
     setAwake: (count) => {
       sleepersAwake = count;
-      if (count === 0) spark.clear(); // a restart: nothing in flight
+      if (count === 0) {
+        spark.clear(); // a restart: nothing in flight
+        rewards.clear();
+      }
       roomDressing.setAwake(count);
     },
     solved: () => {
@@ -1514,6 +1524,11 @@ async function start(): Promise<void> {
             }
           }
           spark.update(paused ? 0 : step);
+          rewards.update(
+            paused ? 0 : step,
+            stage,
+            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
           handTrail.update(
             paused ? 0 : step,
             stage,

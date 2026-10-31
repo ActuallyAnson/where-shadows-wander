@@ -27,6 +27,7 @@ function setup(flameAt?: readonly number[]) {
   const state = {
     awake: -1,
     woke: [] as number[],
+    rewards: [] as number[],
     said: [] as string[],
     mood: 0,
     props: 0,
@@ -54,6 +55,7 @@ function setup(flameAt?: readonly number[]) {
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
     say: (text) => void state.said.push(text),
+    reward: (index) => void state.rewards.push(index),
     wake: (index) => void state.woke.push(index),
     setAwake: (count) => void (state.awake = count),
     solved: () => void calls.push('solved'),
@@ -132,6 +134,7 @@ describe('NightDriver', () => {
     expect(run(25, () => calls.includes('solved'))).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[1]);
     expect(state.woke).toEqual([0]); // the spark goes to the lamp
+    expect(state.rewards).toEqual([0]); // and the puzzle's own reward plays on the paper
     expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
   });
