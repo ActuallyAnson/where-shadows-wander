@@ -20,15 +20,6 @@ const page = (text: string): ProloguePage => ({
   hold: HOLD_S,
 });
 
-/** The story before the night: the room dreams every night; tonight its dreams have sunk too deep; one spark is left to wake them. */
-export const PROLOGUE_PAGES: readonly ProloguePage[] = [
-  page('When the house holds its breath, the room begins to dream.'),
-  page('But tonight the dreams have sunk too deep to wake themselves.'),
-  page('One spark is left, small as a held breath.'),
-  page('It cannot fly. It can only walk.'),
-  page('Give it a road of shadow, and it will wake them, one by one.'),
-];
-
 /** The finale's pages, in the hall of the great crystal: everything awake, the light home, the room dreaming for the child. */
 export const FINALE_PAGES: readonly ProloguePage[] = [
   page('Every sleeper is awake.'),
@@ -37,6 +28,87 @@ export const FINALE_PAGES: readonly ProloguePage[] = [
   page('Now the room dreams for you.'),
   page('Sleep well.'),
 ];
+
+/** What the reel needs from the scene it plays in (CinematicScene fits). */
+export interface ReelScene {
+  setReelTime(seconds: number): void;
+}
+
+/** The opening reel's length (seconds from its start, after the fade), and the moments its notes play. */
+export const REEL_END_S = 21;
+/** Seconds after the reel starts before the scene is showing (the fade to black takes this long). */
+export const REEL_FADE_S = 0.7;
+/**
+ * The lullaby notes the reel plays and when (seconds into the scene): as the five lights go out, last sleeper first, the notes fall
+ * 4, 3, 2, 1, 0; then, as the ember lights, the first note once, alone.
+ */
+export const REEL_NOTES: readonly (readonly [number, number])[] = [
+  [7.6, 4],
+  [8.4, 3],
+  [9.2, 2],
+  [10.0, 1],
+  [10.8, 0],
+  [12.2, 0],
+];
+
+/**
+ * The wordless opening: a short cinematic reel (no pages of text) in which the five sleepers' lights over the castle go out one by
+ * one as the little traveller walks in, the sun sinks, an ember lights at its lantern, and the title appears with one line. The
+ * scene draws it from the time it is given; this keeps the time, the notes and the way out (it can be skipped at any moment).
+ */
+export class PrologueReel {
+  private onDone: (() => void) | null = null;
+  private t = 0;
+  private noted = 0;
+  private active = false;
+
+  constructor(
+    private readonly scene: ReelScene,
+    private readonly host: PrologueHost,
+    /** Called when a note should sound, with its number. */
+    private readonly onNote?: (index: number) => void,
+  ) {}
+
+  get playing(): boolean {
+    return this.active;
+  }
+
+  /** Starts the reel (the room goes dark; one already playing starts over). */
+  start(onDone?: () => void): void {
+    if (!this.active) this.host.enter();
+    this.active = true;
+    this.onDone = onDone ?? null;
+    this.t = 0;
+    this.noted = 0;
+    this.scene.setReelTime(0);
+  }
+
+  /** Ends it now (a skip), and puts the room back. */
+  skip(): void {
+    if (this.active) this.finish();
+  }
+
+  /** Once per frame. */
+  update(dt: number): void {
+    if (!this.active) return;
+    this.t += dt > 0 ? Math.min(dt, 0.1) : 0;
+    const r = this.t - REEL_FADE_S;
+    this.scene.setReelTime(r);
+    while (this.noted < REEL_NOTES.length && r >= REEL_NOTES[this.noted][0]) {
+      this.onNote?.(REEL_NOTES[this.noted][1]);
+      this.noted++;
+    }
+    if (r >= REEL_END_S) this.finish();
+  }
+
+  private finish(): void {
+    this.active = false;
+    this.host.leave();
+    const done = this.onDone;
+    this.onDone = null;
+    done?.();
+  }
+}
 
 /** Where the browser remembers that the prologue has played once (so it comes only the first time a headset starts the game). */
 export const PROLOGUE_SEEN_KEY = 'wsw.prologueSeen';
@@ -93,8 +165,8 @@ export interface PrologueHost {
   leave(): void;
 }
 
-/** Seconds the whole prologue takes, with its black before and after. */
-export function prologueSeconds(pages: readonly ProloguePage[] = PROLOGUE_PAGES): number {
+/** Seconds a run of pages takes, with its black before and after. */
+export function prologueSeconds(pages: readonly ProloguePage[]): number {
   let s = LEAD_IN_S + LEAD_OUT_S;
   pages.forEach((p, i) => {
     s += p.write + p.hold + 1 + (i > 0 ? PAGE_GAP_S : 0); // 1 s is the page's fade out
@@ -111,7 +183,7 @@ export class Prologue {
   constructor(
     private readonly writer: PageWriter,
     private readonly host: PrologueHost,
-    private readonly pages: readonly ProloguePage[] = PROLOGUE_PAGES,
+    private readonly pages: readonly ProloguePage[],
     /** Called as each page starts, with its number (a note to play with it, say). */
     private readonly onPage?: (index: number) => void,
   ) {}

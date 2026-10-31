@@ -35,7 +35,7 @@ import {
 } from './cinematic-art';
 import { SKIP_RADIUS_M } from './pure/skip-touch';
 import { createStagePlane, type MutableStagePlane } from './pure/stage-plane';
-import { paintTraveller, Pose } from './traveller-art';
+import { paintTraveller, Pose, WALK_CYCLE } from './traveller-art';
 
 /** The floor is this far below the eyes (a seated player's eyes are about 1.2 m up). */
 const FLOOR_Y = -1.25;
@@ -44,6 +44,33 @@ const MOTES = 170;
 const SKIP_LOCAL = [0.28, -0.5, -0.6] as const;
 const FADE_IN_S = 1.3;
 const FADE_OUT_S = 1;
+/** How long the wordless opening reel runs (seconds from its start), and when its parts happen. */
+export const REEL_S = 21;
+
+/** A smooth 0..1 ramp of `t` between `a` and `b` (module level, so the reel makes no closure each frame). */
+function ramp(t: number, a: number, b: number): number {
+  const k = (t - a) / (b - a);
+  return k < 0 ? 0 : k > 1 ? 1 : k * k * (3 - 2 * k);
+}
+function basic(m: Mesh): MeshBasicMaterial {
+  return m.material as MeshBasicMaterial;
+}
+function dim(m: Mesh, k: number): void {
+  basic(m).color.setRGB(1 - k * 0.72, 1 - k * 0.7, 1 - k * 0.38);
+}
+/** The five sleepers' lights over the castle: their colours (lamp, bunting, pictures, globe, window). */
+const WISP_COLOURS: readonly (readonly [number, number, number])[] = [
+  [1, 0.75, 0.35],
+  [1, 0.55, 0.58],
+  [0.55, 0.72, 1],
+  [0.45, 0.95, 0.78],
+  [0.72, 0.9, 1],
+];
+/** When the wisps go out, one by one, last sleeper first, and how long each takes to fade. */
+export const WISP_OUT_FROM_S = 7.6;
+export const WISP_OUT_EVERY_S = 0.8;
+const WISP_OUT_S = 0.6;
+
 /** The orders things draw in: the far backdrop first, the floor over it, then the lights, then the words on top. */
 const ORDER = {
   sky: -50,
@@ -114,6 +141,22 @@ export class CinematicScene {
   private readonly geometries: BufferGeometry[] = [];
   private readonly moteMat: ShaderMaterial;
   private readonly traveller: Mesh;
+  /** The parts the opening reel animates (the dusk scene only). */
+  private reel: {
+    sun: Mesh;
+    castle: Mesh;
+    sky: Mesh;
+    floor: Mesh;
+    horizon: Mesh;
+    streak: Mesh;
+    wisps: Mesh[];
+    traveller: Mesh;
+    ember: Mesh;
+    title: Mesh;
+    subtitle: Mesh;
+    walk: CanvasTexture[];
+    idle: CanvasTexture;
+  } | null = null;
   private readonly text: Mesh;
   private readonly textMat: MeshBasicMaterial;
   private textTexture: CanvasTexture | null = null;
@@ -162,21 +205,26 @@ export class CinematicScene {
     };
 
     // The sky, then the big light on the horizon: the sun with the castle before it, or the crystal in the hall.
-    make(
+    const skyMesh = make(
       420,
       160,
       tex(8, 256, (g, w, h) => paintSky(g, w, h, p)),
       ORDER.sky,
-    ).position.set(0, FLOOR_Y + 76, -80);
+    );
+    skyMesh.position.set(0, FLOOR_Y + 76, -80);
+    let sunMesh: Mesh | null = null;
+    let castleMesh: Mesh | null = null;
     if (kind === 'dusk') {
-      make(
+      sunMesh = make(
         34,
         34,
         tex(256, 256, (g, w, h) => paintSun(g, w, h, p)),
         ORDER.sun,
         { additive: true },
-      ).position.set(2, FLOOR_Y + 4.5, -78);
-      make(30, 12, tex(512, 205, paintCastle), ORDER.castle).position.set(2, FLOOR_Y + 6, -76);
+      );
+      sunMesh.position.set(2, FLOOR_Y + 4.5, -78);
+      castleMesh = make(30, 12, tex(512, 205, paintCastle), ORDER.castle);
+      castleMesh.position.set(2, FLOOR_Y + 6, -76);
     } else {
       make(
         22,
@@ -264,6 +312,66 @@ export class CinematicScene {
       ORDER.traveller,
     );
     this.traveller.position.set(-1, FLOOR_Y + 0.72, -6);
+
+    // The wordless opening reel (dusk only): five glowing sleepers over the castle, a walking traveller, an ember, a title.
+    if (kind === 'dusk' && sunMesh && castleMesh) {
+      const orb = tex(128, 128, (g, w, h) => {
+        const grad = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.55)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, w, h);
+      });
+      const wisps: Mesh[] = [];
+      for (let i = 0; i < 5; i++) {
+        const w = make(5.5, 5.5, orb, ORDER.glow + 1, { additive: true });
+        w.position.set(2 + (i - 2) * 6, FLOOR_Y + 15 + 2.2 * Math.cos((i - 2) * 0.55), -68);
+        (w.material as MeshBasicMaterial).color.setRGB(WISP_COLOURS[i][0], WISP_COLOURS[i][1], WISP_COLOURS[i][2]);
+        (w.material as MeshBasicMaterial).opacity = 0;
+        wisps.push(w);
+      }
+      const ember = make(0.8, 0.8, orb, ORDER.traveller + 1, { additive: true });
+      ember.position.set(-0.6, FLOOR_Y + 0.6, -5.9);
+      (ember.material as MeshBasicMaterial).color.setRGB(1, 0.78, 0.4);
+      (ember.material as MeshBasicMaterial).opacity = 0;
+      const title = make(
+        5.8,
+        0.75,
+        tex(1024, 128, (g, w, h) => paintCaption(g, w, h, 'WHERE SHADOWS WANDER')),
+        ORDER.text,
+      );
+      title.position.set(0, 0.85, -4);
+      const subtitle = make(
+        3.4,
+        0.43,
+        tex(1024, 128, (g, w, h) => paintCaption(g, w, h, 'Help it wake them.')),
+        ORDER.text,
+      );
+      subtitle.position.set(0, 0.1, -4);
+      for (const m of [title, subtitle]) {
+        const mat = m.material as MeshBasicMaterial;
+        mat.depthTest = false;
+        mat.opacity = 0;
+      }
+      const walk = WALK_CYCLE.map((pose) => tex(256, 256, (g, w) => paintTraveller(g, w, pose)));
+      const idle = (this.traveller.material as MeshBasicMaterial).map as CanvasTexture;
+      this.reel = {
+        sun: sunMesh,
+        castle: castleMesh,
+        sky: skyMesh,
+        floor,
+        horizon,
+        streak,
+        wisps,
+        traveller: this.traveller,
+        ember,
+        title,
+        subtitle,
+        walk,
+        idle,
+      };
+    }
 
     // Motes of light drifting up through it all.
     const pos = new Float32Array(MOTES * 3);
@@ -363,6 +471,7 @@ export class CinematicScene {
     sp.right[2] = -s;
     sp.normal[0] = s;
     sp.normal[2] = c;
+    this.setReelTime(0);
     this.group.visible = true;
   }
 
@@ -371,6 +480,44 @@ export class CinematicScene {
     this.skipMat.opacity = 0.55 + 0.45 * Math.min(1, Math.max(0, progress));
     const k = 1 + 0.25 * Math.min(1, Math.max(0, progress));
     this.skipButton.scale.set(k, k, 1);
+  }
+
+  /**
+   * Sets the opening reel to `r` seconds in (a pure function of the time, so a jump or a skip cannot leave it half-way): the five
+   * wisps over the castle glow and bob, the traveller walks in from the left, the wisps go out one by one (the last sleeper first),
+   * the sun sinks and the dusk turns to night, an ember lights at the traveller's lantern, and the title writes itself in the dark.
+   */
+  setReelTime(r: number): void {
+    const R = this.reel;
+    if (!R) return;
+    const t = r > 0 ? r : 0;
+    const night = ramp(t, 7.6, 12.5);
+    // The sun rises into its glow, then sinks and the world cools to night.
+    basic(R.sun).opacity = ramp(t, 0, 3) * (1 - night);
+    R.sun.position.y = FLOOR_Y + 4.5 - 6.5 * night;
+    dim(R.sky, night);
+    dim(R.floor, night * 0.6);
+    dim(R.castle, night * 0.55);
+    basic(R.horizon).opacity = 1 - night;
+    basic(R.streak).opacity = 1 - night;
+    // The five sleepers' lights: they come up one by one, bob, and go out last-first.
+    for (let i = 0; i < 5; i++) {
+      const appear = ramp(t, 0.8 + 0.4 * i, 1.8 + 0.4 * i);
+      const outAt = WISP_OUT_FROM_S + WISP_OUT_EVERY_S * (4 - i);
+      const out = t < outAt ? 0 : Math.min(1, (t - outAt) / WISP_OUT_S);
+      basic(R.wisps[i]).opacity = appear * (1 - out) * (0.85 + 0.15 * Math.sin(t * 2.1 + i * 1.3));
+      R.wisps[i].position.y = FLOOR_Y + 15 + 2.2 * Math.cos((i - 2) * 0.55) + 0.25 * Math.sin(t * 1.3 + i);
+    }
+    // The traveller walks in from the left between 3 s and 8 s (a four-frame stride), then stands.
+    const walking = t > 3 && t < 8;
+    R.traveller.position.x = -9 + 8 * ramp(t, 3, 8);
+    basic(R.traveller).map = walking ? R.walk[Math.floor(t * 8) % 4] : R.idle;
+    R.traveller.position.y = FLOOR_Y + 0.72 + (walking ? Math.abs(Math.sin(t * 8 * Math.PI)) * 0.04 : 0);
+    // The ember lights at its lantern, and the title and its one line come up out of the dark.
+    basic(R.ember).opacity = ramp(t, 12, 13.5) * (0.85 + 0.15 * Math.sin(t * 9));
+    R.ember.position.x = R.traveller.position.x + 0.38;
+    basic(R.title).opacity = ramp(t, 13.5, 15.5) * (1 - ramp(t, 20, 21));
+    basic(R.subtitle).opacity = ramp(t, 16.2, 17.8) * (1 - ramp(t, 20, 21));
   }
 
   /** Hides the scene and takes its words away. */
@@ -412,7 +559,7 @@ export class CinematicScene {
     this.time += step;
     this.moteMat.uniforms.uTime.value = this.time;
     // The traveller breathes: a slow small sway.
-    this.traveller.position.y = FLOOR_Y + 0.72 + Math.sin(this.time * 1.6) * 0.012;
+    if (!this.reel) this.traveller.position.y = FLOOR_Y + 0.72 + Math.sin(this.time * 1.6) * 0.012;
     if (this.line >= 0) {
       this.line += step;
       const total = FADE_IN_S + this.hold + FADE_OUT_S;

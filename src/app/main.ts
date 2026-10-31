@@ -48,14 +48,7 @@ import { ENDING_MOOD } from './ending';
 import { OPENING, OPENING_S, openingFoxAlpha } from './opening';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
 import { stagePoint } from '../engine/services/audio/stage-point';
-import {
-  FINALE_PAGES,
-  hasSeenPrologue,
-  markPrologueSeen,
-  PROLOGUE_PAGES,
-  Prologue,
-  type PrologueHost,
-} from './prologue';
+import { FINALE_PAGES, hasSeenPrologue, markPrologueSeen, Prologue, PrologueReel, type PrologueHost } from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
@@ -326,10 +319,8 @@ async function start(): Promise<void> {
       prologueHead.y + 0.3,
       prologueHead.z + prologueAhead.z * 4.5,
     );
-  // The prologue plays only the first note, alone, as it says one spark is left; the finale adds a note a page and ends on all five.
-  const prologue = new Prologue(cinematic, voidHost(cinematic), PROLOGUE_PAGES, (page) => {
-    if (page === 2) storyNote(0);
-  });
+  // The opening: a wordless reel in the dusk scene. The lullaby notes fall as the five lights go out, then the first one sounds alone.
+  const prologue = new PrologueReel(cinematic, voidHost(cinematic), storyNote);
   const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES, (page) => {
     if (page < FINALE_PAGES.length - 1) storyNote(page);
     else for (let k = 0; k < 5; k++) setTimeout(() => storyNote(k), k * 240);

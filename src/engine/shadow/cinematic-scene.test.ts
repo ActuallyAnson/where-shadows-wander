@@ -97,3 +97,50 @@ describe('CinematicScene', () => {
     scene.dispose();
   });
 });
+
+describe('the opening reel', () => {
+  const opacities = (scene: CinematicScene) =>
+    scene.group.children.map((c) => (c as unknown as { material?: { opacity?: number } }).material?.opacity ?? -1);
+  // The five wisps are the meshes drawn at the glow order + 1 (after the streak); find them by their colour tint instead: they are the
+  // only five with a coloured material that starts invisible and fades in. Here: count meshes that are visible at 6 s but not at 0 s.
+  it('is a pure function of the time: the lights come up, go out last-first, the traveller walks in, and the title appears', () => {
+    const scene = new CinematicScene();
+    scene.enter({ x: 0, y: 1.2, z: 0 }, 0, -1);
+    const at = (r: number) => {
+      scene.setReelTime(r);
+      return opacities(scene);
+    };
+    const start = at(0);
+    const lit = at(6);
+    const out = at(11.5);
+    const title = at(18);
+    const rose = lit.filter((o, i) => o > 0.3 && start[i] < 0.05).length;
+    expect(rose).toBeGreaterThanOrEqual(5); // the five lights came up
+    const stillLit = out.filter((o, i) => lit[i] > 0.3 && start[i] < 0.05 && o > 0.3).length;
+    expect(stillLit).toBeLessThan(rose); // and the lights are out by 11.5 s
+    expect(title.filter((o, i) => o > 0.5 && out[i] < 0.05).length).toBeGreaterThanOrEqual(2); // the title and its line
+    const traveller = scene.group.children.find(
+      (c) => Math.abs((c as unknown as { position: { z: number } }).position.z + 6) < 0.01,
+    );
+    scene.setReelTime(3);
+    const x3 = (traveller as unknown as { position: { x: number } }).position.x;
+    scene.setReelTime(6);
+    const x6 = (traveller as unknown as { position: { x: number } }).position.x;
+    scene.setReelTime(9);
+    const x9 = (traveller as unknown as { position: { x: number } }).position.x;
+    expect(x6).toBeGreaterThan(x3);
+    expect(x9).toBeGreaterThan(x6);
+    expect(() => {
+      scene.setReelTime(-4);
+      scene.setReelTime(NaN);
+      scene.setReelTime(1e9);
+    }).not.toThrow();
+    scene.dispose();
+  });
+
+  it('does nothing in the hall, which has no reel', () => {
+    const hall = new CinematicScene(CRYSTAL, 'hall');
+    expect(() => hall.setReelTime(5)).not.toThrow();
+    hall.dispose();
+  });
+});
