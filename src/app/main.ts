@@ -713,6 +713,8 @@ async function start(): Promise<void> {
   };
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
+  const gazeAt = new Vector3();
+  const gazeDir = new Vector3();
   const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
@@ -1705,7 +1707,15 @@ async function start(): Promise<void> {
               menuTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            if (menu.group.visible) menu.update(step, menuTips, tips);
+            if (menu.group.visible) {
+              menu.gazeOn = settings.value.gazeMenus;
+              if (menu.gazeOn) {
+                world.camera.getWorldPosition(gazeAt);
+                world.camera.getWorldDirection(gazeDir);
+                menu.setGaze(gazeAt.x, gazeAt.y, gazeAt.z, gazeDir.x, gazeDir.y, gazeDir.z);
+              }
+              menu.update(step, menuTips, tips);
+            }
             if (prologue.playing) {
               if (prologueSkip.update(step, menuTips, tips, cinematic.skipPlane)) prologue.skip();
               cinematic.setSkipProgress(prologueSkip.progress);

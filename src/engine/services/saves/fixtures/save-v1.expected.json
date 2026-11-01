@@ -37,6 +37,7 @@
     "textSize": 1,
     "highContrast": false,
     "captions": false,
+    "gazeMenus": false,
     "hand": "right"
   },
   "settingsAt": 0

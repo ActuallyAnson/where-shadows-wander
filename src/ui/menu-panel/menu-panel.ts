@@ -15,7 +15,7 @@ import {
 } from '@iwsdk/core';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
 import { placeSettingsPanel, type PanelPose } from '../settings-panel/placement';
-import { createMenuPlane, itemAt, MENU_SIZE_M, MenuInput, type MenuHits } from './menu-layout';
+import { createMenuPlane, ITEM_HALF_U, itemAt, itemV, MENU_SIZE_M, MenuInput, type MenuHits } from './menu-layout';
 import { makeCanvas, MENU_CANVAS_PX, MENU_FONT, paintBackdrop, paintDust, paintMenu } from './menu-art';
 import { MENU_SCREENS, type MenuScreen, type MenuScreenId } from './screens';
 import fontUrl from './fonts/cinzel-latin-400-normal.woff2?url';
@@ -65,6 +65,11 @@ export class MenuPanel {
   private time = 0;
   private high = false;
   lastError: string | null = null;
+  /** Press items by looking at them (the Look to press setting); the app sets the head's ray each frame with `setGaze`. */
+  gazeOn = false;
+  private readonly gazeOrigin = new Float64Array(3);
+  private readonly gazeDir = new Float64Array(3);
+  private readonly dwellBar: Mesh;
   /** A button was pressed on a screen. */
   onPress: ((screen: MenuScreenId, button: string) => void) | null = null;
   /** A fingertip reached an item (once as it arrives), for the sound. */
@@ -99,8 +104,27 @@ export class MenuPanel {
     quad(this.backdropMat, BACKDROP_W, BACKDROP_H, BACKDROP_Z);
     quad(this.dustMat, DUST_SIZE, DUST_SIZE * 0.7, DUST_Z);
     quad(this.menuMat, MENU_SIZE_M, MENU_SIZE_M, 0);
+    // The line that fills under an item while it is looked at.
+    this.dwellBar = new Mesh(
+      geo,
+      new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }),
+    );
+    this.dwellBar.renderOrder = RENDER_ORDER + 1;
+    this.dwellBar.frustumCulled = false;
+    this.dwellBar.visible = false;
+    this.group.add(this.dwellBar);
     this.group.visible = false;
     this.dustTex.repeat.set(1, 0.7);
+  }
+
+  /** Where the head is and the way it points (unit), scene space. */
+  setGaze(x: number, y: number, z: number, dx: number, dy: number, dz: number): void {
+    this.gazeOrigin[0] = x;
+    this.gazeOrigin[1] = y;
+    this.gazeOrigin[2] = z;
+    this.gazeDir[0] = dx;
+    this.gazeDir[1] = dy;
+    this.gazeDir[2] = dz;
   }
 
   /** The screen showing now, or null (null too while a custom screen shows). */
@@ -204,7 +228,24 @@ export class MenuPanel {
     this.dustTex.offset.set(Math.sin(this.time * 0.17) * 0.02, (this.time * 0.012) % 1);
     const content = this.content;
     if (!content || a < 0.7) return;
-    const s = this.input.update(content, this.plane, tips, n);
+    let s = this.input.update(content, this.plane, tips, n);
+    this.dwellBar.visible = false;
+    if (this.gazeOn && this.shown !== null && s.hover < 0) {
+      // No fingertip is at the screen: the head's gaze reaches it instead, and a long look presses. (The button screens only: the
+      // settings screen's small arrows are not for a head to aim at.)
+      s = this.input.gaze(content, this.plane, this.gazeOrigin, this.gazeDir, dt);
+      if (this.input.dwell > 0 && s.hover >= 0) {
+        const bar = this.dwellBar;
+        const width = ITEM_HALF_U * 1.2 * MENU_SIZE_M * this.input.dwell;
+        bar.scale.set(width, 0.004, 1);
+        bar.position.set(
+          -ITEM_HALF_U * 0.6 * MENU_SIZE_M + width / 2,
+          (0.5 - (itemV(s.hover) + 0.04)) * MENU_SIZE_M,
+          0.002,
+        );
+        bar.visible = true;
+      }
+    }
     if (s.hover !== this.lit) {
       if (s.hover >= 0) this.onReach?.();
       this.lit = s.hover;

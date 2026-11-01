@@ -26,6 +26,8 @@ export interface Settings {
   highContrast: boolean;
   /** Text captions for the traveller's sounds and story beats . */
   captions: boolean;
+  /** Press the pause, solved and end screens' buttons by looking at them for a moment, for players who cannot poke. */
+  gazeMenus: boolean;
   /** The hand the panel listens to and opens beside; the game may read it as the player's main hand. */
   hand: Hand;
 }
@@ -47,7 +49,7 @@ export interface NumberSpec {
 }
 export interface ToggleSpec {
   kind: 'toggle';
-  key: 'highContrast' | 'captions';
+  key: 'highContrast' | 'captions' | 'gazeMenus';
   label: string;
   help: string;
   default: boolean;
@@ -178,6 +180,13 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     key: 'captions',
     label: 'Captions',
     help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or a creak.',
+    default: false,
+  },
+  {
+    kind: 'toggle',
+    key: 'gazeMenus',
+    label: 'Look to press',
+    help: 'Press a menu button by looking at it for a moment, with no poke needed.',
     default: false,
   },
   {

@@ -37,6 +37,7 @@
     "textSize": 1,
     "highContrast": true,
     "captions": true,
+    "gazeMenus": false,
     "hand": "left"
   },
   "settingsAt": 1760001300000
