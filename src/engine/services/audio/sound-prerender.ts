@@ -26,6 +26,9 @@ export const PRERENDER_ORDER: readonly SoundId[] = [
   Sound.Note4,
 ];
 
+/** A short wait that lets the browser draw a frame. */
+const framePause = () => new Promise<void>((resolve) => setTimeout(resolve, 12));
+
 /** Every sound once, the likely-first ones first. */
 export function prerenderList(): SoundId[] {
   const list: SoundId[] = [...PRERENDER_ORDER];
@@ -37,9 +40,15 @@ export function prerenderList(): SoundId[] {
  * Asks the pool to render every sound at `rate` (the music always at its own low rate) and keeps each for the engine to take.
  * Resolves with how many were stored. Jobs go one after another, so the worker is never swamped and a failure loses one sound at most.
  */
-export async function startSoundPrerender(pool: TaskPool<RenderJob, RenderedSound>, rate = 48000): Promise<number> {
+export async function startSoundPrerender(
+  pool: TaskPool<RenderJob, RenderedSound>,
+  rate = 48000,
+  pause: () => Promise<void> = framePause,
+): Promise<number> {
   let stored = 0;
   for (const sound of prerenderList()) {
+    // Without workers each sound is made on this thread: let a frame or two run between them rather than freeze the page.
+    if (!pool.workerBacked) await pause();
     try {
       const out = await pool.run({ sound, rate: sound === Sound.Music ? MUSIC_RATE : rate });
       storePrerendered(out.sound, out.rate, out.samples);

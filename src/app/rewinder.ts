@@ -31,10 +31,14 @@ export class Rewinder {
     return s;
   }
 
-  /** A puzzle has begun (at `gameTime` on the game's clock): start a fresh recording of it, which a rewind can reload and replay. */
-  begin(puzzleIndex: number, gameTime = 0): void {
+  /**
+   * A puzzle has begun (at `gameTime` on the game's clock): start a fresh recording of it, which a rewind can reload and replay.
+   * `input` is the frame that loaded it, which the new puzzle played too: it becomes the recording's first frame.
+   */
+  begin(puzzleIndex: number, gameTime = 0, input?: GameInput): void {
     this.recorder.reset();
     this.recorder.recordCommand('goto', puzzleIndex);
+    if (input) this.recorder.record(input);
     this.index = puzzleIndex;
     this.timeAtBegin = gameTime;
   }

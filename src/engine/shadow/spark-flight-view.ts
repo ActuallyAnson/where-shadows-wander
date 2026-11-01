@@ -102,13 +102,17 @@ export class SparkFlightView {
     return s * s * (3 - 2 * s);
   }
 
-  /** Sends a spark from `from` to `to` (scene space) over `seconds`; `onLand` is called once when it arrives. A spark already flying is dropped. */
+  /** Sends a spark from `from` to `to` (scene space) over `seconds`; `onLand` is called once when it arrives. A spark still flying lands at once, so its sleeper is still woken. */
   launch(
     from: Readonly<{ x: number; y: number; z: number }>,
     to: Readonly<{ x: number; y: number; z: number }>,
     onLand: () => void,
     seconds = 1.7,
   ): void {
+    // Two solves close together: the first spark's landing is not lost.
+    const earlier = this.active && this.burst < 0 ? this.onLand : null;
+    this.onLand = null;
+    earlier?.();
     this.from.set(from.x, from.y, from.z);
     this.to.set(to.x, to.y, to.z);
     // The control point: halfway, lifted, so the path rises and then drops onto the target.

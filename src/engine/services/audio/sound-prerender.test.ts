@@ -42,4 +42,12 @@ describe('sound prerender', () => {
     });
     expect(await startSoundPrerender(pool, 22050)).toBe(SOUND_COUNT - 1);
   }, 60000);
+
+  it('lets the page breathe between sounds when there are no workers, and does not when there are', async () => {
+    const pool = new TaskPool<RenderJob, RenderedSound>({ create: () => null, size: 1, fallback: renderJob });
+    expect(pool.workerBacked).toBe(false);
+    let pauses = 0;
+    await startSoundPrerender(pool, 22050, async () => void pauses++);
+    expect(pauses).toBe(SOUND_COUNT);
+  }, 60000);
 });

@@ -53,15 +53,15 @@ export class VerletChain {
     }
   }
 
-  /** Pushes every point within `radius` of (cx, cy) away from it, harder the nearer it is (a spark flying by, a hand). */
+  /** Pushes every point within `radius` of (cx, cy) away from it at up to `strength` metres a second, faster the nearer it is (a spark flying by, a hand). */
   impulse(cx: number, cy: number, radius: number, strength: number): void {
     for (let i = 1; i < this.n - 1; i++) {
       const dx = this.x[i] - cx;
       const dy = this.y[i] - cy;
       const d = Math.sqrt(dx * dx + dy * dy);
       if (d >= radius) continue;
-      const k = (strength * (1 - d / radius)) / (d + 0.05);
-      // Moving the previous place the other way is the same as giving the point a velocity.
+      const k = (strength * (1 - d / radius) * SUBSTEP_S) / (d + 0.05);
+      // Moving the previous place the other way, by a speed times one step, is the same as giving the point that velocity.
       this.px[i] -= dx * k;
       this.py[i] -= dy * k;
     }

@@ -67,7 +67,7 @@ describe('SparkFlightView', () => {
     v.dispose();
   });
 
-  it('can be cleared in flight without calling back, and a new launch replaces a flying spark', () => {
+  it('can be cleared in flight without calling back, and a new launch lands a flying spark first', () => {
     const v = new SparkFlightView();
     let a = 0;
     let b = 0;
@@ -80,7 +80,7 @@ describe('SparkFlightView', () => {
     run(v, 0.3);
     v.launch(from, to, () => b++, 1);
     run(v, 1.5);
-    expect(a).toBe(0);
+    expect(a).toBe(1); // the earlier spark landed when the next went up
     expect(b).toBe(1);
     v.dispose();
   });
@@ -93,6 +93,18 @@ describe('SparkFlightView', () => {
       v.update(NaN);
     }).not.toThrow();
     expect(v.progress).toBe(0);
+    v.dispose();
+  });
+
+  it('lands a spark still flying when another is launched, so its sleeper is still woken', () => {
+    const v = new SparkFlightView();
+    const landed: string[] = [];
+    v.launch(from, to, () => landed.push('first'), 1.5);
+    run(v, 0.5);
+    v.launch(from, to, () => landed.push('second'), 1.5);
+    expect(landed).toEqual(['first']);
+    run(v, 1.6);
+    expect(landed).toEqual(['first', 'second']);
     v.dispose();
   });
 });

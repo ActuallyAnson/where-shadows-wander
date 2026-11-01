@@ -1,3 +1,4 @@
+import { EFFECTS } from './quality-governor';
 import { describe, expect, it } from 'vitest';
 import { PASSES, RenderOrder, validatePasses } from './render-order';
 
@@ -21,6 +22,11 @@ describe('the render order', () => {
     const optional = PASSES.filter((p) => p.optional).map((p) => p.id);
     expect(optional).toEqual(expect.arrayContaining(['propSketch', 'trail', 'ring', 'reward']));
     for (const must of ['paper', 'shadow', 'sprite', 'fade']) expect(optional).not.toContain(must);
+  });
+
+  it('marks as optional exactly the layers the governor can switch off', () => {
+    const optional = PASSES.filter((p) => p.optional).map((p) => p.id);
+    for (const id of optional) expect(EFFECTS as readonly string[], id).toContain(id);
   });
 
   it('catches a clash, a mis-ordered list and a fade that is not last', () => {

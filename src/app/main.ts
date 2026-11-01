@@ -337,6 +337,19 @@ async function start(): Promise<void> {
   // The finale plays in the hall of the great crystal, the last thing the night shows.
   const hall = new CinematicScene(CRYSTAL, 'hall');
   /** One lullaby note, from ahead of where the head faced as a scene began (the sun, or the crystal). */
+  // Delayed story steps (the last notes, the end screen, a fade back up) are kept so a session that ends cancels them.
+  const laterTimers = new Set<ReturnType<typeof setTimeout>>();
+  const later = (fn: () => void, ms: number) => {
+    const handle = setTimeout(() => {
+      laterTimers.delete(handle);
+      fn();
+    }, ms);
+    laterTimers.add(handle);
+  };
+  const cancelLater = () => {
+    for (const handle of laterTimers) clearTimeout(handle);
+    laterTimers.clear();
+  };
   const storyNote = (index: number) =>
     gameAudio.lullabyNote(
       index,
@@ -348,7 +361,7 @@ async function start(): Promise<void> {
   const prologue = new PrologueReel(cinematic, voidHost(cinematic), storyNote);
   const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES, (page) => {
     if (page < FINALE_PAGES.length - 1) storyNote(page);
-    else for (let k = 0; k < 5; k++) setTimeout(() => storyNote(k), k * 240);
+    else for (let k = 0; k < 5; k++) later(() => storyNote(k), k * 240);
   });
   /** The Skip poke for each (a fingertip held on the ring for a moment). */
   const prologueSkip = new SkipTouch();
@@ -389,7 +402,7 @@ async function start(): Promise<void> {
     // end screen comes.
     finale.start(() => {
       storyLine.say('The room dreams on.', 1.6, 3.2);
-      setTimeout(() => onDone?.(), 6500);
+      later(() => onDone?.(), 6500);
     });
   };
   const playSolve = () => {
@@ -549,6 +562,7 @@ async function start(): Promise<void> {
     roomDressing.wakePoint(index, sparkTo);
     spark.launch(sparkFrom, sparkTo, () => {
       roomDressing.setAwake(index + 1);
+      if (index === 1) roomDressing.rippleBunting(); // the second sleeper hangs under the bunting
       gameAudio.lullabyNote(index, sparkTo.x, sparkTo.y, sparkTo.z);
     });
   };
@@ -581,7 +595,7 @@ async function start(): Promise<void> {
       // The room cools with the mood the night sets; the kindred darts off the wall and stays away. The candle gutters: the whole
       // view dims for a moment (a slow fade to half dark, held, then back up) and a beam creaks overhead.
       if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
-      fade.fadeTo(0.55, 1.0, () => setTimeout(() => fade.fadeTo(0, 1.8), 1600));
+      fade.fadeTo(0.55, 1.0, () => later(() => fade.fadeTo(0, 1.8), 1600));
       roomDressing.group.localToWorld(creakPoint.set(0, 2.4, -0.4));
       gameAudio.creak(creakPoint.x, creakPoint.z);
     },
@@ -1105,6 +1119,8 @@ async function start(): Promise<void> {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
     guard('sessionend: ambient', () => {
       ambientOn = false;
+      clearTimeout(ambientTimer); // the chain starts again with the next session
+      ambientTimer = undefined;
       governorOn = false;
       governor.reset();
       applyGovernor();
@@ -1124,6 +1140,7 @@ async function start(): Promise<void> {
     guard('sessionend: story', () => {
       prologue.skip();
       finale.skip();
+      cancelLater(); // skipping runs the end-of-finale step, which must not show the end screen now
     });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';

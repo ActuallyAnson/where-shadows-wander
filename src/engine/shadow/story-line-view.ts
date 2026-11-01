@@ -165,6 +165,7 @@ export class StoryLineView {
       this.pending = { text, delay, hold };
       return;
     }
+    this.pending = null; // a line that was waiting for the old one is stale now
     this.start({ text, delay, hold });
   }
 

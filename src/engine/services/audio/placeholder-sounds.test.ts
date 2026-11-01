@@ -141,3 +141,19 @@ describe('renderPlaceholder', () => {
     expect(renderPlaceholder(Sound.Chime, 24000).length).toBe(renderPlaceholder(Sound.Chime, 48000).length / 2);
   });
 });
+
+describe('the wind loop', () => {
+  it('runs on from its end into its start with no dip to silence', () => {
+    const sr = 22050;
+    const w = renderPlaceholder(Sound.Wind, sr);
+    let step = 0;
+    for (let i = 1; i < w.length; i++) step = Math.max(step, Math.abs(w[i] - w[i - 1]));
+    const seam = Math.abs(w[0] - w[w.length - 1]);
+    expect(seam).toBeLessThan(step * 3);
+    let level = 0;
+    for (let i = 0; i < sr * 0.05; i++) level += Math.abs(w[i]);
+    let mid = 0;
+    for (let i = 0; i < sr * 0.05; i++) mid += Math.abs(w[Math.floor(w.length / 2) + i]);
+    expect(level).toBeGreaterThan(mid * 0.2); // the first 50 ms are not faded to nothing
+  });
+});

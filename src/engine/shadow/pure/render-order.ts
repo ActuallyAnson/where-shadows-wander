@@ -51,14 +51,14 @@ export const PASSES: readonly Pass[] = [
   { id: 'propSketch', order: RenderOrder.propSketch, optional: true },
   { id: 'glow', order: RenderOrder.glow, optional: false },
   { id: 'shadow', order: RenderOrder.shadow, optional: false },
-  { id: 'air', order: RenderOrder.air, optional: true },
+  { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
   { id: 'trail', order: RenderOrder.trail, optional: true },
   { id: 'ring', order: RenderOrder.ring, optional: true },
   { id: 'reward', order: RenderOrder.reward, optional: true },
   { id: 'readingPage', order: RenderOrder.readingPage, optional: false },
-  { id: 'sparkFlight', order: RenderOrder.sparkFlight, optional: true },
+  { id: 'sparkFlight', order: RenderOrder.sparkFlight, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },
 ];
 

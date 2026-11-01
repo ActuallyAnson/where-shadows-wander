@@ -200,6 +200,7 @@ export class NightDriver {
     input.leftTracked = leftTracked;
     input.rightTracked = rightTracked;
     this.rewinder?.record(input);
+    this.timeBefore = game.time;
     const alpha = game.frame(input);
     this.bridge?.update();
     this.readEvents(game);
@@ -217,6 +218,9 @@ export class NightDriver {
     return alpha;
   }
 
+  /** The game's clock just before the frame that is being read, which is when a puzzle loaded in that frame began. */
+  private timeBefore = 0;
+
   private readEvents(game: Game): void {
     const host = this.host;
     const ev = game.events;
@@ -224,7 +228,8 @@ export class NightDriver {
       const e = ev.at(i);
       switch (e.type) {
         case 'puzzle-start':
-          this.rewinder?.begin(e.value, game.time);
+          // The frame that loads a puzzle plays its input in the new puzzle, so the new recording starts with it.
+          this.rewinder?.begin(e.value, this.timeBefore, this.input);
           this.puzzleStarted(game, e.value);
           break;
         case 'traveller-fell':

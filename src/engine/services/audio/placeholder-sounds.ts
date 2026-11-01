@@ -214,23 +214,24 @@ function clockTick(sr: number): Float32Array<ArrayBuffer> {
 /** Wind round the house: low, soft noise that swells and settles, with a faint whistle high in it. A loop that joins its own start. */
 function wind(sr: number): Float32Array<ArrayBuffer> {
   const n = Math.floor(sr * WIND_S);
-  const out = new Float32Array(n);
+  // A little more than one loop is made; the extra is blended over the start, so the end runs on into it with no dip.
+  const edge = Math.floor(sr * 0.25);
+  const made = new Float32Array(n + edge);
   const rnd = seeded(89);
   let a = 0;
   let b = 0;
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < n + edge; i++) {
     const t = i / sr;
     a += (rnd() * 2 - 1 - a) * 0.03;
     b += (a - b) * 0.05;
     const gust = 0.55 + 0.45 * Math.sin((TAU * t) / WIND_S + 1) * (0.7 + 0.3 * Math.sin((TAU * 2 * t) / WIND_S));
     const whistle = Math.sin(TAU * (610 + 35 * Math.sin((TAU * t) / WIND_S)) * t) * 0.025;
-    out[i] = (b * 4 + whistle) * gust;
+    made[i] = (b * 4 + whistle) * gust;
   }
-  const edge = Math.floor(sr * 0.05);
+  const out = made.slice(0, n);
   for (let i = 0; i < edge; i++) {
     const f = i / edge;
-    out[i] *= f;
-    out[n - 1 - i] *= f;
+    out[i] = made[i] * f + made[n + i] * (1 - f);
   }
   return out;
 }

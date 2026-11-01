@@ -121,4 +121,16 @@ describe('Rewinder', () => {
     expect(hand.role).toBe(role);
     expect(hand.shape).toBe(shape);
   });
+
+  it('starts a recording with the frame that loaded the puzzle, which the new puzzle played too', () => {
+    const rw = new Rewinder();
+    const h = new Headless(opts(0));
+    h.game.goto(0);
+    const input = { dt: 1 / 72, paused: false, left: null, right: null, shapeEvents: null };
+    rw.begin(0, 0, input);
+    expect(rw.recorder.frames).toBe(1);
+    expect(rw.recorder.dt[0]).toBeCloseTo(1 / 72, 9);
+    rw.begin(0, 0); // without a frame: empty
+    expect(rw.recorder.frames).toBe(0);
+  });
 });

@@ -62,4 +62,15 @@ describe('VerletChain', () => {
     }
     expect(() => new VerletChain(2, 0, 0, 1, 0, 1)).toThrow();
   });
+
+  it('takes an impulse as a speed: a point next to the push moves a little in one step, not a metre', () => {
+    const c = make();
+    const y0 = c.y[9];
+    const x0 = c.x[9];
+    c.impulse(c.x[9], c.y[9] + 0.02, 0.6, 3); // 3 m/s, just above a point
+    c.advance(1 / 120, 0, 0);
+    expect(Math.hypot(c.x[9] - x0, c.y[9] - y0)).toBeLessThan(0.05);
+    run(c, 0.5);
+    expect(c.stretch).toBeLessThan(0.1); // and the links still hold
+  });
 });

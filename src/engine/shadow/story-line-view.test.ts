@@ -102,4 +102,15 @@ describe('StoryLineView', () => {
     expect(v.progress).toBe(0);
     v.dispose();
   });
+
+  it('drops a line that was waiting for the old one when a plain line replaces it', () => {
+    const v = new StoryLineView();
+    v.say('first', 0, 1);
+    v.say('stale', 0, 1, true); // waits for the first
+    v.say('now', 0, 1); // a plain line replaces what is up, and what was waiting
+    run(v, 0.5);
+    run(v, 10);
+    expect(v.active).toBe(false); // nothing came back after it
+    v.dispose();
+  });
 });
