@@ -2,6 +2,7 @@
 // follow the head, so it is a small black sphere around the eyes (seen from inside, drawn over everything) that is moved to the head
 // each frame; its opacity eases to a target over a given time. Nothing is allocated per frame.
 import { BackSide, Group, Mesh, MeshBasicMaterial, SphereGeometry } from '@iwsdk/core';
+import { RenderOrder } from './pure/render-order';
 
 export class FadeView {
   readonly group = new Group();
@@ -26,7 +27,7 @@ export class FadeView {
     });
     // Close round the eyes, but beyond the near clipping plane, and big enough that turning the head never shows its edge.
     this.sphere = new Mesh(new SphereGeometry(0.4, 12, 8), this.mat);
-    this.sphere.renderOrder = 1000;
+    this.sphere.renderOrder = RenderOrder.fade;
     this.sphere.frustumCulled = false;
     this.sphere.visible = false;
     this.group.add(this.sphere);

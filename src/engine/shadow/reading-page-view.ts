@@ -2,6 +2,7 @@
 // flat hand (palm down, fingers together) that makes the first bridge, drawn in ink on cream paper with a line of words, and it
 // fades in, stays, and fades out over the opening. Drawn once, a single quad; nothing is allocated per frame.
 import { CanvasTexture, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
+import { RenderOrder } from './pure/render-order';
 
 /** The page's size (metres): about the size of a small book held in the lap. */
 const WIDTH = 0.36;
@@ -95,7 +96,7 @@ export class ReadingPageView {
       toneMapped: false,
     });
     this.mesh = new Mesh(new PlaneGeometry(WIDTH, HEIGHT), this.mat);
-    this.mesh.renderOrder = 8;
+    this.mesh.renderOrder = RenderOrder.readingPage;
     this.group.add(this.mesh);
     this.group.visible = false;
   }

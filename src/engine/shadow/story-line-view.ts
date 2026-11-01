@@ -17,9 +17,10 @@ import {
 } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
 import { placeOnStage } from './stage-quad';
+import { RenderOrder } from './pure/render-order';
 
 /** In front of the hands' shadows (render order 2) and the cutscene captions' neighbours. */
-const RENDER_ORDER = 3;
+const RENDER_ORDER = RenderOrder.sprite;
 const LIFT_M = 0.005;
 const WIDTH = 0.8; // of the stage width
 const ASPECT = 8;

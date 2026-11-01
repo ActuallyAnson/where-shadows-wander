@@ -30,6 +30,7 @@ import {
 } from './stage-backdrop-art';
 import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
+import { RenderOrder } from './pure/render-order';
 
 const PAPER = new Color(0xf2e6c9);
 
@@ -148,7 +149,7 @@ const PAPER_OPACITY = 0.95;
 const BORDER = 0x8a6d3b;
 
 /** The paper draws before the shadows (SHADOW_RENDER_ORDER = 2). */
-const PAPER_RENDER_ORDER = 1;
+const PAPER_RENDER_ORDER = RenderOrder.paper;
 
 export class TestStageView {
   readonly group = new Group();

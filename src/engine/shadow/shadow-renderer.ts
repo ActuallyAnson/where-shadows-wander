@@ -9,9 +9,10 @@ import type { ShadowLook } from './pure/shadow-sharpen';
 import type { StagePlane } from './pure/stage-plane';
 import { MAX_CAPSULES, packShadowUniforms, type ShadowUniformArrays } from './pure/shadow-uniforms';
 import { shadowFragment, shadowVertex } from './shadow-shader';
+import { RenderOrder } from './pure/render-order';
 
 /** Shadows draw after the stage paper (1) and before sprites drawn on top. */
-export const SHADOW_RENDER_ORDER = 2;
+export const SHADOW_RENDER_ORDER = RenderOrder.shadow;
 /** Lifted this far off the stage, toward the player, so it never fights the paper for depth. */
 const LIFT_M = 0.002;
 

@@ -12,6 +12,7 @@ import {
   ShaderMaterial,
 } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
+import { RenderOrder } from './pure/render-order';
 
 /** How many specks can be alive at once, and how far in front of the paper they sit (metres). */
 export const BURST_POOL = 96;
@@ -201,7 +202,7 @@ export class RewardBurstView {
     });
     this.points = new Points(geometry, this.material);
     this.points.frustumCulled = false;
-    this.points.renderOrder = 6;
+    this.points.renderOrder = RenderOrder.reward;
     this.group.add(this.points);
     this.group.visible = false;
     for (let i = 0; i < BURST_POOL; i++) this.life[i] = 0;

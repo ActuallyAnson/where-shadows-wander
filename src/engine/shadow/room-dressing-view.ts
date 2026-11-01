@@ -39,6 +39,7 @@ import {
   paintWood,
   WALL_THINGS,
 } from './room-art';
+import { RenderOrder } from './pure/render-order';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -87,7 +88,7 @@ const WONDERS = 5;
 /** Seconds a wonder takes to come on (or go out). */
 const WONDER_EASE_S = 2.2;
 /** In front of the room's walls, to draw over them, added to what is under it. */
-const WONDER_ORDER = 6;
+const WONDER_ORDER = RenderOrder.wonder;
 /** How strongly the glows add to what is under them (they are magic, not floodlights). */
 const WONDER_GAIN = 0.75;
 

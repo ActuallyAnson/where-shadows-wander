@@ -14,12 +14,13 @@ import {
 } from '@iwsdk/core';
 import { createSilhouette, projectProp, type Prop } from './pure/prop-shadow';
 import type { StagePlane } from './pure/stage-plane';
+import { RenderOrder } from './pure/render-order';
 
 /** How much smaller the painting is than its shadow's outline, and how far it sits toward the light (metres, along x and y). */
 const SHRINK = 0.82;
 const TOWARD_LIGHT = [-0.03, 0.022] as const;
 /** In front of the paper (render order 1) and behind the shadows (2); and how far off the paper, metres. */
-const RENDER_ORDER = 1.5;
+const RENDER_ORDER = RenderOrder.propSketch;
 const LIFT_M = 0.0012;
 /** Soft colours, one after another, for the props of a puzzle. */
 const TINTS: readonly (readonly [number, number, number])[] = [

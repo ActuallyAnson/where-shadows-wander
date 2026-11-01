@@ -21,6 +21,7 @@ import type { HandShadow } from '../hands/hand-shadow';
 import type { ShapeEventQueue } from '../hands/shape-events';
 import type { StagePlane } from './pure/stage-plane';
 import { placeOnStage } from './stage-quad';
+import { RenderOrder } from './pure/render-order';
 
 /** Trail points per hand, and how often a new one is laid (seconds). */
 export const TRAIL_POINTS = 18;
@@ -117,7 +118,7 @@ export class HandTrailView {
     });
     this.trail = new Points(geometry, this.trailMat);
     this.trail.frustumCulled = false;
-    this.trail.renderOrder = 4;
+    this.trail.renderOrder = RenderOrder.trail;
     this.group.add(this.trail);
     for (let h = 0; h < 2; h++) {
       const mat = new ShaderMaterial({
@@ -133,7 +134,7 @@ export class HandTrailView {
       const ring = new Mesh(new PlaneGeometry(1, 1), mat);
       ring.matrixAutoUpdate = false;
       ring.frustumCulled = false;
-      ring.renderOrder = 5;
+      ring.renderOrder = RenderOrder.ring;
       ring.visible = false;
       this.rings.push(ring);
       this.ringMats.push(mat);

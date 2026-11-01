@@ -11,11 +11,12 @@ import { skipCentre, SKIP_RADIUS_M } from './pure/skip-touch';
 import type { StagePlane } from './pure/stage-plane';
 import { DEFAULT_SHADOW_OPACITY } from './shadow-renderer';
 import { placeOnStage, crispTexture } from './stage-quad';
+import { RenderOrder } from './pure/render-order';
 
 /** Beats showing at once; more than this are dropped (the data is checked at load). */
 const SLOTS = 4;
 /** In front of the hands' shadows (render order 2) and off the paper. */
-const RENDER_ORDER = 3;
+const RENDER_ORDER = RenderOrder.sprite;
 const LIFT_M = 0.004;
 const PUPPET_WIDTH = 0.35; // of the stage width
 const CAPTION_WIDTH = 0.8;

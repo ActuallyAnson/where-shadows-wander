@@ -13,6 +13,7 @@ import {
   ShaderMaterial,
   Vector3,
 } from '@iwsdk/core';
+import { RenderOrder } from './pure/render-order';
 
 /** Trail points (the first is the head), how often one is laid down (seconds), and how long the burst at the end lasts. */
 const POINTS = 34;
@@ -84,7 +85,7 @@ export class SparkFlightView {
     });
     this.points = new Points(geometry, this.material);
     this.points.frustumCulled = false;
-    this.points.renderOrder = 60;
+    this.points.renderOrder = RenderOrder.sparkFlight;
     this.group.add(this.points);
     this.group.visible = false;
   }
