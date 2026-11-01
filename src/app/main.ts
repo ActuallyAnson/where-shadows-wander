@@ -55,11 +55,13 @@ import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '.
 import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
+import { FrameInspector } from './frame-inspector';
 import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { ReadingPageView } from '../engine/shadow/reading-page-view';
 import { PropSketchView } from '../engine/shadow/prop-sketch-view';
 import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
+import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
@@ -259,7 +261,21 @@ async function start(): Promise<void> {
   const stickerView = new StickerView();
   const storyLine = new StoryLineView();
   const spark = new SparkFlightView();
+  // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
+  // time (and comes back slowly), and the inspector gives the debug bar a line of what a frame costs. It watches only in a headset
+  // session: on the desktop the software renderer would trip it for no reason.
+  const governor = new QualityGovernor();
+  const inspector = new FrameInspector(world.renderer.info, governor);
+  let governorOn = false;
+  let appliedLevel = 0;
   const handTrail = new HandTrailView();
+  /** What the quality level means: the paper's scenery and the rings are switched by it here; the rest are checked where they are used. */
+  const backdropDefault = 0.72;
+  const applyGovernor = () => {
+    appliedLevel = governor.level;
+    stageView.backdrop = governor.isOn('backdrop') ? backdropDefault : 0;
+    handTrail.ringsOn = governor.isOn('ring');
+  };
   const propSketch = new PropSketchView();
   const readingPage = new ReadingPageView();
   const rewards = new RewardBurstView();
@@ -552,7 +568,8 @@ async function start(): Promise<void> {
     scenery: (index) => stageView.setTheme(index),
     reward: (index) => {
       // The puzzle's own reward, on the paper where the traveller stands.
-      if (readTraveller()) rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
+      if (governor.isOn('reward') && readTraveller())
+        rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
     },
     wake: (index) => wakeSleeper(index),
     setAwake: (count) => {
@@ -679,7 +696,7 @@ async function start(): Promise<void> {
   let sleepersAwake = 0;
   const ambientTick = () => {
     ambientTimer = setTimeout(ambientTick, 3500 + Math.random() * 7000);
-    if (!ambientOn || inVoid || visibility.paused || sessionState !== 'playing') return;
+    if (!ambientOn || inVoid || visibility.paused || sessionState !== 'playing' || !governor.isOn('ambient')) return;
     if (Math.random() < 0.15) {
       roomDressing.group.localToWorld(creakPoint.set((Math.random() - 0.5) * 3, 2.4, -1.6 + Math.random() * 2));
       gameAudio.creak(creakPoint.x, creakPoint.z);
@@ -705,7 +722,7 @@ async function start(): Promise<void> {
         stepWalked -= STEP_M;
         stepAlternate = !stepAlternate;
         gameAudio.stepAt(stage, travellerAt.x, travellerAt.y, stepAlternate);
-        rewards.play('puff', travellerAt.x, travellerAt.y - 0.035); // a little dust at its feet
+        if (governor.isOn('reward')) rewards.play('puff', travellerAt.x, travellerAt.y - 0.035); // a little dust at its feet
       }
     } else stepWalked = 0;
     stepLastX = travellerAt.x;
@@ -864,7 +881,7 @@ async function start(): Promise<void> {
       candleLight: candleView.pointLight,
       settings,
       flags: handFlags,
-      readout: () => timings.line,
+      readout: () => (inspector.line ? `${timings.line} · ${inspector.line}` : timings.line),
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
@@ -989,6 +1006,12 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: room sound', () => gameAudio.setRoom(true));
+    guard('sessionstart: quality', () => {
+      governor.reset();
+      governor.setRefreshRate((session as { frameRate?: number } | null)?.frameRate ?? 72);
+      governorOn = !mock && !!session;
+      applyGovernor();
+    });
     guard('sessionstart: ambient', () => {
       placeAmbientSounds();
       ambientOn = true;
@@ -1026,6 +1049,9 @@ async function start(): Promise<void> {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
     guard('sessionend: ambient', () => {
       ambientOn = false;
+      governorOn = false;
+      governor.reset();
+      applyGovernor();
     });
     guard('sessionend: display', () => {
       world.scene.background = null;
@@ -1172,6 +1198,10 @@ async function start(): Promise<void> {
         timings.endFrame();
         return;
       }
+      // What the frame cost, and whether it is time to switch some decoration off (or back on).
+      inspector.update(delta * 1000);
+      if (governorOn && !visibility.paused) governor.update(delta * 1000);
+      if (governor.level !== appliedLevel) applyGovernor();
       // The headset's system menu (visible-blurred) or a hidden page: no hand data arrives and the game holds still.
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
@@ -1537,12 +1567,14 @@ async function start(): Promise<void> {
             stage,
             shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
           );
-          propSketch.update(propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
+          propSketch.update(
+            propsVisible && governor.isOn('propSketch') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
           handTrail.update(
             paused ? 0 : step,
             stage,
             projector.shadows,
-            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+            shadowsVisible && governor.isOn('trail') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
           );
           world.camera.getWorldPosition(settingsHead);
           fade.update(step, settingsHead);
@@ -1770,6 +1802,8 @@ async function start(): Promise<void> {
         stickerView,
         storyLine,
         wakeSleeper,
+        governor,
+        inspector,
         fade,
         rewards,
         handTrail,

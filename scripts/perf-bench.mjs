@@ -21,6 +21,7 @@ const out = flag('--out', null);
 const runs = Number(flag('--runs', '3'));
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+const least = (xs) => Math.min(...xs);
 
 async function once() {
   const browser = await chromium.launch({
@@ -46,6 +47,13 @@ async function once() {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
   const heapMb = await page.evaluate(() => performance.memory.usedJSHeapSize / 1048576);
+  // How fast this machine is just now (a fixed loop), so a busy laptop shows up in the numbers instead of hiding in them.
+  const calibMs = await page.evaluate(() => {
+    const t = performance.now();
+    let x = 0;
+    for (let i = 0; i < 3e7; i++) x += Math.sqrt(i);
+    return performance.now() - t + (x < 0 ? 1 : 0);
+  });
 
   const measure = async (name) => {
     const render = await page.evaluate(() => {
@@ -120,6 +128,12 @@ async function once() {
 
   const states = [];
   states.push(await measure('room'));
+  // The same room with the quality governor at its top level (the decoration shed): what shedding saves.
+  await page.evaluate(() => (window.__wsw.governor.level = 3));
+  await page.waitForTimeout(500);
+  states.push(await measure('room, quality 3'));
+  await page.evaluate(() => (window.__wsw.governor.level = 0));
+  await page.waitForTimeout(500);
   await page.evaluate(() => {
     window.__wsw.roomDressing.setAwake(3);
     window.__wsw.wakeSleeper(1);
@@ -137,7 +151,7 @@ async function once() {
   await page.waitForTimeout(5000);
   states.push(await measure('finale hall'));
   await browser.close();
-  return { startupMs, heapMb, states };
+  return { startupMs, heapMb, calibMs, states };
 }
 
 const results = [];
@@ -149,12 +163,14 @@ const summary = {
   runs,
   startupMs: median(results.map((r) => r.startupMs)),
   heapMb: median(results.map((r) => r.heapMb)),
+  calibMs: +least(results.map((r) => r.calibMs)).toFixed(1),
   states: names.map((name, i) => {
     const rows = results.map((r) => r.states[i]);
     const m = (k) => median(rows.map((r) => r[k]));
     return {
       state: name,
-      renderMs: +m('renderMs').toFixed(2),
+      // The least of the runs: the one with the least interference from the rest of the machine.
+      renderMs: +least(rows.map((r) => r.renderMs)).toFixed(2),
       calls: m('calls'),
       triangles: m('triangles'),
       textures: m('textures'),

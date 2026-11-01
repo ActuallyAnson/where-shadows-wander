@@ -89,6 +89,8 @@ export class HandTrailView {
   private readonly px = [new Float32Array(TRAIL_POINTS), new Float32Array(TRAIL_POINTS)];
   private readonly py = [new Float32Array(TRAIL_POINTS), new Float32Array(TRAIL_POINTS)];
   private readonly live = [new Float32Array(TRAIL_POINTS), new Float32Array(TRAIL_POINTS)];
+  /** Whether a ring opens when a shape is recognised (the quality governor turns this off first when frames run long). */
+  ringsOn = true;
   private since = 0;
   /** How far each ring has opened (0..1), or -1 when it is not showing, and where it is on the stage. */
   private readonly flare = [-1, -1];
@@ -147,7 +149,7 @@ export class HandTrailView {
   onShapeEvents(events: ShapeEventQueue, shadows: Readonly<Record<Handedness, HandShadow>>): void {
     for (let i = 0; i < events.count; i++) {
       const e = events.at(i);
-      if (e.type !== 'commit') continue;
+      if (e.type !== 'commit' || !this.ringsOn) continue;
       const h = e.hand === 'left' ? 0 : 1;
       const s = shadows[e.hand];
       if (!s.active) continue;
