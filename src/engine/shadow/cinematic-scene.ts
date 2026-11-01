@@ -139,8 +139,8 @@ export class CinematicScene {
   private readonly textures: CanvasTexture[] = [];
   private readonly materials: (MeshBasicMaterial | ShaderMaterial)[] = [];
   private readonly geometries: BufferGeometry[] = [];
-  private readonly moteMat: ShaderMaterial;
-  private readonly traveller: Mesh;
+  private moteMat!: ShaderMaterial;
+  private traveller!: Mesh;
   /** The parts the opening reel animates (the dusk scene only). */
   private reel: {
     sun: Mesh;
@@ -157,13 +157,15 @@ export class CinematicScene {
     walk: CanvasTexture[];
     idle: CanvasTexture;
   } | null = null;
-  private readonly text: Mesh;
-  private readonly textMat: MeshBasicMaterial;
+  private text!: Mesh;
+  private textMat!: MeshBasicMaterial;
   private textTexture: CanvasTexture | null = null;
   /** The Skip button: a ring in front of the lap, where a fingertip can poke it (it is a StagePlane for SkipTouch, centred on the button). */
   readonly skipPlane: MutableStagePlane = createStagePlane();
-  private readonly skipButton: Mesh;
-  private readonly skipMat: MeshBasicMaterial;
+  private skipButton!: Mesh;
+  private skipMat!: MeshBasicMaterial;
+  /** Whether the scene's meshes and textures exist: they are made when it is entered and freed when it is left (about 10 MB of textures between the two scenes). */
+  private built = false;
   private time = 0;
   /** Seconds into the line of words, and how long it holds; negative when there is none. */
   private line = -1;
@@ -171,9 +173,20 @@ export class CinematicScene {
 
   constructor(
     private readonly palette: CinematicPalette = DUSK,
-    kind: SceneKind = 'dusk',
+    private readonly kind: SceneKind = 'dusk',
   ) {
-    const p = palette;
+    // Nothing is made yet: the scene builds itself when it is entered and frees itself when it is left.
+    this.skipPlane.right[0] = 1;
+    this.skipPlane.up[1] = 1;
+    this.skipPlane.normal[2] = 1;
+    this.skipPlane.width = this.skipPlane.height = 0.14;
+    this.group.visible = false;
+  }
+
+  /** Paints the textures and makes the meshes (about 20 ms: done under the fade to black). */
+  private build(): void {
+    const p = this.palette;
+    const kind = this.kind;
     const make = (
       w: number,
       h: number,
@@ -443,19 +456,38 @@ export class CinematicScene {
       }),
       ORDER.text + 1,
     );
-    this.skipPlane.right[0] = 1;
-    this.skipPlane.up[1] = 1;
-    this.skipPlane.normal[2] = 1;
-    this.skipPlane.width = this.skipPlane.height = 0.14;
     this.skipButton.position.set(SKIP_LOCAL[0], SKIP_LOCAL[1], SKIP_LOCAL[2]);
     this.skipMat = this.skipButton.material as MeshBasicMaterial;
     this.skipMat.depthTest = false;
     this.skipMat.opacity = 0.55;
-    this.group.visible = false;
+    this.built = true;
+  }
+
+  /** Frees the textures, geometries and materials, and takes the meshes out of the group. */
+  private unbuild(): void {
+    if (!this.built) return;
+    for (const child of [...this.group.children]) this.group.remove(child);
+    this.textTexture?.dispose();
+    this.textTexture = null;
+    for (const tex of this.textures) tex.dispose();
+    for (const g of this.geometries) g.dispose();
+    for (const m of this.materials) m.dispose();
+    this.textures.length = 0;
+    this.geometries.length = 0;
+    this.materials.length = 0;
+    this.reel = null;
+    this.line = -1;
+    this.built = false;
+  }
+
+  /** Whether the scene is made now (between entering and leaving). */
+  get isBuilt(): boolean {
+    return this.built;
   }
 
   /** Puts the scene around the head, facing the way it faces now (`dirX`, `dirZ` is the head's direction on the floor), and shows it. */
   enter(head: Readonly<{ x: number; y: number; z: number }>, dirX: number, dirZ: number): void {
+    if (!this.built) this.build();
     this.group.position.set(head.x, head.y, head.z);
     this.group.rotation.set(0, Math.atan2(-dirX, -dirZ), 0);
     this.time = 0;
@@ -477,6 +509,7 @@ export class CinematicScene {
 
   /** How far the Skip poke has got (0..1): the ring brightens as it fills. */
   setSkipProgress(progress: number): void {
+    if (!this.built) return;
     this.skipMat.opacity = 0.55 + 0.45 * Math.min(1, Math.max(0, progress));
     const k = 1 + 0.25 * Math.min(1, Math.max(0, progress));
     this.skipButton.scale.set(k, k, 1);
@@ -488,7 +521,7 @@ export class CinematicScene {
    * the sun sinks and the dusk turns to night, an ember lights at the traveller's lantern, and the title writes itself in the dark.
    */
   setReelTime(r: number): void {
-    const R = this.reel;
+    const R = this.built ? this.reel : null;
     if (!R) return;
     const t = r > 0 ? r : 0;
     const night = ramp(t, 7.6, 12.5);
@@ -524,6 +557,7 @@ export class CinematicScene {
   leave(): void {
     this.clear();
     this.group.visible = false;
+    this.unbuild();
   }
 
   /** Whether a line of words is showing. */
@@ -536,6 +570,7 @@ export class CinematicScene {
    * the prologue's: how long it takes to write and to hold; here the words simply appear for about that long.)
    */
   show(text: string, options: { write: number; hold: number; maxEm?: number }): void {
+    if (!this.built) return;
     this.textTexture?.dispose();
     this.textTexture = paintedTexture(1024, 128, (g, w, h) => paintCaption(g, w, h, text));
     this.textMat.map = this.textTexture;
@@ -548,13 +583,14 @@ export class CinematicScene {
   /** Takes the words away now. */
   clear(): void {
     this.line = -1;
+    if (!this.built) return;
     this.textMat.opacity = 0;
     this.text.visible = false;
   }
 
   /** Once per frame. Allocates nothing. */
   update(dt: number): void {
-    if (!this.group.visible) return;
+    if (!this.built || !this.group.visible) return;
     const step = dt > 0 ? Math.min(dt, 0.1) : 0;
     this.time += step;
     this.moteMat.uniforms.uTime.value = this.time;
@@ -574,9 +610,5 @@ export class CinematicScene {
 
   dispose(): void {
     this.leave();
-    this.textTexture?.dispose();
-    for (const t of this.textures) t.dispose();
-    for (const g of this.geometries) g.dispose();
-    for (const m of this.materials) m.dispose();
   }
 }

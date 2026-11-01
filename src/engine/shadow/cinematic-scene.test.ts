@@ -61,6 +61,27 @@ describe('CinematicScene', () => {
     scene.dispose();
   });
 
+  it('holds no meshes or textures until it is entered, and frees them all when it is left', () => {
+    const scene = new CinematicScene();
+    expect(scene.isBuilt).toBe(false);
+    expect(scene.group.children).toHaveLength(0);
+    scene.enter({ x: 0, y: 1.2, z: 0 }, 0, -1);
+    expect(scene.isBuilt).toBe(true);
+    expect(scene.group.children.length).toBeGreaterThan(5);
+    scene.leave();
+    expect(scene.isBuilt).toBe(false);
+    expect(scene.group.children).toHaveLength(0);
+    expect(() => {
+      scene.update(0.1);
+      scene.setSkipProgress(0.5);
+      scene.setReelTime(3);
+      scene.show('hello', { write: 1, hold: 1 });
+    }).not.toThrow();
+    scene.enter({ x: 0, y: 1.2, z: 0 }, 0, -1); // and can be entered again
+    expect(scene.group.children.length).toBeGreaterThan(5);
+    scene.dispose();
+  });
+
   it('faces the way the head faces', () => {
     const scene = new CinematicScene();
     scene.enter({ x: 0, y: 1.2, z: 0 }, 0, -1); // looking down -z: no turn
