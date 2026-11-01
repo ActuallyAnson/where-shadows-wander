@@ -114,7 +114,10 @@ export class MenuPanel {
   }
 
   /** Shows a screen in front of the head (`head` is the eye position, (fx, fz) the way it looks), replacing any other. */
-  show(id: MenuScreenId, head: ArrayLike<number>, fx: number, fz: number): Promise<boolean> {
+  show(id: MenuScreenId, head: ArrayLike<number>, fx: number, fz: number, line?: string): Promise<boolean> {
+    // A screen with its own line (the end screen's count of ways found) is painted fresh, not kept.
+    if (line !== undefined)
+      return this.showContent(this.screenContent({ ...MENU_SCREENS[id], line }), head, fx, fz, id);
     let c = this.screenContents.get(id);
     if (!c) {
       c = this.screenContent(MENU_SCREENS[id]);

@@ -111,6 +111,8 @@ import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
+import { endLine } from './journal';
+import { MENU_SCREENS } from '../ui/menu-panel/screens';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -642,6 +644,7 @@ async function start(): Promise<void> {
         rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
     },
     wake: (index) => wakeSleeper(index),
+    note: (text) => captionLine.say(text, 3.2, 2.6),
     setAwake: (count) => {
       sleepersAwake = count;
       if (count === 0) {
@@ -659,7 +662,7 @@ async function start(): Promise<void> {
     },
     twinkle: (x, y) => gameAudio.twinkleAt(stage, x, y),
     playEnding: (onDone) => playEnding(onDone),
-    nightOver: () => void showMenu('end'),
+    nightOver: () => void showMenu('end', endLine(night.waysFound(), MENU_SCREENS.end.line)),
   });
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
@@ -742,10 +745,10 @@ async function start(): Promise<void> {
       night.again();
     }
   };
-  const showMenu = (id: MenuScreenId) => {
+  const showMenu = (id: MenuScreenId, line?: string) => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
-    return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+    return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z, line);
   };
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it

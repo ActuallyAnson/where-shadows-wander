@@ -31,6 +31,7 @@ function setup(flameAt?: readonly number[]) {
     rewards: [] as number[],
     scenery: [] as number[],
     said: [] as string[],
+    notes: [] as string[],
     mood: 0,
     props: 0,
     hint: '' as Shape | '',
@@ -57,6 +58,7 @@ function setup(flameAt?: readonly number[]) {
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
     say: (text) => void state.said.push(text),
+    note: (text) => void state.notes.push(text),
     scenery: (index) => void state.scenery.push(index),
     reward: (index) => void state.rewards.push(index),
     wake: (index) => void state.woke.push(index),
@@ -142,6 +144,35 @@ describe('NightDriver', () => {
     expect(state.rewards).toEqual([0]); // and the puzzle's own reward plays on the paper
     expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
+  });
+
+  it('counts the ways found and says nothing about another way after the tutorial, which has only one', () => {
+    const { driver, state, calls, run, pose } = setup();
+    driver.start();
+    expect(driver.waysFound()).toEqual({ found: 0, total: 9 });
+    run(4);
+    pose('right', 'flat', 0, LEDGE_TOP - 0.01);
+    expect(run(25, () => calls.includes('solved'))).toBe(true);
+    expect(driver.waysFound()).toEqual({ found: 1, total: 9 });
+    expect(state.notes).toEqual([]);
+  });
+
+  it('hints that another way exists after a solve with ways left', () => {
+    const { driver, state, run } = setup();
+    driver.start();
+    const game = driver.game!;
+    game.goto(1);
+    run(DT);
+    game.save.solutions[game.puzzle.id] = [game.puzzle.solutions[0]]; // one way found, as a solve records it
+    (game.events as unknown as { push(t: string, id: string, time: number, a: number, b: number): void }).push(
+      'puzzle-solved',
+      game.puzzle.solutions[0],
+      game.time,
+      1,
+      1,
+    );
+    (driver as unknown as { readEvents(g: unknown): void }).readEvents(game);
+    expect(state.notes).toEqual(['There is another way through.']);
   });
 
   it('shows the outline, then perches the kindred, while the player waits', () => {

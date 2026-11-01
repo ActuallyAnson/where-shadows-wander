@@ -15,6 +15,7 @@ import { createSceneProp, propToScene, type PropCaster } from '../game/props';
 import { createNight } from '../game/puzzles/index';
 import { SaveBridge, saveStateFrom, type SaveStore } from '../game/save-bridge';
 import { newSave } from '../game/save-state';
+import { anotherWayLine, nightWays, waysOf, type Ways } from './journal';
 import { Rewinder } from './rewinder';
 import {
   DIMMING_LINE,
@@ -72,6 +73,8 @@ export interface NightHost {
   solved(): void;
   /** A soft sound and sparkle at (x, y): a puzzle object changed, or the obstacle eased. */
   twinkle(x: number, y: number): void;
+  /** A small line low on the wall, under the story's own (the hint that another way exists). */
+  note?(text: string): void;
   /** The night was turned back `seconds` (a fall, or a rewind asked for): a flash and a sound say so. */
   rewound?(seconds: number): void;
   /** Plays the ending cutscene, then calls onDone. */
@@ -161,6 +164,13 @@ export class NightDriver {
     return gone > 0;
   }
 
+  /** The ways found so far across the night (from the save), for the end screen. */
+  waysFound(): Ways {
+    const found: Record<string, readonly string[]> = {};
+    for (const [id, record] of Object.entries(this.host.saves.data.puzzles)) found[id] = record.solutions;
+    return nightWays(createNight(), found);
+  }
+
   /** "Begin this puzzle again". */
   restart(): void {
     this.game?.restart();
@@ -240,6 +250,9 @@ export class NightDriver {
           host.reward(e.value);
           host.wake(e.value); // the spark flies to the sleeper, and the room lights it when it lands
           if (e.value + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(e.value), WAKE_DELAY_S, WAKE_HOLD_S);
+          // And that this puzzle has another way, when it does and the player has only found one.
+          const another = anotherWayLine(waysOf(game.puzzle, game.save.solutions));
+          if (another) host.note?.(another);
           // Each solve warms the wall one step, except into the fan: the dimming cools it instead.
           const next = e.value + 1;
           if (next < NIGHT_MOOD.length && next !== DIMMING_AT) host.setMood(NIGHT_MOOD[next]);
