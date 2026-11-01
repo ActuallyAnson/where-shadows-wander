@@ -1,0 +1,175 @@
+// A repeatable performance benchmark of the running game, for before-and-after numbers. It opens the Hand Lab in headless Chromium
+// (a software renderer, so the milliseconds are a proxy that rises and falls with the real cost, not a headset's numbers), puts the
+// game in four states and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
+// triangles and textures, the texture memory, and the JavaScript the frame allocates. It also records the start-up time and the heap.
+//
+//   npm run dev                                   (in another terminal, then:)
+//   node scripts/perf-bench.mjs [url] [--label name] [--out file.json] [--runs 3]
+//
+// The default address is https://localhost:5173/?mock=1 (the Vite dev server). Compare two runs with `--out`.
+import { chromium } from 'playwright';
+import { writeFileSync } from 'node:fs';
+
+const args = process.argv.slice(2);
+const flag = (name, fallback) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : fallback;
+};
+const url = args.find((a) => a.startsWith('http')) ?? 'https://localhost:5173/?mock=1';
+const label = flag('--label', 'run');
+const out = flag('--out', null);
+const runs = Number(flag('--runs', '3'));
+
+const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+async function once() {
+  const browser = await chromium.launch({
+    args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--js-flags=--expose-gc'],
+  });
+  const page = await browser.newPage({ ignoreHTTPSErrors: true, viewport: { width: 1000, height: 700 } });
+  const t0 = Date.now();
+  await page.goto(url);
+  await page.waitForFunction(() => window.__wsw);
+  const startupMs = Date.now() - t0;
+  await page.waitForTimeout(26000); // the opening is over and the night has started
+  await page.evaluate(() => {
+    window.__wsw.storyLine.clear();
+    const c = window.__wsw.world.camera;
+    c.fov = 85;
+    c.updateProjectionMatrix();
+    window.__pin = () => {
+      c.position.set(0, 1.3, 0.3);
+      c.lookAt(0, 1.2, -2);
+    };
+    window.__pin();
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('HeapProfiler.enable');
+  const heapMb = await page.evaluate(() => performance.memory.usedJSHeapSize / 1048576);
+
+  const measure = async (name) => {
+    const render = await page.evaluate(() => {
+      const w = window.__wsw.world;
+      const gl = w.renderer.getContext();
+      const px = new Uint8Array(4);
+      const wait = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); // reading a pixel back makes the browser wait for the drawing to finish
+      for (let i = 0; i < 8; i++) w.renderer.render(w.scene, w.camera); // warm up (shaders, uploads)
+      wait();
+      const times = [];
+      for (let i = 0; i < 40; i++) {
+        const t = performance.now();
+        w.renderer.render(w.scene, w.camera);
+        wait(); // so the time includes drawing the pixels, not just recording the commands
+        times.push(performance.now() - t);
+      }
+      times.sort((a, b) => a - b);
+      const info = w.renderer.info;
+      const seen = new Set();
+      let mb = 0;
+      const add = (t) => {
+        if (!t || !t.image || seen.has(t) || !t.image.width) return;
+        seen.add(t);
+        mb += (t.image.width * t.image.height * 4 * (t.generateMipmaps ? 1.33 : 1)) / 1048576;
+      };
+      w.scene.traverse((o) => {
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+          if (!m) continue;
+          add(m.map);
+          if (m.uniforms) for (const k in m.uniforms) if (m.uniforms[k].value?.isTexture) add(m.uniforms[k].value);
+        }
+      });
+      return {
+        renderMs: times[20],
+        calls: info.render.calls,
+        triangles: info.render.triangles,
+        textures: info.memory.textures,
+        textureMb: mb,
+      };
+    });
+    // The JavaScript a frame allocates: a sampling heap profile over 3 s of ordinary frames; "ours" leaves out the browser's emulator
+    // and the Hand Lab panel, which exist only on a desktop.
+    await cdp.send('HeapProfiler.collectGarbage');
+    await cdp.send('HeapProfiler.startSampling', { samplingInterval: 256 });
+    const frames = await page.evaluate(
+      () =>
+        new Promise((res) => {
+          let n = 0;
+          const t0 = performance.now();
+          const f = () => {
+            n++;
+            if (performance.now() - t0 < 3000) requestAnimationFrame(f);
+            else res(n);
+          };
+          requestAnimationFrame(f);
+        }),
+    );
+    const { profile } = await cdp.send('HeapProfiler.stopSampling');
+    let total = 0;
+    let ours = 0;
+    const walk = (node) => {
+      const u = node.callFrame.url;
+      if (node.selfSize > 0) {
+        total += node.selfSize;
+        if (!/iwer|hand-lab|chunk-|:-1$/.test(u + ':' + node.callFrame.lineNumber) && u !== '') ours += node.selfSize;
+      }
+      node.children.forEach(walk);
+    };
+    walk(profile.head);
+    return { state: name, ...render, allocBytesPerFrame: total / frames, ourAllocBytesPerFrame: ours / frames };
+  };
+
+  const states = [];
+  states.push(await measure('room'));
+  await page.evaluate(() => {
+    window.__wsw.roomDressing.setAwake(3);
+    window.__wsw.wakeSleeper(1);
+    window.__wsw.rewards.play('light', 0, 0);
+  });
+  await page.waitForTimeout(600);
+  states.push(await measure('room + spark + reward'));
+  await page.getByText('Prologue').click();
+  await page.waitForTimeout(5500);
+  await page.evaluate(() => window.__pin());
+  states.push(await measure('opening reel'));
+  await page.evaluate(() => window.__wsw.prologue.skip());
+  await page.waitForTimeout(3000);
+  await page.getByText('Ending').click();
+  await page.waitForTimeout(5000);
+  states.push(await measure('finale hall'));
+  await browser.close();
+  return { startupMs, heapMb, states };
+}
+
+const results = [];
+for (let i = 0; i < runs; i++) results.push(await once());
+const names = results[0].states.map((s) => s.state);
+const summary = {
+  label,
+  url,
+  runs,
+  startupMs: median(results.map((r) => r.startupMs)),
+  heapMb: median(results.map((r) => r.heapMb)),
+  states: names.map((name, i) => {
+    const rows = results.map((r) => r.states[i]);
+    const m = (k) => median(rows.map((r) => r[k]));
+    return {
+      state: name,
+      renderMs: +m('renderMs').toFixed(2),
+      calls: m('calls'),
+      triangles: m('triangles'),
+      textures: m('textures'),
+      textureMb: +m('textureMb').toFixed(1),
+      allocBytesPerFrame: Math.round(m('allocBytesPerFrame')),
+      ourAllocBytesPerFrame: Math.round(m('ourAllocBytesPerFrame')),
+    };
+  }),
+};
+console.log(
+  `\n${label}: start-up ${(summary.startupMs / 1000).toFixed(1)} s, heap ${summary.heapMb.toFixed(0)} MB (median of ${runs} runs)`,
+);
+console.log('state                       render ms  calls   tris  textures  tex MB  alloc B/frame (ours)');
+for (const s of summary.states)
+  console.log(
+    `${s.state.padEnd(26)} ${String(s.renderMs).padStart(9)} ${String(s.calls).padStart(6)} ${String(s.triangles).padStart(6)} ${String(s.textures).padStart(9)} ${String(s.textureMb).padStart(7)} ${String(s.allocBytesPerFrame).padStart(9)} (${s.ourAllocBytesPerFrame})`,
+  );
+if (out) writeFileSync(out, JSON.stringify(summary, null, 2) + '\n');
