@@ -78,6 +78,7 @@ import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
+import { LevelEditor } from '../debug/level-editor';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
 import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
 import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
@@ -263,6 +264,8 @@ async function start(): Promise<void> {
   // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
+  // The Hand Lab's level editor, for the puzzle being played.
+  let levelEditor: { puzzle: object; editor: LevelEditor } | null = null;
   const storyLine = new StoryLineView();
   // The captions (a setting): a smaller line of ink low on the wall that names the story's sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
@@ -867,6 +870,21 @@ async function start(): Promise<void> {
       cutscene: { play: () => playOpening() },
       prologue: { play: () => prologue.start() },
       rewind: { go: () => night.rewind(3) },
+      editor: {
+        current: () => {
+          // In the lab there is no opening to start the night: opening the editor does it.
+          if (!night.started) {
+            sessionState = 'playing';
+            candleView.setLocked(true);
+            night.start();
+          }
+          const puzzle = night.game?.puzzle;
+          if (!puzzle) return null;
+          if (levelEditor?.puzzle !== puzzle) levelEditor = { puzzle, editor: new LevelEditor(puzzle) };
+          return levelEditor.editor;
+        },
+        changed: () => night.restart(),
+      },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },

@@ -21,6 +21,7 @@ import { downloadRecording, handCardHtml } from './hand-card';
 import { MOCK_WRIST, type HandSource } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
+import type { EditAction, LevelEditor } from '../debug/level-editor';
 import { ScriptedSource } from './scripted-source';
 import { SyntheticSource } from './synthetic-source';
 import type { WebcamSource } from './webcam-source';
@@ -53,6 +54,8 @@ export interface LabView {
   prologue?: { play(): void };
   /** Turns the night back a few seconds (the puzzle is reloaded and its recorded inputs played again): the Rewind button. */
   rewind?: { go(): void };
+  /** The level editor for the puzzle being played: `current()` is its editor (null before a puzzle loads); `changed()` loads the puzzle again with the edit. */
+  editor?: { current(): LevelEditor | null; changed(): void };
   /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
   stage?: { toggle(): void; label(): string };
 }
@@ -66,6 +69,8 @@ export class HandLab {
   private readonly orbit: OrbitControls;
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
+  /** The level editor row is open. */
+  private editing = false;
   private recording: HandRecording | null = null;
   /** A guided recording in progress: prompts every shape and labels the file. */
   private guided: GuidedRecording | null = null;
@@ -309,6 +314,8 @@ export class HandLab {
       else if (act === 'sticker') this.view.sticker?.next();
       else if (act === 'prologue') this.view.prologue?.play();
       else if (act === 'rewind') this.view.rewind?.go();
+      else if (act === 'edit') this.editing = !this.editing;
+      else if (act === 'edit-do') this.editStep(arg as EditAction | 'copy');
       else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
@@ -374,6 +381,7 @@ export class HandLab {
         ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
         ${this.view.prologue ? btn('prologue', '', 'Prologue', false, 'Play the prologue: the story drawn in calligraphy in the dark') : ''}
         ${this.view.rewind ? btn('rewind', '', 'Rewind 3 s', false, 'Turn the night back three seconds: the puzzle is reloaded and its recorded input played again') : ''}
+        ${this.view.editor ? btn('edit', '', 'Level editor', this.editing, 'Move, resize, add and remove the ground of the puzzle being played, and copy it out as code') : ''}
         ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}
         ${this.view.solve ? btn('solve', '', 'Solve', false, 'Play the solve moment: the wall glows and light bursts out') : ''}
         ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the opening: the title, and the fox drifts in') : ''}
@@ -381,9 +389,30 @@ export class HandLab {
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>
+      ${this.editing ? this.editorRow(btn) : ''}
       <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
     // Fill the new prompt element now rather than leaving it blank until the next live update.
     if (this.guided) this.renderLive();
+  }
+
+  private editorRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
+    const editor = this.view.editor?.current();
+    if (!editor) return '<h2>Level editor</h2><div class="row">No puzzle is loaded yet.</div>';
+    const b = (arg: string, label: string, title = '') => btn('edit-do', arg, label, false, title);
+    const controls = editor.editable
+      ? `<div class="row">${b('prev', '◀ Piece')}${b('next', 'Piece ▶')}${b('left', '←')}${b('right', '→')}${b('up', '↑')}${b('down', '↓')}</div>
+         <div class="row">${b('wider', 'Wider')}${b('narrower', 'Narrower')}${b('taller', 'Taller')}${b('shorter', 'Shorter')}${b('add', '+ Ledge')}${b('remove', 'Delete')}${b('revert', 'Revert')}${b('copy', 'Copy code')}</div>`
+      : '';
+    return `<h2>Level editor</h2><div class="row"><span>${editor.describe()}</span> <span>${editor.message}</span></div>${controls}`;
+  }
+
+  private editStep(action: EditAction | 'copy'): void {
+    const editor = this.view.editor?.current();
+    if (!editor) return;
+    if (action === 'copy') {
+      void navigator.clipboard?.writeText(editor.toSource());
+      editor.message = 'Copied: paste it into the puzzle file.';
+    } else if (editor.run(action)) this.view.editor?.changed();
   }
 
   /** For one hand in front of the webcam: say which it is, since MediaPipe often guesses a lone hand wrong. */
