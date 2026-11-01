@@ -19,6 +19,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { Material } from '@iwsdk/core';
+import { BuntingView } from './bunting-view';
 import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
@@ -170,6 +171,8 @@ export class RoomDressingView {
   private readonly levels = new Float32Array(WONDERS);
   private awakeCount = 0;
   private wondersWereOn = false;
+  /** The swinging bunting along the picture rail on the wall behind the stage. */
+  private readonly bunting = new BuntingView();
   /** How far in front of the player the wall behind the stage is (z in the room's space), set by `place`. */
   private wallZ = -2.35;
   private warmNow = 0;
@@ -187,7 +190,7 @@ export class RoomDressingView {
     );
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
-      paintWall(g, w, h);
+      paintWall(g, w, h, false); // the bunting here is alive (bunting-view.ts)
       WALL_THINGS.forEach((spec, i) => {
         const far = spec.layer === 'shelves';
         castShadow(
@@ -414,7 +417,9 @@ export class RoomDressingView {
     this.wonders.matrixAutoUpdate = false;
     this.group.add(this.wonders);
     this.vertexLit.push(this.wall, left, right);
-    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed);
+    this.group.add(this.bunting.mesh);
+    this.materials.push(this.bunting.material);
+    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
     for (const m of [...this.vertexLit, ...this.centreLit]) {
       this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
     }
@@ -485,6 +490,7 @@ export class RoomDressingView {
       );
       m.updateMatrix();
     });
+    this.bunting.place(z + 0.05);
     this.buildWonders(z);
     this.relight();
   }
@@ -569,6 +575,16 @@ export class RoomDressingView {
     return this.group.localToWorld(out);
   }
 
+  /** The wind along the wall, for the bunting (the fan puzzle blows it hard; see bunting-view.ts). */
+  setWind(wind: number): void {
+    this.bunting.setWind(wind);
+  }
+
+  /** Sets the bunting swinging from where the spark lands on it. */
+  rippleBunting(): void {
+    this.bunting.ripple(-1.0, 2.02, 3.5, 0.7);
+  }
+
   /** Lights the room's wonders up to `count` of them, in order (each eases on over a couple of seconds; fewer than before puts the later ones out). */
   setAwake(count: number): void {
     this.awakeCount = Math.max(0, Math.min(WONDERS, Math.floor(count) || 0));
@@ -624,6 +640,7 @@ export class RoomDressingView {
     if (!(dt > 0)) return;
     this.time += Math.min(dt, 0.1);
     this.easeWonders(Math.min(dt, 0.1));
+    this.bunting.update(Math.min(dt, 0.1));
     for (let i = 0; i < this.snow.length; i++) {
       const t = this.snow[i];
       t.offset.y += Math.min(dt, 0.1) * SNOW_FALL[i];
@@ -668,6 +685,7 @@ export class RoomDressingView {
   dispose(): void {
     this.wonders.geometry.dispose();
     this.wonderMat.dispose();
+    this.bunting.dispose();
     for (const t of this.textures) t.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials as Material[]) m.dispose();

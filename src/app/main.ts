@@ -56,6 +56,7 @@ import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
 import { FrameInspector } from './frame-inspector';
+import { CALM_WIND, FAN_WIND } from '../engine/shadow/bunting-view';
 import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { ReadingPageView } from '../engine/shadow/reading-page-view';
@@ -581,7 +582,10 @@ async function start(): Promise<void> {
       moodGoal = goal;
     },
     say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
-    scenery: (index) => stageView.setTheme(index),
+    scenery: (index) => {
+      stageView.setTheme(index);
+      roomDressing.setWind(index === 3 ? FAN_WIND : CALM_WIND); // the fan puzzle blows the bunting about
+    },
     reward: (index) => {
       // The puzzle's own reward, on the paper where the traveller stands.
       if (governor.isOn('reward') && readTraveller())

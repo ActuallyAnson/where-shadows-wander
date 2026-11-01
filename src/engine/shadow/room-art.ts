@@ -41,10 +41,10 @@ function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fi
 /**
  * The wall behind the stage (4 m by 2.5 m, any canvas of that shape): striped wallpaper with a small repeating motif, a
  * picture rail with paper bunting, framed pictures, two shelves of keepsakes and wooden panelling below. The middle, where
- * the paper stage hangs, is left calm so the shadows read against it. The pictures and shelves are not in it: they are
+ * the paper stage hangs, is left calm so the shadows read against it. `bunting` false leaves the paper bunting out (the wall behind the stage has the real, swinging one). The pictures and shelves are not in it: they are
  * paintWallThings, held off the wall. Its edges and corners are shaded, so the wall sits in the room rather than on the screen.
  */
-export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): void {
+export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, bunting = true): void {
   const r = rng(11);
   g.save();
   g.scale(W / 1024, H / 640);
@@ -88,7 +88,8 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): vo
   const flags = ['#8a4a3a', '#c79a52', '#4d6a5a', '#6a5a86', '#b36a4a'];
   g.strokeStyle = INK;
   g.lineWidth = 3;
-  for (let seg = 0; seg < 2; seg++) {
+  // (The wall behind the stage has live bunting instead: bunting-view.ts.)
+  for (let seg = 0; seg < (bunting ? 2 : 0); seg++) {
     const x0 = seg === 0 ? 70 : 590,
       x1 = seg === 0 ? 440 : 960;
     g.beginPath();

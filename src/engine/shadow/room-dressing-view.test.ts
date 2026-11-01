@@ -13,6 +13,7 @@ import {
   paintWallThings,
   paintWood,
 } from './room-art';
+import { RenderOrder } from './pure/render-order';
 import { RoomDressingView } from './room-dressing-view';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
@@ -74,7 +75,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(24);
+    expect(v.group.children).toHaveLength(25);
     v.dispose();
   });
 
@@ -154,7 +155,11 @@ describe('RoomDressingView', () => {
   it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
     const v = new RoomDressingView();
     const glow = () => {
-      const mesh = v.group.children[v.group.children.length - 1] as unknown as {
+      const mesh = v.group.children.find(
+        (c) =>
+          c.renderOrder === RenderOrder.wonder &&
+          (c as unknown as { geometry: { attributes: { color?: unknown } } }).geometry.attributes.color,
+      ) as unknown as {
         geometry: { attributes: { color: { array: Float32Array } } };
       };
       return Array.from(mesh.geometry.attributes.color.array).reduce((a, b) => a + b, 0);
@@ -226,5 +231,19 @@ describe('RoomDressingView', () => {
   it('disposes cleanly', () => {
     const v = new RoomDressingView();
     expect(() => v.dispose()).not.toThrow();
+  });
+
+  it('has live bunting that sways, can be blown by the wind, and rippled when the spark lands', () => {
+    const v = new RoomDressingView();
+    const motion = () => (v as unknown as { bunting: { motion: number } }).bunting.motion;
+    for (let i = 0; i < 240; i++) v.tick(1 / 60);
+    expect(motion()).toBeGreaterThan(0);
+    v.setWind(0);
+    for (let i = 0; i < 60 * 25; i++) v.tick(1 / 60);
+    const quiet = motion();
+    v.rippleBunting();
+    for (let i = 0; i < 20; i++) v.tick(1 / 60);
+    expect(motion()).toBeGreaterThan(quiet);
+    v.dispose();
   });
 });
