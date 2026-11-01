@@ -51,11 +51,11 @@ function setup() {
 }
 
 describe('FINALE_PAGES', () => {
-  it('ends on the lullaby line, with short pages and a finale of about half a minute or less', () => {
-    expect(FINALE_PAGES.length).toBeGreaterThanOrEqual(4);
+  it('ends on the lullaby line, with short pages and a finale of about twenty seconds or less', () => {
+    expect(FINALE_PAGES.length).toBeGreaterThanOrEqual(3);
     expect(FINALE_PAGES[FINALE_PAGES.length - 1].text).toBe('Sleep well.');
     for (const p of FINALE_PAGES) expect(p.text.length).toBeLessThanOrEqual(60);
-    expect(prologueSeconds(FINALE_PAGES)).toBeLessThan(40);
+    expect(prologueSeconds(FINALE_PAGES)).toBeLessThan(25);
   });
 
   it('plays through the same player as the prologue, page by page', () => {

@@ -23,9 +23,7 @@ const page = (text: string): ProloguePage => ({
 /** The finale's pages, in the hall of the great crystal: everything awake, the light home, the room dreaming for the child. */
 export const FINALE_PAGES: readonly ProloguePage[] = [
   page('Every sleeper is awake.'),
-  page('The lamp remembers fire. The window holds the night.'),
   page('The light found its way home.'),
-  page('Now the room dreams for you.'),
   page('Sleep well.'),
 ];
 
