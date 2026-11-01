@@ -684,6 +684,14 @@ async function start(): Promise<void> {
   const settingsPage = createSettingsPage(settings);
   launcherHooks.openSettings = () => settingsPage.open();
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
+  const applyTextSize = () => {
+    storyLine.scale = settings.value.textSize;
+    captionLine.scale = settings.value.textSize;
+  };
+  settings.subscribe((key) => {
+    if (key === null || key === 'textSize') applyTextSize();
+  });
+  applyTextSize();
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
     shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;

@@ -84,6 +84,8 @@ export class StoryLineView {
   private hold = 0;
   private t = -1;
   private time = 0;
+  /** How much larger than natural the line is drawn (the Wall text size setting), kept inside the wall. */
+  scale = 1;
   private readonly y: number;
   private readonly width: number;
 
@@ -198,7 +200,7 @@ export class StoryLineView {
     this.ink.uniforms.progress.value = written;
     this.ink.uniforms.opacity.value = fade * opacity;
     this.quad.visible = t >= 0 && fade > 0;
-    const w = stage.width * this.width;
+    const w = stage.width * Math.min(0.98, this.width * this.scale);
     const h = w / ASPECT;
     if (this.quad.visible) placeOnStage(this.m, this.quad, stage, 0, stage.height * this.y, w, h, LIFT_M);
     // The spark runs along the baseline with the ink, with a small bob, and burns on a moment after the last letter.

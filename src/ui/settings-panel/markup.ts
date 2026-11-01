@@ -19,10 +19,11 @@ export const METRES_PER_PX = PANEL_WIDTH_M / PANEL_WIDTH_PX;
 /** Every press target is at least this many pixels across: 64 px is 4.1 cm at the panel's real size. */
 export const BUTTON_PX = 64;
 
-/** Which settings are on which page: how you play, then sound and extras. Every setting is on exactly one page. */
+/** Which settings are on which page: how you play, what you see and read, then sound. Every setting is on exactly one page. */
 export const PAGES: readonly (readonly (keyof Settings)[])[] = [
-  ['tolerance', 'holdTime', 'shadowSize', 'sharpen', 'flicker', 'highContrast'],
-  ['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience', 'captions', 'hand'],
+  ['tolerance', 'holdTime', 'shadowSize', 'sharpen', 'flicker', 'hand'],
+  ['highContrast', 'captions', 'textSize'],
+  ['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience'],
 ];
 
 export const ids = {

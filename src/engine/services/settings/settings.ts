@@ -20,6 +20,8 @@ export interface Settings {
   volumeMusic: number;
   volumeEffects: number;
   volumeAmbience: number;
+  /** How large the wall's writing is, 1 (natural) to 1.5. */
+  textSize: number;
   /** Pure black on bright white, no paper texture. */
   highContrast: boolean;
   /** Text captions for the traveller's sounds and story beats . */
@@ -153,6 +155,16 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     max: 1,
     step: 0.1,
     default: 0.6,
+  },
+  {
+    kind: 'number',
+    key: 'textSize',
+    label: 'Wall text size',
+    help: "How large the story's writing and the captions are on the wall.",
+    min: 1,
+    max: 1.5,
+    step: 0.1,
+    default: 1,
   },
   {
     kind: 'toggle',

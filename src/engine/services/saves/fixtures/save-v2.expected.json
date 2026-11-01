@@ -34,6 +34,7 @@
     "volumeMusic": 0.3,
     "volumeEffects": 1,
     "volumeAmbience": 0.6,
+    "textSize": 1,
     "highContrast": true,
     "captions": true,
     "hand": "left"

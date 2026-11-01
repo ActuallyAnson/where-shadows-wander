@@ -22,7 +22,7 @@ describe('settings screen model', () => {
   it('shows every setting on exactly one page', () => {
     const all = PAGES.flatMap((_, p) => rowsFor(p, DEFAULT_SETTINGS, []).map((r) => r.id));
     expect(new Set(all).size).toBe(all.length);
-    expect(all.length).toBe(12);
+    expect(all.length).toBe(13);
   });
 
   it('makes each row and footer button at least 4 cm tall to poke', () => {
