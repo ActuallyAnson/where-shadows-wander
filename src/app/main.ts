@@ -78,6 +78,7 @@ import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
+import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
 import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
 import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
 import { TaskPool, type WorkerLike } from '../engine/services/workers/task-pool';
@@ -263,6 +264,8 @@ async function start(): Promise<void> {
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
   const storyLine = new StoryLineView();
+  // The captions (a setting): a smaller line of ink low on the wall that names the story's sounds.
+  const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
   const spark = new SparkFlightView();
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
   // time (and comes back slowly), and the inspector gives the debug bar a line of what a frame costs. It watches only in a headset
@@ -377,6 +380,7 @@ async function start(): Promise<void> {
   // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
   const playEnding = (onDone?: () => void) => {
     storyLine.clear(); // the finale speaks for itself
+    captionLine.clear();
     moodGoal = ENDING_MOOD;
     // When the hall fades away the room stands there, every sleeper awake: a moment on that picture (with one last line) before the
     // end screen comes.
@@ -446,6 +450,7 @@ async function start(): Promise<void> {
     propShadows.mesh,
     cutsceneView.group,
     storyLine.group,
+    captionLine.group,
     spark.group,
     handTrail.group,
     propSketch.group,
@@ -492,7 +497,14 @@ async function start(): Promise<void> {
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
     void startSoundPrerender(soundPool).then(() => soundPool.dispose());
   });
-  const gameAudio = new GameAudio(audio);
+  const gameAudio = new GameAudio(
+    new CaptioningPlayer(
+      audio,
+      () => settings.value.captions,
+      (text) => captionLine.say(text, 0, 1.6),
+      () => performance.now() / 1000,
+    ),
+  );
   // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
   // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
   let kindredAway = false;
@@ -1609,13 +1621,12 @@ async function start(): Promise<void> {
           prologue.update(step);
           finale.update(step);
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
-          storyLine.update(
-            paused || sessionState !== 'playing' ? 0 : step,
-            stage,
+          const lineOpacity =
             shadowsVisible && !menu.group.visible && !cutscenes.playing
               ? shadowRenderer.baseOpacity * candleView.occlusion
-              : 0,
-          );
+              : 0;
+          storyLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
@@ -1829,6 +1840,7 @@ async function start(): Promise<void> {
         kindredView,
         stickerView,
         storyLine,
+        captionLine,
         wakeSleeper,
         soundPool,
         governor,

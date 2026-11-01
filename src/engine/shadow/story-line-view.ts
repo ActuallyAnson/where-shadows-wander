@@ -84,8 +84,16 @@ export class StoryLineView {
   private hold = 0;
   private t = -1;
   private time = 0;
+  private readonly y: number;
+  private readonly width: number;
 
-  constructor() {
+  /**
+   * @param options `y`: of the stage's height from the centre (default: the top of the wall); `width`: of the stage's width.
+   * A second, smaller line lower down carries the captions.
+   */
+  constructor(options: { y?: number; width?: number } = {}) {
+    this.y = options.y ?? Y;
+    this.width = options.width ?? WIDTH;
     this.ink = new ShaderMaterial({
       uniforms: {
         map: { value: null },
@@ -189,9 +197,9 @@ export class StoryLineView {
     this.ink.uniforms.progress.value = written;
     this.ink.uniforms.opacity.value = fade * opacity;
     this.quad.visible = t >= 0 && fade > 0;
-    const w = stage.width * WIDTH;
+    const w = stage.width * this.width;
     const h = w / ASPECT;
-    if (this.quad.visible) placeOnStage(this.m, this.quad, stage, 0, stage.height * Y, w, h, LIFT_M);
+    if (this.quad.visible) placeOnStage(this.m, this.quad, stage, 0, stage.height * this.y, w, h, LIFT_M);
     // The spark runs along the baseline with the ink, with a small bob, and burns on a moment after the last letter.
     const x0 = this.ink.uniforms.x0.value as number;
     const x1 = this.ink.uniforms.x1.value as number;
@@ -201,7 +209,16 @@ export class StoryLineView {
       const u = x0 + (x1 - x0) * written;
       const bob = Math.sin(this.time * 31) * 0.012 * h;
       const s = stage.width * SPARK_SIZE_M * (0.85 + 0.15 * Math.sin(this.time * 17));
-      placeOnStage(this.m, this.spark, stage, (u - 0.5) * w, stage.height * Y - 0.1 * h + bob, s, s, LIFT_M + 0.001);
+      placeOnStage(
+        this.m,
+        this.spark,
+        stage,
+        (u - 0.5) * w,
+        stage.height * this.y - 0.1 * h + bob,
+        s,
+        s,
+        LIFT_M + 0.001,
+      );
       this.sparkMat.opacity = Math.min(1, (this.write + SPARK_LINGER_S - t) / SPARK_LINGER_S) * opacity;
     }
   }

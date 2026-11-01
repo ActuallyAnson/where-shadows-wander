@@ -22,7 +22,7 @@ export interface Settings {
   volumeAmbience: number;
   /** Pure black on bright white, no paper texture. */
   highContrast: boolean;
-  /** Text captions for the traveller's sounds and story beats (stub until story beats exist). */
+  /** Text captions for the traveller's sounds and story beats . */
   captions: boolean;
   /** The hand the panel listens to and opens beside; the game may read it as the player's main hand. */
   hand: Hand;
@@ -165,7 +165,7 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     kind: 'toggle',
     key: 'captions',
     label: 'Captions',
-    help: 'Shows text for sounds and story moments (coming with the story).',
+    help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or a creak.',
     default: false,
   },
   {
