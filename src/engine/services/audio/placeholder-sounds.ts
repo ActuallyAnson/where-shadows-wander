@@ -613,8 +613,27 @@ export function prewarmMusic(): void {
   if (!prewarmed.has(Sound.Music)) prewarmed.set(Sound.Music, renderPlaceholder(Sound.Music, MUSIC_RATE));
 }
 
+/** Sounds rendered ahead by a worker (sound-prerender.ts), by sound and rate, to be handed over once. */
+const prerendered = new Map<string, Float32Array<ArrayBuffer>>();
+const prerenderKey = (id: SoundId, rate: number) => `${id}@${rate}`;
+
+/** Keeps a sound rendered somewhere else (a worker) for `takeSamples` to hand over. */
+export function storePrerendered(id: SoundId, rate: number, samples: Float32Array<ArrayBuffer>): void {
+  prerendered.set(prerenderKey(id, rate), samples);
+}
+
+/** How many sounds are waiting rendered (for the report and the tests). */
+export function prerenderedCount(): number {
+  return prerendered.size;
+}
+
 /** The samples for `id` at `rate`: the prewarmed ones if they are at that rate (handed over once), else rendered now. */
 export function takeSamples(id: SoundId, rate: number): Float32Array<ArrayBuffer> {
+  const ahead = prerendered.get(prerenderKey(id, rate));
+  if (ahead) {
+    prerendered.delete(prerenderKey(id, rate));
+    return ahead;
+  }
   const ready = prewarmed.get(id);
   if (ready && rate === MUSIC_RATE) {
     prewarmed.delete(id);

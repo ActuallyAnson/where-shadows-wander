@@ -28,6 +28,13 @@ async function once() {
     args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--js-flags=--expose-gc'],
   });
   const page = await browser.newPage({ ignoreHTTPSErrors: true, viewport: { width: 1000, height: 700 } });
+  // Count the stalls: tasks on the main thread that take 50 ms or more (the frame loop cannot run during one).
+  await page.addInitScript(() => {
+    window.__longTasks = [];
+    new PerformanceObserver((list) => {
+      for (const e of list.getEntries()) window.__longTasks.push(e.duration);
+    }).observe({ entryTypes: ['longtask'] });
+  });
   const t0 = Date.now();
   await page.goto(url);
   await page.waitForFunction(() => window.__wsw);
@@ -47,6 +54,11 @@ async function once() {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
   const heapMb = await page.evaluate(() => performance.memory.usedJSHeapSize / 1048576);
+  const stalls = await page.evaluate(() => ({
+    count: window.__longTasks.length,
+    totalMs: window.__longTasks.reduce((a, b) => a + b, 0),
+    worstMs: Math.max(0, ...window.__longTasks),
+  }));
   // How fast this machine is just now (a fixed loop), so a busy laptop shows up in the numbers instead of hiding in them.
   const calibMs = await page.evaluate(() => {
     const t = performance.now();
@@ -128,12 +140,14 @@ async function once() {
 
   const states = [];
   states.push(await measure('room'));
-  // The same room with the quality governor at its top level (the decoration shed): what shedding saves.
-  await page.evaluate(() => (window.__wsw.governor.level = 3));
-  await page.waitForTimeout(500);
-  states.push(await measure('room, quality 3'));
-  await page.evaluate(() => (window.__wsw.governor.level = 0));
-  await page.waitForTimeout(500);
+  // The same room with the quality governor at its top level (the decoration shed): what shedding saves (when this build has one).
+  if (await page.evaluate(() => !!window.__wsw.governor)) {
+    await page.evaluate(() => (window.__wsw.governor.level = 3));
+    await page.waitForTimeout(500);
+    states.push(await measure('room, quality 3'));
+    await page.evaluate(() => (window.__wsw.governor.level = 0));
+    await page.waitForTimeout(500);
+  }
   await page.evaluate(() => {
     window.__wsw.roomDressing.setAwake(3);
     window.__wsw.wakeSleeper(1);
@@ -151,7 +165,7 @@ async function once() {
   await page.waitForTimeout(5000);
   states.push(await measure('finale hall'));
   await browser.close();
-  return { startupMs, heapMb, calibMs, states };
+  return { startupMs, heapMb, calibMs, stalls, states };
 }
 
 const results = [];
@@ -164,6 +178,11 @@ const summary = {
   startupMs: median(results.map((r) => r.startupMs)),
   heapMb: median(results.map((r) => r.heapMb)),
   calibMs: +least(results.map((r) => r.calibMs)).toFixed(1),
+  stalls: {
+    count: median(results.map((r) => r.stalls.count)),
+    totalMs: Math.round(median(results.map((r) => r.stalls.totalMs))),
+    worstMs: Math.round(median(results.map((r) => r.stalls.worstMs))),
+  },
   states: names.map((name, i) => {
     const rows = results.map((r) => r.states[i]);
     const m = (k) => median(rows.map((r) => r[k]));
@@ -182,6 +201,9 @@ const summary = {
 };
 console.log(
   `\n${label}: start-up ${(summary.startupMs / 1000).toFixed(1)} s, heap ${summary.heapMb.toFixed(0)} MB (median of ${runs} runs)`,
+);
+console.log(
+  `main-thread stalls of 50 ms or more in the first 26 s: ${summary.stalls.count} (${summary.stalls.totalMs} ms in all, worst ${summary.stalls.worstMs} ms)`,
 );
 console.log('state                       render ms  calls   tris  textures  tex MB  alloc B/frame (ours)');
 for (const s of summary.states)

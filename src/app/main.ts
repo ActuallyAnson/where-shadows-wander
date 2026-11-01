@@ -77,7 +77,9 @@ import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
-import { prewarmMusic } from '../engine/services/audio/placeholder-sounds';
+import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
+import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
+import { TaskPool, type WorkerLike } from '../engine/services/workers/task-pool';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
@@ -474,7 +476,21 @@ async function start(): Promise<void> {
   uiAudio = audio;
   // The music is made while the title screen sits idle, so starting it with the session costs no frame.
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
-  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
+  // The sounds are made in code; rendering them takes real time on a headset's CPU (the music alone about a second), so a worker does it
+  // ahead (every sound, the room's loops first) and the engine finds each ready. Without workers the pool does the same on the main thread.
+  const soundPool = new TaskPool<RenderJob, RenderedSound>({
+    create: () =>
+      typeof Worker === 'undefined'
+        ? null
+        : (new Worker(new URL('../engine/services/audio/sound-render-worker.ts', import.meta.url), {
+            type: 'module',
+          }) as unknown as WorkerLike),
+    size: 1,
+    fallback: renderJob,
+  });
+  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
+    void startSoundPrerender(soundPool).then(() => soundPool.dispose());
+  });
   const gameAudio = new GameAudio(audio);
   // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
   // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
@@ -1802,6 +1818,7 @@ async function start(): Promise<void> {
         stickerView,
         storyLine,
         wakeSleeper,
+        soundPool,
         governor,
         inspector,
         fade,
