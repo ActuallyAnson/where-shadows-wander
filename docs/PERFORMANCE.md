@@ -33,20 +33,27 @@ a headset**. Nothing has been measured on a Pico or a Quest yet.
 | Verlet bunting | Live flags that flutter in the fan's wind and ripple when a spark lands. | 3.3 microseconds per frame for a rope; about 0 bytes allocated. |
 | Rewind by replay | Turns the night back 3 s by replaying recorded input into a fresh game. | Exact against the original run in tests. |
 
-## Numbers so far (software renderer, 1000x700)
+## Before and after (same laptop, one browser at a time, median of 2 runs, software renderer 1000x700)
 
-| State | Render ms | Draw calls |
-| --- | --- | --- |
-| Room | 25.0 | 52 |
-| Room with spark and reward | 24.8 | 54 |
-| Opening reel | 20.9 | 47 |
-| Finale hall | 19.1 | 37 |
+Before is commit `da2a6a9` (`docs/perf/2026-11-01-before-da2a6a9.json`); after is `feat/engine-systems` (`docs/perf/2026-11-01-engine-systems.json`).
 
-Our own JavaScript allocates about 20 B a frame; the roughly 1 KB a frame in a full page is the desktop hand emulator.
-No single new element measured above about 1 ms.
+| State | Render ms before / after | Draw calls | Textures | Texture MB |
+| --- | --- | --- | --- | --- |
+| Room | 15.8 / 17.7 | 52 / 53 | 44 / 44 | 56.7 / 47.0 |
+| Room, quality level 3 (new) | n/a / 17.8 | n/a / 49 | n/a / 45 | n/a / 47.0 |
+| Room + spark + reward | 17.9 / 20.3 | 54 / 55 | 45 / 45 | 56.7 / 47.0 |
+| Opening reel | 13.6 / 15.4 | 47 / 45 | 64 / 64 | 56.7 / 52.4 |
+| Finale hall | 14.0 / 15.8 | 37 / 35 | 79 / 60 | 56.7 / 51.3 |
+
+What this says, plainly:
+
+- **Texture memory is down** 7 to 17 percent (room 56.7 to 47.0 MB), and the finale hall holds 19 fewer textures. This is the lazy cinematic scenes and the smaller scenery.
+- **Render time is up about 10 percent** (about 2 ms in this software renderer). The new bunting adds a draw call and some triangles, and the machine was still busy with other work (load average 7 to 10), so some of that is noise. It is a cost we chose, not a saving.
+- **The quality governor did not show a saving in this run.** Level 3 cost the same as the room (17.8 ms). An earlier noisy run showed 34 to 24.9 ms; this paired run does not confirm it. The governor is untested on a real headset.
+- **Start-up** is the same (3.5 s before, 3.4 s after), and the long main-thread stalls in the first 26 s are the same count (17 each): they come from start-up work that is not yet moved off the main thread.
+- Our own JavaScript allocation per frame is small in both (9 to 34 B); the larger totals are the desktop hand emulator.
 
 ## Not yet known
 
 - Frame time, thermal behaviour and the governor's thresholds on a Pico and a Quest.
-- The final paired before/after run (baseline commit `da2a6a9` against the current branch). It is heavy and heats the
-  laptop, so it is run once, at the end.
+- Whether the sound worker removes the start-up stalls on a headset (the stalls above are unchanged on the laptop).
