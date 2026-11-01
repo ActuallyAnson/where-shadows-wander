@@ -144,7 +144,7 @@ const fragment = /* glsl */ `
 `;
 
 /** How much of the paper the scenery replaces: enough to see it, little enough that the black shadows still read. */
-const BACKDROP = 0.72;
+export const BACKDROP = 0.72;
 const PAPER_OPACITY = 0.95;
 const BORDER = 0x8a6d3b;
 

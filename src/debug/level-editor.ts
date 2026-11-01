@@ -150,6 +150,7 @@ export class LevelEditor {
     }
     const p = this.def.props![this.selected - 2];
     const size = p.size as number[];
+    const before = size.join();
     if (p.shape === 'box') {
       size[0] = Math.max(MIN_SIZE_M, size[0] + dw);
       size[1] = Math.max(MIN_SIZE_M, size[1] + dh);
@@ -157,6 +158,10 @@ export class LevelEditor {
       // A sphere or cylinder has a radius: wider and narrower change that.
       size[0] = Math.max(MIN_SIZE_M / 2, size[0] + dw / 2);
       if (p.shape === 'cylinder') size[1] = Math.max(MIN_SIZE_M, size[1] + dh);
+    }
+    if (size.join() === before) {
+      this.message = 'That does not change this shape.';
+      return false;
     }
     return true;
   }
@@ -214,13 +219,24 @@ export class LevelEditor {
     ];
     if (l.markers?.length) {
       lines.push('  markers: [');
-      for (const m of l.markers) lines.push(`    { tag: '${m.tag}', ...${rect(m)} },`);
+      for (const m of l.markers)
+        lines.push(
+          `    { tag: '${m.tag}', x: ${num(m.x)}, y: ${num(m.y)}, width: ${num(m.width)}, height: ${num(m.height)} },`,
+        );
+      lines.push('  ],');
+    }
+    if (l.pieces?.length) {
+      lines.push('  pieces: [');
+      for (const q of l.pieces)
+        lines.push(`    { kind: ${q.kind}, x: ${num(q.x)}, y: ${num(q.y)}, radius: ${num(q.radius)} },`);
       lines.push('  ],');
     }
     lines.push('},', 'props: [');
     for (const p of this.def.props ?? []) {
       const extra =
-        (p.depth !== undefined ? `, depth: ${num(p.depth)}` : '') + (p.tilt ? `, tilt: ${num(p.tilt)}` : '');
+        (p.depth !== undefined ? `, depth: ${num(p.depth)}` : '') +
+        (p.tilt ? `, tilt: ${num(p.tilt)}` : '') +
+        (p.solid === false ? ', solid: false' : '');
       lines.push(
         `  { id: '${p.id}', shape: '${p.shape}', x: ${num(p.x)}, y: ${num(p.y)}, size: [${p.size.map(num).join(', ')}]${extra} },`,
       );

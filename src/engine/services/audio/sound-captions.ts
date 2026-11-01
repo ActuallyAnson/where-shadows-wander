@@ -29,7 +29,8 @@ export class CaptioningPlayer implements SoundPlayer {
   constructor(
     private readonly inner: SoundPlayer,
     private readonly enabled: () => boolean,
-    private readonly show: (text: string) => void,
+    /** Shows a caption; false when it could not be shown (so it does not use up the gap). */
+    private readonly show: (text: string) => boolean | void,
     private readonly now: () => number,
   ) {}
 
@@ -39,8 +40,7 @@ export class CaptioningPlayer implements SoundPlayer {
     if (played && text && this.enabled()) {
       const t = this.now();
       if (t - this.last >= CAPTION_GAP_S) {
-        this.last = t;
-        this.show(text);
+        if (this.show(text) !== false) this.last = t;
       }
     }
     return played;

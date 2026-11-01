@@ -18,7 +18,7 @@ function setup(on = true, accepts = true) {
   const player = new CaptioningPlayer(
     inner,
     () => on,
-    (t) => shown.push(t),
+    (t) => void shown.push(t),
     () => time,
   );
   return { player, played, shown, advance: (s: number) => (time += s) };
@@ -43,6 +43,22 @@ describe('CaptioningPlayer', () => {
     const c = setup(true, false);
     c.player.playAt(Sound.Chime, 0, 0, 0);
     expect(c.shown).toEqual([]);
+  });
+
+  it('does not count a caption that could not be shown', () => {
+    const played: number[] = [];
+    let visible = false;
+    const shown: string[] = [];
+    const player = new CaptioningPlayer(
+      { playAt: (id) => (played.push(id), true), setLoop: () => undefined, moveLoop: () => undefined },
+      () => true,
+      (t) => (visible ? (shown.push(t), true) : false),
+      () => 0,
+    );
+    player.playAt(Sound.Chime, 0, 0, 0);
+    visible = true;
+    player.playAt(Sound.Chime, 0, 0, 0); // at once: the first one never used the gap
+    expect(shown).toEqual(['[a soft chime]']);
   });
 
   it('leaves a gap between captions so a run of sparkles does not flood the wall', () => {

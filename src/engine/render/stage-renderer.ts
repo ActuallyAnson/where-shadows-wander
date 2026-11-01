@@ -95,6 +95,9 @@ export class StageRenderer {
     return this._liveCount;
   }
 
+  /** Set by the app each frame: a hand's shadow is close to the traveller, so a traveller standing still glances back at it. */
+  glance = false;
+
   /**
    * Updates all live entity transforms and sprite atlas UVs for this frame.
    *
@@ -103,9 +106,6 @@ export class StageRenderer {
    *
    * Zero per-frame allocations.
    */
-  /** Set by the app each frame: a hand's shadow is close to the traveller, so a traveller standing still glances back at it. */
-  glance = false;
-
   update(store: EntityStore, alpha: number): void {
     let liveCount = 0;
     const capacity = store.capacity;

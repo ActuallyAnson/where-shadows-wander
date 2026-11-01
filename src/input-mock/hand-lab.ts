@@ -55,7 +55,7 @@ export interface LabView {
   /** Turns the night back a few seconds (the puzzle is reloaded and its recorded inputs played again): the Rewind button. */
   rewind?: { go(): void };
   /** The level editor for the puzzle being played: `current()` is its editor (null before a puzzle loads); `changed()` loads the puzzle again with the edit. */
-  editor?: { current(): LevelEditor | null; changed(): void };
+  editor?: { open(): void; current(): LevelEditor | null; changed(): void };
   /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
   stage?: { toggle(): void; label(): string };
 }
@@ -71,6 +71,8 @@ export class HandLab {
   private selected: Handedness = 'right';
   /** The level editor row is open. */
   private editing = false;
+  /** The editor the row was last drawn for. */
+  private shownEditor: LevelEditor | null = null;
   private recording: HandRecording | null = null;
   /** A guided recording in progress: prompts every shape and labels the file. */
   private guided: GuidedRecording | null = null;
@@ -314,8 +316,10 @@ export class HandLab {
       else if (act === 'sticker') this.view.sticker?.next();
       else if (act === 'prologue') this.view.prologue?.play();
       else if (act === 'rewind') this.view.rewind?.go();
-      else if (act === 'edit') this.editing = !this.editing;
-      else if (act === 'edit-do') this.editStep(arg as EditAction | 'copy');
+      else if (act === 'edit') {
+        this.editing = !this.editing;
+        if (this.editing) this.view.editor?.open();
+      } else if (act === 'edit-do') this.editStep(arg as EditAction | 'copy');
       else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
@@ -397,6 +401,7 @@ export class HandLab {
 
   private editorRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
     const editor = this.view.editor?.current();
+    this.shownEditor = editor ?? null;
     if (!editor) return '<h2>Level editor</h2><div class="row">No puzzle is loaded yet.</div>';
     const b = (arg: string, label: string, title = '') => btn('edit-do', arg, label, false, title);
     const controls = editor.editable
@@ -410,8 +415,21 @@ export class HandLab {
     const editor = this.view.editor?.current();
     if (!editor) return;
     if (action === 'copy') {
-      void navigator.clipboard?.writeText(editor.toSource());
-      editor.message = 'Copied: paste it into the puzzle file.';
+      const clipboard = navigator.clipboard;
+      if (!clipboard) editor.message = 'This page cannot reach the clipboard (it needs https or localhost).';
+      else {
+        editor.message = 'Copying…';
+        clipboard.writeText(editor.toSource()).then(
+          () => {
+            editor.message = 'Copied: paste it into the puzzle file.';
+            this.renderControls();
+          },
+          () => {
+            editor.message = 'The clipboard said no: click the page and try again.';
+            this.renderControls();
+          },
+        );
+      }
     } else if (editor.run(action)) this.view.editor?.changed();
   }
 
@@ -422,6 +440,9 @@ export class HandLab {
   }
 
   private renderLive(): void {
+    // The editor follows the puzzle: when it changes (solved, restart), the row is drawn again for the new one.
+    const current = this.editing ? (this.view.editor?.current() ?? null) : null;
+    if (this.editing && current !== this.shownEditor) this.renderControls();
     // The default view is from the player's eyes, looking down -Z.
     for (const side of ['right', 'left'] as const) {
       const el = this.root.querySelector(`#lab-hand-${side}`);

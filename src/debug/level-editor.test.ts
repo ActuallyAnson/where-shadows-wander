@@ -3,6 +3,7 @@ import { Game } from '../game/game';
 import { markerOf } from '../game/level';
 import { MAX_PROPS } from '../game/props';
 import { createNight } from '../game/puzzles/index';
+import { Kind } from '../engine/sim/entity-kinds';
 import { LevelEditor, NUDGE_M } from './level-editor';
 
 function setup(index = 0) {
@@ -111,5 +112,27 @@ describe('LevelEditor', () => {
       expect(() => game.restart()).not.toThrow();
       expect(editor.toSource().length).toBeGreaterThan(20);
     }
+  });
+
+  it('keeps what a puzzle has beyond ledges when it writes the code out, and says so when a resize changes nothing', () => {
+    const puzzle = {
+      layout: {
+        traveller: { x: 0, y: 0 },
+        goal: { x: 1, y: 0, width: 0.1, height: 0.2 },
+        markers: [{ tag: 'gap', x: 0.5, y: 0, width: 0.2, height: 0.1 }],
+        pieces: [{ kind: Kind.Rock, x: 0.2, y: 0.1, radius: 0.05 }],
+      },
+      props: [{ id: 'ball', shape: 'sphere' as const, x: 0, y: 0, size: [0.1], solid: false }],
+    };
+    const editor = new LevelEditor(puzzle);
+    const src = editor.toSource();
+    expect(src).toContain('pieces: [');
+    expect(src).toContain('solid: false');
+    expect(src).toContain("{ tag: 'gap', x: 0.5");
+    expect(src).not.toContain('...');
+    editor.selected = 2;
+    expect(editor.run('taller')).toBe(false); // a sphere has no height
+    expect(editor.message).toContain('does not change');
+    expect(editor.run('wider')).toBe(true);
   });
 });

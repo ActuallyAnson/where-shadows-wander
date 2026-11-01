@@ -76,7 +76,7 @@ import { Bus } from '../engine/services/audio/mixer';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
-import { TestStageView } from '../engine/shadow/test-stage-view';
+import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { LevelEditor } from '../debug/level-editor';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
@@ -120,6 +120,18 @@ import { showStartFailure } from './start-failure';
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
+
+/** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
+function audioContextRate(): number {
+  try {
+    const probe = new AudioContext();
+    const rate = probe.sampleRate;
+    void probe.close();
+    return rate;
+  } catch {
+    return 48000;
+  }
+}
 // The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
 const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
@@ -265,7 +277,7 @@ async function start(): Promise<void> {
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
   // The Hand Lab's level editor, for the puzzle being played.
-  let levelEditor: { puzzle: object; editor: LevelEditor } | null = null;
+  const levelEditors = new WeakMap<object, LevelEditor>(); // one per puzzle, so a revert always goes back to how it was written
   const storyLine = new StoryLineView();
   // The captions (a setting): a smaller line of ink low on the wall that names the story's sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
@@ -279,10 +291,9 @@ async function start(): Promise<void> {
   let appliedLevel = 0;
   const handTrail = new HandTrailView();
   /** What the quality level means: the paper's scenery and the rings are switched by it here; the rest are checked where they are used. */
-  const backdropDefault = 0.72;
   const applyGovernor = () => {
     appliedLevel = governor.level;
-    stageView.backdrop = governor.isOn('backdrop') ? backdropDefault : 0;
+    stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
     handTrail.ringsOn = governor.isOn('ring');
   };
   const propSketch = new PropSketchView();
@@ -511,13 +522,18 @@ async function start(): Promise<void> {
     fallback: renderJob,
   });
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
-    void startSoundPrerender(soundPool).then(() => soundPool.dispose());
+    void startSoundPrerender(soundPool, audioContextRate()).then(() => soundPool.dispose());
   });
   const gameAudio = new GameAudio(
     new CaptioningPlayer(
       audio,
       () => settings.value.captions,
-      (text) => captionLine.say(text, 0, 1.6),
+      (text) => {
+        // Not while the room is out of sight (the prologue, the finale): the wall is not shown, and the caption would be lost.
+        if (inVoid || sessionState !== 'playing') return false;
+        captionLine.say(text, 0, 1.6);
+        return true;
+      },
       () => performance.now() / 1000,
     ),
   );
@@ -885,17 +901,19 @@ async function start(): Promise<void> {
       prologue: { play: () => prologue.start() },
       rewind: { go: () => night.rewind(3) },
       editor: {
-        current: () => {
+        open: () => {
           // In the lab there is no opening to start the night: opening the editor does it.
-          if (!night.started) {
-            sessionState = 'playing';
-            candleView.setLocked(true);
-            night.start();
-          }
+          if (night.started) return;
+          sessionState = 'playing';
+          candleView.setLocked(true);
+          night.start();
+        },
+        current: () => {
           const puzzle = night.game?.puzzle;
           if (!puzzle) return null;
-          if (levelEditor?.puzzle !== puzzle) levelEditor = { puzzle, editor: new LevelEditor(puzzle) };
-          return levelEditor.editor;
+          let editor = levelEditors.get(puzzle);
+          if (!editor) levelEditors.set(puzzle, (editor = new LevelEditor(puzzle)));
+          return editor;
         },
         changed: () => night.restart(),
       },
@@ -1110,8 +1128,10 @@ async function start(): Promise<void> {
     // The first time a headset starts the game, the prologue plays before the candle (once; the Testing switch plays it again).
     if (session && !mock && !hasSeenPrologue()) {
       guard('sessionstart: prologue', () => {
-        markPrologueSeen();
-        setTimeout(() => prologue.start(), 800);
+        later(() => {
+          markPrologueSeen(); // only once it plays: leaving at once should not use up the first showing
+          prologue.start();
+        }, 800);
       });
     }
   });
@@ -1141,6 +1161,7 @@ async function start(): Promise<void> {
       prologue.skip();
       finale.skip();
       cancelLater(); // skipping runs the end-of-finale step, which must not show the end screen now
+      fade.setBlack(false); // and a dim that was waiting to lift must not stay
     });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
@@ -1225,8 +1246,8 @@ async function start(): Promise<void> {
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       if (t.cutscene) setTimeout(() => playOpening(), 1000);
       // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
-      if (t.story === 'prologue') setTimeout(() => prologue.start(), 1000);
-      if (t.story === 'finale') setTimeout(() => finale.start(), 1000);
+      if (t.story === 'prologue') later(() => prologue.start(), 1000);
+      if (t.story === 'finale') later(() => finale.start(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
     });
