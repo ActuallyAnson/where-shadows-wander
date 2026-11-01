@@ -586,6 +586,11 @@ async function start(): Promise<void> {
       stageView.setTheme(index);
       roomDressing.setWind(index === 3 ? FAN_WIND : CALM_WIND); // the fan puzzle blows the bunting about
     },
+    rewound: () => {
+      // The night turns back: a quick dip of the view and a soft chime, so the jump is felt as a rewind, not a glitch.
+      fade.fadeTo(0.45, 0.12, () => fade.fadeTo(0, 0.7));
+      gameAudio.twinkleAt(stage, 0, 0);
+    },
     reward: (index) => {
       // The puzzle's own reward, on the paper where the traveller stands.
       if (governor.isOn('reward') && readTraveller())
@@ -849,6 +854,7 @@ async function start(): Promise<void> {
       },
       cutscene: { play: () => playOpening() },
       prologue: { play: () => prologue.start() },
+      rewind: { go: () => night.rewind(3) },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
@@ -1157,11 +1163,13 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
+    night.rewindOnFall = loadTesting().rewindOnFall;
     showMenuChoice(loadTesting().menu);
     setKindred(loadTesting().kindred);
     window.addEventListener(TESTING_EVENT, (e) => {
       const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
       applyOverlays(t);
+      night.rewindOnFall = t.rewindOnFall;
       showMenuChoice(t.menu);
       setKindred(t.kindred);
     });

@@ -29,6 +29,7 @@ describe('parseTesting', () => {
       record: 'shapes',
       menu: 'off',
       story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     });
@@ -52,6 +53,7 @@ describe('buildTesting', () => {
       record: 'free',
       menu: 'off',
       story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     };
@@ -80,6 +82,7 @@ describe('buildTesting', () => {
               record,
               menu: 'off',
               story: 'off',
+              rewindOnFall: false,
               cutscene: false,
               kindred: false,
             };
@@ -120,6 +123,7 @@ describe('remembering the switches (no address needed)', () => {
           record,
           menu: 'pause',
           story: 'off',
+          rewindOnFall: false,
           cutscene: joints,
           kindred: !joints,
         };
@@ -142,6 +146,7 @@ describe('remembering the switches (no address needed)', () => {
       record: 'off',
       menu: 'off',
       story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     });

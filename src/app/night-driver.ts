@@ -15,6 +15,7 @@ import { createSceneProp, propToScene, type PropCaster } from '../game/props';
 import { createNight } from '../game/puzzles/index';
 import { SaveBridge, saveStateFrom, type SaveStore } from '../game/save-bridge';
 import { newSave } from '../game/save-state';
+import { Rewinder } from './rewinder';
 import {
   DIMMING_LINE,
   LINE_DELAY_S,
@@ -71,14 +72,23 @@ export interface NightHost {
   solved(): void;
   /** A soft sound and sparkle at (x, y): a puzzle object changed, or the obstacle eased. */
   twinkle(x: number, y: number): void;
+  /** The night was turned back `seconds` (a fall, or a rewind asked for): a flash and a sound say so. */
+  rewound?(seconds: number): void;
   /** Plays the ending cutscene, then calls onDone. */
   playEnding(onDone: () => void): void;
   /** The night is over: show the end screen. */
   nightOver(): void;
 }
 
+/** How far the night turns back when the traveller falls and "rewind on a fall" is on. */
+export const FALL_REWIND_S = 3;
+
 export class NightDriver {
   game: Game | null = null;
+  /** When on, a fall turns the night back FALL_REWIND_S seconds (instead of leaving the traveller at the start of the puzzle). */
+  rewindOnFall = false;
+  private rewinder: Rewinder | null = null;
+  private fell = false;
   private bridge: SaveBridge | null = null;
   private readonly input: GameInput = {
     dt: 0,
@@ -139,6 +149,16 @@ export class NightDriver {
     if (save.chapterComplete || save.puzzle >= puzzles.length) save = newSave();
     this.game = new Game({ puzzles, save, caster: this.caster });
     this.bridge = new SaveBridge(this.host.saves, this.game);
+    this.rewinder = new Rewinder();
+  }
+
+  /** Turns the night back `seconds` (the puzzle is reloaded and its recorded inputs played again, all but the last `seconds`). Returns whether it did. */
+  rewind(seconds: number): boolean {
+    const game = this.game;
+    if (!game || !this.rewinder) return false;
+    const gone = this.rewinder.rewind(game, seconds);
+    if (gone > 0) this.host.rewound?.(gone);
+    return gone > 0;
   }
 
   /** "Begin this puzzle again". */
@@ -179,9 +199,14 @@ export class NightDriver {
     input.shapeEvents = shapeEvents;
     input.leftTracked = leftTracked;
     input.rightTracked = rightTracked;
+    this.rewinder?.record(input);
     const alpha = game.frame(input);
     this.bridge?.update();
     this.readEvents(game);
+    if (this.fell) {
+      this.fell = false;
+      if (this.rewindOnFall) this.rewind(FALL_REWIND_S);
+    }
     if (this.returnT >= 0 && !paused) {
       this.returnT += dt;
       if (this.returnT >= RETURN_S) {
@@ -199,7 +224,11 @@ export class NightDriver {
       const e = ev.at(i);
       switch (e.type) {
         case 'puzzle-start':
+          this.rewinder?.begin(e.value, game.time);
           this.puzzleStarted(game, e.value);
+          break;
+        case 'traveller-fell':
+          this.fell = true;
           break;
         case 'puzzle-solved': {
           host.solved();

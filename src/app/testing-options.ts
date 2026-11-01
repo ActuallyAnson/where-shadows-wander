@@ -28,6 +28,8 @@ export interface TestingOptions {
   menu: MenuChoice;
   /** A story scene plays a second after the headset session starts (set in the Testing panel; no address form). */
   story: StoryChoice;
+  /** A fall turns the night back three seconds instead of putting the traveller at the start (set in the Testing panel; no address form). */
+  rewindOnFall: boolean;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
@@ -39,6 +41,7 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   record: 'off',
   menu: 'off',
   story: 'off',
+  rewindOnFall: false,
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
@@ -57,6 +60,7 @@ export function parseTesting(search: string): TestingOptions {
     record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
     menu: 'off',
     story: 'off',
+    rewindOnFall: false,
   };
 }
 
@@ -97,6 +101,7 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
   if (o.menu !== 'off') on.push(`${o.menu} screen`);
   if (o.story !== 'off') on.push(`${o.story} scene on entry`);
+  if (o.rewindOnFall) on.push('rewind on a fall');
   return on;
 }
 
@@ -137,6 +142,7 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
       menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
       story: (STORY_CHOICES as readonly string[]).includes(raw.story ?? '') ? (raw.story as StoryChoice) : 'off',
+      rewindOnFall: raw.rewindOnFall === true,
     };
   } catch {
     return { ...DEFAULT_TESTING };

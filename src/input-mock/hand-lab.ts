@@ -51,6 +51,8 @@ export interface LabView {
   sticker?: { next(): void };
   /** The prologue (the story drawn in white calligraphy in a black void): the Prologue button plays it. */
   prologue?: { play(): void };
+  /** Turns the night back a few seconds (the puzzle is reloaded and its recorded inputs played again): the Rewind button. */
+  rewind?: { go(): void };
   /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
   stage?: { toggle(): void; label(): string };
 }
@@ -306,6 +308,7 @@ export class HandLab {
       else if (act === 'ending') this.view.ending?.play();
       else if (act === 'sticker') this.view.sticker?.next();
       else if (act === 'prologue') this.view.prologue?.play();
+      else if (act === 'rewind') this.view.rewind?.go();
       else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
@@ -370,6 +373,7 @@ export class HandLab {
         ${this.view.stage ? btn('stage', '', `Stage: ${this.view.stage.label()}`, false, 'Switch the stand-in stage between the tabletop theatre and a wall-sized one (the tutorial needs the wall)') : ''}
         ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
         ${this.view.prologue ? btn('prologue', '', 'Prologue', false, 'Play the prologue: the story drawn in calligraphy in the dark') : ''}
+        ${this.view.rewind ? btn('rewind', '', 'Rewind 3 s', false, 'Turn the night back three seconds: the puzzle is reloaded and its recorded input played again') : ''}
         ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}
         ${this.view.solve ? btn('solve', '', 'Solve', false, 'Play the solve moment: the wall glows and light bursts out') : ''}
         ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the opening: the title, and the fox drifts in') : ''}
