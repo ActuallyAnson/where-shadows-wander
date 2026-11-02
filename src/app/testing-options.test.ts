@@ -10,6 +10,7 @@ import {
   parseTesting,
   RECORD_CHOICES,
   type TestingOptions,
+  STORY_CHOICES,
 } from './testing-options';
 
 describe('parseTesting', () => {
@@ -27,6 +28,8 @@ describe('parseTesting', () => {
       settings: true,
       record: 'shapes',
       menu: 'off',
+      story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     });
@@ -49,6 +52,8 @@ describe('buildTesting', () => {
       settings: true,
       record: 'free',
       menu: 'off',
+      story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     };
@@ -76,6 +81,8 @@ describe('buildTesting', () => {
               settings,
               record,
               menu: 'off',
+              story: 'off',
+              rewindOnFall: false,
               cutscene: false,
               kindred: false,
             };
@@ -115,6 +122,8 @@ describe('remembering the switches (no address needed)', () => {
           settings: joints,
           record,
           menu: 'pause',
+          story: 'off',
+          rewindOnFall: false,
           cutscene: joints,
           kindred: !joints,
         };
@@ -136,6 +145,8 @@ describe('remembering the switches (no address needed)', () => {
       settings: true,
       record: 'off',
       menu: 'off',
+      story: 'off',
+      rewindOnFall: false,
       cutscene: false,
       kindred: false,
     });
@@ -151,5 +162,26 @@ describe('remembering the switches (no address needed)', () => {
     expect(loadTesting(throwing)).toEqual(DEFAULT_TESTING);
     expect(saveTesting(DEFAULT_TESTING, throwing)).toBe(false);
     expect(saveTesting(DEFAULT_TESTING, null)).toBe(false);
+  });
+});
+
+describe('the story scene switch', () => {
+  it('cycles off, prologue, finale and round again', () => {
+    expect(STORY_CHOICES).toEqual(['off', 'prologue', 'finale']);
+    expect(nextChoice(STORY_CHOICES, 'off')).toBe('prologue');
+    expect(nextChoice(STORY_CHOICES, 'finale')).toBe('off');
+  });
+
+  it('is remembered, and reads as off when the remembered value is not one of them', () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    };
+    saveTesting({ ...DEFAULT_TESTING, story: 'finale' }, storage);
+    expect(loadTesting(storage).story).toBe('finale');
+    store.set('wsw.testing', JSON.stringify({ story: 'something else' }));
+    expect(loadTesting(storage).story).toBe('off');
+    expect(describeTesting({ ...DEFAULT_TESTING, story: 'prologue' })).toContain('prologue scene on entry');
   });
 });

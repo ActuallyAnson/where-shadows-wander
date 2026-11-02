@@ -95,6 +95,9 @@ export class StageRenderer {
     return this._liveCount;
   }
 
+  /** Set by the app each frame: a hand's shadow is close to the traveller, so a traveller standing still glances back at it. */
+  glance = false;
+
   /**
    * Updates all live entity transforms and sprite atlas UVs for this frame.
    *
@@ -148,8 +151,10 @@ export class StageRenderer {
         } else if ((store.flags[s] & Flag.WaitPose) !== 0) {
           animFrame = 3; // wait pose: looking back toward player
         } else {
-          const speed = Math.hypot(vx, vy);
-          if (speed > 0.05) {
+          const speed = Math.sqrt(vx * vx + vy * vy);
+          if (speed <= 0.05 && this.glance) {
+            animFrame = 3; // a hand's shadow is close and it is standing still: it glances back toward it
+          } else if (speed > 0.05) {
             // Walk animation cadence based on stage position
             animFrame = WALK_CYCLE[Math.floor(Math.abs(renderX) * 16) % WALK_CYCLE.length];
           } else {

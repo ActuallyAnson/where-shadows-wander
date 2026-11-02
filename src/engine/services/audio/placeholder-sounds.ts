@@ -5,6 +5,9 @@
 import { Sound, SOUND_DEFS, type SoundId } from './sounds';
 
 const TAU = Math.PI * 2;
+/** The clock and wind loops' lengths, seconds. */
+export const CLOCK_S = 4;
+export const WIND_S = 6;
 /** The candle loop's length, seconds: long enough that the repeat is not noticed. */
 export const CRACKLE_S = 6;
 /** How loud the candle is rendered (the others peak at 0.8): it is a quiet bed, not an event. */
@@ -17,6 +20,12 @@ export const MUSIC_RATE = 22050;
 /** Its length: four chords of six seconds. */
 export const MUSIC_S = 24;
 const MUSIC_PEAK = 0.5;
+
+/**
+ * The lullaby's five notes, in Hz: C5 D5 E5 G5 A5, a rising run of the pentatonic scale that A minor, F, C and G (the music's
+ * chords) all fit, so any of them sounds right over the music, and a few of them alone sound like the start of a tune.
+ */
+export const LULLABY_HZ: readonly number[] = [523.25, 587.33, 659.25, 783.99, 880];
 
 /** How loud each sound is rendered (it peaks here). A loop is a quiet bed, not an event, so it is lower. */
 const PEAK: Readonly<Record<SoundId, number>> = {
@@ -35,6 +44,17 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Music]: MUSIC_PEAK,
   [Sound.Twinkle]: 0.8,
   [Sound.Hop]: 0.8,
+  [Sound.Note0]: 0.8,
+  [Sound.Note1]: 0.8,
+  [Sound.Note2]: 0.8,
+  [Sound.Note3]: 0.8,
+  [Sound.Note4]: 0.8,
+  [Sound.Clock]: 0.5,
+  [Sound.Wind]: 0.35,
+  [Sound.Creak]: 0.7,
+  [Sound.Snowtick]: 0.6,
+  [Sound.Step0]: 0.6,
+  [Sound.Step1]: 0.6,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -47,6 +67,24 @@ export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array
 
 function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
   switch (id) {
+    case Sound.Note0:
+    case Sound.Note1:
+    case Sound.Note2:
+    case Sound.Note3:
+    case Sound.Note4:
+      return musicBoxNote(sr, LULLABY_HZ[id - Sound.Note0]);
+    case Sound.Clock:
+      return clockTick(sr);
+    case Sound.Wind:
+      return wind(sr);
+    case Sound.Creak:
+      return creak(sr);
+    case Sound.Snowtick:
+      return snowTick(sr);
+    case Sound.Step0:
+      return footstep(sr, 0);
+    case Sound.Step1:
+      return footstep(sr, 1);
     case Sound.Twinkle:
       return twinkle(sr);
     case Sound.Hop:
@@ -126,6 +164,122 @@ function twinkle(sr: number): Float32Array<ArrayBuffer> {
       const t = (i - start) / sr;
       out[i] += Math.sin(TAU * notes[k] * t) * Math.exp(-t * 11) * Math.min(1, t / 0.003) * (1 - k * 0.15);
     }
+  }
+  return out;
+}
+
+/**
+ * One music-box note: a bright pluck with a touch of the inharmonic partials a small tuned comb has, ringing out for just under
+ * two seconds. The same shape for every note, so the five make one voice.
+ */
+function musicBoxNote(sr: number, hz: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 1.9);
+  const out = new Float32Array(n);
+  const partials: readonly (readonly [number, number, number])[] = [
+    [1, 1, 2.6],
+    [2.76, 0.38, 4.5],
+    [5.4, 0.16, 8],
+    [8.93, 0.06, 14],
+  ];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    let s = 0;
+    for (let k = 0; k < partials.length; k++)
+      s += Math.sin(TAU * hz * partials[k][0] * t) * partials[k][1] * Math.exp(-t * partials[k][2]);
+    out[i] = s * Math.min(1, t / 0.0015);
+  }
+  return out;
+}
+
+/** A wooden clock's slow tick-tock: four soft knocks a second apart, alternating a little high and a little low. Silent at both ends. */
+function clockTick(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * CLOCK_S);
+  const out = new Float32Array(n);
+  const rnd = seeded(83);
+  for (let k = 0; k < CLOCK_S; k++) {
+    const start = Math.floor(sr * (0.5 + k));
+    const hz = k % 2 === 0 ? 230 : 175;
+    const gain = k % 2 === 0 ? 1 : 0.7;
+    let lp = 0;
+    for (let i = start; i < n && i < start + sr * 0.25; i++) {
+      const t = (i - start) / sr;
+      lp += (rnd() * 2 - 1 - lp) * 0.3;
+      out[i] +=
+        gain * (Math.sin(TAU * hz * t) * Math.exp(-t * 38) + lp * 0.35 * Math.exp(-t * 90)) * Math.min(1, t / 0.001);
+    }
+  }
+  return out;
+}
+
+/** Wind round the house: low, soft noise that swells and settles, with a faint whistle high in it. A loop that joins its own start. */
+function wind(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * WIND_S);
+  // A little more than one loop is made; the extra is blended over the start, so the end runs on into it with no dip.
+  const edge = Math.floor(sr * 0.25);
+  const made = new Float32Array(n + edge);
+  const rnd = seeded(89);
+  let a = 0;
+  let b = 0;
+  for (let i = 0; i < n + edge; i++) {
+    const t = i / sr;
+    a += (rnd() * 2 - 1 - a) * 0.03;
+    b += (a - b) * 0.05;
+    const gust = 0.55 + 0.45 * Math.sin((TAU * t) / WIND_S + 1) * (0.7 + 0.3 * Math.sin((TAU * 2 * t) / WIND_S));
+    const whistle = Math.sin(TAU * (610 + 35 * Math.sin((TAU * t) / WIND_S)) * t) * 0.025;
+    made[i] = (b * 4 + whistle) * gust;
+  }
+  const out = made.slice(0, n);
+  for (let i = 0; i < edge; i++) {
+    const f = i / edge;
+    out[i] = made[i] * f + made[n + i] * (1 - f);
+  }
+  return out;
+}
+
+/** A timber creaking: a low groan that slides down and up, broken into stuttering pulses, over a second. */
+function creak(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 1.1);
+  const out = new Float32Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const hz = 75 + 35 * Math.sin(Math.PI * Math.min(1, t / 1.0)) - 12 * t;
+    phase += (TAU * hz) / sr;
+    const body = Math.sin(phase) * 0.6 + Math.sin(2 * phase) * 0.3 + Math.sin(3 * phase) * 0.15;
+    const stutter = Math.pow(Math.abs(Math.sin(TAU * 13 * t)), 0.5);
+    const env = Math.min(1, t / 0.08) * Math.exp(-Math.max(0, t - 0.3) * 3.2);
+    out[i] = body * stutter * env;
+  }
+  return out;
+}
+
+/** A few flakes ticking on glass: one very small, bright tick. */
+function snowTick(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.06);
+  const out = new Float32Array(n);
+  const rnd = seeded(97);
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const x = rnd() * 2 - 1;
+    lp += (x - lp) * 0.35;
+    out[i] = (x - lp) * Math.exp(-t * 110) * Math.min(1, t / 0.0004);
+  }
+  return out;
+}
+
+/** A small soft footstep (two variants, a little different): a low, muffled pat of a boot on paper. */
+function footstep(sr: number, variant: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 0.1);
+  const out = new Float32Array(n);
+  const rnd = seeded(101 + variant);
+  let lp = 0;
+  const hz = variant === 0 ? 150 : 125;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    lp += (rnd() * 2 - 1 - lp) * 0.12;
+    out[i] =
+      (Math.sin(TAU * (hz - 55 * t) * t) * Math.exp(-t * 45) + lp * 0.5 * Math.exp(-t * 60)) * Math.min(1, t / 0.0015);
   }
   return out;
 }
@@ -460,8 +614,27 @@ export function prewarmMusic(): void {
   if (!prewarmed.has(Sound.Music)) prewarmed.set(Sound.Music, renderPlaceholder(Sound.Music, MUSIC_RATE));
 }
 
+/** Sounds rendered ahead by a worker (sound-prerender.ts), by sound and rate, to be handed over once. */
+const prerendered = new Map<string, Float32Array<ArrayBuffer>>();
+const prerenderKey = (id: SoundId, rate: number) => `${id}@${rate}`;
+
+/** Keeps a sound rendered somewhere else (a worker) for `takeSamples` to hand over. */
+export function storePrerendered(id: SoundId, rate: number, samples: Float32Array<ArrayBuffer>): void {
+  prerendered.set(prerenderKey(id, rate), samples);
+}
+
+/** How many sounds are waiting rendered (for the report and the tests). */
+export function prerenderedCount(): number {
+  return prerendered.size;
+}
+
 /** The samples for `id` at `rate`: the prewarmed ones if they are at that rate (handed over once), else rendered now. */
 export function takeSamples(id: SoundId, rate: number): Float32Array<ArrayBuffer> {
+  const ahead = prerendered.get(prerenderKey(id, rate));
+  if (ahead) {
+    prerendered.delete(prerenderKey(id, rate));
+    return ahead;
+  }
   const ready = prewarmed.get(id);
   if (ready && rate === MUSIC_RATE) {
     prewarmed.delete(id);

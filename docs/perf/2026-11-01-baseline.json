@@ -1,0 +1,49 @@
+{
+  "label": "baseline (feat/polish-cinematics)",
+  "url": "https://localhost:8115/?mock=1",
+  "runs": 3,
+  "startupMs": 3782,
+  "heapMb": 98.22845458984375,
+  "states": [
+    {
+      "state": "room",
+      "renderMs": 25,
+      "calls": 52,
+      "triangles": 4850,
+      "textures": 44,
+      "textureMb": 56.7,
+      "allocBytesPerFrame": 1096,
+      "ourAllocBytesPerFrame": 30
+    },
+    {
+      "state": "room + spark + reward",
+      "renderMs": 24.8,
+      "calls": 54,
+      "triangles": 4850,
+      "textures": 45,
+      "textureMb": 56.7,
+      "allocBytesPerFrame": 218,
+      "ourAllocBytesPerFrame": 16
+    },
+    {
+      "state": "opening reel",
+      "renderMs": 20.9,
+      "calls": 47,
+      "triangles": 3012,
+      "textures": 64,
+      "textureMb": 56.7,
+      "allocBytesPerFrame": 348,
+      "ourAllocBytesPerFrame": 31
+    },
+    {
+      "state": "finale hall",
+      "renderMs": 19.1,
+      "calls": 37,
+      "triangles": 2992,
+      "textures": 79,
+      "textureMb": 56.7,
+      "allocBytesPerFrame": 229,
+      "ourAllocBytesPerFrame": 20
+    }
+  ]
+}

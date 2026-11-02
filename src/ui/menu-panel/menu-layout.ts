@@ -55,6 +55,9 @@ export const THROUGH_M = 0.06;
 export const PRESS_M = 0.02;
 export const REARM_M = 0.05;
 
+/** How long the head must stay pointed at an item before it presses, seconds (gaze: for players who cannot poke). */
+export const GAZE_DWELL_S = 1.4;
+
 export interface MenuInputState {
   /** The item a fingertip is reaching, or -1. */
   hover: number;
@@ -99,9 +102,65 @@ export class MenuInput {
     return this.state;
   }
 
+  /** How far the gaze has come to pressing the item it rests on, 0 to 1, and which item that is (-1 for none). */
+  dwell = 0;
+  dwellItem = -1;
+  private gazeArmed = true;
+
+  /**
+   * Gaze instead of a fingertip: the head's ray (from `o` along unit `d`, scene space) meets the screen at some item, and resting there for
+   * `dwellS` seconds presses it. Looking away re-arms it, so a held look presses once. Returns the same state record as `update`.
+   */
+  gaze(
+    screen: MenuScreen | MenuHits,
+    plane: MenuPlane,
+    o: ArrayLike<number>,
+    d: ArrayLike<number>,
+    dt: number,
+    dwellS = GAZE_DWELL_S,
+  ): MenuInputState {
+    const p = plane.origin,
+      r = plane.right,
+      u = plane.up,
+      n = plane.normal;
+    this.state.hover = -1;
+    this.state.pressed = -1;
+    const facing = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+    let item = -1;
+    if (Math.abs(facing) > 1e-6) {
+      const t = ((p[0] - o[0]) * n[0] + (p[1] - o[1]) * n[1] + (p[2] - o[2]) * n[2]) / facing;
+      if (t > 0) {
+        const hx = o[0] + d[0] * t - p[0],
+          hy = o[1] + d[1] * t - p[1],
+          hz = o[2] + d[2] * t - p[2];
+        const pu = (hx * r[0] + hy * r[1] + hz * r[2]) / MENU_SIZE_M + 0.5;
+        const pv = 0.5 - (hx * u[0] + hy * u[1] + hz * u[2]) / MENU_SIZE_M;
+        item = 'hitAt' in screen ? screen.hitAt(pu, pv) : itemAt(screen, pu, pv);
+      }
+    }
+    if (item !== this.dwellItem) {
+      this.dwellItem = item;
+      this.dwell = 0;
+      if (item < 0) this.gazeArmed = true;
+    }
+    this.state.hover = item;
+    if (item >= 0 && this.gazeArmed) {
+      this.dwell = Math.min(1, this.dwell + (dt > 0 ? dt : 0) / dwellS);
+      if (this.dwell >= 1) {
+        this.state.pressed = item;
+        this.gazeArmed = false;
+        this.dwell = 0;
+      }
+    }
+    return this.state;
+  }
+
   /** Forget a held press (the screen changed). */
   reset(): void {
     this.armed = false; // a finger already on the new screen must be withdrawn before it presses
+    this.gazeArmed = false; // and a look already resting on an item must move off first
+    this.dwell = 0;
+    this.dwellItem = -1;
     this.state.hover = -1;
     this.state.pressed = -1;
   }

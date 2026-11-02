@@ -13,6 +13,7 @@ import {
   paintWallThings,
   paintWood,
 } from './room-art';
+import { RenderOrder } from './pure/render-order';
 import { RoomDressingView } from './room-dressing-view';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
@@ -74,7 +75,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(23);
+    expect(v.group.children).toHaveLength(25);
     v.dispose();
   });
 
@@ -151,6 +152,39 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
+  it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
+    const v = new RoomDressingView();
+    const glow = () => {
+      const mesh = v.group.children.find(
+        (c) =>
+          c.renderOrder === RenderOrder.wonder &&
+          (c as unknown as { geometry: { attributes: { color?: unknown } } }).geometry.attributes.color,
+      ) as unknown as {
+        geometry: { attributes: { color: { array: Float32Array } } };
+      };
+      return Array.from(mesh.geometry.attributes.color.array).reduce((a, b) => a + b, 0);
+    };
+    v.update(light(true, 1), 1, [0, 1.2, -1]);
+    v.tick(0.1);
+    expect(glow()).toBe(0); // nothing is lit yet
+    v.setAwake(1);
+    for (let i = 0; i < 80; i++) v.tick(0.05);
+    const one = glow();
+    expect(one).toBeGreaterThan(0);
+    v.setAwake(3);
+    for (let i = 0; i < 80; i++) v.tick(0.05);
+    const three = glow();
+    expect(three).toBeGreaterThan(one * 1.5);
+    v.setAwake(99); // more than there are: all of them
+    for (let i = 0; i < 200; i++) v.tick(0.05);
+    expect(glow()).toBeGreaterThan(three);
+    v.setAwake(0);
+    for (let i = 0; i < 200; i++) v.tick(0.05);
+    expect(glow()).toBeCloseTo(0, 5);
+    v.setAwake(NaN);
+    v.dispose();
+  });
+
   it('keeps the window one cool colour whatever the room does, and dims the moon patch under the candle', () => {
     const v = new RoomDressingView();
     const meshes = v.group.children as unknown as { material: { color: { r: number; g: number; b: number } } }[];
@@ -197,5 +231,19 @@ describe('RoomDressingView', () => {
   it('disposes cleanly', () => {
     const v = new RoomDressingView();
     expect(() => v.dispose()).not.toThrow();
+  });
+
+  it('has live bunting that sways, can be blown by the wind, and rippled when the spark lands', () => {
+    const v = new RoomDressingView();
+    const motion = () => (v as unknown as { bunting: { motion: number } }).bunting.motion;
+    for (let i = 0; i < 240; i++) v.tick(1 / 60);
+    expect(motion()).toBeGreaterThan(0);
+    v.setWind(0);
+    for (let i = 0; i < 60 * 25; i++) v.tick(1 / 60);
+    const quiet = motion();
+    v.rippleBunting();
+    for (let i = 0; i < 20; i++) v.tick(1 / 60);
+    expect(motion()).toBeGreaterThan(quiet);
+    v.dispose();
   });
 });

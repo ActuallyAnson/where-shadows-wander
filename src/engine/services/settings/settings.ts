@@ -20,10 +20,14 @@ export interface Settings {
   volumeMusic: number;
   volumeEffects: number;
   volumeAmbience: number;
+  /** How large the wall's writing is, 1 (natural) to 1.5. */
+  textSize: number;
   /** Pure black on bright white, no paper texture. */
   highContrast: boolean;
-  /** Text captions for the traveller's sounds and story beats (stub until story beats exist). */
+  /** Text captions for the traveller's sounds and story beats . */
   captions: boolean;
+  /** Press the pause, solved and end screens' buttons by looking at them for a moment, for players who cannot poke. */
+  gazeMenus: boolean;
   /** The hand the panel listens to and opens beside; the game may read it as the player's main hand. */
   hand: Hand;
 }
@@ -45,7 +49,7 @@ export interface NumberSpec {
 }
 export interface ToggleSpec {
   kind: 'toggle';
-  key: 'highContrast' | 'captions';
+  key: 'highContrast' | 'captions' | 'gazeMenus';
   label: string;
   help: string;
   default: boolean;
@@ -155,6 +159,16 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     default: 0.6,
   },
   {
+    kind: 'number',
+    key: 'textSize',
+    label: 'Wall text size',
+    help: "How large the story's writing and the captions are on the wall.",
+    min: 1,
+    max: 1.5,
+    step: 0.1,
+    default: 1,
+  },
+  {
     kind: 'toggle',
     key: 'highContrast',
     label: 'High contrast',
@@ -165,7 +179,14 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     kind: 'toggle',
     key: 'captions',
     label: 'Captions',
-    help: 'Shows text for sounds and story moments (coming with the story).',
+    help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or a creak.',
+    default: false,
+  },
+  {
+    kind: 'toggle',
+    key: 'gazeMenus',
+    label: 'Look to press',
+    help: 'Press a menu button by looking at it for a moment, with no poke needed.',
     default: false,
   },
   {

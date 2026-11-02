@@ -5,6 +5,7 @@
 import {
   AdditiveBlending,
   BoxGeometry,
+  BufferGeometry,
   CanvasTexture,
   Color,
   DoubleSide,
@@ -17,7 +18,8 @@ import {
   SRGBColorSpace,
   Vector3,
 } from '@iwsdk/core';
-import type { BufferGeometry, Material } from '@iwsdk/core';
+import type { Material } from '@iwsdk/core';
+import { BuntingView } from './bunting-view';
 import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
@@ -38,6 +40,7 @@ import {
   paintWood,
   WALL_THINGS,
 } from './room-art';
+import { RenderOrder } from './pure/render-order';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -80,6 +83,43 @@ const LIT_PEAK = 0.8;
 const FLICKER = 0.1;
 /** The flame has to move this far (m) before the walls' light is worked out again. */
 const FLAME_MOVE = 0.02;
+
+/** Things in the room that light up as the night goes, one more for each puzzle solved. */
+const WONDERS = 5;
+/** Seconds a wonder takes to come on (or go out). */
+const WONDER_EASE_S = 2.2;
+/** In front of the room's walls, to draw over them, added to what is under it. */
+const WONDER_ORDER = RenderOrder.wonder;
+/** How strongly the glows add to what is under them (they are magic, not floodlights). */
+const WONDER_GAIN = 0.75;
+
+interface GlowSpec {
+  /** Which wonder (0 .. WONDERS - 1) lights it. */
+  readonly wonder: number;
+  /** Where its middle is: on the wall behind the stage in that wall's 1024 by 640 units (`wall`), or in the room in metres. */
+  readonly wall?: readonly [number, number, number];
+  readonly at?: readonly [number, number, number];
+  readonly size: readonly [number, number];
+  /** Which way it faces: the player (+z), into the room from the left wall (+x), or from the right wall (-x). */
+  readonly facing: 'z' | '+x' | '-x';
+  readonly colour: readonly [number, number, number];
+}
+
+/**
+ * What lights up, in order: the lamp on the shelf, the bunting along the rail, the two pictures (the moon and the hill of stars),
+ * the globe on the bookcase, then the window (the sill's candle, and the night outside brightening). `wall` is (x, y, lift in
+ * metres off the paper).
+ */
+const GLOWS: readonly GlowSpec[] = [
+  { wonder: 0, wall: [889, 292, 0.12], size: [0.5, 0.5], facing: 'z', colour: [1, 0.72, 0.36] },
+  { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
+  { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
+  { wonder: 2, wall: [220, 391, 0.06], size: [0.55, 0.45], facing: 'z', colour: [0.7, 0.8, 1] },
+  { wonder: 2, wall: [875, 210, 0.06], size: [0.72, 0.58], facing: 'z', colour: [0.5, 0.65, 1] },
+  { wonder: 3, at: [1.8, 1.76, -1.25], size: [0.42, 0.42], facing: '-x', colour: [0.45, 0.95, 0.75] },
+  { wonder: 4, at: [-1.9, 0.99, -0.71], size: [0.3, 0.3], facing: '+x', colour: [1, 0.7, 0.35] },
+  { wonder: 4, at: [-1.96, 1.45, -0.8], size: [1.1, 1.3], facing: '+x', colour: [0.3, 0.5, 0.6] },
+];
 
 const MOON_TINT = new Color(0.2, 0.25, 0.4);
 const CANDLE_TINT = new Color(1.0, 0.82, 0.6);
@@ -127,6 +167,18 @@ export class RoomDressingView {
   private readonly flame = new Vector3();
   private readonly spot = new Vector3();
   private flameOn = false;
+  /** The wonders' glow: how lit each is (0..1), how many should be lit, and the one mesh that draws them all. */
+  private readonly levels = new Float32Array(WONDERS);
+  private awakeCount = 0;
+  private wondersWereOn = false;
+  /** The swinging bunting along the picture rail on the wall behind the stage. */
+  private readonly bunting = new BuntingView();
+  /** How far in front of the player the wall behind the stage is (z in the room's space), set by `place`. */
+  private wallZ = -2.35;
+  private warmNow = 0;
+  private wonders: Mesh;
+  private readonly wonderMat: MeshBasicMaterial;
+  private readonly wonderTexture: CanvasTexture;
 
   constructor() {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
@@ -138,7 +190,7 @@ export class RoomDressingView {
     );
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
-      paintWall(g, w, h);
+      paintWall(g, w, h, false); // the bunting here is alive (bunting-view.ts)
       WALL_THINGS.forEach((spec, i) => {
         const far = spec.layer === 'shelves';
         castShadow(
@@ -161,7 +213,7 @@ export class RoomDressingView {
     });
 
     // The same paper and panelling on the two side walls (one material for both).
-    const sideTexture = this.texture(paintedCanvas(1280, 640, (g, w, h) => paintWall(g, w, h)));
+    const sideTexture = this.texture(paintedCanvas(800, 400, (g, w, h) => paintWall(g, w, h)));
     const left = this.quad(5, 2.5, sideTexture, false, true, undefined, [20, 10]);
     left.rotation.y = Math.PI / 2;
     left.position.set(-1.995, 1.25, -0.4);
@@ -339,8 +391,35 @@ export class RoomDressingView {
       caseBox,
       ...bed,
     );
+    // The wonders: soft glows, all in one mesh (vertex colours say how lit each is), added over what they light.
+    this.wonderTexture = this.texture(
+      paintedCanvas(128, 128, (g, w, h) => {
+        const glow = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        glow.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        glow.addColorStop(0.35, 'rgba(255, 255, 255, 0.4)');
+        glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        g.fillStyle = glow;
+        g.fillRect(0, 0, w, h);
+      }),
+    );
+    this.wonderMat = new MeshBasicMaterial({
+      map: this.wonderTexture,
+      vertexColors: true,
+      transparent: true,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      side: DoubleSide,
+      toneMapped: false,
+    });
+    this.wonders = new Mesh(new BufferGeometry(), this.wonderMat);
+    this.wonders.renderOrder = WONDER_ORDER;
+    this.wonders.frustumCulled = false; // its glows are spread over the whole room
+    this.wonders.matrixAutoUpdate = false;
+    this.group.add(this.wonders);
     this.vertexLit.push(this.wall, left, right);
-    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed);
+    this.group.add(this.bunting.mesh);
+    this.materials.push(this.bunting.material);
+    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
     for (const m of [...this.vertexLit, ...this.centreLit]) {
       this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
     }
@@ -399,6 +478,7 @@ export class RoomDressingView {
   /** Puts the wallpaper wall just in front of Damon's front wall, and the pictures and shelves in front of that (`stageDist` is how far the stage is from the player). */
   place(stageDist = 2.0): void {
     const z = -(Math.max(stageDist, 1.5) + 0.35) + 0.012;
+    this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
     WALL_THINGS.forEach((spec, i) => {
@@ -410,6 +490,8 @@ export class RoomDressingView {
       );
       m.updateMatrix();
     });
+    this.bunting.place(z + 0.05);
+    this.buildWonders(z);
     this.relight();
   }
 
@@ -420,6 +502,7 @@ export class RoomDressingView {
   update(light: Readonly<LanternLight>, occlusion = 1, flame?: ArrayLike<number>): void {
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
     const warm = Math.min(1, Math.max(0, (brightness - 0.04) / 0.5));
+    this.warmNow = warm;
     this.tint.copy(MOON_TINT).lerp(CANDLE_TINT, warm);
     const k = 0.5 + 0.5 * Math.min(1, brightness);
     this.tint.multiplyScalar(warm > 0 ? k * LIT_PEAK : 1);
@@ -482,6 +565,72 @@ export class RoomDressingView {
     }
   }
 
+  /** Where the sleeper `index` (0 = the lamp .. 4 = the window) is, in the world: the point the spark flies to. Writes into `out` and returns it. */
+  wakePoint(index: number, out: Vector3): Vector3 {
+    const i = Math.max(0, Math.min(WONDERS - 1, Math.floor(index) || 0));
+    const spec = GLOWS.find((g) => g.wonder === i) ?? GLOWS[0];
+    if (spec.wall) out.set((spec.wall[0] / 1024) * 4 - 2, 2.5 - (spec.wall[1] / 640) * 2.5, this.wallZ + spec.wall[2]);
+    else out.set(spec.at![0], spec.at![1], spec.at![2]);
+    this.group.updateWorldMatrix(true, false);
+    return this.group.localToWorld(out);
+  }
+
+  /** The wind along the wall, for the bunting (the fan puzzle blows it hard; see bunting-view.ts). */
+  setWind(wind: number): void {
+    this.bunting.setWind(wind);
+  }
+
+  /** Sets the bunting swinging from where the spark lands on it. */
+  rippleBunting(): void {
+    this.bunting.ripple(-1.0, 2.02, 3.5, 0.7);
+  }
+
+  /** Lights the room's wonders up to `count` of them, in order (each eases on over a couple of seconds; fewer than before puts the later ones out). */
+  setAwake(count: number): void {
+    this.awakeCount = Math.max(0, Math.min(WONDERS, Math.floor(count) || 0));
+  }
+
+  /** (Re)builds the one mesh of glows: those on the wall follow the wall's depth `z`. */
+  private buildWonders(z: number): void {
+    const parts: { geo: BufferGeometry; x: number; y: number; z: number }[] = [];
+    for (const spec of GLOWS) {
+      const geo = new PlaneGeometry(spec.size[0], spec.size[1]);
+      if (spec.facing === '+x') geo.rotateY(Math.PI / 2);
+      else if (spec.facing === '-x') geo.rotateY(-Math.PI / 2);
+      if (spec.wall) {
+        parts.push({
+          geo,
+          x: (spec.wall[0] / 1024) * 4 - 2,
+          y: 2.5 - (spec.wall[1] / 640) * 2.5,
+          z: z + spec.wall[2],
+        });
+      } else {
+        parts.push({ geo, x: spec.at![0], y: spec.at![1], z: spec.at![2] });
+      }
+    }
+    const merged = mergeBoxes(parts);
+    for (const p of parts) p.geo.dispose();
+    merged.setAttribute('color', new Float32BufferAttribute(new Float32Array(GLOWS.length * 4 * 3), 3));
+    this.wonders.geometry.dispose();
+    this.wonders.geometry = merged;
+    this.paintWonders();
+  }
+
+  /** Sets every glow's colour from how lit its wonder is now (a small flicker, dimmer when the candle is covered). */
+  private paintWonders(): void {
+    const color = this.wonders.geometry.attributes.color;
+    if (!color) return;
+    const dim = 0.35 + 0.65 * this.warmNow;
+    for (let i = 0; i < GLOWS.length; i++) {
+      const spec = GLOWS[i];
+      const level = this.levels[spec.wonder];
+      const shimmer = 0.88 + 0.12 * Math.sin(this.time * (2.6 + spec.wonder * 0.7) + i * 1.9);
+      const k = level * dim * shimmer * WONDER_GAIN;
+      for (let v = 0; v < 4; v++) color.setXYZ(i * 4 + v, spec.colour[0] * k, spec.colour[1] * k, spec.colour[2] * k);
+    }
+    color.needsUpdate = true;
+  }
+
   /**
    * Moves the snow outside the window and slides the outside layers against each other for where the head is (call once a frame
    * with the frame's seconds and the head's world position). Allocates nothing.
@@ -490,11 +639,28 @@ export class RoomDressingView {
     if (headWorld) this.slideOutside(this.group.worldToLocal(this.head.set(headWorld.x, headWorld.y, headWorld.z)));
     if (!(dt > 0)) return;
     this.time += Math.min(dt, 0.1);
+    this.easeWonders(Math.min(dt, 0.1));
+    this.bunting.update(Math.min(dt, 0.1));
     for (let i = 0; i < this.snow.length; i++) {
       const t = this.snow[i];
       t.offset.y += Math.min(dt, 0.1) * SNOW_FALL[i];
       t.offset.x = Math.sin(this.time * (0.5 + i * 0.3)) * SNOW_SWAY[i];
     }
+  }
+
+  private easeWonders(dt: number): void {
+    let any = false;
+    for (let i = 0; i < WONDERS; i++) {
+      const goal = i < this.awakeCount ? 1 : 0;
+      const step = dt / WONDER_EASE_S;
+      this.levels[i] = Math.max(
+        0,
+        Math.min(1, this.levels[i] + Math.max(-step, Math.min(step, goal - this.levels[i]))),
+      );
+      if (this.levels[i] > 0) any = true;
+    }
+    if (any || this.wondersWereOn) this.paintWonders();
+    this.wondersWereOn = any;
   }
 
   /** A layer's picture slides across the window with the head, by less the nearer the layer is, and never past its painted margin. */
@@ -517,6 +683,9 @@ export class RoomDressingView {
   }
 
   dispose(): void {
+    this.wonders.geometry.dispose();
+    this.wonderMat.dispose();
+    this.bunting.dispose();
     for (const t of this.textures) t.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials as Material[]) m.dispose();

@@ -1,3 +1,4 @@
+import { DIMMING_LINE, PUZZLE_LINES, RETURN_LINE, WAKE_LINES } from './story';
 import { describe, expect, it } from 'vitest';
 import { createHandShadow, type HandShadow } from '../engine/hands/hand-shadow';
 import { ShapeEventQueue } from '../engine/hands/shape-events';
@@ -23,7 +24,21 @@ function setup(flameAt?: readonly number[]) {
   if (flameAt) flame.set(flameAt);
   else placeLantern(head, 0, flame);
   const calls: string[] = [];
-  const state = { mood: 0, props: 0, hint: '' as Shape | '', perched: false, away: false, ended: false };
+  const state = {
+    awake: -1,
+    woke: [] as number[],
+    rewoundBy: [] as number[],
+    rewards: [] as number[],
+    scenery: [] as number[],
+    said: [] as string[],
+    notes: [] as string[],
+    mood: 0,
+    props: 0,
+    hint: '' as Shape | '',
+    perched: false,
+    away: false,
+    ended: false,
+  };
   const saves = new SaveManager({ store: new MemoryStore(), prefix: 'test' });
   saves.load();
   const host: NightHost = {
@@ -42,6 +57,13 @@ function setup(flameAt?: readonly number[]) {
     dim: () => void calls.push('dim'),
     setKindredAway: (away) => void (state.away = away),
     setMood: (goal) => void (state.mood = goal),
+    say: (text) => void state.said.push(text),
+    note: (text) => void state.notes.push(text),
+    scenery: (index) => void state.scenery.push(index),
+    reward: (index) => void state.rewards.push(index),
+    wake: (index) => void state.woke.push(index),
+    rewound: (seconds) => void state.rewoundBy.push(seconds),
+    setAwake: (count) => void (state.awake = count),
     solved: () => void calls.push('solved'),
     twinkle: () => void calls.push('twinkle'),
     playEnding: (onDone) => {
@@ -88,6 +110,9 @@ describe('NightDriver', () => {
     expect(driver.game?.puzzle.id).toBe('n1-books');
     expect(state.props).toBe(2);
     expect(state.mood).toBe(NIGHT_MOOD[0]);
+    expect(state.awake).toBe(0); // nothing in the room is lit yet
+    expect(state.scenery).toEqual([0]); // the first puzzle's scenery is up
+    expect(state.said).toEqual([PUZZLE_LINES[0]]);
   });
 
   // The candle on the bed tray, as main.ts places it for eyes at 1.2 m: 0.45 m ahead, its flame at 0.805 m.
@@ -115,7 +140,39 @@ describe('NightDriver', () => {
     pose('right', 'flat', 0, LEDGE_TOP - 0.01);
     expect(run(25, () => calls.includes('solved'))).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[1]);
+    expect(state.woke).toEqual([0]); // the spark goes to the lamp
+    expect(state.rewards).toEqual([0]); // and the puzzle's own reward plays on the paper
+    expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
+  });
+
+  it('counts the ways found and says nothing about another way after the tutorial, which has only one', () => {
+    const { driver, state, calls, run, pose } = setup();
+    driver.start();
+    expect(driver.waysFound()).toEqual({ found: 0, total: 9 });
+    run(4);
+    pose('right', 'flat', 0, LEDGE_TOP - 0.01);
+    expect(run(25, () => calls.includes('solved'))).toBe(true);
+    expect(driver.waysFound()).toEqual({ found: 1, total: 9 });
+    expect(state.notes).toEqual([]);
+  });
+
+  it('hints that another way exists after a solve with ways left', () => {
+    const { driver, state, run } = setup();
+    driver.start();
+    const game = driver.game!;
+    game.goto(1);
+    run(DT);
+    game.save.solutions[game.puzzle.id] = [game.puzzle.solutions[0]]; // one way found, as a solve records it
+    (game.events as unknown as { push(t: string, id: string, time: number, a: number, b: number): void }).push(
+      'puzzle-solved',
+      game.puzzle.solutions[0],
+      game.time,
+      1,
+      1,
+    );
+    (driver as unknown as { readEvents(g: unknown): void }).readEvents(game);
+    expect(state.notes).toEqual(['There is another way through.']);
   });
 
   it('shows the outline, then perches the kindred, while the player waits', () => {
@@ -138,6 +195,7 @@ describe('NightDriver', () => {
     expect(calls).toContain('dim');
     expect(state.away).toBe(true);
     expect(state.mood).toBe(NIGHT_MOOD[DIMMING_AT]);
+    expect(state.said).toContain(DIMMING_LINE);
   });
 
   it('ends the night: the return, then the ending, then the end screen', () => {
@@ -151,6 +209,8 @@ describe('NightDriver', () => {
     pose('left', 'flat', 0.01, LEDGE_TOP - 0.01);
     expect(run(40, () => driver.game!.complete)).toBe(true);
     expect(state.mood).toBe(RETURN_MOOD);
+    expect(state.woke).toContain(4); // the last spark goes to the window
+    expect(state.said).toContain(RETURN_LINE);
     expect(state.away).toBe(false);
     expect(state.perched).toBe(true);
     expect(calls).not.toContain('ending');
@@ -165,5 +225,37 @@ describe('NightDriver', () => {
     driver.start();
     expect(driver.game?.puzzle.id).toBe('n1-books');
     expect(driver.game?.complete).toBe(false);
+  });
+
+  it('turns the night back: the puzzle is reloaded and its recorded input played again, and the app is told', () => {
+    const { driver, state, run } = setup();
+    expect(driver.rewind(2)).toBe(false); // before the night starts
+    driver.start();
+    run(6);
+    const game = driver.game!;
+    const before = game.time;
+    expect(driver.rewind(2)).toBe(true);
+    expect(state.rewoundBy).toHaveLength(1);
+    expect(state.rewoundBy[0]).toBeGreaterThanOrEqual(2);
+    expect(game.time).toBeLessThan(before - 1.5); // the clock is back too
+    run(2); // and play goes on from there
+    expect(game.time).toBeGreaterThan(before - 1.5);
+    expect(driver.rewind(0)).toBe(false);
+  });
+
+  it('does not rewind on a fall unless it is switched on', () => {
+    const { driver, state, run } = setup();
+    driver.start();
+    run(4);
+    expect(driver.rewindOnFall).toBe(false);
+    // (A real fall is hard to stage in a unit test; the driver notes one by setting `fell` when the game's event comes.)
+    const fall = () => ((driver as unknown as { fell: boolean }).fell = true);
+    fall();
+    run(0.05);
+    expect(state.rewoundBy).toHaveLength(0);
+    driver.rewindOnFall = true;
+    fall();
+    run(0.05);
+    expect(state.rewoundBy).toHaveLength(1);
   });
 });

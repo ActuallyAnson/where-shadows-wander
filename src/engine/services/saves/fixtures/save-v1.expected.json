@@ -34,8 +34,10 @@
     "volumeMusic": 0.7,
     "volumeEffects": 1,
     "volumeAmbience": 0.6,
+    "textSize": 1,
     "highContrast": false,
     "captions": false,
+    "gazeMenus": false,
     "hand": "right"
   },
   "settingsAt": 0

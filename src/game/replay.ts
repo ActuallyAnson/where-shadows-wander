@@ -52,6 +52,15 @@ export class InputRecorder {
     this.commandArg = new Int16Array(maxFrames);
   }
 
+  /** Forgets every recorded frame (the memory is kept), to record again from the start. */
+  reset(): void {
+    this.frames = 0;
+    this.full = false;
+    this.eventsDropped = 0;
+    this.command[0] = 0;
+    this.commandArg[0] = 0;
+  }
+
   /**
    * Notes a game.restart() or game.goto(i) made before the next frame, so a replay does the same.
    * Call it alongside the command.

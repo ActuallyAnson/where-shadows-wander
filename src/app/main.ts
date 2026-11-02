@@ -13,6 +13,7 @@ import {
   World,
   createSystem,
 } from '@iwsdk/core';
+import type { Object3D } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
@@ -43,12 +44,27 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
-import { ENDING, ENDING_MOOD } from './ending';
-import { OPENING, openingFoxAlpha } from './opening';
+import { ENDING_MOOD } from './ending';
+import { OPENING, OPENING_S, openingFoxAlpha } from './opening';
+import { SkipTouch } from '../engine/shadow/pure/skip-touch';
+import { stagePoint } from '../engine/services/audio/stage-point';
+import { FINALE_PAGES, hasSeenPrologue, markPrologueSeen, Prologue, PrologueReel, type PrologueHost } from './prologue';
 import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
 import { KindredView } from '../engine/shadow/kindred-view';
 import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
 import { StickerView } from '../engine/shadow/sticker-view';
+import { CRYSTAL } from '../engine/shadow/cinematic-art';
+import { CinematicScene } from '../engine/shadow/cinematic-scene';
+import { FrameInspector } from './frame-inspector';
+import { CALM_WIND, FAN_WIND } from '../engine/shadow/bunting-view';
+import { FadeView } from '../engine/shadow/fade-view';
+import { HandTrailView } from '../engine/shadow/hand-trail-view';
+import { ReadingPageView } from '../engine/shadow/reading-page-view';
+import { PropSketchView } from '../engine/shadow/prop-sketch-view';
+import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
+import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
+import { SparkFlightView } from '../engine/shadow/spark-flight-view';
+import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GlowView } from '../engine/shadow/glow-view';
 import { AirView } from '../engine/shadow/air-view';
 import { RabbitView } from '../engine/shadow/rabbit-view';
@@ -60,9 +76,13 @@ import { Bus } from '../engine/services/audio/mixer';
 import { CutsceneView } from '../engine/shadow/cutscene-view';
 import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
-import { TestStageView } from '../engine/shadow/test-stage-view';
+import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
-import { prewarmMusic } from '../engine/services/audio/placeholder-sounds';
+import { LevelEditor } from '../debug/level-editor';
+import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
+import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
+import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
+import { TaskPool, type WorkerLike } from '../engine/services/workers/task-pool';
 import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-audio-engine';
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
@@ -91,6 +111,8 @@ import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
+import { endLine } from './journal';
+import { MENU_SCREENS } from '../ui/menu-panel/screens';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -100,6 +122,18 @@ import { showStartFailure } from './start-failure';
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 const mockOptions = mockOptionsFromUrl(location.search);
+
+/** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
+function audioContextRate(): number {
+  try {
+    const probe = new AudioContext();
+    const rate = probe.sampleRate;
+    void probe.close();
+    return rate;
+  } catch {
+    return 48000;
+  }
+}
 // The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
 const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
@@ -244,6 +278,109 @@ async function start(): Promise<void> {
   // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
   const travellerMood = new TravellerMood();
   const stickerView = new StickerView();
+  // The Hand Lab's level editor, for the puzzle being played.
+  const levelEditors = new WeakMap<object, LevelEditor>(); // one per puzzle, so a revert always goes back to how it was written
+  const storyLine = new StoryLineView();
+  // The captions (a setting): a smaller line of ink low on the wall that names the story's sounds.
+  const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
+  const spark = new SparkFlightView();
+  // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
+  // time (and comes back slowly), and the inspector gives the debug bar a line of what a frame costs. It watches only in a headset
+  // session: on the desktop the software renderer would trip it for no reason.
+  const governor = new QualityGovernor();
+  const inspector = new FrameInspector(world.renderer.info, governor);
+  let governorOn = false;
+  let appliedLevel = 0;
+  const handTrail = new HandTrailView();
+  /** What the quality level means: the paper's scenery and the rings are switched by it here; the rest are checked where they are used. */
+  const applyGovernor = () => {
+    appliedLevel = governor.level;
+    stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
+    handTrail.ringsOn = governor.isOn('ring');
+  };
+  const propSketch = new PropSketchView();
+  const readingPage = new ReadingPageView();
+  const rewards = new RewardBurstView();
+  const sparkFrom = new Vector3();
+  const sparkTo = new Vector3();
+  const sparkStart = { x: 0, y: 0, z: 0 };
+  // The prologue: a black void with the story drawn in white calligraphy. While it plays, everything else in the scene is
+  // hidden (and put back after), and the pages float where the player was facing.
+  const cinematic = new CinematicScene();
+  const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
+  let backgroundBeforePrologue: typeof world.scene.background = null;
+  /**
+   * What a full-view scene does to the app: the screen fades to black, the room is hidden and the background made black while the
+   * scene plays, and the room is put back through another fade after (so neither way is a hard cut).
+   */
+  const fade = new FadeView();
+  let inVoid = false;
+  const voidHost = (scene: CinematicScene): PrologueHost => ({
+    enter: () => {
+      fade.fadeTo(1, 0.6, () => {
+        hiddenForPrologue.length = 0;
+        for (const child of world.scene.children) {
+          if (child === cinematic.group || child === hall.group || child === fade.group) continue;
+          hiddenForPrologue.push({ object: child, visible: child.visible });
+          child.visible = false;
+        }
+        backgroundBeforePrologue = world.scene.background;
+        world.scene.background = new Color(0x000000);
+        inVoid = true;
+        // The scene is built around the head, facing the way it faces now.
+        world.camera.getWorldPosition(prologueHead);
+        world.camera.getWorldDirection(prologueAhead);
+        scene.enter(prologueHead, prologueAhead.x, prologueAhead.z);
+        fade.fadeTo(0, 0.9);
+      });
+    },
+    leave: () => {
+      fade.fadeTo(1, 0.5, () => {
+        if (inVoid) {
+          for (const h of hiddenForPrologue) h.object.visible = h.visible;
+          hiddenForPrologue.length = 0;
+          world.scene.background = backgroundBeforePrologue;
+          inVoid = false;
+        }
+        scene.leave();
+        fade.fadeTo(0, 0.9);
+      });
+    },
+  });
+  // The finale plays in the hall of the great crystal, the last thing the night shows.
+  const hall = new CinematicScene(CRYSTAL, 'hall');
+  /** One lullaby note, from ahead of where the head faced as a scene began (the sun, or the crystal). */
+  // Delayed story steps (the last notes, the end screen, a fade back up) are kept so a session that ends cancels them.
+  const laterTimers = new Set<ReturnType<typeof setTimeout>>();
+  const later = (fn: () => void, ms: number) => {
+    const handle = setTimeout(() => {
+      laterTimers.delete(handle);
+      fn();
+    }, ms);
+    laterTimers.add(handle);
+  };
+  const cancelLater = () => {
+    for (const handle of laterTimers) clearTimeout(handle);
+    laterTimers.clear();
+  };
+  const storyNote = (index: number) =>
+    gameAudio.lullabyNote(
+      index,
+      prologueHead.x + prologueAhead.x * 4.5,
+      prologueHead.y + 0.3,
+      prologueHead.z + prologueAhead.z * 4.5,
+    );
+  // The opening: a wordless reel in the dusk scene. The lullaby notes fall as the five lights go out, then the first one sounds alone.
+  const prologue = new PrologueReel(cinematic, voidHost(cinematic), storyNote);
+  const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES, (page) => {
+    if (page < FINALE_PAGES.length - 1) storyNote(page);
+    else for (let k = 0; k < 5; k++) later(() => storyNote(k), k * 240);
+  });
+  /** The Skip poke for each (a fingertip held on the ring for a moment). */
+  const prologueSkip = new SkipTouch();
+  const finaleSkip = new SkipTouch();
+  const prologueHead = new Vector3();
+  const prologueAhead = new Vector3();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
   const travellerAt = { x: 0, y: 0 };
   const readTraveller = (): boolean => {
@@ -271,11 +408,15 @@ async function start(): Promise<void> {
   let moodGoal = 0.4;
   // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
   const playEnding = (onDone?: () => void) => {
-    const problems = cutscenes.play(ENDING, onDone);
-    if (problems.length > 0) {
-      failures.report('ending', new Error(problems.join('; ')));
-      onDone?.();
-    } else moodGoal = ENDING_MOOD;
+    storyLine.clear(); // the finale speaks for itself
+    captionLine.clear();
+    moodGoal = ENDING_MOOD;
+    // When the hall fades away the room stands there, every sleeper awake: a moment on that picture (with one last line) before the
+    // end screen comes.
+    finale.start(() => {
+      storyLine.say('The room dreams on.', 1.6, 3.2);
+      later(() => onDone?.(), 6500);
+    });
   };
   const playSolve = () => {
     moodGoal = 1;
@@ -293,6 +434,7 @@ async function start(): Promise<void> {
   };
   const playOpening = () => {
     const problems = cutscenes.play(OPENING, () => {
+      readingPage.clear();
       openingT = -1;
       setKindred(kindredWanted);
       sessionState = 'playing';
@@ -307,6 +449,10 @@ async function start(): Promise<void> {
       return;
     }
     openingT = 0;
+    // The first page of the book, low in front of the player while the night begins: the flat hand that makes the first bridge.
+    world.camera.getWorldPosition(prologueHead);
+    world.camera.getWorldDirection(prologueAhead);
+    readingPage.show(prologueHead, prologueAhead.x, prologueAhead.z, OPENING_S);
     kindred.x = -kindredStartX; // enters from the left edge
     setKindred(true);
   };
@@ -332,6 +478,16 @@ async function start(): Promise<void> {
     shadowRenderer.mesh,
     propShadows.mesh,
     cutsceneView.group,
+    storyLine.group,
+    captionLine.group,
+    spark.group,
+    handTrail.group,
+    propSketch.group,
+    rewards.group,
+    readingPage.group,
+    cinematic.group,
+    fade.group,
+    hall.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -355,8 +511,34 @@ async function start(): Promise<void> {
   uiAudio = audio;
   // The music is made while the title screen sits idle, so starting it with the session costs no frame.
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
-  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => prewarmMusic());
-  const gameAudio = new GameAudio(audio);
+  // The sounds are made in code; rendering them takes real time on a headset's CPU (the music alone about a second), so a worker does it
+  // ahead (every sound, the room's loops first) and the engine finds each ready. Without workers the pool does the same on the main thread.
+  const soundPool = new TaskPool<RenderJob, RenderedSound>({
+    create: () =>
+      typeof Worker === 'undefined'
+        ? null
+        : (new Worker(new URL('../engine/services/audio/sound-render-worker.ts', import.meta.url), {
+            type: 'module',
+          }) as unknown as WorkerLike),
+    size: 1,
+    fallback: renderJob,
+  });
+  (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
+    void startSoundPrerender(soundPool, audioContextRate()).then(() => soundPool.dispose());
+  });
+  const gameAudio = new GameAudio(
+    new CaptioningPlayer(
+      audio,
+      () => settings.value.captions,
+      (text) => {
+        // Not while the room is out of sight (the prologue, the finale): the wall is not shown, and the caption would be lost.
+        if (inVoid || sessionState !== 'playing') return false;
+        captionLine.say(text, 0, 1.6);
+        return true;
+      },
+      () => performance.now() / 1000,
+    ),
+  );
   // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
   // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
   let kindredAway = false;
@@ -386,6 +568,22 @@ async function start(): Promise<void> {
   };
   // The night (src/game) and what it shows: night-driver.ts turns the game's events into these calls.
   const propOutline = createSilhouette();
+  const wakeSleeper = (index: number): void => {
+    // The spark leaves the traveller (where it stands on the paper), flies across the room to the sleeper, and the room lights it
+    // and plays its note when it lands.
+    if (!readTraveller()) {
+      travellerAt.x = 0;
+      travellerAt.y = 0;
+    }
+    stagePoint(stage, travellerAt.x, travellerAt.y + 0.05, 0.06, sparkStart);
+    sparkFrom.set(sparkStart.x, sparkStart.y, sparkStart.z);
+    roomDressing.wakePoint(index, sparkTo);
+    spark.launch(sparkFrom, sparkTo, () => {
+      roomDressing.setAwake(index + 1);
+      if (index === 1) roomDressing.rippleBunting(); // the second sleeper hangs under the bunting
+      gameAudio.lullabyNote(index, sparkTo.x, sparkTo.y, sparkTo.z);
+    });
+  };
   const night = new NightDriver({
     stage,
     flame: candleView.flamePosition,
@@ -393,6 +591,7 @@ async function start(): Promise<void> {
     saves,
     setProps: (list, light, onStage, blend) => {
       propShadows.setProps(list, light, onStage, blend);
+      propSketch.setProps(list, light, onStage, blend); // and a faint painting of each prop, toward the light
       // The dust a hand shakes off a prop's shadow needs the outlines too (on puzzle load only, so it may allocate).
       propTouch.setPolygons(
         list.map((p) => {
@@ -411,8 +610,12 @@ async function start(): Promise<void> {
     perchKindred: visitKindred,
     releaseKindred: endKindredVisit,
     dim: () => {
-      // The room cools with the mood the night sets; the kindred darts off the wall and stays away.
+      // The room cools with the mood the night sets; the kindred darts off the wall and stays away. The candle gutters: the whole
+      // view dims for a moment (a slow fade to half dark, held, then back up) and a beam creaks overhead.
       if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
+      fade.fadeTo(0.55, 1.0, () => later(() => fade.fadeTo(0, 1.8), 1600));
+      roomDressing.group.localToWorld(creakPoint.set(0, 2.4, -0.4));
+      gameAudio.creak(creakPoint.x, creakPoint.z);
     },
     setKindredAway: (away) => {
       kindredAway = away;
@@ -425,6 +628,31 @@ async function start(): Promise<void> {
     setMood: (goal) => {
       moodGoal = goal;
     },
+    say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
+    scenery: (index) => {
+      stageView.setTheme(index);
+      roomDressing.setWind(index === 3 ? FAN_WIND : CALM_WIND); // the fan puzzle blows the bunting about
+    },
+    rewound: () => {
+      // The night turns back: a quick dip of the view and a soft chime, so the jump is felt as a rewind, not a glitch.
+      fade.fadeTo(0.45, 0.12, () => fade.fadeTo(0, 0.7));
+      gameAudio.twinkleAt(stage, 0, 0);
+    },
+    reward: (index) => {
+      // The puzzle's own reward, on the paper where the traveller stands.
+      if (governor.isOn('reward') && readTraveller())
+        rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
+    },
+    wake: (index) => wakeSleeper(index),
+    note: (text) => captionLine.say(text, 3.2, 2.6),
+    setAwake: (count) => {
+      sleepersAwake = count;
+      if (count === 0) {
+        spark.clear(); // a restart: nothing in flight
+        rewards.clear();
+      }
+      roomDressing.setAwake(count);
+    },
     solved: () => {
       // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
       const mood = moodGoal;
@@ -434,7 +662,7 @@ async function start(): Promise<void> {
     },
     twinkle: (x, y) => gameAudio.twinkleAt(stage, x, y),
     playEnding: (onDone) => playEnding(onDone),
-    nightOver: () => void showMenu('end'),
+    nightOver: () => void showMenu('end', endLine(night.waysFound(), MENU_SCREENS.end.line)),
   });
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
@@ -456,6 +684,14 @@ async function start(): Promise<void> {
   const settingsPage = createSettingsPage(settings);
   launcherHooks.openSettings = () => settingsPage.open();
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
+  const applyTextSize = () => {
+    storyLine.scale = settings.value.textSize;
+    captionLine.scale = settings.value.textSize;
+  };
+  settings.subscribe((key) => {
+    if (key === null || key === 'textSize') applyTextSize();
+  });
+  applyTextSize();
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
     shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
@@ -477,6 +713,8 @@ async function start(): Promise<void> {
   };
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
+  const gazeAt = new Vector3();
+  const gazeDir = new Vector3();
   const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
@@ -517,14 +755,62 @@ async function start(): Promise<void> {
       night.again();
     }
   };
-  const showMenu = (id: MenuScreenId) => {
+  const showMenu = (id: MenuScreenId, line?: string) => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
-    return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+    return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z, line);
   };
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
+  // The room's ambient sounds: the clock at the back and the wind at the window follow the room when it is placed round the player;
+  // a few flakes tick on the glass and a beam creaks now and then, less as the sleepers wake, and never over a story scene.
+  const clockPoint = new Vector3();
+  const windPoint = new Vector3();
+  const creakPoint = new Vector3();
+  const placeAmbientSounds = () => {
+    roomDressing.group.updateWorldMatrix(true, false);
+    roomDressing.group.localToWorld(clockPoint.set(-1.4, 1.9, 0.8));
+    roomDressing.group.localToWorld(windPoint.set(-1.95, 1.4, -0.8));
+    gameAudio.placeAmbient(clockPoint, windPoint);
+  };
+  let ambientOn = false;
+  let ambientTimer: ReturnType<typeof setTimeout> | undefined;
+  let sleepersAwake = 0;
+  const ambientTick = () => {
+    ambientTimer = setTimeout(ambientTick, 3500 + Math.random() * 7000);
+    if (!ambientOn || inVoid || visibility.paused || sessionState !== 'playing' || !governor.isOn('ambient')) return;
+    if (Math.random() < 0.15) {
+      roomDressing.group.localToWorld(creakPoint.set((Math.random() - 0.5) * 3, 2.4, -1.6 + Math.random() * 2));
+      gameAudio.creak(creakPoint.x, creakPoint.z);
+    } else if (Math.random() < 1 - 0.16 * sleepersAwake) gameAudio.snowTick();
+  };
+  // The traveller's footsteps: one soft step for every stride of ground it walks (not while it waits, and not across a jump).
+  /** How close (metres on the paper) a hand's shadow must come to the traveller for it to glance at it. */
+  const GLANCE_M = 0.13;
+  const STEP_M = 0.045;
+  let stepLastX = 0;
+  let stepWalked = 0;
+  let stepSeen = false;
+  let stepAlternate = false;
+  const footsteps = () => {
+    if (!readTraveller()) {
+      stepSeen = false;
+      return;
+    }
+    const dx = Math.abs(travellerAt.x - stepLastX);
+    if (stepSeen && night.game!.traveller.state === 'walk' && dx < 0.1) {
+      stepWalked += dx;
+      if (stepWalked >= STEP_M) {
+        stepWalked -= STEP_M;
+        stepAlternate = !stepAlternate;
+        gameAudio.stepAt(stage, travellerAt.x, travellerAt.y, stepAlternate);
+        if (governor.isOn('reward')) rewards.play('puff', travellerAt.x, travellerAt.y - 0.035); // a little dust at its feet
+      }
+    } else stepWalked = 0;
+    stepLastX = travellerAt.x;
+    stepSeen = true;
+  };
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
     if (!(Number.isFinite(yaw) && Number.isFinite(head[0]) && Number.isFinite(head[1]) && Number.isFinite(head[2]))) {
@@ -551,6 +837,7 @@ async function start(): Promise<void> {
     const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
     roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
+    placeAmbientSounds();
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -624,6 +911,25 @@ async function start(): Promise<void> {
         label: () => menuChoice,
       },
       cutscene: { play: () => playOpening() },
+      prologue: { play: () => prologue.start() },
+      rewind: { go: () => night.rewind(3) },
+      editor: {
+        open: () => {
+          // In the lab there is no opening to start the night: opening the editor does it.
+          if (night.started) return;
+          sessionState = 'playing';
+          candleView.setLocked(true);
+          night.start();
+        },
+        current: () => {
+          const puzzle = night.game?.puzzle;
+          if (!puzzle) return null;
+          let editor = levelEditors.get(puzzle);
+          if (!editor) levelEditors.set(puzzle, (editor = new LevelEditor(puzzle)));
+          return editor;
+        },
+        changed: () => night.restart(),
+      },
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
@@ -676,7 +982,7 @@ async function start(): Promise<void> {
       candleLight: candleView.pointLight,
       settings,
       flags: handFlags,
-      readout: () => timings.line,
+      readout: () => (inspector.line ? `${timings.line} · ${inspector.line}` : timings.line),
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
@@ -801,6 +1107,17 @@ async function start(): Promise<void> {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: room sound', () => gameAudio.setRoom(true));
+    guard('sessionstart: quality', () => {
+      governor.reset();
+      governor.setRefreshRate((session as { frameRate?: number } | null)?.frameRate ?? 72);
+      governorOn = !mock && !!session;
+      applyGovernor();
+    });
+    guard('sessionstart: ambient', () => {
+      placeAmbientSounds();
+      ambientOn = true;
+      if (ambientTimer === undefined) ambientTimer = setTimeout(ambientTick, 6000);
+    });
     if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
     if (session)
@@ -821,9 +1138,26 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
+    // The first time a headset starts the game, the prologue plays before the candle (once; the Testing switch plays it again).
+    if (session && !mock && !hasSeenPrologue()) {
+      guard('sessionstart: prologue', () => {
+        later(() => {
+          markPrologueSeen(); // only once it plays: leaving at once should not use up the first showing
+          prologue.start();
+        }, 800);
+      });
+    }
   });
   world.renderer.xr.addEventListener('sessionend', () => {
     guard('sessionend: room sound', () => gameAudio.setRoom(false));
+    guard('sessionend: ambient', () => {
+      ambientOn = false;
+      clearTimeout(ambientTimer); // the chain starts again with the next session
+      ambientTimer = undefined;
+      governorOn = false;
+      governor.reset();
+      applyGovernor();
+    });
     guard('sessionend: display', () => {
       world.scene.background = null;
       world.renderer.setClearColor(0x000000, 0);
@@ -836,6 +1170,12 @@ async function start(): Promise<void> {
         placeRig([0, 1.2, 0], 0);
       });
     }
+    guard('sessionend: story', () => {
+      prologue.skip();
+      finale.skip();
+      cancelLater(); // skipping runs the end-of-finale step, which must not show the end screen now
+      fade.setBlack(false); // and a dim that was waiting to lift must not stay
+    });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
@@ -904,11 +1244,13 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
+    night.rewindOnFall = loadTesting().rewindOnFall;
     showMenuChoice(loadTesting().menu);
     setKindred(loadTesting().kindred);
     window.addEventListener(TESTING_EVENT, (e) => {
       const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
       applyOverlays(t);
+      night.rewindOnFall = t.rewindOnFall;
       showMenuChoice(t.menu);
       setKindred(t.kindred);
     });
@@ -916,6 +1258,9 @@ async function start(): Promise<void> {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       if (t.cutscene) setTimeout(() => playOpening(), 1000);
+      // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
+      if (t.story === 'prologue') later(() => prologue.start(), 1000);
+      if (t.story === 'finale') later(() => finale.start(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
     });
@@ -962,11 +1307,21 @@ async function start(): Promise<void> {
         timings.endFrame();
         return;
       }
+      // What the frame cost, and whether it is time to switch some decoration off (or back on).
+      inspector.update(delta * 1000);
+      if (governorOn && !visibility.paused) governor.update(delta * 1000);
+      if (governor.level !== appliedLevel) applyGovernor();
       // The headset's system menu (visible-blurred) or a hidden page: no hand data arrives and the game holds still.
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
       const step = Math.min(delta, MAX_STEP_S);
-      const shadowsVisible = candleView.lit && sessionState !== 'paused' && sessionState !== 'title_vr';
+      const shadowsVisible =
+        candleView.lit &&
+        sessionState !== 'paused' &&
+        sessionState !== 'title_vr' &&
+        !prologue.playing &&
+        !finale.playing &&
+        !inVoid;
       // The ledges' shadows wait until the opening is over, or they sit over its captions.
       const propsVisible = shadowsVisible && openingT < 0;
       timings.begin(SLOT.read);
@@ -1069,6 +1424,8 @@ async function start(): Promise<void> {
           if (!handTouchingWick && mock) {
             handTouchingWick = true;
           }
+          // Not while a story scene is playing: the room is hidden and the hands are somewhere else.
+          if (prologue.playing || finale.playing) handTouchingWick = false;
 
           if (handTouchingWick) {
             ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
@@ -1163,7 +1520,10 @@ async function start(): Promise<void> {
           ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
 
           projector.update(hands.hands, stage, candleView.flamePosition);
-          if (!paused) gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
+          if (!paused) {
+            gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
+            handTrail.onShapeEvents(shapes.events, projector.shadows);
+          }
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
@@ -1309,7 +1669,34 @@ async function start(): Promise<void> {
               );
             }
           }
-          if (menu.group.visible || cutscenes.playing) {
+          spark.update(paused ? 0 : step);
+          readingPage.update(step);
+          rewards.update(
+            paused ? 0 : step,
+            stage,
+            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
+          propSketch.update(
+            propsVisible && governor.isOn('propSketch') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
+          handTrail.update(
+            paused ? 0 : step,
+            stage,
+            projector.shadows,
+            shadowsVisible && governor.isOn('trail') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+          );
+          world.camera.getWorldPosition(settingsHead);
+          fade.update(step, settingsHead);
+          prologue.update(step);
+          finale.update(step);
+          // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
+          const lineOpacity =
+            shadowsVisible && !menu.group.visible && !cutscenes.playing
+              ? shadowRenderer.baseOpacity * candleView.occlusion
+              : 0;
+          storyLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
@@ -1320,7 +1707,23 @@ async function start(): Promise<void> {
               menuTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            if (menu.group.visible) menu.update(step, menuTips, tips);
+            if (menu.group.visible) {
+              menu.gazeOn = settings.value.gazeMenus;
+              if (menu.gazeOn) {
+                world.camera.getWorldPosition(gazeAt);
+                world.camera.getWorldDirection(gazeDir);
+                menu.setGaze(gazeAt.x, gazeAt.y, gazeAt.z, gazeDir.x, gazeDir.y, gazeDir.z);
+              }
+              menu.update(step, menuTips, tips);
+            }
+            if (prologue.playing) {
+              if (prologueSkip.update(step, menuTips, tips, cinematic.skipPlane)) prologue.skip();
+              cinematic.setSkipProgress(prologueSkip.progress);
+            }
+            if (finale.playing) {
+              if (finaleSkip.update(step, menuTips, tips, hall.skipPlane)) finale.skip();
+              hall.setSkipProgress(finaleSkip.progress);
+            }
             if (cutscenes.playing)
               cutscenes.update(step, stage, menuTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
           }
@@ -1365,13 +1768,15 @@ async function start(): Promise<void> {
             ghostTarget.update(delta, projector.shadows, shapes);
             ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
             // The traveller's mood: how near is the nearer hand's shadow?
-            if (readTraveller()) {
+            if (!readTraveller()) stageRenderer.glance = false;
+            else {
               let gap = 1e9;
               for (let i = 0; i < 2; i++) {
                 const hs = projector.shadows[i === 0 ? 'left' : 'right'];
                 if (hs.active && hs.onStage)
                   gap = Math.min(gap, nearestJointGap(hs.joints, hs.joints.length / 2, travellerAt.x, travellerAt.y));
               }
+              stageRenderer.glance = gap < GLANCE_M; // it glances back at a hand that reaches close to it
               const state = night.game!.traveller.state;
               travellerMood.update(
                 delta,
@@ -1397,6 +1802,7 @@ async function start(): Promise<void> {
             hands.hands.left.tracked,
             hands.hands.right.tracked,
           );
+          footsteps();
         } catch (e) {
           failures.report('simulation', e);
         }
@@ -1416,6 +1822,8 @@ async function start(): Promise<void> {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        world.camera.getWorldPosition(settingsHead);
+        stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
         world.camera.getWorldPosition(settingsHead);
@@ -1508,6 +1916,17 @@ async function start(): Promise<void> {
         kindred,
         kindredView,
         stickerView,
+        storyLine,
+        captionLine,
+        wakeSleeper,
+        soundPool,
+        governor,
+        inspector,
+        fade,
+        rewards,
+        handTrail,
+        prologue,
+        finale,
         openSettings,
         shapes,
         gestures,

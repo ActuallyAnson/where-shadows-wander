@@ -15,8 +15,9 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
+import { RenderOrder } from './pure/render-order';
 
-const RENDER_ORDER = 2.2;
+const RENDER_ORDER = RenderOrder.air;
 const DUST_COUNT = 72;
 /** The shaft's base is this fraction of the wall's width across. */
 const SHAFT_WIDTH = 0.7;

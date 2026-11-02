@@ -4,6 +4,7 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  CanvasTexture,
   Color,
   DoubleSide,
   Group,
@@ -12,14 +13,24 @@ import {
   Matrix4,
   Mesh,
   PlaneGeometry,
+  RepeatWrapping,
   ShaderMaterial,
+  SRGBColorSpace,
   Vector2,
   Vector3,
 } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
 import { LanternGlow } from './lantern-glow';
+import {
+  BACKDROP_THEMES,
+  paintBackdrop,
+  paintBackdropTheme,
+  type BackdropLayer,
+  type BackdropTheme,
+} from './stage-backdrop-art';
 import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
+import { RenderOrder } from './pure/render-order';
 
 const PAPER = new Color(0xf2e6c9);
 
@@ -43,6 +54,14 @@ const fragment = /* glsl */ `
   uniform float uMood;     // 0 cold and bluish .. 1 warm
   uniform float uTime;
   uniform float uHigh;     // 1 for high contrast: plain white, no texture
+  uniform sampler2D uSky;
+  uniform sampler2D uFar;
+  uniform sampler2D uMid;
+  uniform sampler2D uNear;
+  uniform sampler2D uClouds;
+  uniform vec2 uHead;      // the head's place across and up from the stage's centre, metres (the scenery's layers shift with it)
+  uniform float uBackdrop; // how much of the paper the painted scenery replaces, 0..1
+  uniform float uMidShift; // how far the near scenery has slid sideways (a set change), in widths of the paper
   varying vec2 vUv;
 
   float hash(vec2 p) {
@@ -85,6 +104,35 @@ const fragment = /* glsl */ `
     vec3 tint = mix(vec3(0.8, 0.9, 1.06), vec3(1.08, 0.95, 0.76), uMood);
     vec3 col = uPaper * tint * light * tooth * (0.965 + 0.02 * fine + 0.015 * fibre) * (0.97 + 0.03 * blot);
 
+    // The painted scenery behind the shadows: sky and moon, far hills, drifting clouds, near hills with a cottage, a fringe of
+    // grass, and a few fireflies. Each layer is shifted a little by where the head is (the far ones with it, the near ones against
+    // it), so the paper has depth. It is pale and low in contrast on purpose, so the black shadows still read.
+    if (uBackdrop > 0.0) {
+      vec2 head = clamp(uHead, vec2(-0.5), vec2(0.5));
+      vec2 base = (vUv - 0.5) * 0.93 + 0.5;
+      vec3 bg = texture2D(uSky, base - head * 0.012).rgb;
+      vec4 far = texture2D(uFar, base - head * 0.03);
+      bg = mix(bg, far.rgb, far.a);
+      vec4 cl = texture2D(uClouds, vec2(base.x - head.x * 0.02 + uTime * 0.005, base.y - head.y * 0.02));
+      bg = mix(bg, vec3(1.0), cl.a * 0.5);
+      vec4 mid = texture2D(uMid, base + head * 0.004 + vec2(uMidShift, 0.0));
+      bg = mix(bg, mid.rgb, mid.a * (1.0 - smoothstep(0.0, 0.9, abs(uMidShift))));
+      vec4 nr = texture2D(uNear, base + head * 0.08);
+      bg = mix(bg, nr.rgb, nr.a);
+      for (int i = 0; i < 7; i++) {
+        float fi = float(i);
+        vec2 home = (vec2(hash(vec2(fi, 1.3)), 0.2 + 0.55 * hash(vec2(fi, 7.1))) - 0.5) * uSize;
+        vec2 fp = home + vec2(0.035 * sin(uTime * 0.4 + fi * 2.1), 0.025 * cos(uTime * 0.5 + fi * 1.7));
+        vec2 dd = p - fp;
+        float flick = 0.5 + 0.5 * sin(uTime * (1.2 + fi * 0.3) + fi * 4.0);
+        float r2 = dot(dd, dd);
+        bg += vec3(1.0, 0.82, 0.42) * (exp(-r2 * 16000.0) * 0.9 + exp(-r2 * 420.0) * 0.2) * flick;
+      }
+      vec3 sceneTint = mix(vec3(0.84, 0.92, 1.08), vec3(1.1, 0.95, 0.8), uMood);
+      vec3 scene = bg * sceneTint * light * tooth * (0.97 + 0.03 * blot);
+      col = mix(col, scene, uBackdrop);
+    }
+
     // The rim of the sheet darkens a little, unevenly.
     float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
     float rim = smoothstep(0.0, 0.035 + 0.01 * blot, edge);
@@ -95,11 +143,13 @@ const fragment = /* glsl */ `
   }
 `;
 
+/** How much of the paper the scenery replaces: enough to see it, little enough that the black shadows still read. */
+export const BACKDROP = 0.72;
 const PAPER_OPACITY = 0.95;
 const BORDER = 0x8a6d3b;
 
 /** The paper draws before the shadows (SHADOW_RENDER_ORDER = 2). */
-const PAPER_RENDER_ORDER = 1;
+const PAPER_RENDER_ORDER = RenderOrder.paper;
 
 export class TestStageView {
   readonly group = new Group();
@@ -113,6 +163,13 @@ export class TestStageView {
   private time = 0;
   private _highContrast = false;
   private _mood = 0.75;
+  private readonly textures: CanvasTexture[] = [];
+  /** The near scenery for each puzzle, and the set change in progress: which one is up, which is wanted, and how far along. */
+  private readonly themeTextures: (CanvasTexture | null)[] = [];
+  private themeUp = -1;
+  private themeWanted = -1;
+  private slide = 1;
+  private readonly headLocal = new Vector3();
 
   constructor() {
     this.paperMaterial = new ShaderMaterial({
@@ -125,6 +182,14 @@ export class TestStageView {
         uMood: { value: this._mood },
         uTime: { value: 0 },
         uHigh: { value: 0 },
+        uSky: { value: this.layerTexture('sky') },
+        uFar: { value: this.layerTexture('far') },
+        uMid: { value: this.layerTexture('mid') },
+        uNear: { value: this.layerTexture('near') },
+        uClouds: { value: this.layerTexture('clouds', true) },
+        uHead: { value: new Vector2(0, 0) },
+        uBackdrop: { value: BACKDROP },
+        uMidShift: { value: 0 },
       },
       vertexShader: vertex,
       fragmentShader: fragment,
@@ -146,6 +211,91 @@ export class TestStageView {
     }
     this.group.add(this.paper, this.border, this.flame.mesh);
     this.group.visible = false;
+  }
+
+  /** A painted layer of the scenery as a texture (the clouds wrap across so they can drift). */
+  private layerTexture(layer: BackdropLayer, wrap = false): CanvasTexture {
+    let canvas: HTMLCanvasElement | undefined;
+    if (typeof document !== 'undefined') canvas = document.createElement('canvas');
+    if (!canvas) canvas = { width: 640, height: 360, getContext: () => null } as unknown as HTMLCanvasElement;
+    // The scenery is soft and pale, so a modest size does it (a quarter the memory of 1024 by 576 for each of the five layers).
+    canvas.width = 640;
+    canvas.height = 360;
+    const g = canvas.getContext ? canvas.getContext('2d') : null;
+    if (g) paintBackdrop(g, 640, 360, layer);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    if (wrap) texture.wrapS = RepeatWrapping;
+    this.textures.push(texture);
+    return texture;
+  }
+
+  /**
+   * Where the head is, so the scenery's layers can shift against each other as it moves (call once a frame with the head's
+   * world position). Allocates nothing.
+   */
+  setHead(head: Readonly<{ x: number; y: number; z: number }>): void {
+    const st = this.stage;
+    if (!st) return;
+    const dx = head.x - st.origin[0],
+      dy = head.y - st.origin[1],
+      dz = head.z - st.origin[2];
+    this.headLocal.set(
+      dx * st.right[0] + dy * st.right[1] + dz * st.right[2],
+      dx * st.up[0] + dy * st.up[1] + dz * st.up[2],
+      0,
+    );
+    (this.paperMaterial.uniforms.uHead.value as Vector2).set(this.headLocal.x, this.headLocal.y);
+  }
+
+  /** How much of the paper the painted scenery replaces (0 is the plain paper). */
+  set backdrop(v: number) {
+    this.paperMaterial.uniforms.uBackdrop.value = v >= 1 ? 1 : v > 0 ? v : 0;
+  }
+
+  get backdrop(): number {
+    return this.paperMaterial.uniforms.uBackdrop.value as number;
+  }
+
+  dispose(): void {
+    for (const t of this.textures) t.dispose();
+    this.paper.geometry.dispose();
+    this.paperMaterial.dispose();
+  }
+
+  /**
+   * Changes the near scenery to puzzle `index`'s: the old set slides off one side of the paper (half a second) and the new one slides
+   * in from the other (another half). The first call just puts the scenery up.
+   */
+  setTheme(index: number): void {
+    const wanted = Math.max(0, Math.min(BACKDROP_THEMES - 1, Math.floor(index) || 0));
+    if (wanted === this.themeWanted) return;
+    this.themeWanted = wanted;
+    if (this.themeUp < 0) {
+      this.themeUp = wanted;
+      this.paperMaterial.uniforms.uMid.value = this.themeTexture(wanted);
+      return;
+    }
+    this.slide = 0; // goes 0..0.5 out, 0.5..1 in
+  }
+
+  /** The painted near scenery for a puzzle (made the first time it is wanted, then kept). */
+  private themeTexture(theme: number): CanvasTexture {
+    let t = this.themeTextures[theme];
+    if (!t) {
+      let canvas: HTMLCanvasElement | undefined;
+      if (typeof document !== 'undefined') canvas = document.createElement('canvas');
+      if (!canvas) canvas = { width: 512, height: 288, getContext: () => null } as unknown as HTMLCanvasElement;
+      canvas.width = 512;
+      canvas.height = 288;
+      const g = canvas.getContext ? canvas.getContext('2d') : null;
+      if (g) paintBackdropTheme(g, 512, 288, theme as BackdropTheme);
+      t = new CanvasTexture(canvas);
+      t.colorSpace = SRGBColorSpace;
+      this.textures.push(t);
+      this.themeTextures[theme] = t;
+    }
+    return t;
   }
 
   /** Places the paper on the stage and the flame at the lantern. Call when either moves. */
@@ -230,6 +380,17 @@ export class TestStageView {
     if (flame) this.setFlameOnWall(flame);
     this.time += dt > 0 ? Math.min(dt, 0.1) : 0;
     const u = this.paperMaterial.uniforms;
+    // A set change: the old scenery slides off, the new one is swapped in out of sight, and slides on.
+    if (this.slide < 1) {
+      this.slide = Math.min(1, this.slide + (dt > 0 ? Math.min(dt, 0.1) : 0) * 1);
+      if (this.slide >= 0.5 && this.themeUp !== this.themeWanted) {
+        this.themeUp = this.themeWanted;
+        u.uMid.value = this.themeTexture(this.themeUp);
+      }
+      const k = this.slide < 0.5 ? this.slide * 2 : (this.slide - 0.5) * 2;
+      const ease = k * k * (3 - 2 * k);
+      u.uMidShift.value = this.slide < 0.5 ? ease * 1.0 : -(1 - ease) * 1.0;
+    }
     u.uTime.value = this.time;
     u.uBright.value = light.lit ? Math.max(0.04, occlusion * (0.15 + 0.85 * light.intensity)) : 0.04;
     this.flame.update(light, cameraQuaternion);

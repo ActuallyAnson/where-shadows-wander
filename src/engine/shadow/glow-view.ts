@@ -4,9 +4,10 @@
 import { CanvasTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry } from '@iwsdk/core';
 import type { StagePlane } from './pure/stage-plane';
 import { placeOnStage, crispTexture } from './stage-quad';
+import { RenderOrder } from './pure/render-order';
 
 export const GLOW_SLOTS = 3;
-const RENDER_ORDER = 1.8;
+const RENDER_ORDER = RenderOrder.glow;
 const LIFT_M = 0.0015;
 
 function glowTexture(): CanvasTexture {

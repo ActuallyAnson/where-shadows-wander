@@ -1,0 +1,65 @@
+{
+  "label": "engine-systems",
+  "url": "https://localhost:8115/?mock=1",
+  "runs": 2,
+  "startupMs": 3406,
+  "heapMb": 132.56072998046875,
+  "calibMs": 19,
+  "stalls": {
+    "count": 17,
+    "totalMs": 5521,
+    "worstMs": 1833
+  },
+  "states": [
+    {
+      "state": "room",
+      "renderMs": 17.7,
+      "calls": 53,
+      "triangles": 4940,
+      "textures": 44,
+      "textureMb": 47,
+      "allocBytesPerFrame": 840,
+      "ourAllocBytesPerFrame": 34
+    },
+    {
+      "state": "room, quality 3",
+      "renderMs": 17.8,
+      "calls": 49,
+      "triangles": 4924,
+      "textures": 45,
+      "textureMb": 47,
+      "allocBytesPerFrame": 989,
+      "ourAllocBytesPerFrame": 7
+    },
+    {
+      "state": "room + spark + reward",
+      "renderMs": 20.3,
+      "calls": 55,
+      "triangles": 4940,
+      "textures": 45,
+      "textureMb": 47,
+      "allocBytesPerFrame": 172,
+      "ourAllocBytesPerFrame": 28
+    },
+    {
+      "state": "opening reel",
+      "renderMs": 15.4,
+      "calls": 45,
+      "triangles": 3008,
+      "textures": 64,
+      "textureMb": 52.4,
+      "allocBytesPerFrame": 448,
+      "ourAllocBytesPerFrame": 33
+    },
+    {
+      "state": "finale hall",
+      "renderMs": 15.8,
+      "calls": 35,
+      "triangles": 2988,
+      "textures": 60,
+      "textureMb": 51.3,
+      "allocBytesPerFrame": 126,
+      "ourAllocBytesPerFrame": 24
+    }
+  ]
+}

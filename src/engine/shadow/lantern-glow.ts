@@ -7,9 +7,10 @@
 import { Color, Mesh, PlaneGeometry, ShaderMaterial } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
 import type { LanternLight } from './pure/lantern-light';
+import { RenderOrder } from './pure/render-order';
 
 /** Drawn over the paper (1) and the shadow (2). */
-export const GLOW_RENDER_ORDER = 3;
+export const GLOW_RENDER_ORDER = RenderOrder.sprite;
 
 const vertex = /* glsl */ `
   varying vec2 vUv;

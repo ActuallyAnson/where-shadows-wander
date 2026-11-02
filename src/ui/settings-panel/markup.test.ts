@@ -29,10 +29,10 @@ describe('settingsMarkup', () => {
     expect(text).toContain(`id="${ids.close}"`);
   });
 
-  it('puts every setting on exactly one page, six to a page', () => {
+  it('puts every setting on exactly one page, at most six to a page', () => {
     const all = PAGES.flat();
     expect([...all].sort()).toEqual(SETTING_SPECS.map((s) => s.key).sort());
-    for (const p of PAGES) expect(p).toHaveLength(6);
+    for (const p of PAGES) expect(p.length).toBeLessThanOrEqual(6);
     PAGES.forEach((_, n) => expect(text).toContain(`id="${ids.page(n)}"`));
   });
 

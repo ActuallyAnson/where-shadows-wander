@@ -71,8 +71,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    // Scripts run inside the managed browser by `npx iwsdk browser run`.
-    files: ['scripts/census.mjs', 'scripts/read-report.mjs'],
+    // Scripts run inside the managed browser by `npx iwsdk browser run`, and the benchmark, whose page.evaluate callbacks run in the page.
+    files: ['scripts/census.mjs', 'scripts/read-report.mjs', 'scripts/perf-bench.mjs'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   prettier,
