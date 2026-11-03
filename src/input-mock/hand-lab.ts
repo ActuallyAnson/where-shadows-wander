@@ -52,6 +52,8 @@ export interface LabView {
   sticker?: { next(): void };
   /** The prologue (the story drawn in white calligraphy in a black void): the Prologue button plays it. */
   prologue?: { play(): void };
+  /** The travel scenes between puzzles (the land wakes, the traveller walks into the next): the Travel button plays the next pair. */
+  travel?: { play(): void };
   /** Turns the night back a few seconds (the puzzle is reloaded and its recorded inputs played again): the Rewind button. */
   rewind?: { go(): void };
   /** The level editor for the puzzle being played: `current()` is its editor (null before a puzzle loads); `changed()` loads the puzzle again with the edit. */
@@ -315,6 +317,7 @@ export class HandLab {
       else if (act === 'ending') this.view.ending?.play();
       else if (act === 'sticker') this.view.sticker?.next();
       else if (act === 'prologue') this.view.prologue?.play();
+      else if (act === 'travel') this.view.travel?.play();
       else if (act === 'rewind') this.view.rewind?.go();
       else if (act === 'edit') {
         this.editing = !this.editing;
@@ -384,6 +387,7 @@ export class HandLab {
         ${this.view.stage ? btn('stage', '', `Stage: ${this.view.stage.label()}`, false, 'Switch the stand-in stage between the tabletop theatre and a wall-sized one (the tutorial needs the wall)') : ''}
         ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
         ${this.view.prologue ? btn('prologue', '', 'Prologue', false, 'Play the prologue: the story drawn in calligraphy in the dark') : ''}
+        ${this.view.travel ? btn('travel', '', 'Travel', false, 'Play a travel scene: a land wakes, and the traveller walks into the next one') : ''}
         ${this.view.rewind ? btn('rewind', '', 'Rewind 3 s', false, 'Turn the night back three seconds: the puzzle is reloaded and its recorded input played again') : ''}
         ${this.view.editor ? btn('edit', '', 'Level editor', this.editing, 'Move, resize, add and remove the ground of the puzzle being played, and copy it out as code') : ''}
         ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}

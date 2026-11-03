@@ -37,6 +37,7 @@
     "textSize": 1,
     "highContrast": true,
     "captions": true,
+    "travelScenes": true,
     "gazeMenus": false,
     "hand": "left"
   },

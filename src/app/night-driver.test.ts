@@ -259,3 +259,29 @@ describe('NightDriver', () => {
     expect(state.rewoundBy).toHaveLength(1);
   });
 });
+
+describe('NightDriver travel scenes', () => {
+  it('asks for a travel scene when the night moves on to the next puzzle, and not for the first puzzle, a restart or a jump', () => {
+    const { driver, host, run } = setup();
+    const travelled: [number, number][] = [];
+    host.travel = (from, to) => void travelled.push([from, to]);
+    driver.start();
+    run(DT);
+    expect(travelled).toEqual([]); // the first puzzle: no walk (the opening has just played)
+    driver.game!.goto(1);
+    run(DT);
+    expect(travelled).toEqual([[0, 1]]); // moving on: the first land wakes, the traveller walks into the second
+    driver.game!.restart();
+    run(DT);
+    expect(travelled).toEqual([[0, 1]]); // a restart is not a walk
+    driver.game!.goto(3);
+    run(DT);
+    expect(travelled).toEqual([[0, 1]]); // nor is a jump over a puzzle
+    driver.game!.goto(4);
+    run(DT);
+    expect(travelled).toEqual([
+      [0, 1],
+      [3, 4],
+    ]);
+  });
+});

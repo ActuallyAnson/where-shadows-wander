@@ -8,7 +8,7 @@ import { pathPoint as climbPathPoint } from './climb-art';
 
 type Ctx = CanvasRenderingContext2D;
 
-export type LandId = 'pass' | 'cave' | 'heights' | 'castle';
+export type LandId = 'pass' | 'canyon' | 'cave' | 'heights' | 'castle';
 export type LandLayer = 'sky' | 'far' | 'mid' | 'path' | 'near';
 export type Landmark = 'cairn' | 'sign' | 'lamp' | 'flag' | 'crystal' | 'torch' | 'gate';
 
@@ -18,12 +18,16 @@ export interface LandStyle {
   readonly sleepTint: readonly [number, number, number];
   readonly sky: { top: string; mid: string; low: string; sun: readonly [number, number, string] };
   readonly far: {
-    kind: 'peaks' | 'hills' | 'cloud' | 'cave';
+    kind: 'peaks' | 'hills' | 'cloud' | 'cave' | 'mesas';
     near: readonly number[];
     far: readonly number[];
     haze: string;
   };
-  readonly mid: { kind: 'peaks' | 'cave' | 'castle' | 'ridge'; body: readonly number[]; lit: readonly number[] };
+  readonly mid: {
+    kind: 'peaks' | 'cave' | 'castle' | 'ridge' | 'buttes';
+    body: readonly number[];
+    lit: readonly number[];
+  };
   readonly ground: {
     top: string;
     bottom: string;
@@ -66,6 +70,26 @@ export const LANDS: Readonly<Record<LandId, LandStyle>> = {
       { at: 0.86, kind: 'cairn' },
     ],
     near: { grass: [80, 96, 60], rocks: true },
+  },
+  canyon: {
+    name: 'The Stair of Stone',
+    sleepTint: [84, 96, 150],
+    sky: { top: '#5e97c4', mid: '#cfdcd0', low: '#f6e4be', sun: [0.74, 0.14, '#fff8e2'] },
+    far: { kind: 'mesas', near: [150, 104, 88], far: [208, 186, 168], haze: '246,230,200' },
+    mid: { kind: 'buttes', body: [138, 82, 56], lit: [232, 178, 122] },
+    ground: { top: '#d49a64', bottom: '#6a4030', seams: true, tufts: 'dry', water: false },
+    path: [
+      [0.04, 0.88],
+      [0.3, 0.84],
+      [0.55, 0.74],
+      [0.96, 0.62],
+    ],
+    landmarks: [
+      { at: 0.2, kind: 'sign' },
+      { at: 0.52, kind: 'lamp' },
+      { at: 0.85, kind: 'cairn' },
+    ],
+    near: { grass: [150, 130, 70], rocks: true },
   },
   cave: {
     name: 'The Weeping Cave',
@@ -135,6 +159,9 @@ export const LANDS: Readonly<Record<LandId, LandStyle>> = {
 };
 
 export const LAND_IDS = Object.keys(LANDS) as LandId[];
+
+/** The land each puzzle of the night happens in, in order. */
+export const LAND_OF_PUZZLE: readonly LandId[] = ['pass', 'canyon', 'cave', 'heights', 'castle'];
 
 /** Where along a land's path a point is, in layer pixels (the same walk as the climb, with the land's own waypoints). */
 export function landPathPoint(land: LandId, u: number, W: number, H: number, out: { x: number; y: number }): void {
@@ -365,6 +392,47 @@ export function paintLandLayer(land: LandId, layer: LandLayer, g: Ctx, W: number
         g.fillStyle = haze;
         g.fillRect(0, base - amp, W, amp + H * 0.2);
       }
+    } else if (s.mid.kind === 'buttes') {
+      // Tall banded sandstone buttes, lit from the right, dusty, with the air between softening them.
+      const count = 8;
+      for (let k = 0; k < count; k++) {
+        const cx = ((k + 0.5) / count) * W + (r() - 0.5) * W * 0.04;
+        const w = W * (0.07 + r() * 0.06);
+        const top = H * (0.2 + r() * 0.36);
+        const gr = g.createLinearGradient(cx - w, 0, cx + w, 0);
+        gr.addColorStop(0, mix(body, body, 1));
+        gr.addColorStop(1, mix(body, lit, 0.85));
+        g.fillStyle = gr;
+        const edge = ridgeFn(60 + k, 4);
+        g.beginPath();
+        g.moveTo(cx - w, H);
+        for (let i = 0; i <= 12; i++) g.lineTo(cx - w + edge(i / 12) * w * 0.16, H - (i / 12) * (H - top));
+        g.lineTo(cx - w * 0.9, top);
+        g.lineTo(cx + w * 0.9, top + H * 0.01);
+        for (let i = 0; i <= 12; i++)
+          g.lineTo(cx + w + edge(1 - i / 12 + 0.4) * w * 0.16, H - (1 - i / 12) * (H - top));
+        g.closePath();
+        g.fill();
+        g.save();
+        g.clip();
+        for (let b = 0; b < 20; b++) {
+          g.fillStyle = `rgba(${r() < 0.5 ? '255,214,170' : '70,34,26'},${0.07 + r() * 0.12})`;
+          g.fillRect(cx - w, top + r() * (H - top), w * 2, 2 + r() * 8);
+        }
+        const side = g.createLinearGradient(cx - w, 0, cx + w, 0);
+        side.addColorStop(0, 'rgba(50,22,16,0.4)');
+        side.addColorStop(0.55, 'rgba(50,22,16,0)');
+        g.fillStyle = side;
+        g.fillRect(cx - w, top, w * 2, H - top);
+        g.fillStyle = 'rgba(255,236,196,0.55)';
+        g.fillRect(cx - w * 0.9, top, w * 1.8, 5);
+        g.restore();
+      }
+      const air = g.createLinearGradient(0, 0, 0, H);
+      air.addColorStop(0, `rgba(${s.far.haze},0.5)`);
+      air.addColorStop(1, `rgba(${s.far.haze},0.05)`);
+      g.fillStyle = air;
+      g.fillRect(0, 0, W, H);
     } else if (s.mid.kind === 'cave') {
       // The back wall of the cavern, streaked; stalactites hanging from the roof; a waterfall into the pool.
       const wall = g.createLinearGradient(0, 0, 0, H);
@@ -426,43 +494,79 @@ export function paintLandLayer(land: LandId, layer: LandLayer, g: Ctx, W: number
       g.fillStyle = gap;
       g.fillRect(0, 0, W, H * 0.7);
     } else {
-      // The castle on its hill, seen from afar, with windows lit.
+      // The castle on its hill, seen from afar: a gatehouse in the middle, towers of different heights, battlements, flags, and windows lit.
       const hill = ridgeFn(62, 3);
-      g.fillStyle = mix(body, lit, 0.15);
+      g.fillStyle = mix(body, lit, 0.12);
       g.beginPath();
-      g.moveTo(W * 0.2, H);
-      for (let i = 0; i <= 60; i++) {
-        const x = 0.25 + (i / 60) * 0.55;
-        g.lineTo(x * W, H * 0.62 + (1 - Math.sin(((x - 0.25) / 0.55) * Math.PI)) * H * 0.16 + hill(x) * H * 0.01);
+      g.moveTo(W * 0.1, H);
+      for (let i = 0; i <= 80; i++) {
+        const x = 0.16 + (i / 80) * 0.72;
+        g.lineTo(
+          x * W,
+          H * 0.64 + (1 - Math.sin(((x - 0.16) / 0.72) * Math.PI) ** 0.7) * H * 0.2 + hill(x) * H * 0.008,
+        );
       }
-      g.lineTo(W * 0.85, H);
+      g.lineTo(W * 0.92, H);
       g.fill();
       const stone = mix(body, body, 1);
+      const roof = mix(body, lit, 0.22);
+      const castleX = 0.52;
       const towers = [
-        { x: 0.42, w: 0.04, top: 0.36 },
-        { x: 0.49, w: 0.06, top: 0.26 },
-        { x: 0.57, w: 0.04, top: 0.34 },
-        { x: 0.63, w: 0.035, top: 0.42 },
+        { x: -0.19, w: 0.034, top: 0.5 },
+        { x: -0.13, w: 0.045, top: 0.4 },
+        { x: -0.06, w: 0.05, top: 0.3 },
+        { x: 0.02, w: 0.07, top: 0.2 },
+        { x: 0.11, w: 0.05, top: 0.32 },
+        { x: 0.18, w: 0.045, top: 0.42 },
+        { x: 0.24, w: 0.034, top: 0.5 },
       ];
+      // The curtain wall with battlements.
       g.fillStyle = stone;
-      g.fillRect(W * 0.4, H * 0.5, W * 0.28, H * 0.14);
-      for (const t of towers) {
+      g.fillRect(W * (castleX - 0.21), H * 0.56, W * 0.47, H * 0.1);
+      for (let i = 0; i < 40; i++) g.fillRect(W * (castleX - 0.21 + i * 0.0118), H * 0.545, W * 0.006, H * 0.016);
+      for (const tw of towers) {
+        const x = castleX + tw.x;
         g.fillStyle = stone;
-        g.fillRect(W * t.x, H * t.top, W * t.w, H * 0.64 - H * t.top);
+        g.fillRect(W * x, H * tw.top, W * tw.w, H * 0.66 - H * tw.top);
+        for (let i = 0; i < 4; i++)
+          g.fillRect(W * (x + (i * tw.w) / 3.4), H * tw.top - H * 0.012, W * tw.w * 0.18, H * 0.014);
         poly(
           g,
           [
-            [W * (t.x - 0.005), H * t.top],
-            [W * (t.x + t.w * 0.5), H * (t.top - 0.08)],
-            [W * (t.x + t.w + 0.005), H * t.top],
+            [W * (x - 0.004), H * tw.top - H * 0.012],
+            [W * (x + tw.w * 0.5), H * (tw.top - 0.1)],
+            [W * (x + tw.w + 0.004), H * tw.top - H * 0.012],
           ],
-          mix(body, lit, 0.2),
+          roof,
         );
-        for (let k = 0; k < 3; k++) {
-          g.fillStyle = r() < 0.7 ? 'rgba(255,208,120,0.95)' : 'rgba(20,18,40,0.9)';
-          g.fillRect(W * (t.x + t.w * 0.38), H * (t.top + 0.03 + k * 0.05), W * t.w * 0.22, H * 0.022);
+        g.strokeStyle = stone as string;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(W * (x + tw.w * 0.5), H * (tw.top - 0.1));
+        g.lineTo(W * (x + tw.w * 0.5), H * (tw.top - 0.135));
+        g.stroke();
+        poly(
+          g,
+          [
+            [W * (x + tw.w * 0.5), H * (tw.top - 0.135)],
+            [W * (x + tw.w * 0.5 + 0.018), H * (tw.top - 0.127)],
+            [W * (x + tw.w * 0.5), H * (tw.top - 0.118)],
+          ],
+          '#b8554a',
+        );
+        for (let k = 0; k < 4; k++) {
+          const wy = H * (tw.top + 0.03 + k * 0.045);
+          if (wy > H * 0.62) break;
+          g.fillStyle = r() < 0.72 ? 'rgba(255,208,120,0.95)' : 'rgba(20,18,40,0.9)';
+          g.fillRect(W * (x + tw.w * 0.36), wy, W * tw.w * 0.26, H * 0.024);
         }
       }
+      // A warm glow where the gate is (the gate itself stands at the end of the road).
+      const gl = g.createRadialGradient(W * castleX, H * 0.62, 0, W * castleX, H * 0.62, W * 0.03);
+      gl.addColorStop(0, 'rgba(255,196,110,0.5)');
+      gl.addColorStop(1, 'rgba(255,196,110,0)');
+      g.fillStyle = gl;
+      g.fillRect(W * (castleX - 0.04), H * 0.56, W * 0.1, H * 0.12);
     }
   }
 

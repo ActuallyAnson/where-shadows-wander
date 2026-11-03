@@ -55,6 +55,8 @@ import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '.
 import { StickerView } from '../engine/shadow/sticker-view';
 import { CRYSTAL } from '../engine/shadow/cinematic-art';
 import { CinematicScene } from '../engine/shadow/cinematic-scene';
+import { WalkSceneView } from '../engine/shadow/walk-scene-view';
+import { LAND_OF_PUZZLE } from '../engine/shadow/walk-lands';
 import { FrameInspector } from './frame-inspector';
 import { CALM_WIND, FAN_WIND } from '../engine/shadow/bunting-view';
 import { FadeView } from '../engine/shadow/fade-view';
@@ -315,12 +317,16 @@ async function start(): Promise<void> {
    */
   const fade = new FadeView();
   let inVoid = false;
-  const voidHost = (scene: CinematicScene): PrologueHost => ({
+  const voidHost = (scene: {
+    enter(head: { x: number; y: number; z: number }, dirX: number, dirZ: number): void;
+    leave(): void;
+  }): PrologueHost => ({
     enter: () => {
       fade.fadeTo(1, 0.6, () => {
         hiddenForPrologue.length = 0;
         for (const child of world.scene.children) {
-          if (child === cinematic.group || child === hall.group || child === fade.group) continue;
+          if (child === cinematic.group || child === hall.group || child === walkScene.group || child === fade.group)
+            continue;
           hiddenForPrologue.push({ object: child, visible: child.visible });
           child.visible = false;
         }
@@ -347,6 +353,34 @@ async function start(): Promise<void> {
       });
     },
   });
+  // The travel scenes between puzzles: the traveller walks into the next land (and the land it has just left wakes), in the same void.
+  const walkScene = new WalkSceneView();
+  let travelDemo = 0;
+  const walkHost = voidHost(walkScene);
+  interface TravelRun {
+    segments: { land: (typeof LAND_OF_PUZZLE)[number]; mode: 'arrive' | 'wake' }[];
+    at: number;
+    dipping: boolean;
+    leaving: boolean;
+    resume: SessionState;
+  }
+  let travelRun: TravelRun | null = null;
+
+  const reducedMotion = () =>
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** Plays the walk from puzzle `from` (its land wakes) to puzzle `to` (the traveller walks into its land), if travel scenes are on. */
+  const travelTo = (from: number, to: number) => {
+    if (travelRun || inVoid || prologue.playing || finale.playing) return;
+    if (!settings.value.travelScenes || reducedMotion()) return;
+    const segments: TravelRun['segments'] = [];
+    if (from >= 0 && LAND_OF_PUZZLE[from]) segments.push({ land: LAND_OF_PUZZLE[from], mode: 'wake' });
+    if (LAND_OF_PUZZLE[to]) segments.push({ land: LAND_OF_PUZZLE[to], mode: 'arrive' });
+    if (segments.length === 0) return;
+    travelRun = { segments, at: 0, dipping: false, leaving: false, resume: sessionState };
+    sessionState = 'opening'; // the game holds still while the traveller walks
+    walkScene.prepare(segments[0].land, segments[0].mode);
+    walkHost.enter();
+  };
   // The finale plays in the hall of the great crystal, the last thing the night shows.
   const hall = new CinematicScene(CRYSTAL, 'hall');
   /** One lullaby note, from ahead of where the head faced as a scene began (the sun, or the crystal). */
@@ -488,6 +522,7 @@ async function start(): Promise<void> {
     cinematic.group,
     fade.group,
     hall.group,
+    walkScene.group,
     glow.group,
     rabbits.group,
     dust.mesh,
@@ -644,6 +679,7 @@ async function start(): Promise<void> {
         rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
     },
     wake: (index) => wakeSleeper(index),
+    travel: (from, to) => travelTo(from, to),
     note: (text) => captionLine.say(text, 3.2, 2.6),
     setAwake: (count) => {
       sleepersAwake = count;
@@ -917,6 +953,7 @@ async function start(): Promise<void> {
       },
       cutscene: { play: () => playOpening() },
       prologue: { play: () => prologue.start() },
+      travel: { play: () => travelTo(travelDemo++ % 4, (travelDemo % 4) + 1) },
       rewind: { go: () => night.rewind(3) },
       editor: {
         open: () => {
@@ -1265,6 +1302,7 @@ async function start(): Promise<void> {
       if (t.cutscene) setTimeout(() => playOpening(), 1000);
       // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
       if (t.story === 'prologue') later(() => prologue.start(), 1000);
+      if (t.story === 'travel') later(() => travelTo(2, 3), 1000);
       if (t.story === 'finale') later(() => finale.start(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
@@ -1694,6 +1732,31 @@ async function start(): Promise<void> {
           fade.update(step, settingsHead);
           prologue.update(step);
           finale.update(step);
+          if (travelRun && inVoid) {
+            const run = travelRun;
+            walkScene.update(step);
+            if (walkScene.finished && !run.dipping && !run.leaving) {
+              if (run.at + 1 < run.segments.length) {
+                // The next scene (the walk into the new land) follows the waking: a quick dip to black, so the repaint is not seen.
+                run.dipping = true;
+                const next = run.segments[run.at + 1];
+                fade.fadeTo(1, 0.35, () => {
+                  run.at++;
+                  world.camera.getWorldPosition(prologueHead);
+                  world.camera.getWorldDirection(prologueAhead);
+                  walkScene.start(prologueHead, prologueAhead.x, prologueAhead.z, next.land, next.mode);
+                  fade.fadeTo(0, 0.5, () => (run.dipping = false));
+                });
+              } else {
+                run.leaving = true;
+                walkHost.leave();
+                later(() => {
+                  sessionState = run.resume;
+                  travelRun = null;
+                }, 1300);
+              }
+            }
+          }
           // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
           const lineOpacity =
             shadowsVisible && !menu.group.visible && !cutscenes.playing

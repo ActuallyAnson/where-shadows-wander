@@ -77,7 +77,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
     menu.textContent = `Menu screen showing: ${options.menu}`;
     rewind.textContent = `Rewind on a fall (turn the night back 3 s): ${options.rewindOnFall ? 'ON' : 'off'}`;
-    story.textContent = `Story scene when VR starts: ${options.story} (the prologue, or the finale)`;
+    story.textContent = `Story scene when VR starts: ${options.story} (the prologue, the finale, or a travel scene)`;
     for (const [b, isOn] of [
       [joints, options.joints],
       [shadow, options.shadow],

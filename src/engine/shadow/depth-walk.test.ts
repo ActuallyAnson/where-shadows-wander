@@ -32,6 +32,6 @@ describe('the depth walk', () => {
     const props = placeProps(land, 30);
     expect(props.length).toBeGreaterThan(5);
     for (let i = 1; i < props.length; i++) expect(props[i].z).toBeGreaterThanOrEqual(props[i - 1].z);
-    for (const p of props) expect(Math.abs(p.off)).toBeGreaterThan(ROAD_M * 0.5); // never on the road itself
+    for (const p of props.filter((q) => q.kind !== 'gate')) expect(Math.abs(p.off)).toBeGreaterThan(ROAD_M * 0.5); // never on the road itself (the gate stands at its end)
   });
 });
