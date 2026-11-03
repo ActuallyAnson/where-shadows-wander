@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { JOINT_COUNT } from '../hands/hand';
 import { makeFakeXr } from './fake-xr-hands';
 import { XRHandReader } from './xr-hands';
 
@@ -60,9 +61,27 @@ describe('XRHandReader on the getJointPose path (the Pico’s)', () => {
 });
 
 describe('XRHandReader bookkeeping', () => {
+  it('holds a hand through a short dropout, then lets it go', () => {
+    const xr = makeFakeXr({ fast: true });
+    const reader = new XRHandReader();
+    reader.update(xr.frame, ref, xr.origin);
+    const was = reader.hands.right.tracked ? 'right' : 'left';
+    expect(reader.hands[was].tracked).toBe(true);
+    const x = reader.hands[was].positions[0];
+    (xr.session as unknown as { inputSources: unknown[] }).inputSources.length = 0;
+    reader.update(xr.frame, ref, xr.origin); // gone this frame, but only just
+    expect(reader.hands[was].tracked).toBe(true);
+    expect(reader.hands[was].positions[0]).toBe(x);
+    expect(reader.hands[was].validJoints).toBe(JOINT_COUNT);
+    reader.lossGraceMs = 0; // past the grace
+    reader.update(xr.frame, ref, xr.origin);
+    expect(reader.hands[was].tracked).toBe(false);
+  });
+
   it('clears both hands at the start of every frame', () => {
     const xr = makeFakeXr({ fast: true });
     const reader = new XRHandReader();
+    reader.lossGraceMs = 0; // (the grace would hold them: that is tested above)
     reader.update(xr.frame, ref, xr.origin);
     (xr.session as unknown as { inputSources: unknown[] }).inputSources.length = 0;
     reader.update(xr.frame, ref, xr.origin);

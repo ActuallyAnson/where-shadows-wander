@@ -13,15 +13,15 @@ describe('VrTitleView', () => {
     expect(title.group.position.z).toBeCloseTo(-0.55, 2);
   });
 
-  it('updates position and rotates toward camera', () => {
+  it('is placed facing the player and then stays put as the head turns', () => {
     const title = new VrTitleView();
-    title.place(0.1, 1.0, -0.6);
+    title.place(0.1, 1.0, -0.6, 0.5);
     expect(title.group.position.x).toBeCloseTo(0.1, 4);
-
-    const quat = new Quaternion();
-    quat.setFromAxisAngle({ x: 0, y: 1, z: 0 }, 0.5);
-    title.update(0.016, quat);
-    expect(title.group.quaternion.y).toBeCloseTo(quat.y, 4);
+    const turned = new Quaternion().setFromAxisAngle({ x: 0, y: 1, z: 0 }, 0.5);
+    expect(title.group.quaternion.y).toBeCloseTo(turned.y, 4);
+    for (let i = 0; i < 10; i++) title.update(0.016);
+    expect(title.group.quaternion.y).toBeCloseTo(turned.y, 4); // looking round does not move it
+    expect(title.group.position.x).toBeCloseTo(0.1, 4);
   });
 
   it('dissolves over DISSOLVE_DURATION_S upon ignition and hides', () => {

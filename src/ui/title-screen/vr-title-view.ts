@@ -2,16 +2,7 @@
 // Dissolves into mist upon candle ignition.
 // Belongs to Teammate B's UI domain (src/ui/title-screen).
 // Zero per-frame allocations.
-import {
-  CanvasTexture,
-  DoubleSide,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  PlaneGeometry,
-  SRGBColorSpace,
-  type Quaternion,
-} from '@iwsdk/core';
+import { CanvasTexture, DoubleSide, Group, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
 
 export const VR_TITLE_WIDTH_M = 0.75;
 export const VR_TITLE_HEIGHT_M = 0.4;
@@ -184,9 +175,10 @@ export class VrTitleView {
     return this.material.opacity;
   }
 
-  /** Positions the title in world space facing the player. */
-  place(x: number, y: number, z: number): void {
+  /** Positions the title in world space, turned by `yaw` to face the player who stands where the room was placed. It then stays put. */
+  place(x: number, y: number, z: number, yaw = 0): void {
     this.group.position.set(x, y, z);
+    this.group.rotation.set(0, yaw, 0);
   }
 
   /** The line showing now (0 none, 1 the riddle, 2 the plainer line); a new line fades in afresh. */
@@ -214,14 +206,10 @@ export class VrTitleView {
   }
 
   /**
-   * Advances dissolve animation and rotates to billboard toward the player.
-   * Zero per-frame allocations.
+   * Advances the hint and the dissolve. The title hangs where it was placed and does not turn with the head, so looking about before
+   * lighting the candle does not drag it along. Zero per-frame allocations.
    */
-  update(dt: number, cameraQuat?: Quaternion): void {
-    if (cameraQuat && !this._isDissolved) {
-      this.group.quaternion.copy(cameraQuat);
-    }
-
+  update(dt: number): void {
     const goal = this.hintLevel > 0 && !this.dissolving && !this._isDissolved ? 1 : 0;
     this.hintAlpha += (goal - this.hintAlpha) * Math.min(1, dt * HINT_FADE_RATE);
     this.hintMaterial.opacity = this.hintAlpha < 0.01 ? 0 : this.hintAlpha;

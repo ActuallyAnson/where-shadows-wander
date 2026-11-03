@@ -742,6 +742,11 @@ async function start(): Promise<void> {
       menuChoice = 'off';
       sessionState = 'playing';
       candleView.setLocked(true);
+    } else if (screen === 'pause' && button === 'exit') {
+      // Back to the browser page: the session ends, and the title is there again.
+      menu.hide();
+      menuChoice = 'off';
+      void world.renderer.xr.getSession()?.end();
     } else if (screen === 'pause' && button === 'restart') {
       menu.hide();
       menuChoice = 'off';
@@ -859,7 +864,7 @@ async function start(): Promise<void> {
     const titleX = head[0] - Math.sin(yaw) * titleDist;
     const titleY = head[1] - 0.15;
     const titleZ = head[2] - Math.cos(yaw) * titleDist;
-    vrTitle.place(titleX, titleY, titleZ);
+    vrTitle.place(titleX, titleY, titleZ, yaw);
     const r = stage.right,
       u = stage.up,
       n = stage.normal,
@@ -1398,7 +1403,7 @@ async function start(): Promise<void> {
         }
         world.camera.getWorldQuaternion(cameraQuat);
         if (sessionState === 'title_vr') {
-          vrTitle.update(step, cameraQuat);
+          vrTitle.update(step);
           titleLighter.visible = true;
           titleLighter.update(hands.hands.right, cameraQuat, clock);
 
@@ -1464,7 +1469,7 @@ async function start(): Promise<void> {
         } else {
           titleLighter.visible = false;
           if (sessionState === 'opening') {
-            vrTitle.update(step, cameraQuat);
+            vrTitle.update(step);
           } else if (sessionState === 'playing') {
             if (candleView.isCovered) {
               sessionState = 'paused';

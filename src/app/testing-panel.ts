@@ -33,6 +33,8 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   element.id = 'xr-testing-panel';
   element.style.cssText =
     'width:100%;box-sizing:border-box;display:none;flex-direction:column;gap:8px;padding:12px;' +
+    // Twelve switches are taller than a headset browser's window: the panel scrolls rather than running off the top.
+    'max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;' +
     'background:rgba(15,18,24,0.97);border:1px solid #3a4459;border-radius:10px;pointer-events:auto;' +
     'font:14px system-ui,sans-serif;color:#c9d1d9;box-shadow:0 8px 24px rgba(0,0,0,0.5);';
 
