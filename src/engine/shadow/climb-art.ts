@@ -15,7 +15,7 @@ export const CLIMB_SIZE: Readonly<Record<ClimbLayer, readonly [number, number]>>
   far: [1.4, 1],
   mid: [2.1, 1.5],
   path: [2.4, 1.9],
-  near: [1.4, 1],
+  near: [2.4, 1],
   frame: [1, 1],
 };
 
@@ -349,6 +349,10 @@ export function paintClimbLayer(g: Ctx, layer: ClimbLayer, W: number, H: number,
       );
       g.fill();
     }
+    // A couple of dark rocks very near the camera, out of focus: they pass by as the traveller goes on, and are not always there.
+    blur(g, unit / 120);
+    rockMass(g, r, { x0: W * 0.2, y0: H * 0.7, x1: W * 0.3, y1: H * 1.05 }, [26, 12, 10], [120, 70, 50], 1, 4);
+    rockMass(g, r, { x0: W * 0.7, y0: H * 0.8, x1: W * 0.84, y1: H * 1.05 }, [26, 12, 10], [120, 70, 50], 1, 4);
     blur(g, 0);
   }
 

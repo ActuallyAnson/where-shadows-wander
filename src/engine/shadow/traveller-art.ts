@@ -1,7 +1,7 @@
 // The traveller, drawn as a character: a small hooded wanderer in profile (facing right) with a pointed cowl, a scarf that
 // streams behind, a round cloak with a swishing tail, stubby boots and a lantern that swings from one hand. It is a black
 // silhouette like everything else in the shadows, with the two warm things that give it life: glowing eyes under the hood
-// and the lantern. Nine poses from one set of curves, so a pose only changes numbers. Nothing here is downloaded: it is paths
+// and the lantern. Thirteen poses from one set of curves, so a pose only changes numbers. Nothing here is downloaded: it is paths
 // drawn in code, at any size. A sprite atlas calls paintTraveller(g, size, pose) once per pose.
 
 /** Pose numbers. The walk cycle is WALK_CYCLE; BLINK is the idle pose with the eyes shut, shown now and then. */
@@ -15,8 +15,15 @@ export const Pose = {
   Walk3: 6,
   Walk4: 7,
   Blink: 8,
+  /** Going up a step: one boot lifted high, the body leaning in, the lantern arm reaching. */
+  Climb1: 9,
+  Climb2: 10,
+  /** Standing and looking up (at the top of a climb, at a high place). */
+  LookUp: 11,
+  /** A hop over something small. */
+  Hop: 12,
 } as const;
-export const TRAVELLER_POSES = 9;
+export const TRAVELLER_POSES = 13;
 /** The poses of one stride, in order (about 8 steps a second looks like a steady walk). */
 export const WALK_CYCLE: readonly number[] = [Pose.Walk1, Pose.Walk3, Pose.Walk2, Pose.Walk4];
 
@@ -181,6 +188,66 @@ const POSES: readonly Params[] = [
     eyes: 0.08,
     lift: 0,
     hem: 0,
+    shake: 0,
+  },
+  /* climb 1: the front boot up on the next step */ {
+    lean: 14,
+    stride: 18,
+    liftBack: 4,
+    liftFront: 26,
+    swing: 0.2,
+    arm: 0.55,
+    wave: 1.5,
+    trail: 1.2,
+    tilt: -0.1,
+    eyes: 1,
+    lift: 4,
+    hem: 6,
+    shake: 0,
+  },
+  /* climb 2: the back boot comes up, the body rising */ {
+    lean: 12,
+    stride: -14,
+    liftBack: 24,
+    liftFront: 2,
+    swing: -0.1,
+    arm: 0.7,
+    wave: 2.8,
+    trail: 1.2,
+    tilt: -0.08,
+    eyes: 1,
+    lift: 8,
+    hem: -5,
+    shake: 0,
+  },
+  /* look up */ {
+    lean: -4,
+    stride: 0,
+    liftBack: 0,
+    liftFront: 0,
+    swing: 0.04,
+    arm: 0.3,
+    wave: 0.6,
+    trail: 0.9,
+    tilt: -0.38,
+    eyes: 1,
+    lift: 0,
+    hem: 2,
+    shake: 0,
+  },
+  /* hop */ {
+    lean: 4,
+    stride: 8,
+    liftBack: 16,
+    liftFront: 20,
+    swing: 0.4,
+    arm: 0.8,
+    wave: 2.2,
+    trail: 1.5,
+    tilt: -0.05,
+    eyes: 1,
+    lift: 26,
+    hem: 10,
     shake: 0,
   },
 ];
