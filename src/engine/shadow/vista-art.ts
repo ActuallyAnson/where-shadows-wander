@@ -9,7 +9,7 @@ type Ctx = CanvasRenderingContext2D;
 export type LayerName = 'sky' | 'far' | 'near' | 'mid' | 'water' | 'front' | 'frame';
 // ('frame' is the rock that frames the picture at its edges: it stays where it is on screen while the land moves.)
 
-function rng(seed: number): () => number {
+export function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -21,7 +21,7 @@ function rng(seed: number): () => number {
 }
 
 /** A smooth ridge line: layered sines with random phases, from `x` in 0..1, a value in about -1..1. */
-function ridgeFn(seed: number, octaves = 5): (x: number) => number {
+export function ridgeFn(seed: number, octaves = 5): (x: number) => number {
   const r = rng(seed);
   const parts = Array.from({ length: octaves }, (_, i) => ({
     f: 2 ** i * (1.3 + r()),
@@ -32,12 +32,12 @@ function ridgeFn(seed: number, octaves = 5): (x: number) => number {
   return (x) => parts.reduce((s, q) => s + Math.sin(x * q.f * 6.283 + q.p) * q.a, 0) / total;
 }
 
-function mix(a: number[], b: number[], t: number): string {
+export function mix(a: number[], b: number[], t: number): string {
   const c = a.map((v, i) => Math.round(v + (b[i] - v) * t));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
-function poly(g: Ctx, pts: readonly (readonly [number, number])[], fill: string | CanvasGradient): void {
+export function poly(g: Ctx, pts: readonly (readonly [number, number])[], fill: string | CanvasGradient): void {
   g.beginPath();
   g.moveTo(pts[0][0], pts[0][1]);
   for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
@@ -46,12 +46,12 @@ function poly(g: Ctx, pts: readonly (readonly [number, number])[], fill: string 
   g.fill();
 }
 
-function blur(g: Ctx, px: number): void {
+export function blur(g: Ctx, px: number): void {
   if ('filter' in g) g.filter = px > 0 ? `blur(${px}px)` : 'none';
 }
 
 /** A jagged rock mass: a polygon whose edge is rough, cut into facets that catch the light on one side. */
-function rockMass(
+export function rockMass(
   g: Ctx,
   r: () => number,
   box: { x0: number; y0: number; x1: number; y1: number },
@@ -66,6 +66,7 @@ function rockMass(
   const w = x1 - x0;
   const h = y1 - y0;
   g.save();
+  const outline: [number, number][] = [];
   if (inner) {
     const edge = ridgeFn(Math.floor(x0 * 7 + y0 * 13 + facets) + 5, 6);
     const top = ridgeFn(Math.floor(x1 * 3 + y1) + 11, 5);
@@ -83,7 +84,9 @@ function rockMass(
     // Down the inner side, a broken cliff face.
     for (let i = 0; i <= steps; i++) {
       const y = y0 + (i / steps) * (y1 - y0 + h * 0.1);
-      g.lineTo(ix((y - y0) / h), y);
+      const ox = ix((y - y0) / h);
+      outline.push([ox, y]);
+      g.lineTo(ox, y);
     }
     g.lineTo(inner === 'right' ? x0 - w : x1 + w, y1 + h * 0.2);
     g.closePath();
@@ -119,6 +122,13 @@ function rockMass(
       }
     }
   }
+  // Soft light over the facets: brighter on the side the light comes from, darker low down where the rock is in its own shade.
+  const shade = g.createLinearGradient(lightFrom === 1 ? x1 : x0, y0, lightFrom === 1 ? x0 : x1, y1);
+  shade.addColorStop(0, 'rgba(255,236,200,0.16)');
+  shade.addColorStop(0.5, 'rgba(0,0,0,0)');
+  shade.addColorStop(1, 'rgba(0,0,0,0.38)');
+  g.fillStyle = shade;
+  g.fillRect(x0 - w, y0 - h, w * 3, h * 3);
   // Grit: specks and cracks over the facets, so the surface is not smooth flat colour.
   const specks = Math.round((w * h) / 90);
   for (let i = 0; i < specks; i++) {
@@ -134,6 +144,16 @@ function rockMass(
     const cy = y0 + r() * h;
     g.moveTo(cx, cy);
     g.lineTo(cx + (r() - 0.5) * 50, cy + 10 + r() * 60);
+    g.stroke();
+  }
+  // A thin lit edge along the broken face that looks toward the light.
+  if (outline.length > 1) {
+    g.strokeStyle = 'rgba(255,238,206,0.42)';
+    g.lineWidth = Math.max(1.5, w / 160);
+    g.lineJoin = 'round';
+    g.beginPath();
+    g.moveTo(outline[0][0], outline[0][1]);
+    for (const [ox, oy] of outline) g.lineTo(ox, oy);
     g.stroke();
   }
   g.restore();
