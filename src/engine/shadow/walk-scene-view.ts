@@ -26,8 +26,11 @@ import {
   ROAD_END_M,
   START_Z,
   wakingAt,
+  WAKE_BEAT_S,
   WAKING_S,
 } from './pure/walk-timeline';
+import { SKIP_RADIUS_M } from './pure/skip-touch';
+import { createStagePlane, type MutableStagePlane } from './pure/stage-plane';
 import { paintTraveller, paintTravellerBack, Pose } from './traveller-art';
 import { LAND_SIZE, LANDS, paintLandLayer, type LandId } from './walk-lands';
 
@@ -45,6 +48,8 @@ const FAR_AT = 75;
 const MID_START = 80;
 const MID_END = 46;
 const STRIDE_M = 0.55;
+/** Where the Skip button is, in the scene's own space: a little to the right, low and near. */
+const SKIP_LOCAL = [0.28, -0.5, -0.6] as const;
 
 export type WalkMode = 'arrive' | 'wake';
 
@@ -105,6 +110,15 @@ export class WalkSceneView {
   private frames: Record<string, CanvasTexture> = {};
   private castleX = 0;
   private done = false;
+  private skipButton!: Mesh;
+  private skipMat!: MeshBasicMaterial;
+  private lastStride = 0;
+  private wakeSounded = false;
+  /** Where a fingertip pokes to skip (the same ring as the other full-view scenes). */
+  readonly skipPlane: MutableStagePlane = createStagePlane();
+  /** Told on each footstep (which of the two feet) and once when the sleeper wakes, for the app to make the sounds. */
+  onStep: ((alternate: boolean) => void) | null = null;
+  onWake: (() => void) | null = null;
 
   constructor() {
     this.group.visible = false;
@@ -153,8 +167,36 @@ export class WalkSceneView {
     this.done = false;
     this.group.position.set(head.x, head.y, head.z);
     this.group.rotation.set(0, Math.atan2(-dirX, -dirZ), 0);
+    this.lastStride = Math.floor(START_Z / STRIDE_M);
+    this.wakeSounded = false;
+    // The Skip button's plane, in the world: centred on the button, turned with the scene.
+    const yaw = this.group.rotation.y;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    const sp = this.skipPlane;
+    sp.origin[0] = head.x + SKIP_LOCAL[0] * c + SKIP_LOCAL[2] * s;
+    sp.origin[1] = head.y + SKIP_LOCAL[1];
+    sp.origin[2] = head.z - SKIP_LOCAL[0] * s + SKIP_LOCAL[2] * c;
+    sp.right[0] = c;
+    sp.right[2] = -s;
+    sp.normal[0] = s;
+    sp.normal[2] = c;
+    sp.right[1] = 0;
+    sp.normal[1] = 0;
+    sp.up[1] = 1;
+    sp.width = sp.height = SKIP_RADIUS_M * 2;
+    this.skipMat.opacity = 0.55;
     this.group.visible = true;
     this.update(0);
+  }
+
+  /** How far the fingertip has held on Skip, 0 to 1: the ring brightens and swells. */
+  setSkipProgress(progress: number): void {
+    if (!this.built) return;
+    const k = Math.min(1, Math.max(0, progress));
+    this.skipMat.opacity = 0.55 + 0.45 * k;
+    const sc = 1 + 0.25 * k;
+    this.skipButton.scale.set(sc, sc, 1);
   }
 
   /** Ends the scene now. */
@@ -379,6 +421,26 @@ export class WalkSceneView {
     this.pool = pool.mesh;
     this.poolMat = pool.mat;
 
+    // The Skip button: a ring with its word, low and near where the hands rest.
+    const skipTex = tex(128, 128, (g, w, h) => {
+      g.clearRect(0, 0, w, h);
+      g.strokeStyle = 'rgba(255, 238, 205, 0.9)';
+      g.lineWidth = 6;
+      g.beginPath();
+      g.arc(w / 2, h / 2, w * 0.4, 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = 'rgba(255, 238, 205, 0.95)';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = `700 ${Math.round(w * 0.2)}px 'Cinzel Decorative', Georgia, serif`;
+      g.fillText('SKIP', w / 2, h / 2 + 2);
+    });
+    const skip = make(plane(SKIP_RADIUS_M * 2.4, SKIP_RADIUS_M * 2.4), skipTex, 1001);
+    this.skipButton = skip.mesh;
+    this.skipMat = skip.mat;
+    this.skipMat.depthTest = false;
+    this.skipMat.opacity = 0.55;
+    this.skipButton.position.set(SKIP_LOCAL[0], SKIP_LOCAL[1], SKIP_LOCAL[2]);
     // The flash of gold at the moment the sleeper wakes: a veil in front of the eyes.
     const flashTex = tex(8, 8, (g, w, h) => {
       g.fillStyle = '#ffd896';
@@ -452,6 +514,15 @@ export class WalkSceneView {
     this.traveller.renderOrder = 200 - zT * 5 + 0.5;
     this.shadow.position.set(cx, FLOOR_Y + 0.02, -zT);
     this.pool.position.set(cx + 0.5, FLOOR_Y + 0.03, -zT);
+    // Sounds: a footstep at each stride of the walk, and the sleeper's note when the day begins.
+    if (this.mode === 'arrive') {
+      const stride = Math.floor(zT / STRIDE_M);
+      if (look === 'walk' && stride !== this.lastStride) this.onStep?.(stride % 2 === 0);
+      this.lastStride = stride;
+    } else if (!this.wakeSounded && this.time >= WAKE_BEAT_S + 0.15) {
+      this.wakeSounded = true;
+      this.onWake?.();
+    }
     // Which picture the traveller shows.
     let frame = 'back';
     if (look === 'stand') frame = this.time % 4.5 > 4.3 ? 'blink' : 'stand';

@@ -357,11 +357,28 @@ async function start(): Promise<void> {
   const walkScene = new WalkSceneView();
   let travelDemo = 0;
   const walkHost = voidHost(walkScene);
+  // The walk's sounds: footsteps in time with the traveller (from ahead of where the head faced), and the sleeper's note as its land wakes.
+  const walkPoint = new Vector3();
+  const walkAt = () => {
+    walkPoint.set(prologueHead.x + prologueAhead.x * 3.6, prologueHead.y - 1.2, prologueHead.z + prologueAhead.z * 3.6);
+    return walkPoint;
+  };
+  walkScene.onStep = (alternate) => {
+    const p = walkAt();
+    gameAudio.stepAtPoint(p.x, p.y, p.z, alternate);
+  };
+  walkScene.onWake = () => {
+    const p = walkAt();
+    const index = Math.max(0, travelRun ? LAND_OF_PUZZLE.indexOf(travelRun.segments[travelRun.at].land) : 0);
+    gameAudio.lullabyNote(index, p.x, p.y + 1.2, p.z);
+  };
   interface TravelRun {
     segments: { land: (typeof LAND_OF_PUZZLE)[number]; mode: 'arrive' | 'wake' }[];
     at: number;
     dipping: boolean;
     leaving: boolean;
+    /** Skip was poked: whatever is left of the walk is dropped. */
+    skipRest: boolean;
     resume: SessionState;
   }
   let travelRun: TravelRun | null = null;
@@ -376,7 +393,7 @@ async function start(): Promise<void> {
     if (from >= 0 && LAND_OF_PUZZLE[from]) segments.push({ land: LAND_OF_PUZZLE[from], mode: 'wake' });
     if (LAND_OF_PUZZLE[to]) segments.push({ land: LAND_OF_PUZZLE[to], mode: 'arrive' });
     if (segments.length === 0) return;
-    travelRun = { segments, at: 0, dipping: false, leaving: false, resume: sessionState };
+    travelRun = { segments, at: 0, dipping: false, leaving: false, skipRest: false, resume: sessionState };
     sessionState = 'opening'; // the game holds still while the traveller walks
     walkScene.prepare(segments[0].land, segments[0].mode);
     walkHost.enter();
@@ -413,6 +430,7 @@ async function start(): Promise<void> {
   /** The Skip poke for each (a fingertip held on the ring for a moment). */
   const prologueSkip = new SkipTouch();
   const finaleSkip = new SkipTouch();
+  const walkSkip = new SkipTouch();
   const prologueHead = new Vector3();
   const prologueAhead = new Vector3();
   /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
@@ -1736,7 +1754,7 @@ async function start(): Promise<void> {
             const run = travelRun;
             walkScene.update(step);
             if (walkScene.finished && !run.dipping && !run.leaving) {
-              if (run.at + 1 < run.segments.length) {
+              if (run.at + 1 < run.segments.length && !run.skipRest) {
                 // The next scene (the walk into the new land) follows the waking: a quick dip to black, so the repaint is not seen.
                 run.dipping = true;
                 const next = run.segments[run.at + 1];
@@ -1764,7 +1782,7 @@ async function start(): Promise<void> {
               : 0;
           storyLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
-          if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing) {
+          if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing || (travelRun && inVoid)) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
@@ -1783,6 +1801,13 @@ async function start(): Promise<void> {
                 menu.setGaze(gazeAt.x, gazeAt.y, gazeAt.z, gazeDir.x, gazeDir.y, gazeDir.z);
               }
               menu.update(step, menuTips, tips);
+            }
+            if (travelRun && inVoid && !travelRun.leaving) {
+              if (walkSkip.update(step, menuTips, tips, walkScene.skipPlane)) {
+                travelRun.skipRest = true;
+                walkScene.skip();
+              }
+              walkScene.setSkipProgress(walkSkip.progress);
             }
             if (prologue.playing) {
               if (prologueSkip.update(step, menuTips, tips, cinematic.skipPlane)) prologue.skip();

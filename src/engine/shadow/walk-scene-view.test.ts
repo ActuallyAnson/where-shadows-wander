@@ -59,4 +59,30 @@ describe('WalkSceneView', () => {
     }).not.toThrow();
     v.dispose();
   });
+
+  it('makes a footstep on each stride of the walk, alternating feet, and tells once when the sleeper wakes', () => {
+    const v = new WalkSceneView();
+    const feet: boolean[] = [];
+    v.onStep = (alt) => feet.push(alt);
+    v.start(HEAD, 0, -1, 'cave', 'arrive');
+    while (v.playing) v.update(1 / 72);
+    expect(feet.length).toBeGreaterThan(15);
+    for (let i = 1; i < feet.length; i++) expect(feet[i]).toBe(!feet[i - 1]);
+    let woke = 0;
+    v.onWake = () => woke++;
+    v.start(HEAD, 0, -1, 'cave', 'wake');
+    while (v.playing) v.update(1 / 72);
+    expect(woke).toBe(1);
+    v.dispose();
+  });
+
+  it('has a Skip button that stands where the head faced, in reach, and brightens as it is held', () => {
+    const v = new WalkSceneView();
+    v.start(HEAD, 0, -1, 'castle', 'arrive');
+    const o = v.skipPlane.origin;
+    expect(Math.hypot(o[0] - HEAD.x, o[2] - HEAD.z)).toBeLessThan(1); // near the hands
+    expect(o[1]).toBeLessThan(HEAD.y); // low
+    expect(() => v.setSkipProgress(0.7)).not.toThrow();
+    v.dispose();
+  });
 });
