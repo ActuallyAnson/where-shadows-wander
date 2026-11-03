@@ -5,6 +5,9 @@
 
 type Ctx = CanvasRenderingContext2D;
 
+/** The parts a vista is cut into, to be drawn at different depths and moved on their own (paint with `only` to get one). */
+export type LayerName = 'sky' | 'far' | 'near' | 'mid' | 'water' | 'front';
+
 function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -496,36 +499,40 @@ export function paintCavern(g: Ctx, W: number, H: number): void {
 }
 
 /** A windswept highland at golden hour: a sea of cloud below, ridges standing out of it, a grassy edge bent in the wind. */
-export function paintHighlands(g: Ctx, W: number, H: number): void {
+export function paintHighlands(g: Ctx, W: number, H: number, only?: LayerName): void {
+  const on = (n: LayerName) => !only || only === n;
   const r = rng(31337);
   g.save();
   g.clearRect(0, 0, W, H);
-  const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
-  sky.addColorStop(0, '#5b6fa8');
-  sky.addColorStop(0.45, '#c79bb0');
-  sky.addColorStop(0.8, '#f2c79a');
-  sky.addColorStop(1, '#f8dfb4');
-  g.fillStyle = sky;
-  g.fillRect(0, 0, W, H);
-  const sun = g.createRadialGradient(W * 0.3, H * 0.5, 0, W * 0.3, H * 0.5, W * 0.5);
-  sun.addColorStop(0, 'rgba(255,236,190,1)');
-  sun.addColorStop(0.12, 'rgba(255,214,150,0.7)');
-  sun.addColorStop(1, 'rgba(255,200,140,0)');
-  g.fillStyle = sun;
-  g.fillRect(0, 0, W, H);
-  // High streaks of cloud, stretched by the wind.
-  blur(g, W / 160);
-  for (let i = 0; i < 14; i++) {
-    g.fillStyle = `rgba(255,236,230,${0.1 + r() * 0.2})`;
-    g.beginPath();
-    g.ellipse(r() * W, H * (0.05 + r() * 0.3), W * (0.08 + r() * 0.16), H * (0.006 + r() * 0.012), -0.04, 0, 6.283);
-    g.fill();
+  if (on('sky')) {
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
+    sky.addColorStop(0, '#5b6fa8');
+    sky.addColorStop(0.45, '#c79bb0');
+    sky.addColorStop(0.8, '#f2c79a');
+    sky.addColorStop(1, '#f8dfb4');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    const sun = g.createRadialGradient(W * 0.3, H * 0.5, 0, W * 0.3, H * 0.5, W * 0.5);
+    sun.addColorStop(0, 'rgba(255,236,190,1)');
+    sun.addColorStop(0.12, 'rgba(255,214,150,0.7)');
+    sun.addColorStop(1, 'rgba(255,200,140,0)');
+    g.fillStyle = sun;
+    g.fillRect(0, 0, W, H);
+    // High streaks of cloud, stretched by the wind.
+    blur(g, W / 160);
+    for (let i = 0; i < 14; i++) {
+      g.fillStyle = `rgba(255,236,230,${0.1 + r() * 0.2})`;
+      g.beginPath();
+      g.ellipse(r() * W, H * (0.05 + r() * 0.3), W * (0.08 + r() * 0.16), H * (0.006 + r() * 0.012), -0.04, 0, 6.283);
+      g.fill();
+    }
+    blur(g, 0);
   }
-  blur(g, 0);
   // Ridges standing out of a sea of cloud: far ones violet, near ones deep blue-green; a bank of cloud in front of each.
   const far = [176, 150, 178];
   const near = [58, 70, 96];
   for (let k = 0; k < 4; k++) {
+    if (!on(k < 2 ? 'far' : 'near')) continue;
     const t = k / 3;
     const ridge = ridgeFn(500 + k * 31, 5);
     const base = H * (0.5 + t * 0.12);
@@ -560,95 +567,99 @@ export function paintHighlands(g: Ctx, W: number, H: number): void {
     }
     blur(g, 0);
   }
-  // The grassy edge in the front, a cliff top with wind-bent tufts and rocks, and a lean tree.
-  const edge = ridgeFn(88, 4);
-  g.beginPath();
-  g.moveTo(0, H);
-  for (let i = 0; i <= 80; i++) g.lineTo((i / 80) * W, H * 0.78 + edge(i / 80) * H * 0.04 + (i / 80) * H * 0.06);
-  g.lineTo(W, H);
-  g.closePath();
-  const grass = g.createLinearGradient(0, H * 0.7, 0, H);
-  grass.addColorStop(0, '#5f6b3e');
-  grass.addColorStop(1, '#232a1a');
-  g.fillStyle = grass;
-  g.fill();
-  for (let i = 0; i < 1400; i++) {
-    const x = r() * W;
-    const y = H * (0.8 + r() * 0.2);
-    const len = 8 + r() * 22;
-    g.strokeStyle = `rgba(${150 + r() * 70},${160 + r() * 60},${80 + r() * 40},${0.3 + r() * 0.4})`;
-    g.lineWidth = 1 + r() * 1.5;
+  if (on('front')) {
+    // The grassy edge in the front, a cliff top with wind-bent tufts and rocks, and a lean tree.
+    const edge = ridgeFn(88, 4);
     g.beginPath();
-    g.moveTo(x, y);
-    g.quadraticCurveTo(x + len * 0.3, y - len * 0.8, x + len * 0.9, y - len * 0.7); // bent downwind, to the right
-    g.stroke();
-  }
-  rockMass(
-    g,
-    r,
-    { x0: -W * 0.04, y0: H * 0.7, x1: W * 0.2, y1: H * 1.02 },
-    [26, 28, 34],
-    [150, 124, 120],
-    1,
-    6,
-    'right',
-  );
-  rockMass(
-    g,
-    r,
-    { x0: W * 0.86, y0: H * 0.76, x1: W * 1.04, y1: H * 1.02 },
-    [26, 28, 34],
-    [140, 118, 116],
-    1,
-    5,
-    'left',
-  );
-  // A lone tree leaning with the wind, in silhouette against the glow.
-  g.strokeStyle = '#1b1a22';
-  g.lineCap = 'round';
-  g.lineWidth = W * 0.008;
-  g.beginPath();
-  g.moveTo(W * 0.78, H * 0.8);
-  g.quadraticCurveTo(W * 0.78, H * 0.62, W * 0.83, H * 0.55);
-  g.stroke();
-  for (let i = 0; i < 90; i++) {
-    g.fillStyle = `rgba(28,26,36,${0.7 + r() * 0.3})`;
-    g.beginPath();
-    g.ellipse(
-      W * (0.82 + (r() - 0.3) * 0.08),
-      H * (0.55 + (r() - 0.5) * 0.06),
-      5 + r() * 12,
-      2 + r() * 5,
-      -0.3,
-      0,
-      6.283,
+    g.moveTo(0, H);
+    for (let i = 0; i <= 80; i++) g.lineTo((i / 80) * W, H * 0.78 + edge(i / 80) * H * 0.04 + (i / 80) * H * 0.06);
+    g.lineTo(W, H);
+    g.closePath();
+    const grass = g.createLinearGradient(0, H * 0.7, 0, H);
+    grass.addColorStop(0, '#5f6b3e');
+    grass.addColorStop(1, '#232a1a');
+    g.fillStyle = grass;
+    g.fill();
+    for (let i = 0; i < 1400; i++) {
+      const x = r() * W;
+      const y = H * (0.8 + r() * 0.2);
+      const len = 8 + r() * 22;
+      g.strokeStyle = `rgba(${150 + r() * 70},${160 + r() * 60},${80 + r() * 40},${0.3 + r() * 0.4})`;
+      g.lineWidth = 1 + r() * 1.5;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + len * 0.3, y - len * 0.8, x + len * 0.9, y - len * 0.7); // bent downwind, to the right
+      g.stroke();
+    }
+    rockMass(
+      g,
+      r,
+      { x0: -W * 0.04, y0: H * 0.7, x1: W * 0.2, y1: H * 1.02 },
+      [26, 28, 34],
+      [150, 124, 120],
+      1,
+      6,
+      'right',
     );
-    g.fill();
-  }
-  // Wind: streaks and petals blowing across.
-  g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 40; i++) {
-    const y = H * (0.2 + r() * 0.7);
-    const x = r() * W;
-    g.strokeStyle = `rgba(255,236,214,${0.04 + r() * 0.1})`;
-    g.lineWidth = 1 + r() * 2;
+    rockMass(
+      g,
+      r,
+      { x0: W * 0.86, y0: H * 0.76, x1: W * 1.04, y1: H * 1.02 },
+      [26, 28, 34],
+      [140, 118, 116],
+      1,
+      5,
+      'left',
+    );
+    // A lone tree leaning with the wind, in silhouette against the glow.
+    g.strokeStyle = '#1b1a22';
+    g.lineCap = 'round';
+    g.lineWidth = W * 0.008;
     g.beginPath();
-    g.moveTo(x, y);
-    g.bezierCurveTo(x + 60, y - 8, x + 120, y + 8, x + 180 + r() * 120, y - 4);
+    g.moveTo(W * 0.78, H * 0.8);
+    g.quadraticCurveTo(W * 0.78, H * 0.62, W * 0.83, H * 0.55);
     g.stroke();
+    for (let i = 0; i < 90; i++) {
+      g.fillStyle = `rgba(28,26,36,${0.7 + r() * 0.3})`;
+      g.beginPath();
+      g.ellipse(
+        W * (0.82 + (r() - 0.3) * 0.08),
+        H * (0.55 + (r() - 0.5) * 0.06),
+        5 + r() * 12,
+        2 + r() * 5,
+        -0.3,
+        0,
+        6.283,
+      );
+      g.fill();
+    }
   }
-  for (let i = 0; i < 70; i++) {
-    g.fillStyle = `rgba(255,214,180,${0.3 + r() * 0.5})`;
-    g.beginPath();
-    g.ellipse(r() * W, H * (0.3 + r() * 0.6), 2 + r() * 3, 1 + r() * 1.5, r(), 0, 6.283);
-    g.fill();
+  if (!only) {
+    // Wind: streaks and petals blowing across.
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 40; i++) {
+      const y = H * (0.2 + r() * 0.7);
+      const x = r() * W;
+      g.strokeStyle = `rgba(255,236,214,${0.04 + r() * 0.1})`;
+      g.lineWidth = 1 + r() * 2;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.bezierCurveTo(x + 60, y - 8, x + 120, y + 8, x + 180 + r() * 120, y - 4);
+      g.stroke();
+    }
+    for (let i = 0; i < 70; i++) {
+      g.fillStyle = `rgba(255,214,180,${0.3 + r() * 0.5})`;
+      g.beginPath();
+      g.ellipse(r() * W, H * (0.3 + r() * 0.6), 2 + r() * 3, 1 + r() * 1.5, r(), 0, 6.283);
+      g.fill();
+    }
+    g.globalCompositeOperation = 'source-over';
+    const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.7);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(14,10,22,0.45)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, W, H);
   }
-  g.globalCompositeOperation = 'source-over';
-  const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.7);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(14,10,22,0.45)');
-  g.fillStyle = vig;
-  g.fillRect(0, 0, W, H);
   g.restore();
 }
 
@@ -785,57 +796,9 @@ export function paintCanyon(g: Ctx, W: number, H: number): void {
 }
 
 /** A castle at dusk on a hill, its windows lit, a moat in front holding the reflection, a big moon and stars. */
-export function paintCastle(g: Ctx, W: number, H: number): void {
+export function paintCastle(g: Ctx, W: number, H: number, only?: LayerName): void {
+  const on = (n: LayerName) => !only || only === n;
   const r = rng(1313);
-  g.save();
-  g.clearRect(0, 0, W, H);
-  const sky = g.createLinearGradient(0, 0, 0, H * 0.62);
-  sky.addColorStop(0, '#1a1f4a');
-  sky.addColorStop(0.5, '#6a4a86');
-  sky.addColorStop(0.85, '#e58f78');
-  sky.addColorStop(1, '#f6c58c');
-  g.fillStyle = sky;
-  g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 160; i++) {
-    g.fillStyle = `rgba(255,248,230,${0.2 + r() * 0.7})`;
-    g.beginPath();
-    g.arc(r() * W, r() * H * 0.4, 0.5 + r() * 1.3, 0, 6.283);
-    g.fill();
-  }
-  const moon = g.createRadialGradient(W * 0.72, H * 0.2, 0, W * 0.72, H * 0.2, W * 0.2);
-  moon.addColorStop(0, 'rgba(255,250,232,1)');
-  moon.addColorStop(0.2, 'rgba(255,244,214,0.9)');
-  moon.addColorStop(0.24, 'rgba(255,230,190,0.35)');
-  moon.addColorStop(1, 'rgba(255,220,170,0)');
-  g.fillStyle = moon;
-  g.fillRect(0, 0, W, H);
-  blur(g, W / 200);
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = `rgba(255,214,190,${0.12 + r() * 0.14})`;
-    g.beginPath();
-    g.ellipse(r() * W, H * (0.1 + r() * 0.32), W * (0.06 + r() * 0.1), H * 0.014, 0, 0, 6.283);
-    g.fill();
-  }
-  blur(g, 0);
-  // Far hills, violet, then the castle's hill.
-  const hills = ridgeFn(61, 4);
-  g.fillStyle = '#4a3a66';
-  g.beginPath();
-  g.moveTo(0, H);
-  for (let i = 0; i <= 90; i++) g.lineTo((i / 90) * W, H * 0.56 + hills(i / 90) * H * 0.05);
-  g.lineTo(W, H);
-  g.fill();
-  const hill = ridgeFn(62, 3);
-  g.fillStyle = '#24203e';
-  g.beginPath();
-  g.moveTo(W * 0.15, H);
-  for (let i = 0; i <= 60; i++) {
-    const x = 0.2 + (i / 60) * 0.6;
-    g.lineTo(x * W, H * 0.52 + (1 - Math.sin(((x - 0.2) / 0.6) * Math.PI)) * H * 0.1 + hill(x) * H * 0.01);
-  }
-  g.lineTo(W * 0.85, H);
-  g.fill();
-  // The castle: towers of different heights with cones, walls with crenellations, windows lit warm.
   const stone = '#1a1830';
   const towers = [
     { x: 0.36, w: 0.05, top: 0.3 },
@@ -843,95 +806,174 @@ export function paintCastle(g: Ctx, W: number, H: number): void {
     { x: 0.53, w: 0.05, top: 0.28 },
     { x: 0.6, w: 0.045, top: 0.36 },
   ];
-  g.fillStyle = stone;
-  g.fillRect(W * 0.33, H * 0.42, W * 0.34, H * 0.12); // the curtain wall
-  for (let i = 0; i < 34; i++) g.fillRect(W * (0.33 + i * 0.01), H * 0.405, W * 0.006, H * 0.016);
-  for (const t of towers) {
-    g.fillStyle = stone;
-    g.fillRect(W * t.x, H * t.top, W * t.w, H * 0.54 - H * t.top);
-    poly(
-      g,
-      [
-        [W * (t.x - 0.006), H * t.top],
-        [W * (t.x + t.w * 0.5), H * (t.top - 0.09)],
-        [W * (t.x + t.w + 0.006), H * t.top],
-      ],
-      '#2a2448',
-    );
-    // Windows, some lit.
-    for (let k = 0; k < 3; k++) {
-      const lit = r() < 0.7;
-      g.fillStyle = lit ? 'rgba(255,208,120,0.95)' : 'rgba(20,18,40,0.9)';
-      g.fillRect(W * (t.x + t.w * 0.38), H * (t.top + 0.03 + k * 0.05), W * t.w * 0.22, H * 0.022);
-    }
-  }
-  // The great gate, its arch glowing.
-  g.fillStyle = 'rgba(255,196,110,0.9)';
-  g.beginPath();
-  g.moveTo(W * 0.475, H * 0.54);
-  g.lineTo(W * 0.475, H * 0.5);
-  g.arc(W * 0.5, H * 0.5, W * 0.025, Math.PI, 0);
-  g.lineTo(W * 0.525, H * 0.54);
-  g.fill();
-  // The moat: dark water holding the castle's lights and the sky, with a stone bridge across.
-  const moatTop = H * 0.66;
-  const water = g.createLinearGradient(0, moatTop, 0, H * 0.84);
-  water.addColorStop(0, '#6b5a8e');
-  water.addColorStop(1, '#171532');
-  g.fillStyle = water;
-  g.fillRect(0, moatTop, W, H * 0.18);
   g.save();
-  g.beginPath();
-  g.rect(0, moatTop, W, H * 0.18);
-  g.clip();
-  g.globalAlpha = 0.5;
-  blur(g, 3);
-  for (const t of towers) {
-    g.fillStyle = '#0f0e22';
-    g.fillRect(W * t.x, moatTop + (H * 0.54 - H * t.top) * 0.0 + H * 0.02, W * t.w, H * (0.1 + (0.54 - t.top) * 0.3));
+  g.clearRect(0, 0, W, H);
+  if (on('sky')) {
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.62);
+    sky.addColorStop(0, '#1a1f4a');
+    sky.addColorStop(0.5, '#6a4a86');
+    sky.addColorStop(0.85, '#e58f78');
+    sky.addColorStop(1, '#f6c58c');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 160; i++) {
+      g.fillStyle = `rgba(255,248,230,${0.2 + r() * 0.7})`;
+      g.beginPath();
+      g.arc(r() * W, r() * H * 0.4, 0.5 + r() * 1.3, 0, 6.283);
+      g.fill();
+    }
+    const moon = g.createRadialGradient(W * 0.72, H * 0.2, 0, W * 0.72, H * 0.2, W * 0.2);
+    moon.addColorStop(0, 'rgba(255,250,232,1)');
+    moon.addColorStop(0.2, 'rgba(255,244,214,0.9)');
+    moon.addColorStop(0.24, 'rgba(255,230,190,0.35)');
+    moon.addColorStop(1, 'rgba(255,220,170,0)');
+    g.fillStyle = moon;
+    g.fillRect(0, 0, W, H);
+    blur(g, W / 200);
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = `rgba(255,214,190,${0.12 + r() * 0.14})`;
+      g.beginPath();
+      g.ellipse(r() * W, H * (0.1 + r() * 0.32), W * (0.06 + r() * 0.1), H * 0.014, 0, 0, 6.283);
+      g.fill();
+    }
+    blur(g, 0);
   }
-  for (let i = 0; i < 12; i++) {
-    g.fillStyle = 'rgba(255,200,120,0.8)';
-    g.fillRect(W * (0.38 + r() * 0.24), moatTop + H * (0.02 + r() * 0.1), 3 + r() * 5, 14 + r() * 26);
-  }
-  blur(g, 0);
-  g.restore();
-  for (let i = 0; i < 200; i++) {
-    g.strokeStyle = `rgba(230,210,240,${0.04 + r() * 0.12})`;
-    g.lineWidth = 1 + r() * 1.4;
-    const x = r() * W;
-    const y = moatTop + r() * H * 0.18;
+  if (on('far')) {
+    // Far hills, violet, then the castle's hill.
+    const hills = ridgeFn(61, 4);
+    g.fillStyle = '#4a3a66';
     g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + 10 + r() * 60, y);
-    g.stroke();
+    g.moveTo(0, H);
+    for (let i = 0; i <= 90; i++) g.lineTo((i / 90) * W, H * 0.56 + hills(i / 90) * H * 0.05);
+    g.lineTo(W, H);
+    g.fill();
   }
-  g.fillStyle = '#211d3a';
-  g.fillRect(W * 0.46, moatTop - H * 0.02, W * 0.08, H * 0.04); // the bridge
-  // The near bank and dark rocks framing the picture.
-  const bank = g.createLinearGradient(0, H * 0.82, 0, H);
-  bank.addColorStop(0, '#2b2a3c');
-  bank.addColorStop(1, '#0d0c18');
-  g.fillStyle = bank;
-  g.fillRect(0, H * 0.82, W, H * 0.18);
-  rockMass(g, r, { x0: -W * 0.05, y0: H * 0.3, x1: W * 0.22, y1: H * 1.02 }, [10, 10, 20], [96, 70, 96], 1, 7, 'right');
-  rockMass(g, r, { x0: W * 0.8, y0: H * 0.4, x1: W * 1.05, y1: H * 1.02 }, [10, 10, 20], [110, 80, 100], 1, 7, 'left');
-  // Fireflies and torch glow.
-  g.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 70; i++) {
-    const x = r() * W;
-    const y = H * (0.45 + r() * 0.5);
-    const f = g.createRadialGradient(x, y, 0, x, y, 8 + r() * 10);
-    f.addColorStop(0, 'rgba(255,230,150,0.9)');
-    f.addColorStop(1, 'rgba(255,200,100,0)');
-    g.fillStyle = f;
-    g.fillRect(x - 20, y - 20, 40, 40);
+  if (on('mid')) {
+    const hill = ridgeFn(62, 3);
+    g.fillStyle = '#24203e';
+    g.beginPath();
+    g.moveTo(W * 0.15, H);
+    for (let i = 0; i <= 60; i++) {
+      const x = 0.2 + (i / 60) * 0.6;
+      g.lineTo(x * W, H * 0.52 + (1 - Math.sin(((x - 0.2) / 0.6) * Math.PI)) * H * 0.1 + hill(x) * H * 0.01);
+    }
+    g.lineTo(W * 0.85, H);
+    g.fill();
+    // The castle: towers of different heights with cones, walls with crenellations, windows lit warm.
+    g.fillStyle = stone;
+    g.fillRect(W * 0.33, H * 0.42, W * 0.34, H * 0.12); // the curtain wall
+    for (let i = 0; i < 34; i++) g.fillRect(W * (0.33 + i * 0.01), H * 0.405, W * 0.006, H * 0.016);
+    for (const t of towers) {
+      g.fillStyle = stone;
+      g.fillRect(W * t.x, H * t.top, W * t.w, H * 0.54 - H * t.top);
+      poly(
+        g,
+        [
+          [W * (t.x - 0.006), H * t.top],
+          [W * (t.x + t.w * 0.5), H * (t.top - 0.09)],
+          [W * (t.x + t.w + 0.006), H * t.top],
+        ],
+        '#2a2448',
+      );
+      // Windows, some lit.
+      for (let k = 0; k < 3; k++) {
+        const lit = r() < 0.7;
+        g.fillStyle = lit ? 'rgba(255,208,120,0.95)' : 'rgba(20,18,40,0.9)';
+        g.fillRect(W * (t.x + t.w * 0.38), H * (t.top + 0.03 + k * 0.05), W * t.w * 0.22, H * 0.022);
+      }
+    }
+    // The great gate, its arch glowing.
+    g.fillStyle = 'rgba(255,196,110,0.9)';
+    g.beginPath();
+    g.moveTo(W * 0.475, H * 0.54);
+    g.lineTo(W * 0.475, H * 0.5);
+    g.arc(W * 0.5, H * 0.5, W * 0.025, Math.PI, 0);
+    g.lineTo(W * 0.525, H * 0.54);
+    g.fill();
   }
-  g.globalCompositeOperation = 'source-over';
-  const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.72);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(6,4,16,0.5)');
-  g.fillStyle = vig;
-  g.fillRect(0, 0, W, H);
+  if (on('water')) {
+    // The moat: dark water holding the castle's lights and the sky, with a stone bridge across.
+    const moatTop = H * 0.66;
+    const water = g.createLinearGradient(0, moatTop, 0, H * 0.84);
+    water.addColorStop(0, '#6b5a8e');
+    water.addColorStop(1, '#171532');
+    g.fillStyle = water;
+    g.fillRect(0, moatTop, W, H * 0.18);
+    g.save();
+    g.beginPath();
+    g.rect(0, moatTop, W, H * 0.18);
+    g.clip();
+    g.globalAlpha = 0.5;
+    blur(g, 3);
+    for (const t of towers) {
+      g.fillStyle = '#0f0e22';
+      g.fillRect(W * t.x, moatTop + (H * 0.54 - H * t.top) * 0.0 + H * 0.02, W * t.w, H * (0.1 + (0.54 - t.top) * 0.3));
+    }
+    for (let i = 0; i < 12; i++) {
+      g.fillStyle = 'rgba(255,200,120,0.8)';
+      g.fillRect(W * (0.38 + r() * 0.24), moatTop + H * (0.02 + r() * 0.1), 3 + r() * 5, 14 + r() * 26);
+    }
+    blur(g, 0);
+    g.restore();
+    for (let i = 0; i < 200; i++) {
+      g.strokeStyle = `rgba(230,210,240,${0.04 + r() * 0.12})`;
+      g.lineWidth = 1 + r() * 1.4;
+      const x = r() * W;
+      const y = moatTop + r() * H * 0.18;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + 10 + r() * 60, y);
+      g.stroke();
+    }
+    g.fillStyle = '#211d3a';
+    g.fillRect(W * 0.46, moatTop - H * 0.02, W * 0.08, H * 0.04); // the bridge
+  }
+  if (on('front')) {
+    // The near bank and dark rocks framing the picture.
+    const bank = g.createLinearGradient(0, H * 0.82, 0, H);
+    bank.addColorStop(0, '#2b2a3c');
+    bank.addColorStop(1, '#0d0c18');
+    g.fillStyle = bank;
+    g.fillRect(0, H * 0.82, W, H * 0.18);
+    rockMass(
+      g,
+      r,
+      { x0: -W * 0.05, y0: H * 0.3, x1: W * 0.22, y1: H * 1.02 },
+      [10, 10, 20],
+      [96, 70, 96],
+      1,
+      7,
+      'right',
+    );
+    rockMass(
+      g,
+      r,
+      { x0: W * 0.8, y0: H * 0.4, x1: W * 1.05, y1: H * 1.02 },
+      [10, 10, 20],
+      [110, 80, 100],
+      1,
+      7,
+      'left',
+    );
+  }
+  if (!only) {
+    // Fireflies and torch glow.
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 70; i++) {
+      const x = r() * W;
+      const y = H * (0.45 + r() * 0.5);
+      const f = g.createRadialGradient(x, y, 0, x, y, 8 + r() * 10);
+      f.addColorStop(0, 'rgba(255,230,150,0.9)');
+      f.addColorStop(1, 'rgba(255,200,100,0)');
+      g.fillStyle = f;
+      g.fillRect(x - 20, y - 20, 40, 40);
+    }
+    g.globalCompositeOperation = 'source-over';
+    const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.72);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(6,4,16,0.5)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, W, H);
+  }
   g.restore();
 }
