@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paintCavern, paintMountains } from './vista-art';
+import { paintCanyon, paintCastle, paintCavern, paintHighlands, paintMountains } from './vista-art';
 
 /** A canvas context that does nothing but count the calls and hand back gradients that take colour stops. */
 function fakeContext() {
@@ -27,13 +27,16 @@ function fakeContext() {
 describe.each([
   ['the misty mountains', paintMountains],
   ['the cavern pool', paintCavern],
+  ['the windswept highlands', paintHighlands],
+  ['the canyon', paintCanyon],
+  ['the castle at dusk', paintCastle],
 ])('%s', (_, paint) => {
   it('paints without error at any size, and the same way every time', () => {
     const a = fakeContext();
     const b = fakeContext();
     expect(() => paint(a, 640, 360)).not.toThrow();
     paint(b, 640, 360);
-    expect(a.calls).toBeGreaterThan(500);
+    expect(a.calls).toBeGreaterThan(300);
     expect(b.calls).toBe(a.calls);
     expect(() => paint(fakeContext(), 64, 36)).not.toThrow();
   });

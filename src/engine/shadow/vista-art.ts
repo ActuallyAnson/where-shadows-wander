@@ -494,3 +494,444 @@ export function paintCavern(g: Ctx, W: number, H: number): void {
   g.fillRect(0, 0, W, H);
   g.restore();
 }
+
+/** A windswept highland at golden hour: a sea of cloud below, ridges standing out of it, a grassy edge bent in the wind. */
+export function paintHighlands(g: Ctx, W: number, H: number): void {
+  const r = rng(31337);
+  g.save();
+  g.clearRect(0, 0, W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H * 0.7);
+  sky.addColorStop(0, '#5b6fa8');
+  sky.addColorStop(0.45, '#c79bb0');
+  sky.addColorStop(0.8, '#f2c79a');
+  sky.addColorStop(1, '#f8dfb4');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  const sun = g.createRadialGradient(W * 0.3, H * 0.5, 0, W * 0.3, H * 0.5, W * 0.5);
+  sun.addColorStop(0, 'rgba(255,236,190,1)');
+  sun.addColorStop(0.12, 'rgba(255,214,150,0.7)');
+  sun.addColorStop(1, 'rgba(255,200,140,0)');
+  g.fillStyle = sun;
+  g.fillRect(0, 0, W, H);
+  // High streaks of cloud, stretched by the wind.
+  blur(g, W / 160);
+  for (let i = 0; i < 14; i++) {
+    g.fillStyle = `rgba(255,236,230,${0.1 + r() * 0.2})`;
+    g.beginPath();
+    g.ellipse(r() * W, H * (0.05 + r() * 0.3), W * (0.08 + r() * 0.16), H * (0.006 + r() * 0.012), -0.04, 0, 6.283);
+    g.fill();
+  }
+  blur(g, 0);
+  // Ridges standing out of a sea of cloud: far ones violet, near ones deep blue-green; a bank of cloud in front of each.
+  const far = [176, 150, 178];
+  const near = [58, 70, 96];
+  for (let k = 0; k < 4; k++) {
+    const t = k / 3;
+    const ridge = ridgeFn(500 + k * 31, 5);
+    const base = H * (0.5 + t * 0.12);
+    const amp = H * (0.2 - t * 0.04);
+    blur(g, (1 - t) * (W / 500) * 2);
+    g.beginPath();
+    g.moveTo(0, H);
+    for (let i = 0; i <= 140; i++) {
+      const x = i / 140;
+      const peak = 1 - Math.abs(ridge(x));
+      g.lineTo(x * W, base - peak * peak * peak * amp);
+    }
+    g.lineTo(W, H);
+    g.closePath();
+    g.fillStyle = mix(far, near, t);
+    g.fill();
+    blur(g, 0);
+    blur(g, W / 120);
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = `rgba(255,232,214,${0.35 - t * 0.12})`;
+      g.beginPath();
+      g.ellipse(
+        r() * W,
+        base + H * 0.03 + r() * H * 0.04,
+        W * (0.07 + r() * 0.12),
+        H * (0.02 + r() * 0.03),
+        0,
+        0,
+        6.283,
+      );
+      g.fill();
+    }
+    blur(g, 0);
+  }
+  // The grassy edge in the front, a cliff top with wind-bent tufts and rocks, and a lean tree.
+  const edge = ridgeFn(88, 4);
+  g.beginPath();
+  g.moveTo(0, H);
+  for (let i = 0; i <= 80; i++) g.lineTo((i / 80) * W, H * 0.78 + edge(i / 80) * H * 0.04 + (i / 80) * H * 0.06);
+  g.lineTo(W, H);
+  g.closePath();
+  const grass = g.createLinearGradient(0, H * 0.7, 0, H);
+  grass.addColorStop(0, '#5f6b3e');
+  grass.addColorStop(1, '#232a1a');
+  g.fillStyle = grass;
+  g.fill();
+  for (let i = 0; i < 1400; i++) {
+    const x = r() * W;
+    const y = H * (0.8 + r() * 0.2);
+    const len = 8 + r() * 22;
+    g.strokeStyle = `rgba(${150 + r() * 70},${160 + r() * 60},${80 + r() * 40},${0.3 + r() * 0.4})`;
+    g.lineWidth = 1 + r() * 1.5;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.quadraticCurveTo(x + len * 0.3, y - len * 0.8, x + len * 0.9, y - len * 0.7); // bent downwind, to the right
+    g.stroke();
+  }
+  rockMass(
+    g,
+    r,
+    { x0: -W * 0.04, y0: H * 0.7, x1: W * 0.2, y1: H * 1.02 },
+    [26, 28, 34],
+    [150, 124, 120],
+    1,
+    6,
+    'right',
+  );
+  rockMass(
+    g,
+    r,
+    { x0: W * 0.86, y0: H * 0.76, x1: W * 1.04, y1: H * 1.02 },
+    [26, 28, 34],
+    [140, 118, 116],
+    1,
+    5,
+    'left',
+  );
+  // A lone tree leaning with the wind, in silhouette against the glow.
+  g.strokeStyle = '#1b1a22';
+  g.lineCap = 'round';
+  g.lineWidth = W * 0.008;
+  g.beginPath();
+  g.moveTo(W * 0.78, H * 0.8);
+  g.quadraticCurveTo(W * 0.78, H * 0.62, W * 0.83, H * 0.55);
+  g.stroke();
+  for (let i = 0; i < 90; i++) {
+    g.fillStyle = `rgba(28,26,36,${0.7 + r() * 0.3})`;
+    g.beginPath();
+    g.ellipse(
+      W * (0.82 + (r() - 0.3) * 0.08),
+      H * (0.55 + (r() - 0.5) * 0.06),
+      5 + r() * 12,
+      2 + r() * 5,
+      -0.3,
+      0,
+      6.283,
+    );
+    g.fill();
+  }
+  // Wind: streaks and petals blowing across.
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 40; i++) {
+    const y = H * (0.2 + r() * 0.7);
+    const x = r() * W;
+    g.strokeStyle = `rgba(255,236,214,${0.04 + r() * 0.1})`;
+    g.lineWidth = 1 + r() * 2;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.bezierCurveTo(x + 60, y - 8, x + 120, y + 8, x + 180 + r() * 120, y - 4);
+    g.stroke();
+  }
+  for (let i = 0; i < 70; i++) {
+    g.fillStyle = `rgba(255,214,180,${0.3 + r() * 0.5})`;
+    g.beginPath();
+    g.ellipse(r() * W, H * (0.3 + r() * 0.6), 2 + r() * 3, 1 + r() * 1.5, r(), 0, 6.283);
+    g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.7);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(14,10,22,0.45)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, W, H);
+  g.restore();
+}
+
+/** A sandstone canyon: banded cliffs in warm light, ledges climbing in steps, a dusty floor, far mesas in haze. */
+export function paintCanyon(g: Ctx, W: number, H: number): void {
+  const r = rng(2468);
+  g.save();
+  g.clearRect(0, 0, W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H * 0.55);
+  sky.addColorStop(0, '#6ea3cc');
+  sky.addColorStop(1, '#f1e1c3');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  const sun = g.createRadialGradient(W * 0.7, H * 0.12, 0, W * 0.7, H * 0.12, W * 0.4);
+  sun.addColorStop(0, 'rgba(255,248,220,0.95)');
+  sun.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = sun;
+  g.fillRect(0, 0, W, H);
+  // Far mesas in haze.
+  const bands = [
+    [222, 192, 158],
+    [206, 160, 124],
+    [180, 126, 96],
+    [140, 90, 70],
+  ];
+  for (let k = 0; k < 4; k++) {
+    const t = k / 3;
+    const ridge = ridgeFn(900 + k * 13, 4);
+    const base = H * (0.42 + t * 0.1);
+    blur(g, (1 - t) * 3);
+    g.beginPath();
+    g.moveTo(0, H);
+    for (let i = 0; i <= 90; i++) {
+      const x = i / 90;
+      // Flat-topped: the ridge is cut off into mesas.
+      const hgt = Math.min(0.55, Math.max(0, ridge(x) * 0.5 + 0.35));
+      g.lineTo(x * W, base - Math.round(hgt * 6) * (H * 0.022));
+    }
+    g.lineTo(W, H);
+    g.closePath();
+    g.fillStyle = mix(bands[k], bands[Math.min(3, k + 1)], 0.3);
+    g.fill();
+    blur(g, 0);
+    const haze = g.createLinearGradient(0, base - H * 0.05, 0, base + H * 0.08);
+    haze.addColorStop(0, 'rgba(244,226,196,0)');
+    haze.addColorStop(1, `rgba(244,226,196,${0.5 - t * 0.3})`);
+    g.fillStyle = haze;
+    g.fillRect(0, base - H * 0.05, W, H * 0.2);
+  }
+  // The canyon floor.
+  const floor = g.createLinearGradient(0, H * 0.62, 0, H);
+  floor.addColorStop(0, '#d6b48a');
+  floor.addColorStop(1, '#6d4c37');
+  g.fillStyle = floor;
+  g.fillRect(0, H * 0.62, W, H * 0.38);
+  for (let i = 0; i < 2200; i++) {
+    const y = H * 0.62 + r() ** 0.8 * H * 0.38;
+    g.fillStyle = `rgba(${r() < 0.5 ? '70,44,30' : '240,214,170'},${0.08 + r() * 0.16})`;
+    g.fillRect(r() * W, y, 1 + r() * 4, 1 + r() * 2);
+  }
+  // Stepped ledges climbing across the middle: flat tops, banded faces, lit from the sun side.
+  const steps = [
+    { x: 0.34, w: 0.16, top: 0.74 },
+    { x: 0.5, w: 0.14, top: 0.66 },
+    { x: 0.62, w: 0.13, top: 0.58 },
+  ];
+  for (const s of steps) {
+    const x0 = W * s.x;
+    const x1 = W * (s.x + s.w);
+    const y0 = H * s.top;
+    const body = g.createLinearGradient(x0, 0, x1, 0);
+    body.addColorStop(0, '#a8663f');
+    body.addColorStop(1, '#6c3f2c');
+    g.fillStyle = body;
+    g.fillRect(x0, y0, x1 - x0, H * 0.82 - y0);
+    for (let b = 0; b < 8; b++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '255,214,170' : '60,30,22'},${0.1 + r() * 0.15})`;
+      g.fillRect(x0, y0 + b * ((H * 0.82 - y0) / 8), x1 - x0, 2 + r() * 6);
+    }
+    g.fillStyle = '#e2b886'; // the lit top
+    g.fillRect(x0, y0 - 5, x1 - x0, 8);
+  }
+  // The great walls on both sides: banded strata in red and ochre, with a broken edge.
+  const wall = (x0: number, x1: number, inner: 'left' | 'right', dark: number[], lit: number[]) => {
+    rockMass(g, r, { x0, y0: -H * 0.02, x1, y1: H * 1.02 }, dark, lit, inner === 'right' ? -1 : 1, 8, inner);
+    // Strata: horizontal bands across the face, clipped to the mass by drawing only inside its box.
+    g.save();
+    g.beginPath();
+    // Only the solid part of the wall (the broken inner edge is left bare, so the bands do not spill into the sky).
+    const solid = (x1 - x0) * 0.6;
+    const sx0 = inner === 'right' ? Math.max(0, x0) : x1 - solid;
+    const sx1 = inner === 'right' ? x0 + solid : Math.min(W, x1);
+    g.rect(sx0, 0, sx1 - sx0, H);
+    g.clip();
+    for (let b = 0; b < 26; b++) {
+      g.fillStyle = `rgba(${r() < 0.5 ? '255,190,130' : '40,16,12'},${0.06 + r() * 0.1})`;
+      g.fillRect(sx0, r() * H, sx1 - sx0, 3 + r() * 14);
+    }
+    g.restore();
+  };
+  wall(-W * 0.05, W * 0.3, 'right', [58, 26, 20], [214, 130, 82]);
+  wall(W * 0.76, W * 1.05, 'left', [54, 24, 20], [226, 150, 96]);
+  // Sun shafts and drifting dust over all of it.
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4; i++) {
+    const x = W * (0.55 + r() * 0.2);
+    const shaft = g.createLinearGradient(x, 0, x - W * 0.15, H * 0.8);
+    shaft.addColorStop(0, 'rgba(255,236,190,0.16)');
+    shaft.addColorStop(1, 'rgba(255,236,190,0)');
+    poly(
+      g,
+      [
+        [x, 0],
+        [x + W * 0.05, 0],
+        [x - W * 0.1, H * 0.8],
+        [x - W * 0.2, H * 0.8],
+      ],
+      shaft,
+    );
+  }
+  for (let i = 0; i < 140; i++) {
+    g.fillStyle = `rgba(255,236,200,${0.1 + r() * 0.35})`;
+    g.beginPath();
+    g.arc(r() * W, r() * H, 0.6 + r() * 1.6, 0, 6.283);
+    g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.72);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(24,10,6,0.45)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, W, H);
+  g.restore();
+}
+
+/** A castle at dusk on a hill, its windows lit, a moat in front holding the reflection, a big moon and stars. */
+export function paintCastle(g: Ctx, W: number, H: number): void {
+  const r = rng(1313);
+  g.save();
+  g.clearRect(0, 0, W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H * 0.62);
+  sky.addColorStop(0, '#1a1f4a');
+  sky.addColorStop(0.5, '#6a4a86');
+  sky.addColorStop(0.85, '#e58f78');
+  sky.addColorStop(1, '#f6c58c');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 160; i++) {
+    g.fillStyle = `rgba(255,248,230,${0.2 + r() * 0.7})`;
+    g.beginPath();
+    g.arc(r() * W, r() * H * 0.4, 0.5 + r() * 1.3, 0, 6.283);
+    g.fill();
+  }
+  const moon = g.createRadialGradient(W * 0.72, H * 0.2, 0, W * 0.72, H * 0.2, W * 0.2);
+  moon.addColorStop(0, 'rgba(255,250,232,1)');
+  moon.addColorStop(0.2, 'rgba(255,244,214,0.9)');
+  moon.addColorStop(0.24, 'rgba(255,230,190,0.35)');
+  moon.addColorStop(1, 'rgba(255,220,170,0)');
+  g.fillStyle = moon;
+  g.fillRect(0, 0, W, H);
+  blur(g, W / 200);
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = `rgba(255,214,190,${0.12 + r() * 0.14})`;
+    g.beginPath();
+    g.ellipse(r() * W, H * (0.1 + r() * 0.32), W * (0.06 + r() * 0.1), H * 0.014, 0, 0, 6.283);
+    g.fill();
+  }
+  blur(g, 0);
+  // Far hills, violet, then the castle's hill.
+  const hills = ridgeFn(61, 4);
+  g.fillStyle = '#4a3a66';
+  g.beginPath();
+  g.moveTo(0, H);
+  for (let i = 0; i <= 90; i++) g.lineTo((i / 90) * W, H * 0.56 + hills(i / 90) * H * 0.05);
+  g.lineTo(W, H);
+  g.fill();
+  const hill = ridgeFn(62, 3);
+  g.fillStyle = '#24203e';
+  g.beginPath();
+  g.moveTo(W * 0.15, H);
+  for (let i = 0; i <= 60; i++) {
+    const x = 0.2 + (i / 60) * 0.6;
+    g.lineTo(x * W, H * 0.52 + (1 - Math.sin(((x - 0.2) / 0.6) * Math.PI)) * H * 0.1 + hill(x) * H * 0.01);
+  }
+  g.lineTo(W * 0.85, H);
+  g.fill();
+  // The castle: towers of different heights with cones, walls with crenellations, windows lit warm.
+  const stone = '#1a1830';
+  const towers = [
+    { x: 0.36, w: 0.05, top: 0.3 },
+    { x: 0.44, w: 0.07, top: 0.2 },
+    { x: 0.53, w: 0.05, top: 0.28 },
+    { x: 0.6, w: 0.045, top: 0.36 },
+  ];
+  g.fillStyle = stone;
+  g.fillRect(W * 0.33, H * 0.42, W * 0.34, H * 0.12); // the curtain wall
+  for (let i = 0; i < 34; i++) g.fillRect(W * (0.33 + i * 0.01), H * 0.405, W * 0.006, H * 0.016);
+  for (const t of towers) {
+    g.fillStyle = stone;
+    g.fillRect(W * t.x, H * t.top, W * t.w, H * 0.54 - H * t.top);
+    poly(
+      g,
+      [
+        [W * (t.x - 0.006), H * t.top],
+        [W * (t.x + t.w * 0.5), H * (t.top - 0.09)],
+        [W * (t.x + t.w + 0.006), H * t.top],
+      ],
+      '#2a2448',
+    );
+    // Windows, some lit.
+    for (let k = 0; k < 3; k++) {
+      const lit = r() < 0.7;
+      g.fillStyle = lit ? 'rgba(255,208,120,0.95)' : 'rgba(20,18,40,0.9)';
+      g.fillRect(W * (t.x + t.w * 0.38), H * (t.top + 0.03 + k * 0.05), W * t.w * 0.22, H * 0.022);
+    }
+  }
+  // The great gate, its arch glowing.
+  g.fillStyle = 'rgba(255,196,110,0.9)';
+  g.beginPath();
+  g.moveTo(W * 0.475, H * 0.54);
+  g.lineTo(W * 0.475, H * 0.5);
+  g.arc(W * 0.5, H * 0.5, W * 0.025, Math.PI, 0);
+  g.lineTo(W * 0.525, H * 0.54);
+  g.fill();
+  // The moat: dark water holding the castle's lights and the sky, with a stone bridge across.
+  const moatTop = H * 0.66;
+  const water = g.createLinearGradient(0, moatTop, 0, H * 0.84);
+  water.addColorStop(0, '#6b5a8e');
+  water.addColorStop(1, '#171532');
+  g.fillStyle = water;
+  g.fillRect(0, moatTop, W, H * 0.18);
+  g.save();
+  g.beginPath();
+  g.rect(0, moatTop, W, H * 0.18);
+  g.clip();
+  g.globalAlpha = 0.5;
+  blur(g, 3);
+  for (const t of towers) {
+    g.fillStyle = '#0f0e22';
+    g.fillRect(W * t.x, moatTop + (H * 0.54 - H * t.top) * 0.0 + H * 0.02, W * t.w, H * (0.1 + (0.54 - t.top) * 0.3));
+  }
+  for (let i = 0; i < 12; i++) {
+    g.fillStyle = 'rgba(255,200,120,0.8)';
+    g.fillRect(W * (0.38 + r() * 0.24), moatTop + H * (0.02 + r() * 0.1), 3 + r() * 5, 14 + r() * 26);
+  }
+  blur(g, 0);
+  g.restore();
+  for (let i = 0; i < 200; i++) {
+    g.strokeStyle = `rgba(230,210,240,${0.04 + r() * 0.12})`;
+    g.lineWidth = 1 + r() * 1.4;
+    const x = r() * W;
+    const y = moatTop + r() * H * 0.18;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + 10 + r() * 60, y);
+    g.stroke();
+  }
+  g.fillStyle = '#211d3a';
+  g.fillRect(W * 0.46, moatTop - H * 0.02, W * 0.08, H * 0.04); // the bridge
+  // The near bank and dark rocks framing the picture.
+  const bank = g.createLinearGradient(0, H * 0.82, 0, H);
+  bank.addColorStop(0, '#2b2a3c');
+  bank.addColorStop(1, '#0d0c18');
+  g.fillStyle = bank;
+  g.fillRect(0, H * 0.82, W, H * 0.18);
+  rockMass(g, r, { x0: -W * 0.05, y0: H * 0.3, x1: W * 0.22, y1: H * 1.02 }, [10, 10, 20], [96, 70, 96], 1, 7, 'right');
+  rockMass(g, r, { x0: W * 0.8, y0: H * 0.4, x1: W * 1.05, y1: H * 1.02 }, [10, 10, 20], [110, 80, 100], 1, 7, 'left');
+  // Fireflies and torch glow.
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 70; i++) {
+    const x = r() * W;
+    const y = H * (0.45 + r() * 0.5);
+    const f = g.createRadialGradient(x, y, 0, x, y, 8 + r() * 10);
+    f.addColorStop(0, 'rgba(255,230,150,0.9)');
+    f.addColorStop(1, 'rgba(255,200,100,0)');
+    g.fillStyle = f;
+    g.fillRect(x - 20, y - 20, 40, 40);
+  }
+  g.globalCompositeOperation = 'source-over';
+  const vig = g.createRadialGradient(W / 2, H * 0.5, H * 0.4, W / 2, H * 0.5, W * 0.72);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(6,4,16,0.5)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, W, H);
+  g.restore();
+}
