@@ -6,7 +6,8 @@
 type Ctx = CanvasRenderingContext2D;
 
 /** The parts a vista is cut into, to be drawn at different depths and moved on their own (paint with `only` to get one). */
-export type LayerName = 'sky' | 'far' | 'near' | 'mid' | 'water' | 'front';
+export type LayerName = 'sky' | 'far' | 'near' | 'mid' | 'water' | 'front' | 'frame';
+// ('frame' is the rock that frames the picture at its edges: it stays where it is on screen while the land moves.)
 
 function rng(seed: number): () => number {
   let a = seed >>> 0;
@@ -591,26 +592,6 @@ export function paintHighlands(g: Ctx, W: number, H: number, only?: LayerName): 
       g.quadraticCurveTo(x + len * 0.3, y - len * 0.8, x + len * 0.9, y - len * 0.7); // bent downwind, to the right
       g.stroke();
     }
-    rockMass(
-      g,
-      r,
-      { x0: -W * 0.04, y0: H * 0.7, x1: W * 0.2, y1: H * 1.02 },
-      [26, 28, 34],
-      [150, 124, 120],
-      1,
-      6,
-      'right',
-    );
-    rockMass(
-      g,
-      r,
-      { x0: W * 0.86, y0: H * 0.76, x1: W * 1.04, y1: H * 1.02 },
-      [26, 28, 34],
-      [140, 118, 116],
-      1,
-      5,
-      'left',
-    );
     // A lone tree leaning with the wind, in silhouette against the glow.
     g.strokeStyle = '#1b1a22';
     g.lineCap = 'round';
@@ -633,6 +614,28 @@ export function paintHighlands(g: Ctx, W: number, H: number, only?: LayerName): 
       );
       g.fill();
     }
+  }
+  if (on('frame')) {
+    rockMass(
+      g,
+      r,
+      { x0: -W * 0.04, y0: H * 0.7, x1: W * 0.2, y1: H * 1.02 },
+      [26, 28, 34],
+      [150, 124, 120],
+      1,
+      6,
+      'right',
+    );
+    rockMass(
+      g,
+      r,
+      { x0: W * 0.86, y0: H * 0.76, x1: W * 1.04, y1: H * 1.02 },
+      [26, 28, 34],
+      [140, 118, 116],
+      1,
+      5,
+      'left',
+    );
   }
   if (!only) {
     // Wind: streaks and petals blowing across.
@@ -935,6 +938,8 @@ export function paintCastle(g: Ctx, W: number, H: number, only?: LayerName): voi
     bank.addColorStop(1, '#0d0c18');
     g.fillStyle = bank;
     g.fillRect(0, H * 0.82, W, H * 0.18);
+  }
+  if (on('frame')) {
     rockMass(
       g,
       r,
