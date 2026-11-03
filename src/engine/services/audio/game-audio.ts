@@ -120,6 +120,11 @@ export class GameAudio {
     this.player.playAt(Sound.Creak, x, 2.4, z);
   }
 
+  /** One footstep at a point in the room (scene space), for the travel scenes; `alternate` picks the other of the two steps. */
+  stepAtPoint(x: number, y: number, z: number, alternate: boolean): void {
+    this.player.playAt(alternate ? Sound.Step1 : Sound.Step0, x, y, z);
+  }
+
   /** One footstep of the traveller at a point on the wall (stage coordinates); `alternate` picks the other of the two steps. */
   stepAt(stage: StagePlane, x: number, y: number, alternate: boolean): void {
     stagePoint(stage, x, y, WALL_LIFT_M, this.at);

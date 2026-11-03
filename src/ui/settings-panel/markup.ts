@@ -22,7 +22,7 @@ export const BUTTON_PX = 64;
 /** Which settings are on which page: how you play, what you see and read, then sound. Every setting is on exactly one page. */
 export const PAGES: readonly (readonly (keyof Settings)[])[] = [
   ['tolerance', 'holdTime', 'shadowSize', 'sharpen', 'flicker', 'hand'],
-  ['highContrast', 'captions', 'textSize', 'gazeMenus'],
+  ['highContrast', 'captions', 'textSize', 'travelScenes', 'gazeMenus'],
   ['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience'],
 ];
 

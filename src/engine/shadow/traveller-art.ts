@@ -1,7 +1,7 @@
 // The traveller, drawn as a character: a small hooded wanderer in profile (facing right) with a pointed cowl, a scarf that
 // streams behind, a round cloak with a swishing tail, stubby boots and a lantern that swings from one hand. It is a black
 // silhouette like everything else in the shadows, with the two warm things that give it life: glowing eyes under the hood
-// and the lantern. Nine poses from one set of curves, so a pose only changes numbers. Nothing here is downloaded: it is paths
+// and the lantern. Thirteen poses from one set of curves, so a pose only changes numbers. Nothing here is downloaded: it is paths
 // drawn in code, at any size. A sprite atlas calls paintTraveller(g, size, pose) once per pose.
 
 /** Pose numbers. The walk cycle is WALK_CYCLE; BLINK is the idle pose with the eyes shut, shown now and then. */
@@ -15,8 +15,15 @@ export const Pose = {
   Walk3: 6,
   Walk4: 7,
   Blink: 8,
+  /** Going up a step: one boot lifted high, the body leaning in, the lantern arm reaching. */
+  Climb1: 9,
+  Climb2: 10,
+  /** Standing and looking up (at the top of a climb, at a high place). */
+  LookUp: 11,
+  /** A hop over something small. */
+  Hop: 12,
 } as const;
-export const TRAVELLER_POSES = 9;
+export const TRAVELLER_POSES = 13;
 /** The poses of one stride, in order (about 8 steps a second looks like a steady walk). */
 export const WALK_CYCLE: readonly number[] = [Pose.Walk1, Pose.Walk3, Pose.Walk2, Pose.Walk4];
 
@@ -181,6 +188,66 @@ const POSES: readonly Params[] = [
     eyes: 0.08,
     lift: 0,
     hem: 0,
+    shake: 0,
+  },
+  /* climb 1: the front boot up on the next step */ {
+    lean: 14,
+    stride: 18,
+    liftBack: 4,
+    liftFront: 26,
+    swing: 0.2,
+    arm: 0.55,
+    wave: 1.5,
+    trail: 1.2,
+    tilt: -0.1,
+    eyes: 1,
+    lift: 4,
+    hem: 6,
+    shake: 0,
+  },
+  /* climb 2: the back boot comes up, the body rising */ {
+    lean: 12,
+    stride: -14,
+    liftBack: 24,
+    liftFront: 2,
+    swing: -0.1,
+    arm: 0.7,
+    wave: 2.8,
+    trail: 1.2,
+    tilt: -0.08,
+    eyes: 1,
+    lift: 8,
+    hem: -5,
+    shake: 0,
+  },
+  /* look up */ {
+    lean: -4,
+    stride: 0,
+    liftBack: 0,
+    liftFront: 0,
+    swing: 0.04,
+    arm: 0.3,
+    wave: 0.6,
+    trail: 0.9,
+    tilt: -0.38,
+    eyes: 1,
+    lift: 0,
+    hem: 2,
+    shake: 0,
+  },
+  /* hop */ {
+    lean: 4,
+    stride: 8,
+    liftBack: 16,
+    liftFront: 20,
+    swing: 0.4,
+    arm: 0.8,
+    wave: 2.2,
+    trail: 1.5,
+    tilt: -0.05,
+    eyes: 1,
+    lift: 26,
+    hem: 10,
     shake: 0,
   },
 ];
@@ -363,5 +430,89 @@ export function paintTraveller(g: CanvasRenderingContext2D, size: number, pose: 
     }
   }
   g.restore();
+  g.restore();
+}
+
+/** The walk away from the viewer has this many frames (one stride is the four in turn). */
+export const BACK_FRAMES = 4;
+
+/**
+ * The traveller seen from behind, walking away (for the paths that wind into the distance): the pointed cowl and the round cloak, the
+ * scarf hanging down the back, the boots taking turns, and the lantern swinging at one side. `frame` is 0 to BACK_FRAMES - 1 in a stride;
+ * pass `walking` false for standing still. A black silhouette, like the side view, with the lantern as the one warm thing.
+ */
+export function paintTravellerBack(g: CanvasRenderingContext2D, size: number, frame: number, walking = true): void {
+  const k = size / TRAVELLER_BOX;
+  const f = ((frame % BACK_FRAMES) + BACK_FRAMES) % BACK_FRAMES;
+  // 0: left boot forward, 1: passing (body high), 2: right boot forward, 3: passing.
+  const step = walking ? [-1, 0, 1, 0][f] : 0;
+  const high = walking && (f === 1 || f === 3) ? 5 : 0;
+  const swayX = walking ? step * 2.5 : 0;
+  g.save();
+  g.scale(k, k);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  const ground = 238;
+  g.translate(128 + swayX, ground - high);
+  g.scale(0.8, 0.8);
+  g.translate(-128, -ground);
+  g.fillStyle = INK;
+  // Boots: the one forward is lower on the screen (nearer the viewer) than the one lifting behind.
+  const boot = (cx: number, lift: number, fwd: number) => {
+    g.beginPath();
+    g.ellipse(cx, ground - 10 - lift + fwd * 4, 17, 11, 0, 0, 6.283);
+    g.fill();
+  };
+  boot(106, step === 1 ? 10 : 0, step === -1 ? 1 : 0);
+  boot(150, step === -1 ? 10 : 0, step === 1 ? 1 : 0);
+  // The cloak: a bell from the shoulders to a scalloped hem, swaying a little against the stride.
+  const hem = walking ? -step * 6 : 0;
+  g.beginPath();
+  g.moveTo(128, 78);
+  g.bezierCurveTo(88, 90, 66, 150, 62 + hem, 214);
+  for (let i = 0; i < 4; i++) {
+    const x0 = 62 + hem + i * 33;
+    g.quadraticCurveTo(x0 + 16, 224 + (i % 2) * 5, x0 + 33, 214 - ((i + 1) % 2) * 2);
+  }
+  g.bezierCurveTo(190, 150, 168, 90, 128, 78);
+  g.fill();
+  // The hood: a rounded cowl with a small tip leaning with the stride.
+  const lean = walking ? step * 3 : 0;
+  g.beginPath();
+  g.moveTo(128 + lean, 22);
+  g.bezierCurveTo(150, 40, 170, 70, 164, 100);
+  g.quadraticCurveTo(128, 118, 92, 100);
+  g.bezierCurveTo(86, 70, 106, 40, 128 + lean, 22);
+  g.fill();
+  g.beginPath();
+  g.arc(128 + lean, 20, 5.5, 0, 6.283);
+  g.fill();
+  // The scarf, hanging down the back and waving: drawn lighter so it reads against the cloak.
+  g.strokeStyle = '#2a2230';
+  g.lineWidth = 10;
+  g.beginPath();
+  g.moveTo(122, 104);
+  const w = walking ? Math.sin(f * 1.6) * 8 : 2;
+  g.bezierCurveTo(116 + w, 124, 130 - w, 142, 120 + w, 168);
+  g.stroke();
+  // The lantern in the hand at the right side, swinging with the stride, and its glow.
+  const lx = 186 - (walking ? step * 5 : 0);
+  const ly = 168 + (walking ? Math.abs(step) * -4 : 0);
+  g.strokeStyle = INK;
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(166, 128);
+  g.lineTo(lx, ly - 18);
+  g.stroke();
+  g.fillStyle = INK;
+  g.fillRect(lx - 11, ly - 16, 22, 32);
+  g.fillStyle = AMBER;
+  g.fillRect(lx - 7, ly - 11, 14, 22);
+  g.globalCompositeOperation = 'lighter';
+  const glow = g.createRadialGradient(lx, ly, 0, lx, ly, 40);
+  glow.addColorStop(0, 'rgba(255,214,130,0.75)');
+  glow.addColorStop(1, 'rgba(255,190,90,0)');
+  g.fillStyle = glow;
+  g.fillRect(lx - 40, ly - 40, 80, 80);
   g.restore();
 }

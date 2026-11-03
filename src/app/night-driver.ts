@@ -73,6 +73,8 @@ export interface NightHost {
   solved(): void;
   /** A soft sound and sparkle at (x, y): a puzzle object changed, or the obstacle eased. */
   twinkle(x: number, y: number): void;
+  /** Moving on from puzzle `from` to puzzle `to`: the walk between them (the land wakes, the traveller walks into the next). */
+  travel?(from: number, to: number): void;
   /** A small line low on the wall, under the story's own (the hint that another way exists). */
   note?(text: string): void;
   /** The night was turned back `seconds` (a fall, or a rewind asked for): a flash and a sound say so. */
@@ -240,6 +242,8 @@ export class NightDriver {
         case 'puzzle-start':
           // The frame that loads a puzzle plays its input in the new puzzle, so the new recording starts with it.
           this.rewinder?.begin(e.value, this.timeBefore, this.input);
+          // Moving on from the last puzzle (not a restart, a rewind or the first): the travel scene between the two lands.
+          if (e.value >= 1 && this.shownIndex === e.value - 1) host.travel?.(e.value - 1, e.value);
           this.puzzleStarted(game, e.value);
           break;
         case 'traveller-fell':

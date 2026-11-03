@@ -166,10 +166,10 @@ describe('remembering the switches (no address needed)', () => {
 });
 
 describe('the story scene switch', () => {
-  it('cycles off, prologue, finale and round again', () => {
-    expect(STORY_CHOICES).toEqual(['off', 'prologue', 'finale']);
+  it('cycles off, prologue, finale, travel and round again', () => {
+    expect(STORY_CHOICES).toEqual(['off', 'prologue', 'finale', 'travel']);
     expect(nextChoice(STORY_CHOICES, 'off')).toBe('prologue');
-    expect(nextChoice(STORY_CHOICES, 'finale')).toBe('off');
+    expect(nextChoice(STORY_CHOICES, 'travel')).toBe('off');
   });
 
   it('is remembered, and reads as off when the remembered value is not one of them', () => {

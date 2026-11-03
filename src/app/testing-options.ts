@@ -8,8 +8,8 @@ export type RecordChoice = 'off' | 'free' | 'shapes';
 export type MenuChoice = 'off' | 'pause' | 'solved' | 'end';
 export const MENU_CHOICES: readonly MenuChoice[] = ['off', 'pause', 'solved', 'end'];
 /** A story scene to play a second after the headset session starts: the prologue (the burning dusk) or the finale (the crystal hall). */
-export type StoryChoice = 'off' | 'prologue' | 'finale';
-export const STORY_CHOICES: readonly StoryChoice[] = ['off', 'prologue', 'finale'];
+export type StoryChoice = 'off' | 'prologue' | 'finale' | 'travel';
+export const STORY_CHOICES: readonly StoryChoice[] = ['off', 'prologue', 'finale', 'travel'];
 
 export interface TestingOptions {
   /** A dot on every tracked hand joint (?debug=joints). */
