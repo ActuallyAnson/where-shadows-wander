@@ -38,6 +38,12 @@ export interface XRHandReaderDebug {
 /** How many input-source change events the diagnostics keep. */
 const MAX_SOURCE_EVENTS = 50;
 
+/**
+ * How long a hand that drops out of tracking is held where it was last fully seen, milliseconds. Turning a hand over (back to palm) often
+ * loses a joint or two for a few frames; without this the hand and its shadow blink out, and a held shape lets go.
+ */
+export const LOSS_GRACE_MS = 250;
+
 export class XRHandReader {
   readonly hands: Record<Handedness, HandFrame> = {
     left: createHandFrame('left'),
@@ -52,6 +58,12 @@ export class XRHandReader {
     inputSourceEvents: [],
     lastError: null,
   };
+  /** The last frame each hand was fully tracked (joints, radii and when), kept to hold a hand through a short dropout. */
+  private readonly lastGood = { left: new Float32Array(JOINT_COUNT * 3), right: new Float32Array(JOINT_COUNT * 3) };
+  private readonly lastGoodRadii = { left: new Float32Array(JOINT_COUNT), right: new Float32Array(JOINT_COUNT) };
+  private readonly lastFullAt = { left: -Infinity, right: -Infinity };
+  /** Milliseconds a lost hand is held (0 turns it off). */
+  lossGraceMs = LOSS_GRACE_MS;
   /** Input sources this frame that are hands (not controllers); 0 when hand tracking is off or the browser gives no joints. */
   handSources = 0;
   private readonly poses = new Float32Array(16 * JOINT_COUNT);
@@ -274,6 +286,25 @@ export class XRHandReader {
       }
       hand.validJoints = valid;
       hand.tracked = valid === JOINT_COUNT;
+    }
+    this.holdThroughDropout();
+  }
+
+  /** A hand fully seen a moment ago and not now is kept where it was for `lossGraceMs`, so a flicker does not blank it. */
+  private holdThroughDropout(): void {
+    const now = performance.now();
+    for (const side of ['left', 'right'] as const) {
+      const hand = this.hands[side];
+      if (hand.tracked) {
+        this.lastGood[side].set(hand.positions);
+        this.lastGoodRadii[side].set(hand.radii);
+        this.lastFullAt[side] = now;
+      } else if (now - this.lastFullAt[side] < this.lossGraceMs) {
+        hand.positions.set(this.lastGood[side]);
+        hand.radii.set(this.lastGoodRadii[side]);
+        hand.validJoints = JOINT_COUNT;
+        hand.tracked = true;
+      }
     }
   }
 }

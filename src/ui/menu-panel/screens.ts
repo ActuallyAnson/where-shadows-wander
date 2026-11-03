@@ -22,6 +22,7 @@ export const MENU_SCREENS: Readonly<Record<MenuScreenId, MenuScreen>> = {
       { id: 'resume', label: 'Light the candle' },
       { id: 'settings', label: 'Settings' },
       { id: 'restart', label: 'Begin this part again' },
+      { id: 'exit', label: 'Leave the game' },
     ],
   },
   solved: {
