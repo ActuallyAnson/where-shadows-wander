@@ -149,6 +149,25 @@ export function paintClimbLayer(g: Ctx, layer: ClimbLayer, W: number, H: number,
         g.fillStyle = `rgba(${r() < 0.5 ? '255,214,170' : '70,34,26'},${0.07 + r() * 0.12})`;
         g.fillRect(cx - w, top + r() * (H - top), w * 2, 2 + r() * 8);
       }
+      // Weathering: vertical grooves where rain has run, a shaded left side, and grit.
+      for (let gv = 0; gv < 9; gv++) {
+        const gx = cx - w + r() * w * 2;
+        const gg = g.createLinearGradient(gx, top, gx, H);
+        gg.addColorStop(0, 'rgba(60,26,18,0)');
+        gg.addColorStop(0.3, `rgba(60,26,18,${0.12 + r() * 0.2})`);
+        gg.addColorStop(1, 'rgba(60,26,18,0.04)');
+        g.fillStyle = gg;
+        g.fillRect(gx, top + r() * (H - top) * 0.3, 2 + r() * 5, (H - top) * (0.4 + r() * 0.6));
+      }
+      const side = g.createLinearGradient(cx - w, 0, cx + w, 0);
+      side.addColorStop(0, 'rgba(50,22,16,0.4)');
+      side.addColorStop(0.55, 'rgba(50,22,16,0)');
+      g.fillStyle = side;
+      g.fillRect(cx - w, top, w * 2, H - top);
+      for (let i = 0; i < 380; i++) {
+        g.fillStyle = r() < 0.5 ? `rgba(0,0,0,${0.04 + r() * 0.1})` : `rgba(255,236,206,${0.03 + r() * 0.08})`;
+        g.fillRect(cx - w + r() * w * 2, top + r() * (H - top), 1 + r() * 3, 1 + r() * 3);
+      }
       g.fillStyle = 'rgba(255,236,196,0.55)';
       g.fillRect(cx - w * 0.9, top, w * 1.8, 5);
       g.restore();
@@ -182,6 +201,24 @@ export function paintClimbLayer(g: Ctx, layer: ClimbLayer, W: number, H: number,
     for (let i = 0; i < 2600; i++) {
       g.fillStyle = r() < 0.5 ? `rgba(0,0,0,${0.05 + r() * 0.12})` : `rgba(255,240,214,${0.04 + r() * 0.1})`;
       g.fillRect(r() * W, H * 0.5 + r() * H * 0.5, 1 + r() * 4, 1 + r() * 2);
+    }
+    // Blocks: courses of cut stone with staggered joints, so the terraces read as built, not as flat colour.
+    for (let row = 0; row < 14; row++) {
+      const y = H * 0.5 + row * H * 0.038 + (r() - 0.5) * 6;
+      g.strokeStyle = 'rgba(40,18,12,0.28)';
+      g.lineWidth = 1.2 + r() * 1.2;
+      g.beginPath();
+      g.moveTo(0, y);
+      g.lineTo(W, y);
+      g.stroke();
+      let x = r() * unit * 0.1;
+      while (x < W) {
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + (r() - 0.5) * 3, y + H * 0.038);
+        g.stroke();
+        x += unit * (0.07 + r() * 0.1);
+      }
     }
     // Cracks and dark crevices under each lip, so the steps have weight.
     for (let i = 1; i < pts.length; i++) {
