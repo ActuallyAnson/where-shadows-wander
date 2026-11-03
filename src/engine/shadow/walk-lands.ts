@@ -159,7 +159,7 @@ export function landPathPoint(land: LandId, u: number, W: number, H: number, out
 }
 void climbPathPoint;
 
-function drawLandmark(g: Ctx, kind: Landmark, x: number, base: number, unit: number, r: () => number): void {
+export function drawLandmark(g: Ctx, kind: Landmark, x: number, base: number, unit: number, r: () => number): void {
   g.save();
   g.fillStyle = '#241a1e';
   g.strokeStyle = '#241a1e';

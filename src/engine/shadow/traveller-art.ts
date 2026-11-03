@@ -432,3 +432,87 @@ export function paintTraveller(g: CanvasRenderingContext2D, size: number, pose: 
   g.restore();
   g.restore();
 }
+
+/** The walk away from the viewer has this many frames (one stride is the four in turn). */
+export const BACK_FRAMES = 4;
+
+/**
+ * The traveller seen from behind, walking away (for the paths that wind into the distance): the pointed cowl and the round cloak, the
+ * scarf hanging down the back, the boots taking turns, and the lantern swinging at one side. `frame` is 0 to BACK_FRAMES - 1 in a stride;
+ * pass `walking` false for standing still. A black silhouette, like the side view, with the lantern as the one warm thing.
+ */
+export function paintTravellerBack(g: CanvasRenderingContext2D, size: number, frame: number, walking = true): void {
+  const k = size / TRAVELLER_BOX;
+  const f = ((frame % BACK_FRAMES) + BACK_FRAMES) % BACK_FRAMES;
+  // 0: left boot forward, 1: passing (body high), 2: right boot forward, 3: passing.
+  const step = walking ? [-1, 0, 1, 0][f] : 0;
+  const high = walking && (f === 1 || f === 3) ? 5 : 0;
+  const swayX = walking ? step * 2.5 : 0;
+  g.save();
+  g.scale(k, k);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  const ground = 238;
+  g.translate(128 + swayX, ground - high);
+  g.scale(0.8, 0.8);
+  g.translate(-128, -ground);
+  g.fillStyle = INK;
+  // Boots: the one forward is lower on the screen (nearer the viewer) than the one lifting behind.
+  const boot = (cx: number, lift: number, fwd: number) => {
+    g.beginPath();
+    g.ellipse(cx, ground - 10 - lift + fwd * 4, 17, 11, 0, 0, 6.283);
+    g.fill();
+  };
+  boot(106, step === 1 ? 10 : 0, step === -1 ? 1 : 0);
+  boot(150, step === -1 ? 10 : 0, step === 1 ? 1 : 0);
+  // The cloak: a bell from the shoulders to a scalloped hem, swaying a little against the stride.
+  const hem = walking ? -step * 6 : 0;
+  g.beginPath();
+  g.moveTo(128, 78);
+  g.bezierCurveTo(88, 90, 66, 150, 62 + hem, 214);
+  for (let i = 0; i < 4; i++) {
+    const x0 = 62 + hem + i * 33;
+    g.quadraticCurveTo(x0 + 16, 224 + (i % 2) * 5, x0 + 33, 214 - ((i + 1) % 2) * 2);
+  }
+  g.bezierCurveTo(190, 150, 168, 90, 128, 78);
+  g.fill();
+  // The hood: a rounded cowl with a small tip leaning with the stride.
+  const lean = walking ? step * 3 : 0;
+  g.beginPath();
+  g.moveTo(128 + lean, 22);
+  g.bezierCurveTo(150, 40, 170, 70, 164, 100);
+  g.quadraticCurveTo(128, 118, 92, 100);
+  g.bezierCurveTo(86, 70, 106, 40, 128 + lean, 22);
+  g.fill();
+  g.beginPath();
+  g.arc(128 + lean, 20, 5.5, 0, 6.283);
+  g.fill();
+  // The scarf, hanging down the back and waving: drawn lighter so it reads against the cloak.
+  g.strokeStyle = '#2a2230';
+  g.lineWidth = 10;
+  g.beginPath();
+  g.moveTo(122, 104);
+  const w = walking ? Math.sin(f * 1.6) * 8 : 2;
+  g.bezierCurveTo(116 + w, 124, 130 - w, 142, 120 + w, 168);
+  g.stroke();
+  // The lantern in the hand at the right side, swinging with the stride, and its glow.
+  const lx = 186 - (walking ? step * 5 : 0);
+  const ly = 168 + (walking ? Math.abs(step) * -4 : 0);
+  g.strokeStyle = INK;
+  g.lineWidth = 5;
+  g.beginPath();
+  g.moveTo(166, 128);
+  g.lineTo(lx, ly - 18);
+  g.stroke();
+  g.fillStyle = INK;
+  g.fillRect(lx - 11, ly - 16, 22, 32);
+  g.fillStyle = AMBER;
+  g.fillRect(lx - 7, ly - 11, 14, 22);
+  g.globalCompositeOperation = 'lighter';
+  const glow = g.createRadialGradient(lx, ly, 0, lx, ly, 40);
+  glow.addColorStop(0, 'rgba(255,214,130,0.75)');
+  glow.addColorStop(1, 'rgba(255,190,90,0)');
+  g.fillStyle = glow;
+  g.fillRect(lx - 40, ly - 40, 80, 80);
+  g.restore();
+}
