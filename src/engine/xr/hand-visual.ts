@@ -18,7 +18,7 @@ import {
 } from '@iwsdk/core';
 import { JOINT_COUNT, type HandFrame } from '../hands/hand';
 import { CAPSULE_JOINTS } from '../shadow/pure/shadow-projector';
-import { FADE_IN_S, FADE_OUT_S } from './hand-fade';
+import { FADE_IN_S, FADE_OUT_S, nearFade } from './hand-fade';
 
 export interface HandVisual {
   /** Add this to the scene. */
@@ -27,7 +27,13 @@ export interface HandVisual {
    * Call once per frame. `flame` is the candle flame position, or null when there is none. `shown` is false
    * while the game is paused (no hand data arrives then), which fades the hands out instead of freezing them.
    */
-  update(hands: readonly HandFrame[], dt: number, flame?: ArrayLike<number> | null, shown?: boolean): void;
+  update(
+    hands: readonly HandFrame[],
+    dt: number,
+    flame?: ArrayLike<number> | null,
+    shown?: boolean,
+    eye?: ArrayLike<number> | null,
+  ): void;
   dispose(): void;
 }
 
@@ -119,7 +125,13 @@ export class CapsuleHandVisual implements HandVisual {
     return attr;
   }
 
-  update(hands: readonly HandFrame[], dt: number, flame?: ArrayLike<number> | null, shown = true): void {
+  update(
+    hands: readonly HandFrame[],
+    dt: number,
+    flame?: ArrayLike<number> | null,
+    shown = true,
+    eye?: ArrayLike<number> | null,
+  ): void {
     const hasFlame = flame !== null && flame !== undefined;
     const fx = hasFlame ? flame[0] : 0;
     const fy = hasFlame ? flame[1] : 0;
@@ -147,6 +159,19 @@ export class CapsuleHandVisual implements HandVisual {
       if (fade <= 0 || this.seen[side] === 0) continue;
       const p = this.lastPositions[side];
       const r = this.lastRadii[side];
+      // Close to the eyes the hand fades away (the nearest joint decides), so a turned palm never blacks out the view.
+      let drawn = fade;
+      if (eye) {
+        let nearest = Infinity;
+        for (let j = 0; j < JOINT_COUNT; j++) {
+          const dx = p[j * 3] - eye[0];
+          const dy = p[j * 3 + 1] - eye[1];
+          const dz = p[j * 3 + 2] - eye[2];
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 < nearest) nearest = d2;
+        }
+        drawn = fade * nearFade(Math.sqrt(nearest));
+      }
       for (let j = 0; j < JOINT_COUNT; j++) {
         const x = p[j * 3];
         const y = p[j * 3 + 1];
@@ -192,7 +217,7 @@ export class CapsuleHandVisual implements HandVisual {
         jc[nj * 3] = b[0] + (lit[0] - b[0]) * t;
         jc[nj * 3 + 1] = b[1] + (lit[1] - b[1]) * t;
         jc[nj * 3 + 2] = b[2] + (lit[2] - b[2]) * t;
-        this.jointFade[nj++] = fade;
+        this.jointFade[nj++] = drawn;
       }
       for (let k = 0; k < BONES; k++) {
         const i = CAPSULE_JOINTS[k * 2] * 3;
@@ -267,7 +292,7 @@ export class CapsuleHandVisual implements HandVisual {
         bc[nb * 3] = baseDefault[0] + (lit[0] - baseDefault[0]) * tb;
         bc[nb * 3 + 1] = baseDefault[1] + (lit[1] - baseDefault[1]) * tb;
         bc[nb * 3 + 2] = baseDefault[2] + (lit[2] - baseDefault[2]) * tb;
-        this.boneFade[nb++] = fade;
+        this.boneFade[nb++] = drawn;
       }
     }
     this.joints.count = nj;

@@ -768,6 +768,7 @@ async function start(): Promise<void> {
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
   const gazeAt = new Vector3();
+  const handEye = new Float32Array(3); // where the eyes are, for fading the drawn hands near them
   const gazeDir = new Vector3();
   const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
@@ -1960,12 +1961,17 @@ async function start(): Promise<void> {
         occluder.update(handList);
         timings.begin(SLOT.handVisual);
         handVisual.object.visible = !passthrough && handFlags.handVisual;
+        world.camera.getWorldPosition(settingsHead);
+        handEye[0] = settingsHead.x;
+        handEye[1] = settingsHead.y;
+        handEye[2] = settingsHead.z;
         const activeHands = sessionState === 'title_vr' ? [] : handList;
         handVisual.update(
           activeHands,
           step,
           rigPlaced && candleView.lit ? candleView.flamePosition : null,
           !paused && sessionState !== 'title_vr',
+          handEye,
         );
         timings.end(SLOT.handVisual);
       } catch (e) {
