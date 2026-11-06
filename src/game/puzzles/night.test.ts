@@ -271,16 +271,21 @@ describe('the hint ladder', () => {
   /** Seconds from the start of a puzzle's log entry for `what`, or NaN if it never came. */
   const firstAt = (h: Headless, what: string) => h.log.find((e) => e.what.startsWith(what))?.t ?? NaN;
 
-  it('climbs on every stage with no hands: the outline, the kindred 20 s later, then the obstacle eases', () => {
-    for (let i = 0; i < createNight().length; i++) {
-      const h = stage(i);
-      h.run(130);
-      const shown = firstAt(h, 'hint-show');
-      expect(shown, `puzzle ${i + 1} shows its outline`).toBeLessThan(40);
-      expect(firstAt(h, 'hint-kindred') - shown).toBeCloseTo(20, 0);
-      expect(firstAt(h, 'hint-ease') - shown).toBeCloseTo(80, 0);
-    }
-  });
+  // 15 stages of 130 simulated seconds each: about 3 s alone, longer with the whole suite running.
+  it(
+    'climbs on every stage with no hands: the outline, the kindred 20 s later, then the obstacle eases',
+    { timeout: 30_000 },
+    () => {
+      for (let i = 0; i < createNight().length; i++) {
+        const h = stage(i);
+        h.run(130);
+        const shown = firstAt(h, 'hint-show');
+        expect(shown, `puzzle ${i + 1} shows its outline`).toBeLessThan(40);
+        expect(firstAt(h, 'hint-kindred') - shown).toBeCloseTo(20, 0);
+        expect(firstAt(h, 'hint-ease') - shown).toBeCloseTo(80, 0);
+      }
+    },
+  );
 
   it('eases the fan to a breeze the traveller walks through on its own', () => {
     const h = at(3);
