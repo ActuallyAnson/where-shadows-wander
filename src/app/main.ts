@@ -386,17 +386,27 @@ async function start(): Promise<void> {
   const reducedMotion = () =>
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** Plays the walk from puzzle `from` (its land wakes) to puzzle `to` (the traveller walks into its land), if travel scenes are on. */
-  const travelTo = (from: number, to: number) => {
-    if (travelRun || inVoid || prologue.playing || finale.playing) return;
-    if (!settings.value.travelScenes || reducedMotion()) return;
+  const travelTo = (from: number, to: number): 'started' | 'busy' | 'off' => {
+    if (travelRun || inVoid || prologue.playing || finale.playing) return 'busy';
+    if (!settings.value.travelScenes || reducedMotion()) return 'off';
     const segments: TravelRun['segments'] = [];
     if (from >= 0 && LAND_OF_PUZZLE[from]) segments.push({ land: LAND_OF_PUZZLE[from], mode: 'wake' });
     if (LAND_OF_PUZZLE[to]) segments.push({ land: LAND_OF_PUZZLE[to], mode: 'arrive' });
-    if (segments.length === 0) return;
+    if (segments.length === 0) return 'off';
     travelRun = { segments, at: 0, dipping: false, leaving: false, skipRest: false, resume: sessionState };
     sessionState = 'opening'; // the game holds still while the traveller walks
     walkScene.prepare(segments[0].land, segments[0].mode);
     walkHost.enter();
+    return 'started';
+  };
+  /** For the Testing switch: waits while another full-view scene (the first-time opening) is playing, and says in the report why it did not play. */
+  const travelWhenFree = (from: number, to: number, triesLeft = 60) => {
+    const result = travelTo(from, to);
+    if (result === 'busy' && triesLeft > 0) later(() => travelWhenFree(from, to, triesLeft - 1), 500);
+    else if (result === 'off')
+      diagnostics.error(
+        `travel scene did not play: ${settings.value.travelScenes ? 'the device asks for less motion' : 'Travel scenes is off in Settings'}`,
+      );
   };
   // The finale plays in the hall of the great crystal, the last thing the night shows.
   const hall = new CinematicScene(CRYSTAL, 'hall');
@@ -697,7 +707,7 @@ async function start(): Promise<void> {
         rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
     },
     wake: (index) => wakeSleeper(index),
-    travel: (from, to) => travelTo(from, to),
+    travel: (from, to) => void travelTo(from, to),
     note: (text) => captionLine.say(text, 3.2, 2.6),
     setAwake: (count) => {
       sleepersAwake = count;
@@ -768,6 +778,7 @@ async function start(): Promise<void> {
   const settingsHead = new Vector3();
   const settingsLook = new Vector3();
   const gazeAt = new Vector3();
+  const handEye = new Float32Array(3); // where the eyes are, for fading the drawn hands near them
   const gazeDir = new Vector3();
   const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
@@ -971,7 +982,12 @@ async function start(): Promise<void> {
       },
       cutscene: { play: () => playOpening() },
       prologue: { play: () => prologue.start() },
-      travel: { play: () => travelTo(travelDemo++ % 4, (travelDemo % 4) + 1) },
+      travel: {
+        play: () => {
+          const from = travelDemo++ % 4;
+          void travelTo(from, from + 1);
+        },
+      },
       rewind: { go: () => night.rewind(3) },
       editor: {
         open: () => {
@@ -1320,7 +1336,7 @@ async function start(): Promise<void> {
       if (t.cutscene) setTimeout(() => playOpening(), 1000);
       // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
       if (t.story === 'prologue') later(() => prologue.start(), 1000);
-      if (t.story === 'travel') later(() => travelTo(2, 3), 1000);
+      if (t.story === 'travel') later(() => travelWhenFree(2, 3), 1000);
       if (t.story === 'finale') later(() => finale.start(), 1000);
       setKindred(t.kindred);
       armRecording(t.record);
@@ -1960,12 +1976,17 @@ async function start(): Promise<void> {
         occluder.update(handList);
         timings.begin(SLOT.handVisual);
         handVisual.object.visible = !passthrough && handFlags.handVisual;
+        world.camera.getWorldPosition(settingsHead);
+        handEye[0] = settingsHead.x;
+        handEye[1] = settingsHead.y;
+        handEye[2] = settingsHead.z;
         const activeHands = sessionState === 'title_vr' ? [] : handList;
         handVisual.update(
           activeHands,
           step,
           rigPlaced && candleView.lit ? candleView.flamePosition : null,
           !paused && sessionState !== 'title_vr',
+          handEye,
         );
         timings.end(SLOT.handVisual);
       } catch (e) {
