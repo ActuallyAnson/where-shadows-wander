@@ -199,6 +199,10 @@ The story is told without words (only a title and a few short captions), each be
 | The dimming | between puzzles 3 and 4 | The light gutters, the kindred hides, the room goes cold. |
 | The return | puzzle 5 solved | The kindred returns, the room fills with light, the traveller reaches the lit window. |
 | The end | after the window | The candle burns low, the kindred flies to the traveller, the kid falls asleep, "The End". Built (`src/app/ending.ts`). |
+| Chapter card | as each level after the first begins | The level's number and sleeper ("II · The bunting") on the wall, the kindred leading the way in (not while it is away). About 4.5 s. Built (`src/game/story.ts`). |
+| The sleeper stirs | between two stages of a level | The level's sleeper stirs (stage 1 solved) and half wakes (stage 2) in a caption, while the kindred sweeps across the new land, or once it has fled a paper bird. About 6.5 s. Built (`src/game/story.ts`). |
+
+**The story (6 Nov 2026).** The room dreams every night, but tonight its dreams have sunk too deep to wake, and the traveller carries the one spark left to wake the five sleepers: the lamp, the bunting, the pictures, the globe and the window. Each level is one sleeper, and it takes all three of its stages to wake it: it stirs, it half wakes, it wakes. Every stage has a line of its own, said a moment after it appears (what lies in the way, told as story, never as an instruction). Between scenes there is always something: the stir interlude between stages, the travel scene and the chapter card between levels. The game holds still while one plays, and each can be skipped.
 
 Still open: what the last scene's lit window is, and whether the kindred leads the traveller there.
 

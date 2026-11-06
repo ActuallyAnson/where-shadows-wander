@@ -30,19 +30,21 @@ title (cold, dark) ─► lighting ritual (3 s at the wick) ─► OPENING ─�
    ─► THE DIMMING ─► 4 fan ─► 5 castle ─► THE RETURN ─► THE END ─► "Begin again"
 ```
 
-Between stages of a level: the traveller reaches the goal, `puzzle-solved` fires (the chime and the reward), a 2.5 s outro holds the scene, then the next stage's props swap in. Between levels, the last stage's solve also wakes the level's sleeper and warms the wall one step, and the travel scene walks the traveller into the next land. Because the props are invisible, nothing in the room is seen moving; only the wall's shadows change. The traveller walks in from the left edge of each scene.
+Between stages of a level: the traveller reaches the goal, `puzzle-solved` fires (the chime and the reward), a 2.5 s outro holds the scene, then the next stage's props swap in and its interlude plays (the sleeper stirs), with the game held until it ends; then the stage's own line. Between levels, the last stage's solve also wakes the level's sleeper and warms the wall one step, and the travel scene walks the traveller into the next land, then the new level's chapter card plays on the wall. Because the props are invisible, nothing in the room is seen moving; only the wall's shadows change. The traveller walks in from the left edge of each scene.
 
 Pausing (flame covered 3 s, or headset off) holds the world mid-puzzle. "Begin this puzzle again" reloads the current puzzle from its layout.
 
 ## Story beats (cutscenes)
 
-Wordless apart from a few short captions, each under 15 s and skippable. Cutscene data is a list of timed beats (`CutsceneData` in `src/engine/sim/cutscene.ts`): captions and puppets moving from one stage position to another.
+Wordless apart from a few short captions, each under 15 s and skippable. The story's text (the level lines and wake lines in `src/app/story.ts`, the stage lines, stir lines and interludes in `src/game/story.ts`) tells of the five sleepers: each level wakes one, and it stirs, half wakes and wakes over the level's three stages. A line said as a scene begins waits until its interlude has ended. Cutscene data is a list of timed beats (`CutsceneData` in `src/engine/sim/cutscene.ts`): captions and puppets moving from one stage position to another.
 
 | Beat | Plays | What happens | Mood | Status |
 |---|---|---|---|---|
 | **Opening** | the candle is lit | The title on the wall, the kindred drifts in out of the dark, caption "Hold your hands to the light", the kindred fades. 11.5 s. | 0.4 | Built: `src/app/opening.ts` (captions are placeholders) |
 | **The dimming** | after puzzle 3's outro, before puzzle 4 loads | The candle gutters (the flame shrinks, the flicker deepens for 2–3 s), the kindred darts behind the edge of the wall and hides, the room cools. No caption. Then the fan's scene fades in. The kindred stays away through puzzle 4, so its hint rung there is skipped (the traveller's look-back comes earlier instead). | 0.7 → 0.45 | Built simply: the mood drops and the kindred darts off and stays away. The candle's gutter is not built |
 | **The return** | puzzle 5 solved, the traveller inside the castle | The kindred flies back in from the dark and circles the castle window, which lights; the room fills with warm light. | 0.85 → 1.0 | Built: the window lights, the kindred perches by it, the mood goes to 1.0, and the ending follows 3.5 s later |
+| **Chapter card** | as each level after the first begins (after the travel scene, if it plays) | Caption "II · The bunting" (the level's number and sleeper); the kindred flies in from the left leading the way, except on the fan and the castle, where it is away. About 4.5 s. | the level's | Built: `src/game/story.ts` |
+| **The sleeper stirs** | as a level's second and third stages begin | The sleeper's caption ("The lamp stirs. A little light leaks out.", then "It dreams of a match, and almost wakes."); the kindred sweeps across the new land from the right. On the pictures a painted bird follows it; on the fan a paper bird is blown backwards; at the castle a bird circles up toward the window. About 6.5 s. | unchanged | Built: `src/game/story.ts` |
 | **The end** | after the return | Caption "The candle burns low.", the kindred flies to the traveller, the traveller cheers, "The light found its way home.", "Sleep well.", then the "The End" screen with "Begin again". | 1.0 → 0.3 | Built: `src/app/ending.ts` |
 
 ## Colour script (the wall's mood)
