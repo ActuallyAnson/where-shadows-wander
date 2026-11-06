@@ -6,7 +6,7 @@ import { Touch } from '../../engine/sim/solver';
 import { Headless } from '../headless';
 import { newSave } from '../save-state';
 import { LEDGE_TOP } from './bedroom';
-import { createNight } from './index';
+import { createNight, firstStageOf } from './index';
 import { TABLE_RISE } from './n2-ledge';
 
 const BRIDGE_Y = LEDGE_TOP - 0.01;
@@ -16,7 +16,7 @@ const MOAT_BRIDGE: [number, number] = [0.01, BRIDGE_Y];
 
 function at(index: number) {
   const save = newSave();
-  save.puzzle = index;
+  save.puzzle = firstStageOf(index);
   return new Headless({ puzzles: createNight(), save, seed: 1 });
 }
 const travellerX = (h: Headless) => h.game.store.x[h.game.traveller.slot(h.game)];

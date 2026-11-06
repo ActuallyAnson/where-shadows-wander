@@ -42,6 +42,14 @@ export interface PuzzleDef extends LevelSource {
   /** Stable id, used in saves and events ("p1-gap"). */
   readonly id: string;
   readonly title: string;
+  /**
+   * The level this puzzle belongs to (0 = the books .. 4 = the castle), and its stage within it
+   * (0 first). A level is a run of puzzles on the same idea, each harder than the last; the app
+   * plays a level's story beats (the travel scene, the sleeper waking, the mood) once per level, not
+   * per stage. Set by createNight; a puzzle played on its own is its own level.
+   */
+  readonly level?: number;
+  readonly stage?: number;
   /** Solution ids, intended one first. */
   readonly solutions: readonly string[];
   /** The shape the ghost hint shows. */

@@ -8,9 +8,12 @@ import { MemoryStore } from '../engine/services/saves/storage';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import { placeLantern } from '../engine/shadow/pure/test-rig';
 import { fistShadow, flatShadow } from '../engine/sim/shadow-shapes';
+import { Touch } from '../engine/sim/solver';
 import { StageFrame } from '../engine/stage/stage-frame';
 import { PROP_TAG_BASE } from '../game/props';
 import { LEDGE_TOP } from '../game/puzzles/bedroom';
+import { firstStageOf } from '../game/puzzles/index';
+import { KEEP_GATE_X, KEEP_MOAT, KEEP_PLATE_X, KEEP_STEP } from '../game/puzzles/n5-castle';
 import { DIMMING_AT, NIGHT_MOOD, NightDriver, RETURN_MOOD, RETURN_S, type NightHost } from './night-driver';
 
 const DT = 1 / 72;
@@ -94,12 +97,18 @@ function setup(flameAt?: readonly number[]) {
     else shadowR = sh;
     shapes.push('commit', hand, shape, 0, 0.5, 0.4);
   };
+  /** Moves a hand's shadow without a new commit (the shape is held). */
+  const move = (hand: 'left' | 'right', shape: 'flat' | 'fist', x: number, y: number) => {
+    const sh = hand === 'left' ? left : right;
+    if (shape === 'flat') flatShadow(sh, x, y);
+    else fistShadow(sh, x, y);
+  };
   const hide = (hand: 'left' | 'right') => {
     shapes.push('release', hand, 'flat', 0, 0, 1, 'exit');
     if (hand === 'left') shadowL = null;
     else shadowR = null;
   };
-  return { driver, host, state, calls, saves, run, pose, hide };
+  return { driver, host, state, calls, saves, run, pose, move, hide };
 }
 
 describe('NightDriver', () => {
@@ -119,11 +128,11 @@ describe('NightDriver', () => {
   it.each([
     ['the stand-in lantern', undefined],
     ['the candle on the bed tray', [0, 0.805, -0.45]],
-  ])('casts every puzzle from %s so the traveller stands on a prop', (_, flameAt) => {
+  ])('casts every stage from %s so the traveller stands on a prop', (_, flameAt) => {
     const { driver, run } = setup(flameAt);
     driver.start();
     const game = driver.game!;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < game.puzzleCount; i++) {
       game.goto(i);
       run(0.5);
       expect(game.layout.problems, game.puzzle.id).toEqual([]);
@@ -133,46 +142,73 @@ describe('NightDriver', () => {
     }
   });
 
-  it('solves the tutorial with a flat hand, saves it, and warms the wall one step', () => {
+  it("solves the tutorial with a flat hand and saves it; the lamp waits for the level's last stage", () => {
     const { driver, state, calls, saves, run, pose } = setup();
     driver.start();
     run(4);
     pose('right', 'flat', 0, LEDGE_TOP - 0.01);
     expect(run(25, () => calls.includes('solved'))).toBe(true);
-    expect(state.mood).toBe(NIGHT_MOOD[1]);
-    expect(state.woke).toEqual([0]); // the spark goes to the lamp
-    expect(state.rewards).toEqual([0]); // and the puzzle's own reward plays on the paper
-    expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
+    expect(state.rewards).toEqual([0]); // the level's own reward plays on the paper
+    expect(state.woke).toEqual([]); // but the level goes on: no spark yet
+    expect(state.mood).toBe(NIGHT_MOOD[0]);
+    expect(state.said).not.toContain(WAKE_LINES[0]);
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
+  });
+
+  it("moves on to the level's next stage with only new props: no scenery, line or mood change", () => {
+    const { driver, state, run, pose } = setup();
+    driver.start();
+    run(4);
+    pose('right', 'flat', 0, LEDGE_TOP - 0.01);
+    expect(run(30, () => driver.game!.puzzle.id === 'n1-stones')).toBe(true);
+    expect(state.props).toBe(3);
+    expect(state.scenery).toEqual([0]);
+    expect(state.said).toEqual([PUZZLE_LINES[0]]);
+    expect(state.awake).toBe(0);
+  });
+
+  it("wakes the level's sleeper and warms the wall one step when its last stage is solved", () => {
+    const { driver, state, calls, run } = setup();
+    driver.start();
+    const game = driver.game!;
+    const last = firstStageOf(1) - 1;
+    game.goto(last);
+    run(DT);
+    solveNow(driver, last);
+    expect(calls).toContain('solved');
+    expect(state.woke).toEqual([0]); // the spark goes to the lamp
+    expect(state.rewards).toEqual([0]);
+    expect(state.said).toContain(WAKE_LINES[0]); // and says it woke
+    expect(state.mood).toBe(NIGHT_MOOD[1]);
   });
 
   it('counts the ways found and says nothing about another way after the tutorial, which has only one', () => {
     const { driver, state, calls, run, pose } = setup();
     driver.start();
-    expect(driver.waysFound()).toEqual({ found: 0, total: 9 });
+    expect(driver.waysFound()).toEqual({ found: 0, total: 28 });
     run(4);
     pose('right', 'flat', 0, LEDGE_TOP - 0.01);
     expect(run(25, () => calls.includes('solved'))).toBe(true);
-    expect(driver.waysFound()).toEqual({ found: 1, total: 9 });
+    expect(driver.waysFound()).toEqual({ found: 1, total: 28 });
     expect(state.notes).toEqual([]);
   });
 
-  it('hints that another way exists after a solve with ways left', () => {
+  it("hints that other ways exist when a level's last stage is solved with ways left, not after each stage", () => {
     const { driver, state, run } = setup();
     driver.start();
     const game = driver.game!;
-    game.goto(1);
+    const first = firstStageOf(1);
+    game.goto(first);
     run(DT);
     game.save.solutions[game.puzzle.id] = [game.puzzle.solutions[0]]; // one way found, as a solve records it
-    (game.events as unknown as { push(t: string, id: string, time: number, a: number, b: number): void }).push(
-      'puzzle-solved',
-      game.puzzle.solutions[0],
-      game.time,
-      1,
-      1,
-    );
-    (driver as unknown as { readEvents(g: unknown): void }).readEvents(game);
-    expect(state.notes).toEqual(['There is another way through.']);
+    solveNow(driver, first);
+    expect(state.notes).toEqual([]); // the level goes on
+    const last = firstStageOf(2) - 1;
+    game.goto(last);
+    run(DT);
+    game.save.solutions[game.puzzle.id] = [game.puzzle.solutions[0]];
+    solveNow(driver, last);
+    expect(state.notes).toEqual(['There are other ways through.']); // 2 of the level's 6
   });
 
   it('shows the outline, then perches the kindred, while the player waits', () => {
@@ -187,10 +223,10 @@ describe('NightDriver', () => {
   it('plays the dimming moving on to the fan, and keeps the kindred away there', () => {
     const { driver, state, calls, run } = setup();
     driver.start();
-    driver.game!.goto(DIMMING_AT - 1);
+    driver.game!.goto(firstStageOf(DIMMING_AT) - 1);
     run(DT);
     expect(calls).not.toContain('dim');
-    driver.game!.goto(DIMMING_AT);
+    driver.game!.goto(firstStageOf(DIMMING_AT));
     run(DT);
     expect(calls).toContain('dim');
     expect(state.away).toBe(true);
@@ -199,15 +235,30 @@ describe('NightDriver', () => {
   });
 
   it('ends the night: the return, then the ending, then the end screen', () => {
-    const { driver, state, calls, run, pose, hide } = setup();
+    const { driver, state, calls, run, pose, move, hide } = setup();
     driver.start();
-    driver.game!.goto(4);
+    const game = driver.game!;
+    game.goto(game.puzzleCount - 1); // the keep: counterweight, moat, then a lift up the step
     run(DT);
-    pose('right', 'fist', -0.3, 0.07);
+    const x = () => game.store.x[game.traveller.slot(game)];
+    pose('right', 'fist', KEEP_PLATE_X, 0.07);
     run(1.5);
     hide('right');
-    pose('left', 'flat', 0.01, LEDGE_TOP - 0.01);
-    expect(run(40, () => driver.game!.complete)).toBe(true);
+    pose('left', 'flat', (KEEP_MOAT[0] + KEEP_MOAT[1]) / 2, LEDGE_TOP - 0.01);
+    expect(run(30, () => x() > KEEP_GATE_X)).toBe(true);
+    hide('left');
+    run(0.6);
+    const stepX = (KEEP_STEP[0] + KEEP_STEP[1]) / 2;
+    let y = LEDGE_TOP - 0.065;
+    pose('right', 'fist', stepX, y);
+    const lift = () => {
+      if (game.traveller.standingOn(game) === Touch.Hand && y < LEDGE_TOP + 0.075) {
+        y += 0.002;
+        move('right', 'fist', stepX, y);
+      }
+      return game.complete;
+    };
+    expect(run(60, lift)).toBe(true);
     expect(state.mood).toBe(RETURN_MOOD);
     expect(state.woke).toContain(4); // the last spark goes to the window
     expect(state.said).toContain(RETURN_LINE);
@@ -261,23 +312,30 @@ describe('NightDriver', () => {
 });
 
 describe('NightDriver travel scenes', () => {
-  it('asks for a travel scene when the night moves on to the next puzzle, and not for the first puzzle, a restart or a jump', () => {
+  it('asks for a travel scene when the night moves on to the next level, and not for a stage, the first puzzle, a restart or a jump', () => {
     const { driver, host, run } = setup();
     const travelled: [number, number][] = [];
     host.travel = (from, to) => void travelled.push([from, to]);
     driver.start();
     run(DT);
     expect(travelled).toEqual([]); // the first puzzle: no walk (the opening has just played)
-    driver.game!.goto(1);
+    for (let i = 1; i < firstStageOf(1); i++) {
+      driver.game!.goto(i);
+      run(DT);
+    }
+    expect(travelled).toEqual([]); // the next stages of the same level: no walk
+    driver.game!.goto(firstStageOf(1));
     run(DT);
     expect(travelled).toEqual([[0, 1]]); // moving on: the first land wakes, the traveller walks into the second
     driver.game!.restart();
     run(DT);
     expect(travelled).toEqual([[0, 1]]); // a restart is not a walk
-    driver.game!.goto(3);
+    driver.game!.goto(firstStageOf(3));
     run(DT);
-    expect(travelled).toEqual([[0, 1]]); // nor is a jump over a puzzle
-    driver.game!.goto(4);
+    expect(travelled).toEqual([[0, 1]]); // nor is a jump over a level
+    driver.game!.goto(firstStageOf(4) - 1);
+    run(DT);
+    driver.game!.goto(firstStageOf(4));
     run(DT);
     expect(travelled).toEqual([
       [0, 1],
@@ -285,3 +343,16 @@ describe('NightDriver travel scenes', () => {
     ]);
   });
 });
+
+/** Delivers a solve of puzzle `index` (the current one) to the driver now, as the game reports one. */
+function solveNow(driver: NightDriver, index: number): void {
+  const game = driver.game!;
+  (game.events as unknown as { push(t: string, id: string, time: number, a: number, b: number): void }).push(
+    'puzzle-solved',
+    game.puzzle.solutions[0],
+    game.time,
+    index,
+    1,
+  );
+  (driver as unknown as { readEvents(g: unknown): void }).readEvents(game);
+}

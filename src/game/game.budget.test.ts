@@ -28,7 +28,7 @@ function msPerFrame(frame: () => void): number {
 }
 
 describe('game frame time', () => {
-  for (const name of ['drip', 'fan', 'castle'] as BusySceneName[]) {
+  for (const name of ['drip', 'hanging', 'fan', 'two-fans', 'castle'] as BusySceneName[]) {
     it(`stays inside the budget in the busiest scene: ${name}`, () => {
       const ms = msPerFrame(busyScene(name));
       console.info(`game frame (${name}): ${(ms * 1000).toFixed(1)} µs`);
