@@ -8,6 +8,8 @@ export interface CaptionBeat {
   readonly at: number;
   readonly duration: number;
   readonly text: string;
+  /** Height on the wall, a fraction of the stage's height from its centre (+ is up); low on the wall when left out. */
+  readonly y?: number;
 }
 
 /** A shadow puppet (the name of a drawing, e.g. 'bird') sliding from one point to another (metres on the real 1.6 m wall; a smaller stage scales them). */

@@ -21,7 +21,7 @@ const LIFT_M = 0.004;
 const PUPPET_WIDTH = 0.35; // of the stage width
 const CAPTION_WIDTH = 0.8;
 const CAPTION_ASPECT = 8;
-const CAPTION_Y = -0.3; // of the stage height, from the centre
+const CAPTION_Y = -0.3; // of the stage height, from the centre (a caption beat can ask for another height)
 const SKIP_LIFT_M = 0.006;
 const INK = '#1a1410';
 /** Puppet positions in a cutscene are metres on the real wall (about this wide); they scale to the stage actually in use. */
@@ -193,7 +193,7 @@ export class CutsceneView {
       const w = stage.width * (puppet ? (art.width ?? PUPPET_WIDTH) : CAPTION_WIDTH);
       const scale = stage.width / REF_STAGE_WIDTH_M;
       const x = puppet ? s.x * scale : 0;
-      const y = puppet ? s.y * scale : stage.height * CAPTION_Y;
+      const y = s.beat.kind === 'puppet' ? s.y * scale : stage.height * (s.beat.y ?? CAPTION_Y);
       placeOnStage(this.m, q, stage, x, y, w, w / art.aspect, LIFT_M);
       const mat = this.mats[i];
       if (mat.map !== art.tex) {

@@ -23,6 +23,11 @@ export const KINDRED_AWAY_FROM = 3;
 export const SLEEPERS: readonly string[] = ['The lamp', 'The bunting', 'The pictures', 'The globe', 'The window'];
 
 const NUMERALS = ['I', 'II', 'III', 'IV', 'V'];
+/**
+ * The interludes' captions stand high on the wall, where the story's lines are written: low down
+ * they would cross the ledges' black shadows. The puppets fly below them.
+ */
+const CAPTION_HIGH = 0.32;
 
 /**
  * The line under each later stage, [level][stage - 1]: said a moment after the stage appears, as
@@ -58,26 +63,27 @@ export function stageLine(level: number, stage: number): string {
  */
 function stir(level: number, stage: number): CutsceneData {
   const text = STIR_LINES[level][stage - 1];
-  const beats: Beat[] = [{ kind: 'caption', at: 0.6, duration: 5.4, text }];
+  const beats: Beat[] = [{ kind: 'caption', at: 0.6, duration: 5.4, text, y: CAPTION_HIGH }];
   if (level < KINDRED_AWAY_FROM) {
-    beats.push({ kind: 'puppet', at: 0.3, duration: 6, puppet: 'fox-flying', from: [0.7, 0.28], to: [-0.6, 0.1] });
+    beats.push({ kind: 'puppet', at: 0.3, duration: 6, puppet: 'fox-flying', from: [0.7, 0.12], to: [-0.6, -0.02] });
     // The pictures' sleeper is a painted bird: it follows the kindred out of its frame.
     if (level === 2)
-      beats.push({ kind: 'puppet', at: 1.6, duration: 4.6, puppet: 'bird', from: [0.6, 0.34], to: [-0.4, 0.22] });
+      beats.push({ kind: 'puppet', at: 1.6, duration: 4.6, puppet: 'bird', from: [0.6, 0.16], to: [-0.4, 0.04] });
   } else if (level === 3) {
     // The fan's wind blows the bird backwards, against the way the traveller walks.
-    beats.push({ kind: 'puppet', at: 0.4, duration: 5, puppet: 'bird', from: [-0.65, 0.3], to: [0.65, 0.18] });
+    beats.push({ kind: 'puppet', at: 0.4, duration: 5, puppet: 'bird', from: [-0.65, 0.1], to: [0.65, 0.0] });
   } else {
-    beats.push({ kind: 'puppet', at: 0.4, duration: 5.8, puppet: 'bird', from: [-0.5, 0.05], to: [0.45, 0.32] });
+    beats.push({ kind: 'puppet', at: 0.4, duration: 5.8, puppet: 'bird', from: [-0.5, -0.05], to: [0.45, 0.15] });
   }
   return { id: `stir-${level}-${stage}`, beats };
 }
 
 /** The chapter card: the level's number and sleeper, and the kindred (if it is about) leading the way in. About 4.5 s. */
 function chapter(level: number): CutsceneData {
-  const beats: Beat[] = [{ kind: 'caption', at: 0.4, duration: 4, text: `${NUMERALS[level]} · ${SLEEPERS[level]}` }];
+  const text = `${NUMERALS[level]} · ${SLEEPERS[level]}`;
+  const beats: Beat[] = [{ kind: 'caption', at: 0.4, duration: 4, text, y: CAPTION_HIGH }];
   if (level < KINDRED_AWAY_FROM)
-    beats.push({ kind: 'puppet', at: 0.2, duration: 4.2, puppet: 'fox-flying', from: [-0.7, 0.12], to: [0.6, 0.3] });
+    beats.push({ kind: 'puppet', at: 0.2, duration: 4.2, puppet: 'fox-flying', from: [-0.7, -0.02], to: [0.6, 0.14] });
   return { id: `chapter-${level}`, beats };
 }
 
