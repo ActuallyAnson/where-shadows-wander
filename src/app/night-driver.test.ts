@@ -14,7 +14,17 @@ import { PROP_TAG_BASE } from '../game/props';
 import { LEDGE_TOP } from '../game/puzzles/bedroom';
 import { firstStageOf } from '../game/puzzles/index';
 import { KEEP_GATE_X, KEEP_MOAT, KEEP_PLATE_X, KEEP_STEP } from '../game/puzzles/n5-castle';
-import { DIMMING_AT, NIGHT_MOOD, NightDriver, RETURN_MOOD, RETURN_S, type NightHost } from './night-driver';
+import { stageLine } from '../game/story';
+import type { CutsceneData } from '../engine/sim/cutscene';
+import {
+  DIMMING_AT,
+  INTERLUDE_HOLD_LIMIT_S,
+  NIGHT_MOOD,
+  NightDriver,
+  RETURN_MOOD,
+  RETURN_S,
+  type NightHost,
+} from './night-driver';
 
 const DT = 1 / 72;
 
@@ -155,7 +165,7 @@ describe('NightDriver', () => {
     expect(saves.data.puzzles['n1-books']?.solved).toBe(true);
   });
 
-  it("moves on to the level's next stage with only new props: no scenery, line or mood change", () => {
+  it("moves on to the level's next stage with new props and its own line: no scenery or mood change", () => {
     const { driver, state, run, pose } = setup();
     driver.start();
     run(4);
@@ -163,7 +173,7 @@ describe('NightDriver', () => {
     expect(run(30, () => driver.game!.puzzle.id === 'n1-stones')).toBe(true);
     expect(state.props).toBe(3);
     expect(state.scenery).toEqual([0]);
-    expect(state.said).toEqual([PUZZLE_LINES[0]]);
+    expect(state.said).toEqual([PUZZLE_LINES[0], stageLine(0, 1)]);
     expect(state.awake).toBe(0);
   });
 
@@ -308,6 +318,77 @@ describe('NightDriver', () => {
     fall();
     run(0.05);
     expect(state.rewoundBy).toHaveLength(1);
+  });
+});
+
+describe('NightDriver interludes', () => {
+  function withInterludes() {
+    const s = setup();
+    const played: { data: CutsceneData; onDone: () => void }[] = [];
+    s.host.interlude = (data, onDone) => void played.push({ data, onDone });
+    return { ...s, played };
+  }
+
+  it("plays the sleeper's stir moving on to a later stage, holding the game until it ends", () => {
+    const { driver, played, run } = withInterludes();
+    driver.start();
+    run(DT);
+    expect(played).toEqual([]); // the first puzzle: the opening has just played
+    const game = driver.game!;
+    game.goto(1);
+    run(DT);
+    expect(played.map((p) => p.data.id)).toEqual(['stir-0-1']);
+    expect(driver.inInterlude).toBe(true);
+    const t = game.time;
+    run(2);
+    expect(game.time).toBe(t); // held
+    played[0].onDone();
+    expect(driver.inInterlude).toBe(false);
+    run(1);
+    expect(game.time).toBeGreaterThan(t + 0.9);
+  });
+
+  it("plays the next level's chapter card on moving on to it, and nothing on a restart, a jump or a resume", () => {
+    const { driver, played, run } = withInterludes();
+    driver.start();
+    const game = driver.game!;
+    game.goto(firstStageOf(1) - 1);
+    run(DT);
+    expect(played).toEqual([]); // a jump
+    game.goto(firstStageOf(1));
+    run(DT);
+    expect(played.map((p) => p.data.id)).toEqual(['chapter-1']);
+    played[0].onDone();
+    game.restart();
+    run(DT);
+    expect(played).toHaveLength(1);
+  });
+
+  it('lets an older interlude ending late leave a newer one holding, and gives up on one that never ends', () => {
+    const { driver, played, run } = withInterludes();
+    driver.start();
+    run(DT);
+    const game = driver.game!;
+    game.goto(1);
+    run(DT);
+    game.goto(2);
+    run(DT);
+    expect(played.map((p) => p.data.id)).toEqual(['stir-0-1', 'stir-0-2']);
+    played[0].onDone();
+    expect(driver.inInterlude).toBe(true);
+    run(INTERLUDE_HOLD_LIMIT_S + 0.1);
+    expect(driver.inInterlude).toBe(false);
+  });
+
+  it('stops holding when the night begins again', () => {
+    const { driver, played, run } = withInterludes();
+    driver.start();
+    run(DT);
+    driver.game!.goto(1);
+    run(DT);
+    expect(played).toHaveLength(1);
+    driver.again();
+    expect(driver.inInterlude).toBe(false);
   });
 });
 
