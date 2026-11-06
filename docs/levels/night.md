@@ -1,6 +1,6 @@
 # The night: level overview
 
-The whole game is one level: one night in the kid's bedroom, five puzzles, about 5–8 minutes. This page is the arc and the shared rules; each puzzle has its own page with its layout, triggers, hints and feedback. The theme and the reasons behind it are in the [GDD](../GDD.md); open design questions are in the [design worksheet](../DESIGN-WORKSHEET.md).
+The whole game is one night in the kid's bedroom: five levels, one new idea each, and three stages per level, each harder than the last. That is fifteen puzzles, about 10–14 minutes. This page is the arc and the shared rules; each level has its own page with its layout, triggers, hints and feedback. The first stage is described in full, and the harder stages are under "Stages" at the end. The theme and the reasons behind it are in the [GDD](../GDD.md); open design questions are in the [design worksheet](../DESIGN-WORKSHEET.md).
 
 | # | Puzzle | New idea | Intended | Alternative | Target | Page | Code |
 |---|---|---|---|---|---|---|---|
@@ -11,6 +11,16 @@ The whole game is one level: one night in the kid's bedroom, five puzzles, about
 | 4 | The fan | shapes can block | spread | fist anchor | 60 s | [04-fan](04-fan.md) | `n4-fan.ts` |
 | 5 | The castle | combine what you learned | flat + fist, either order | (the other order) | 90 s | [05-castle](05-castle.md) | `n5-castle.ts` |
 
+The table lists each level's first stage. Its two harder stages, in order:
+
+| Level | Stage 2 | Stage 3 |
+|---|---|---|
+| 1 The books | `n1-stones`: two gaps, one bridge moved between them | `n1-wide`: a gap wider than a hand, crossed by carrying the traveller |
+| 2 The ledge | `n2-stair`: two lifts | `n2-step-bridge`: a bridge, then a lift |
+| 3 The dripping plant | `n3-hanging`: a long, swaying strip of drips, the cover carried along | `n3-drip-gap`: shelter, then a bridge |
+| 4 The fan | `n4-two-fans`: two winds, the second stronger | `n4-fan-step`: a windbreak, then a lift |
+| 5 The castle | `n5-wide-moat`: carried over the moat, and the counterweight | `n5-keep`: counterweight, moat, then a lift up to the keep |
+
 The puzzles are built and tested headless (`src/game/puzzles/night.test.ts`, each solved every way it should be and failed one way it shouldn't). The app plays them (`src/app/night-driver.ts` turns the game's events into the room): the props' shadows, the hint ladder, the mood, the dimming, the return and the ending. What is still a first look or missing is under "What is left to build".
 
 ## The flow of the night
@@ -20,7 +30,7 @@ title (cold, dark) ─► lighting ritual (3 s at the wick) ─► OPENING ─�
    ─► THE DIMMING ─► 4 fan ─► 5 castle ─► THE RETURN ─► THE END ─► "Begin again"
 ```
 
-Between puzzles: the traveller reaches the goal, `puzzle-solved` fires (chime, the wall warms one step), a 2.5 s outro holds the scene, then the next puzzle's props swap in. Because the props are invisible, nothing in the room is seen moving; only the wall's shadows change. The traveller walks in from the left edge of each scene.
+Between stages of a level: the traveller reaches the goal, `puzzle-solved` fires (the chime and the reward), a 2.5 s outro holds the scene, then the next stage's props swap in. Between levels, the last stage's solve also wakes the level's sleeper and warms the wall one step, and the travel scene walks the traveller into the next land. Because the props are invisible, nothing in the room is seen moving; only the wall's shadows change. The traveller walks in from the left edge of each scene.
 
 Pausing (flame covered 3 s, or headset off) holds the world mid-puzzle. "Begin this puzzle again" reloads the current puzzle from its layout.
 

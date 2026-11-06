@@ -412,12 +412,23 @@ Each puzzle's test (`night.test.ts`) also checks one way that should not work: a
 
 The fist anchor's reach was widened from 0.15 to 0.25 m: a fist lower than about 0.13 m above the traveller's centre stands in its way, so the old reach left a band only 2 cm tall to hold it in.
 
+### Levels and stages (6 Nov 2026)
+
+The five puzzles above are now the first stages of five **levels**, and each level has two harder stages after its first (`createNightLevels()`, 15 puzzles in all; the stages are listed in `docs/levels/night.md`). The second stage asks more of the level's idea; the third combines it with an earlier level's idea, one obstacle after the other.
+
+- **One flat list.** `createNight()` flattens the levels and marks each puzzle with its `level` and `stage` (new optional `PuzzleDef` fields). `Game` still plays a flat list, so saves (`save.puzzle`), replays, the rewinder and `goto` count puzzles, not levels. `Game.levelOf(i)`, `stageOf(i)`, `endsLevel(i)`, `puzzleAt(i)` and `indexOfPuzzle(id)` answer the level questions; a list with no levels is one level per puzzle.
+- **The app counts levels.** `NightDriver` plays a level's beats (the travel scene, the scenery, the line, the dimming, the sleeper waking, the mood, the "another way" note across the level's stages) when the level changes or its last stage is solved; a stage inside a level gets the chime and the reward, and new props.
+- **Shared hazards.** The drips and the wind moved out of their puzzles into `drips.ts` (`Drips`, a strip that may sway) and `wind.ts` (`Wind`, a band with its own strength), so a stage can have two winds or a wind and a step. `bedroom.ts` gained `gapMarker`, `gapAhead` and `hintAtGapAhead` for stages with more than one gap.
+- **Carrying.** A hand moved sideways with the traveller standing on it carries it (the solver's friction against the hand's velocity), which the wide gap and wide moat use.
+- **Tests.** `stages.test.ts` solves each new stage every way it should be solved and fails one way it shouldn't, and plays the whole night, all 15 stages, with each hand alone. The tests of the game's mechanics (`game.test.ts`, `flow.test.ts`, `save-bridge.test.ts`, `review-regressions.test.ts`, `debug.test.ts`) play the first stage of each level, the five puzzles they were written for.
+- **Old saves.** A save's resume point is an index into the list, so a save from before this change resumes at whichever stage now has that index.
+
 ### Adding a puzzle
 
 1. **Layout and props.** Write a factory, `createXPuzzle(): PuzzleDef`, in `src/game/puzzles/`, with its `layout` (the traveller's start, the goal, any markers) and its `props`, using the helpers in `bedroom.ts`. Set `ground: false` and `groundY: LEDGE_TOP` as the others do.
 2. **Code.** Keep the puzzle's state inside the factory (each `Game` gets its own, so a replay beside the live game can't disturb it) and reset that state in `setup`. Build terrain and fixtures in `setup`; never allocate in `step` or `afterStep`.
-3. **Register it.** Add it to `createNight()` in `src/game/puzzles/index.ts`.
-4. **Test it.** Add headless tests to `night.test.ts` that solve it every way it should be solvable, check the recorded solution, and check one way that shouldn't work.
+3. **Register it.** Add it to its level's list (`createBooksLevel()` and so on, listed by `createNightLevels()` in `src/game/puzzles/index.ts`).
+4. **Test it.** Add headless tests to `stages.test.ts` that solve it every way it should be solvable, check the recorded solution, and check one way that shouldn't work, and add its script to `SOLVE` there so the whole-night test plays it.
 
 ## Session flow: `src/game/flow.ts`
 

@@ -69,3 +69,14 @@ A long shelf with a freshly watered plant hanging above it. Water drips steadily
 
 - This is the last puzzle before **the dimming** (see [the night](night.md)): its outro hands over to that cutscene instead of straight to the fan.
 - One of the two puzzles that keeps a hand up for a while (about 10–15 s): the alternative roof lets a tired player hold still.
+
+## Stages
+
+The page above is stage 1. Level 3 has two harder stages after it (`src/game/puzzles/n3-drip.ts`; the drips themselves are in `drips.ts`).
+
+| Stage | Id | Layout | Solutions | Hint | Doesn't work |
+|---|---|---|---|---|---|
+| 2 The hanging plant | `n3-hanging` | a 0.6 m strip of drips (26 a second) that sways 4 cm each way over 5 s | `cup` or `roof`, carried along over the traveller | cup, beside the drips | a roof held still in the middle: it covers half the strip |
+| 3 Drips and a gap | `n3-drip-gap` | drips from x −0.45 to −0.15, then a 0.22 m gap in the shelf | `cup` or `roof` through the drips (a flat hand can be the roof and then the bridge), then a bridge | cup beside the drips, then flat over the gap | the cover alone: the traveller waits at the gap |
+
+**Change to every drip stage, stage 1 included:** the traveller no longer steps under the leaves unless the spot just ahead (0.12 m) is covered by a cup or a flat hand, with 3 cm to spare. It used to stop wherever the last drops happened to land, so it crept forward in dry moments, and each creep counted as progress and set the hint ladder back. Once the ladder eases the drips, only real landings stop it, so it can walk between the sparse drops.

@@ -13,7 +13,7 @@ Where Shadows Wander is a seated, hands-only virtual reality puzzle game: a kid 
 | Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
 | Engine | IWSDK (three.js) for the XR session and emulator; gameplay in our own TypeScript code |
 | Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
-| Session length | 5–8 minutes: one night, one level |
+| Session length | 10–14 minutes: one night of five levels (to measure in playtests) |
 | Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
 
 ### Direction (5 Oct 2026)
@@ -35,7 +35,7 @@ This section brings the GDD in line with the [design worksheet](DESIGN-WORKSHEET
 - **The light is a candle,** not a lantern. It stands on the bed tray and the player lights it with a small flame carried in the right hand (the lighting ritual).
 - **Companions are cut from gameplay.** The rabbit and fox no longer break free as helpers with abilities, and no puzzle needs them: their shapes are the most complicated in the set and the classifier is weakest on them, so a puzzle that needed one would fail players for reasons they can't see. Gameplay uses the four verb shapes only: flat, fist, cup and spread.
 - **The kindred** is a small spirit fox made of shadow that lives on the wall. It is a picture only: it flies about, perches, and carries the story beats and hints, but it never touches the puzzle. The rabbit and fox hand shapes are still recognised for a visual flourish (a shadow rabbit hops out of a rabbit hand, a fox hand calls the kindred), with no gameplay role.
-- **The night is five puzzles,** one new idea each, with a kind hint ladder and no failure (see Puzzles). Each has a level document in [`docs/levels/`](levels/night.md).
+- **The night is five levels,** one new idea each, and each level is three puzzles (stages) on its idea, each harder than the last, with a kind hint ladder and no failure (see Puzzles). Each level has a document in [`docs/levels/`](levels/night.md).
 - **Wordless story beats and a colour script** frame the night: the room starts cold and warms with each solve, dims once in the middle, and ends warm as the kid falls asleep.
 
 ### Design pillars
@@ -133,7 +133,7 @@ Simple physical roles (bridge, rock) use the shadow's actual outline for collisi
 
 ### Puzzles
 
-The night is five puzzles in the kid's bedroom, each standing on the shadows of a few invisible props. Each puzzle is a single scene of the stage with one obstacle and **one new idea, never two at once**; the last combines two. Every puzzle has one intended solution and one alternative (except the tutorial), a kind hint, and a reward the player can see. Every puzzle can be finished with one hand. Times are targets for a first-time player.
+The night is five levels in the kid's bedroom, each standing on the shadows of a few invisible props. Each level brings **one new idea, never two at once**; the last combines them. A level's first stage teaches its idea exactly as the table below describes. The level then has two more stages (see "Levels and stages" below). Every puzzle has one intended solution and one alternative (except the tutorial), a kind hint, and a reward the player can see. Every puzzle can be finished with one hand. Times are targets for a first-time player.
 
 | \# | Puzzle | Obstacle | New idea | Intended solution | Alternative | Target time |
 |----|----|----|----|----|----|----|
@@ -142,6 +142,20 @@ The night is five puzzles in the kid's bedroom, each standing on the shadows of 
 | 3 | **The dripping plant** | A freshly watered plant drips on the traveller's lantern | Shapes can shelter | Cup to catch the drips | Flat hand as a roof | 60 s |
 | 4 | **The fan** | A desk fan blows the traveller back | Shapes can block | Spread hand as a windbreak | Fist as an anchor | 60 s |
 | 5 | **The castle** (last) | A moat, and a shut castle gate with a counterweight | Combine what you learned | Flat bridge over the moat and a fist on the counterweight, in either order | (the other order) | 90 s |
+
+#### Levels and stages
+
+The first stages alone were too simple, so each level has three stages on its idea, each harder than the last. The second stage asks more of the idea; the third combines it with an idea from an earlier level, one obstacle after the other, so one hand is still enough.
+
+| Level | Stage 1 (teaches) | Stage 2 (asks more) | Stage 3 (combines) |
+|----|----|----|----|
+| 1 The books | The books: one gap | Stepping stones: two gaps, one hand moved from the first to the second | The wide gap: wider than a hand, so the traveller is carried across (a fist carries too) |
+| 2 The ledge | The ledge: one lift | The stair: two lifts, the table then the dresser | The bridge and the step: a gap to bridge, then a step to lift |
+| 3 The dripping plant | One plant, a cover held still is enough | The hanging plant: a long, swaying strip of drips; the cover must go along with the traveller | Drips and a gap: shelter, then a bridge |
+| 4 The fan | One fan | Two fans: a small one, a calm, then a big one that blows harder | The fan and the step: through the wind, then a lift onto the table |
+| 5 The castle | Moat and gate, either order | The wide moat: carried over, and the counterweight | The keep: moat, gate, then a step up to the keep's door |
+
+The room's story beats belong to levels, not stages: the travel scene, the scenery, the line on the wall, the sleeper waking and the wall warming all happen once per level. A stage solved inside a level gets the chime and the reward, and the next stage's props swap in after the outro.
 
 The layouts (props, positions, triggers, hints and cutscenes) are in the level documents: [the night](levels/night.md) and one per puzzle. The worksheet keeps the reasoning and the questions still open.
 
@@ -173,7 +187,7 @@ The tutorial shows the outline from the start, and a puzzle may start a rung lat
 
 ### The night
 
-The whole game is one small level: one night of five puzzles, about 5–8 minutes. Each puzzle is a scene; the traveller walks from one into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the candle burns low, and the room settles into sleep. There are no further nights or chapters.
+The whole game is one night of five levels, three stages each, about 10–14 minutes. Each stage is a scene; the traveller walks from one level's land into the next. It ends with the kid falling asleep: the traveller reaches a lit window, the candle burns low, and the room settles into sleep. There are no further nights or chapters.
 
 ### Story beats
 
