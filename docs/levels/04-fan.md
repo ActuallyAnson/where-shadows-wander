@@ -68,3 +68,14 @@ After the dimming the room is cooler and the kindred is gone. A desk fan stands 
 ## Notes
 
 - The fist anchor's reach was widened from 0.15 to 0.25 m: a fist lower than about 0.13 m above the traveller's centre stands in its way, so the old reach left a band only 2 cm tall.
+
+## Stages
+
+The page above is stage 1. Level 4 has two harder stages after it (`src/game/puzzles/n4-fan.ts`; the wind itself is in `wind.ts`).
+
+| Stage | Id | Layout | Solutions | Hint | Doesn't work |
+|---|---|---|---|---|---|
+| 2 Two fans | `n4-two-fans` | a small fan's wind from x −0.5 to −0.1, a calm, then a big fan's wind from x 0.2 to the edge, 1.4 times as strong | `wall` or `anchor`, carried through both winds | spread, at the start of the next wind | a windbreak only through the small fan |
+| 3 The fan and the step | `n4-fan-step` | a fan on a shelf above blows from x −0.45 to 0, then a 0.12 m gap and the table 0.12 m up | `wall` or `anchor` through the wind, then a lift up the step | spread in the wind, then fist at the step | the windbreak alone: the traveller waits below the table |
+
+The wind stops short of the step, so the lift is never done in the wind.

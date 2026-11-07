@@ -1,111 +1,154 @@
-// Puzzle 4, the fan: a desk fan at the end of the shelf blows across its right half and pushes the
-// traveller back. Intended: a spread hand stands upright on its windward side as a windbreak. Also
-// works: a fist held just above the traveller as a rock to hold on to (an anchor), carried along
-// with it.
-import { HAND_COUNT } from '../../engine/sim/solver';
+// Level 4, the fan: shapes can block. Three stages, each harder than the last.
+//
+// 1. The fan: a desk fan at the end of the shelf blows across its right half and pushes the
+//    traveller back. Intended: a spread hand stands upright on its windward side as a windbreak.
+//    Also works: a fist held just above the traveller as a rock to hold on to (an anchor), carried
+//    along with it.
+// 2. Two fans: a small fan, a calm, then a big fan that blows harder: the windbreak goes with the
+//    traveller twice, and the second time it must hold against more.
+// 3. The fan and the step: through the wind, then up a step onto the bedside table (level 2's
+//    lift). The shape the outline asks for changes with the obstacle ahead.
+//
+// The wind itself (pushing, sheltering, anchoring) is in wind.ts.
+import type { Shape } from '../../engine/hands/shapes';
 import { WALL_WIDTH_M } from '../../engine/stage/stage-frame';
-import { Role } from '../abilities';
 import type { GameContext } from '../context';
-import type { Fixture } from '../fixtures';
+import type { LevelProp } from '../props';
 import type { PuzzleDef } from '../puzzle';
-import { WALK_SPEED } from '../traveller';
-import { goalOn, LEDGE_TOP, ledge, PROP_DEPTH, startOn } from './bedroom';
+import { gapMarker, goalOn, hintAtGapAhead, LEDGE_TOP, ledge, PROP_DEPTH, startOn } from './bedroom';
+import { TABLE_TOP } from './n2-ledge';
+import { Wind, WIND_PUSH } from './wind';
 
-/** Where the fan's wind blows (from this stage x to the right edge), and how hard, m/s against the traveller. */
+export { EASED_WIND_PUSH, WIND_PUSH } from './wind';
+
+/** Where the fan's wind blows from (this stage x to the right edge). */
 export const WIND_FROM_X = -0.25;
-export const WIND_PUSH = -0.22;
-/** Once the hint ladder eases the puzzle: a breeze the traveller can walk against. */
-export const EASED_WIND_PUSH = -0.05;
-/** An anchored traveller still feels this share of the wind (it leans in, but makes way). */
-const ANCHORED_SHARE = 0.25;
-/**
- * How close the rock must be to anchor the traveller, metres. A fist lower than about 0.13 m above
- * the traveller's centre stands in its way, so this leaves a band about 12 cm tall to hold it in.
- */
-const ANCHOR_REACH = 0.25;
+/** Stage 2: the small fan's wind, and the big fan's, which blows this much harder. */
+export const SMALL_FAN: readonly [number, number] = [-0.5, -0.1];
+export const BIG_FAN_FROM = 0.2;
+export const BIG_FAN_PUSH = WIND_PUSH * 1.4;
+/** Stage 3: the wind, and the step after it. */
+export const STEP_WIND: readonly [number, number] = [-0.45, 0.0];
+export const FAN_STEP_GAP: readonly [number, number] = [0.08, 0.2];
 
-// The wind is stronger than the traveller's stride: on its own it never gets through.
-if (WIND_PUSH + WALK_SPEED >= 0) throw new Error('n4-fan: the wind must out-push the traveller');
-if (EASED_WIND_PUSH + WALK_SPEED <= 0) throw new Error('n4-fan: the eased breeze must let the traveller through');
+/** A desk fan's shadow (scenery): its head at (x, y), on a stand down to `base` (the shelf's top). */
+function fan(id: string, x: number, y = 0, size = 0.12, base = LEDGE_TOP): LevelProp[] {
+  const stand = y - base - size / 2;
+  return [
+    { id: `${id}-head`, shape: 'sphere', x, y, size: [size], depth: 0.06, solid: false },
+    { id: `${id}-stand`, shape: 'cylinder', x, y: base + stand / 2, size: [0.015, stand, PROP_DEPTH], solid: false },
+  ];
+}
 
-/** Whether a rock-role hand is close above the traveller for it to hold on to. */
-function anchored(ctx: GameContext, x: number, y: number): boolean {
-  for (let h = 0; h < HAND_COUNT; h++) {
-    if (!ctx.abilities.has(h, Role.Rock)) continue;
-    const a = ctx.abilities.hands[h];
-    const dx = a.cx - x,
-      dy = a.cy - y;
-    if (dx * dx + dy * dy <= ANCHOR_REACH * ANCHOR_REACH && a.cy >= y) return true;
-  }
-  return false;
+/** Stage 3's upper shelf (scenery), the fan standing on it and blowing down along the path. */
+const UPPER_SHELF_TOP = 0.0;
+
+/** The outline on the windward side of where the wind starts. */
+function hintInWind(ctx: GameContext, from: number, out: Float64Array): void {
+  out[0] = from + 0.15;
+  out[1] = ctx.groundY + 0.15;
 }
 
 /** A fresh puzzle with its own state: one per Game, so two games never share it. */
 export function createFanPuzzle(): PuzzleDef {
-  const state: { wind: Fixture | null; push: number } = { wind: null, push: WIND_PUSH };
+  const wind = new Wind({ from: WIND_FROM_X, to: WALL_WIDTH_M / 2 });
   return {
     id: 'n4-fan',
     title: 'The fan',
     layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
-    props: [
-      ledge('shelf', -0.81, 0.81),
-      // The fan is scenery, standing above the end of the shelf: its head and its stand.
-      { id: 'fan-head', shape: 'sphere', x: 0.72, y: 0.0, size: [0.12], depth: 0.06, solid: false },
-      { id: 'fan-stand', shape: 'cylinder', x: 0.72, y: -0.17, size: [0.015, 0.18, PROP_DEPTH], solid: false },
-    ],
+    // The fan is scenery, standing above the end of the shelf.
+    props: [ledge('shelf', -0.81, 0.81), ...fan('fan', 0.72)],
     ground: false,
     groundY: LEDGE_TOP,
     solutions: ['wall', 'anchor'],
     hintShape: 'spread',
+    setup: (ctx) => wind.setup(ctx),
+    step: (ctx) => wind.step(ctx),
+    ease: () => wind.ease(),
+    hintAt: (ctx, out) => hintInWind(ctx, WIND_FROM_X, out),
+  };
+}
 
+/** Stage 2, two fans: a small one, a calm, a big one. */
+export function createTwoFansPuzzle(): PuzzleDef {
+  const small = new Wind({ from: SMALL_FAN[0], to: SMALL_FAN[1] });
+  const big = new Wind({ from: BIG_FAN_FROM, to: WALL_WIDTH_M / 2, push: BIG_FAN_PUSH });
+  /** Past the small fan's wind, the big fan is next. */
+  const pastSmall = (ctx: GameContext) => {
+    const s = ctx.traveller.slot(ctx);
+    return s >= 0 && ctx.store.x[s] > SMALL_FAN[1];
+  };
+  return {
+    id: 'n4-two-fans',
+    title: 'Two fans',
+    layout: { traveller: startOn(-0.7), goal: goalOn(0.7) },
+    props: [ledge('shelf', -0.81, 0.81), ...fan('small-fan', -0.05, -0.08, 0.08), ...fan('big-fan', 0.72, 0.02, 0.16)],
+    ground: false,
+    groundY: LEDGE_TOP,
+    solutions: ['wall', 'anchor'],
+    hintShape: 'spread',
     setup(ctx) {
-      state.push = WIND_PUSH;
-      const right = WALL_WIDTH_M / 2;
-      state.wind = ctx.fixtures.add(
-        'wind',
-        (WIND_FROM_X + right) / 2,
-        ctx.groundY + 0.25,
-        right - WIND_FROM_X,
-        0.5,
-        true,
-        1,
-      );
+      small.setup(ctx);
+      big.setup(ctx);
     },
-
     step(ctx) {
-      const t = ctx.traveller;
-      const s = t.slot(ctx);
-      const wind = state.wind;
-      if (s < 0 || t.state === 'goal' || !wind) return;
-      const { store } = ctx;
-      const x = store.x[s],
-        y = store.y[s],
-        r = store.radius[s];
-      // value: how hard the wind reaches the traveller (1 full, low when sheltered), for the renderer.
-      wind.value = 1;
-      if (x < WIND_FROM_X) return;
-      if (ctx.abilities.wallShelters(ctx, x, y, r, 1)) {
-        ctx.credit('wall', ctx.dt);
-        wind.value = 0.2;
-        return;
-      }
-      if (anchored(ctx, x, y)) {
-        ctx.credit('anchor', ctx.dt);
-        t.push = state.push * ANCHORED_SHARE;
-        return;
-      }
-      t.push = state.push;
+      small.step(ctx);
+      big.step(ctx);
     },
-
-    // The ladder's last rung: the fan slows to a breeze.
     ease() {
-      state.push = EASED_WIND_PUSH;
-      if (state.wind) state.wind.value = EASED_WIND_PUSH / WIND_PUSH;
+      small.ease();
+      big.ease();
     },
+    hintAt: (ctx, out) => hintInWind(ctx, pastSmall(ctx) ? BIG_FAN_FROM : SMALL_FAN[0], out),
+  };
+}
 
+/** Stage 3, the fan and the step: shelter through the wind, then lift up the step. */
+export function createFanStepPuzzle(): PuzzleDef {
+  const wind = new Wind({ from: STEP_WIND[0], to: STEP_WIND[1] });
+  const pastWind = (ctx: GameContext) => {
+    const s = ctx.traveller.slot(ctx);
+    return s >= 0 && ctx.store.x[s] > STEP_WIND[1];
+  };
+  return {
+    id: 'n4-fan-step',
+    title: 'The fan and the step',
+    layout: {
+      traveller: startOn(-0.7),
+      goal: goalOn(0.6, TABLE_TOP),
+      markers: [gapMarker(FAN_STEP_GAP[0], FAN_STEP_GAP[1])],
+    },
+    props: [
+      ledge('shelf', -0.81, FAN_STEP_GAP[0]),
+      ledge('bedside-table', FAN_STEP_GAP[1], 0.81, TABLE_TOP, 0.26),
+      // The fan stands on a shelf above the step, blowing back along the path below.
+      {
+        id: 'upper-shelf',
+        shape: 'box',
+        x: 0.02,
+        y: UPPER_SHELF_TOP - 0.02,
+        size: [0.26, 0.04, PROP_DEPTH],
+        solid: false,
+      },
+      ...fan('fan', 0.02, UPPER_SHELF_TOP + 0.1, 0.1, UPPER_SHELF_TOP),
+    ],
+    ground: false,
+    groundY: LEDGE_TOP,
+    // Recorded by what got it through the wind (the lift after it is level 2's idea).
+    solutions: ['wall', 'anchor'],
+    hintShape: 'spread',
+    hintShapeAt: (ctx): Shape => (pastWind(ctx) ? 'fist' : 'spread'),
+    setup: (ctx) => wind.setup(ctx),
+    step: (ctx) => wind.step(ctx),
+    ease: () => wind.ease(),
     hintAt(ctx, out) {
-      out[0] = WIND_FROM_X + 0.15;
-      out[1] = ctx.groundY + 0.15;
+      if (pastWind(ctx)) hintAtGapAhead(ctx, out, -0.065);
+      else hintInWind(ctx, STEP_WIND[0], out);
     },
   };
+}
+
+/** Level 4's stages, in order. */
+export function createFanLevel(): PuzzleDef[] {
+  return [createFanPuzzle(), createTwoFansPuzzle(), createFanStepPuzzle()];
 }

@@ -78,3 +78,14 @@ The hint follows what the traveller needs next (`hintShapeAt`): the moat's bridg
 
 - The castle is drawn, but it is only a shadow: its towers stand above the floor, clear of the traveller's head.
 - The order is saved per puzzle (`save.solutions['n5-castle']`), which "Reason to come back" uses: a replay can nudge the player toward the order they haven't tried.
+
+## Stages
+
+The page above is stage 1. Level 5 has two harder stages after it (`src/game/puzzles/n5-castle.ts`; one `createCastlePuzzle(layout)` builds all three).
+
+| Stage | Id | Layout | Solutions | Hint | Doesn't work |
+|---|---|---|---|---|---|
+| 2 The wide moat | `n5-wide-moat` | a 0.44 m moat, too wide for a hand; the gate and counterweight as in stage 1 | `gate-first` or `bridge-first`, the traveller carried over the moat | flat at the moat's near edge, fist on the counterweight | a bridge held still over the middle of the moat |
+| 3 The keep | `n5-keep` | a 0.22 m moat at x −0.3, the counterweight at x −0.55, the gate at x 0.2, then a 0.12 m step up to the keep | counterweight and moat in either order (`gate-first`, `bridge-first`), then a lift up the step | flat, fist on the counterweight, or fist at the step: whatever is next | without the lift: the traveller waits below the keep |
+
+The keep is the night's last puzzle: its goal is where the window lights and the return begins.

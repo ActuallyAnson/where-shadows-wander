@@ -75,3 +75,12 @@ The outline only shows the shape and where; rung 5's drifting outline is what sh
 
 - **New sound and animation** for the lift (B): the game doesn't emit an event for it yet. The view can tell from the traveller standing on a hand (`traveller.standingOn`) whose shadow is moving up; if that is awkward, A can add a `puzzle-event` `lifting`.
 - Fist shadows are round, so standing on one is a little less stable than on a plank. The headless tests use a stand-in blob; check it on the headset with a real fist.
+
+## Stages
+
+The page above is stage 1. Level 2 has two harder stages after it (`src/game/puzzles/n2-ledge.ts`).
+
+| Stage | Id | Layout | Solutions | Hint | Doesn't work |
+|---|---|---|---|---|---|
+| 2 The stair | `n2-stair` | books, a 0.12 m gap, the bedside table 0.12 m up, a 0.12 m gap, the dresser 0.12 m higher again | `rock` or `bridge`: lifted up twice | fist, in the next gap, below its near ledge | one lift: the traveller waits below the dresser |
+| 3 The bridge and the step | `n2-step-bridge` | books, a 0.22 m gap, more books, a 0.12 m gap, the table 0.12 m up | a flat bridge over the gap, then `rock` or `bridge` up the step (recorded by what carried it up: time on a hand at the step counts five times over) | flat at the gap, then fist at the step | the bridge alone: the traveller waits below the table |

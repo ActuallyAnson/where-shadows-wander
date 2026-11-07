@@ -184,6 +184,32 @@ export class Game implements GameContext {
     return this.puzzles[index].id;
   }
 
+  /** Puzzle `index` in this game's list. */
+  puzzleAt(index: number): PuzzleDef {
+    return this.puzzles[index];
+  }
+
+  /** The index of the puzzle with this id, or -1. */
+  indexOfPuzzle(id: string): number {
+    for (let i = 0; i < this.puzzles.length; i++) if (this.puzzles[i].id === id) return i;
+    return -1;
+  }
+
+  /** The level puzzle `index` belongs to (its own index when the list has no levels). */
+  levelOf(index: number): number {
+    return this.puzzles[index].level ?? index;
+  }
+
+  /** Puzzle `index`'s stage within its level (0 first). */
+  stageOf(index: number): number {
+    return this.puzzles[index].stage ?? 0;
+  }
+
+  /** Whether puzzle `index` is the last stage of its level (solving it finishes the level). */
+  endsLevel(index: number): boolean {
+    return index + 1 >= this.puzzles.length || this.levelOf(index + 1) !== this.levelOf(index);
+  }
+
   /** The interpolation factor for drawing entity state (px + (x - px) * alpha). */
   get alpha(): number {
     return this.loop.alpha;

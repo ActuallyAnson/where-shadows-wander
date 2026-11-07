@@ -1,11 +1,21 @@
 // Plays the night (src/game) in the app: makes the Game when the opening ends, feeds it each frame,
 // and turns its events into what the room shows and plays (docs/levels/night.md): the props'
-// shadows, the hint ladder (the outline, the kindred's perch), the wall's mood per puzzle, the
+// shadows, the hint ladder (the outline, the kindred's perch), the wall's mood per level, the
 // dimming before the fan, the return and the ending after the castle. main.ts makes one and calls
 // frame() while the session is playing. Plain TypeScript: everything it touches comes in through
 // NightHost, so main.ts keeps the views.
+//
+// The night is five levels of three stages each (src/game/puzzles/index.ts). The game counts
+// stages; the room counts levels: the travel scene, the scenery, the story's lines, the sleeper
+// waking and the mood change once per level, and a stage solved inside a level gets only the chime
+// and the reward. Every `index` NightHost is given is a level (0 = the books .. 4 = the castle).
+//
+// Between the scenes, the story (src/game/story.ts): moving on to a later stage plays its interlude,
+// a short wall cutscene in which the level's sleeper stirs, and moving on to a new level plays its
+// chapter card; the game holds still while one plays. Each later stage has its own line too.
 import type { HandShadow } from '../engine/hands/hand-shadow';
 import type { ShapeEvent } from '../engine/hands/shape-events';
+import { MAX_CUTSCENE_S, type CutsceneData } from '../engine/sim/cutscene';
 import type { Shape } from '../engine/hands/shapes';
 import { createSilhouette, type Prop } from '../engine/shadow/pure/prop-shadow';
 import { addPropTerrain } from '../engine/shadow/pure/prop-terrain';
@@ -15,6 +25,7 @@ import { createSceneProp, propToScene, type PropCaster } from '../game/props';
 import { createNight } from '../game/puzzles/index';
 import { SaveBridge, saveStateFrom, type SaveStore } from '../game/save-bridge';
 import { newSave } from '../game/save-state';
+import { interludeFor, stageLine } from '../game/story';
 import { anotherWayLine, nightWays, waysOf, type Ways } from './journal';
 import { Rewinder } from './rewinder';
 import {
@@ -28,11 +39,11 @@ import {
   wakeLineFor,
 } from './story';
 
-/** The wall's mood (0 cold .. 1 warm) on each puzzle: the colour script (docs/levels/night.md). */
+/** The wall's mood (0 cold .. 1 warm) on each level: the colour script (docs/levels/night.md). */
 export const NIGHT_MOOD: readonly number[] = [0.4, 0.55, 0.7, 0.45, 0.85];
 /** The mood the return warms the room to, after the castle. */
 export const RETURN_MOOD = 1;
-/** The puzzle the dimming plays before (the fan): from it on, the kindred is away until the return. */
+/** The level the dimming plays before (the fan): from it on, the kindred is away until the return. */
 export const DIMMING_AT = 3;
 /** Seconds of the return (the window lit, the kindred back) before the ending cutscene. */
 export const RETURN_S = 3.5;
@@ -61,20 +72,25 @@ export interface NightHost {
   setMood(goal: number): void;
   /** One short line of the story on the wall: after `delay` seconds, for `hold` seconds. */
   say(text: string, delay: number, hold: number, after?: boolean): void;
-  /** Puzzle `index`'s scenery comes up on the paper (the last one slides away). */
+  /** Level `index`'s scenery comes up on the paper (the last one slides away). */
   scenery(index: number): void;
-  /** The reward for solving puzzle `index` plays where the traveller stands (gold dust, sparks, drops, leaves, light). */
+  /** The reward for solving a stage of level `index` plays where the traveller stands (gold dust, sparks, drops, leaves, light). */
   reward(index: number): void;
   /** The spark flies from the paper to sleeper `index` (0 = the lamp .. 4 = the window); the room lights it when it lands. */
   wake(index: number): void;
-  /** How many things in the room are lit (one more each puzzle solved: 0 .. the number of puzzles). */
+  /** How many things in the room are lit (one more each level finished: 0 .. the number of levels). */
   setAwake(count: number): void;
   /** The solve moment: the chime, the bloom. */
   solved(): void;
   /** A soft sound and sparkle at (x, y): a puzzle object changed, or the obstacle eased. */
   twinkle(x: number, y: number): void;
-  /** Moving on from puzzle `from` to puzzle `to`: the walk between them (the land wakes, the traveller walks into the next). */
+  /** Moving on from level `from` to level `to`: the walk between them (the land wakes, the traveller walks into the next). */
   travel?(from: number, to: number): void;
+  /**
+   * A short cutscene on the wall between two scenes (src/game/story.ts); the game holds still until
+   * onDone is called (when it ends, is skipped, or cannot play).
+   */
+  interlude?(data: CutsceneData, onDone: () => void): void;
   /** A small line low on the wall, under the story's own (the hint that another way exists). */
   note?(text: string): void;
   /** The night was turned back `seconds` (a fall, or a rewind asked for): a flash and a sound say so. */
@@ -87,6 +103,8 @@ export interface NightHost {
 
 /** How far the night turns back when the traveller falls and "rewind on a fall" is on. */
 export const FALL_REWIND_S = 3;
+/** The longest the game holds still for an interlude whose end never comes (a session ended under it, say). */
+export const INTERLUDE_HOLD_LIMIT_S = MAX_CUTSCENE_S + 2;
 
 export class NightDriver {
   game: Game | null = null;
@@ -111,6 +129,10 @@ export class NightDriver {
   private shownIndex = -1;
   /** Seconds into the return, or -1. */
   private returnT = -1;
+  /** Seconds the game has been held for an interlude, or -1 when none is playing. */
+  private interludeT = -1;
+  /** Which interlude the hold belongs to, so a late onDone from an older one does not end a newer one's. */
+  private interludeId = 0;
 
   constructor(private readonly host: NightHost) {
     // Props' shadows become ground the same way they are drawn: from the flame, with the hands' blend.
@@ -130,6 +152,11 @@ export class NightDriver {
 
   get started(): boolean {
     return this.game !== null;
+  }
+
+  /** Whether an interlude is playing and the game is held for it. */
+  get inInterlude(): boolean {
+    return this.interludeT >= 0;
   }
 
   /** Fixed steps run so far (for the diagnostics report). */
@@ -182,6 +209,7 @@ export class NightDriver {
   again(): void {
     if (!this.game) return this.start();
     this.returnT = -1;
+    this.interludeT = -1;
     this.shownIndex = -1;
     this.game.goto(0);
   }
@@ -205,7 +233,11 @@ export class NightDriver {
     if (!game) return 0;
     const input = this.input;
     input.dt = dt;
-    input.paused = paused;
+    if (this.interludeT >= 0) {
+      this.interludeT += dt;
+      if (this.interludeT > INTERLUDE_HOLD_LIMIT_S) this.interludeT = -1;
+    }
+    input.paused = paused || this.interludeT >= 0;
     input.left = left;
     input.right = right;
     input.shapeEvents = shapeEvents;
@@ -239,26 +271,34 @@ export class NightDriver {
     for (let i = 0; i < ev.count; i++) {
       const e = ev.at(i);
       switch (e.type) {
-        case 'puzzle-start':
+        case 'puzzle-start': {
           // The frame that loads a puzzle plays its input in the new puzzle, so the new recording starts with it.
           this.rewinder?.begin(e.value, this.timeBefore, this.input);
-          // Moving on from the last puzzle (not a restart, a rewind or the first): the travel scene between the two lands.
-          if (e.value >= 1 && this.shownIndex === e.value - 1) host.travel?.(e.value - 1, e.value);
+          // Moving on from the last level's last stage (not a restart, a rewind, the first, or the next
+          // stage of the same level): the travel scene between the two lands.
+          const level = game.levelOf(e.value);
+          const movedOn = e.value >= 1 && this.shownIndex === e.value - 1;
+          if (movedOn && game.levelOf(e.value - 1) === level - 1) host.travel?.(level - 1, level);
           this.puzzleStarted(game, e.value);
+          if (movedOn) this.playInterlude(game, e.value);
           break;
+        }
         case 'traveller-fell':
           this.fell = true;
           break;
         case 'puzzle-solved': {
+          // e.value is the stage solved; the room's beats are per level, and play when its last stage is solved.
+          const level = game.levelOf(e.value);
           host.solved();
-          host.reward(e.value);
-          host.wake(e.value); // the spark flies to the sleeper, and the room lights it when it lands
-          if (e.value + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(e.value), WAKE_DELAY_S, WAKE_HOLD_S);
-          // And that this puzzle has another way, when it does and the player has only found one.
-          const another = anotherWayLine(waysOf(game.puzzle, game.save.solutions));
+          host.reward(level);
+          if (!game.endsLevel(e.value)) break;
+          host.wake(level); // the spark flies to the sleeper, and the room lights it when it lands
+          if (level + 1 < NIGHT_MOOD.length) host.say(wakeLineFor(level), WAKE_DELAY_S, WAKE_HOLD_S);
+          // And that this level has another way, when it does and the player has not found them all.
+          const another = anotherWayLine(levelWays(game, level));
           if (another) host.note?.(another);
-          // Each solve warms the wall one step, except into the fan: the dimming cools it instead.
-          const next = e.value + 1;
+          // Each level finished warms the wall one step, except into the fan: the dimming cools it instead.
+          const next = level + 1;
           if (next < NIGHT_MOOD.length && next !== DIMMING_AT) host.setMood(NIGHT_MOOD[next]);
           break;
         }
@@ -294,15 +334,38 @@ export class NightDriver {
     }
   }
 
+  /** The story between the scenes as stage `index` begins: the sleeper stirs, or the next level's card. The game holds until it ends. */
+  private playInterlude(game: Game, index: number): void {
+    const data = interludeFor(game.levelOf(index), game.stageOf(index));
+    if (!data || !this.host.interlude) return;
+    const id = ++this.interludeId;
+    this.interludeT = 0;
+    this.host.interlude(data, () => {
+      if (id === this.interludeId) this.interludeT = -1;
+    });
+  }
+
   private puzzleStarted(game: Game, index: number): void {
     const host = this.host;
-    if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.dim();
-    host.setKindredAway(index >= DIMMING_AT);
-    host.setAwake(index);
-    host.scenery(index);
-    if (index === DIMMING_AT && this.shownIndex === DIMMING_AT - 1) host.say(DIMMING_LINE, 1.5, 4);
-    else host.say(lineForPuzzle(index), LINE_DELAY_S, LINE_HOLD_S, true); // after the last wake line has been written
-    host.setMood(NIGHT_MOOD[Math.min(index, NIGHT_MOOD.length - 1)]);
+    const level = game.levelOf(index);
+    const shownLevel = this.shownIndex >= 0 ? game.levelOf(this.shownIndex) : -1;
+    // A level's beats (the dimming, the scenery, its line) play as the level begins: on its first
+    // stage, or on arriving in it from another level. A later stage of the same level, or a restart
+    // of one, only swaps the props.
+    if (level !== shownLevel || game.stageOf(index) === 0) {
+      const dimming = level === DIMMING_AT && shownLevel === DIMMING_AT - 1 && this.shownIndex === index - 1;
+      if (dimming) host.dim();
+      host.setKindredAway(level >= DIMMING_AT);
+      host.setAwake(level);
+      host.scenery(level);
+      if (dimming) host.say(DIMMING_LINE, 1.5, 4);
+      else host.say(lineForPuzzle(level), LINE_DELAY_S, LINE_HOLD_S, true); // after the last wake line has been written
+    } else if (index !== this.shownIndex) {
+      // A later stage, moved on to or resumed (not restarted): its own line.
+      const line = stageLine(level, game.stageOf(index));
+      if (line) host.say(line, LINE_DELAY_S, LINE_HOLD_S, true);
+    }
+    host.setMood(NIGHT_MOOD[Math.min(level, NIGHT_MOOD.length - 1)]);
     host.hideHint();
     host.releaseKindred();
     this.shownIndex = index;
@@ -314,4 +377,16 @@ export class NightDriver {
     }
     host.setProps(props, host.flame, host.stage, host.blend());
   }
+}
+
+/** The ways found across every stage of `level` (called once per level finished). */
+export function levelWays(game: Game, level: number): Ways {
+  const sum: Ways = { found: 0, total: 0 };
+  for (let i = 0; i < game.puzzleCount; i++) {
+    if (game.levelOf(i) !== level) continue;
+    const w = waysOf(game.puzzleAt(i), game.save.solutions);
+    sum.found += w.found;
+    sum.total += w.total;
+  }
+  return sum;
 }

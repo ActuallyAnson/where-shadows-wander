@@ -9,7 +9,7 @@ import { Game, type GameInput } from './game';
 import { createNight } from './puzzles/index';
 import { newSave } from './save-state';
 
-export type BusySceneName = 'drip' | 'fan' | 'castle';
+export type BusySceneName = 'drip' | 'hanging' | 'fan' | 'two-fans' | 'castle';
 
 interface Pose {
   shape: Shape;
@@ -17,22 +17,35 @@ interface Pose {
   y: number;
 }
 
-const SCENES: Record<BusySceneName, { puzzle: number; left: Pose; right: Pose }> = {
+const SCENES: Record<BusySceneName, { puzzle: string; left: Pose; right: Pose }> = {
   // A cup sweeping the far half of the drips and a roof off to the side: the drips keep falling on
   // the path, so the traveller waits.
-  drip: { puzzle: 2, left: { shape: 'cup', x: 0.12, y: 0 }, right: { shape: 'flat', x: 0.5, y: 0.15 } },
+  drip: { puzzle: 'n3-drip', left: { shape: 'cup', x: 0.12, y: 0 }, right: { shape: 'flat', x: 0.5, y: 0.15 } },
+  // The hanging plant's long, swaying strip at its full rate, a cup and a roof both off to the side.
+  hanging: {
+    puzzle: 'n3-hanging',
+    left: { shape: 'cup', x: 0.55, y: 0 },
+    right: { shape: 'flat', x: -0.6, y: 0.15 },
+  },
   // A windbreak and an anchor both behind the traveller: the wind keeps it from the goal.
-  fan: { puzzle: 3, left: { shape: 'spread', x: -0.5, y: -0.07 }, right: { shape: 'fist', x: -0.7, y: 0.0 } },
+  fan: { puzzle: 'n4-fan', left: { shape: 'spread', x: -0.5, y: -0.07 }, right: { shape: 'fist', x: -0.7, y: 0.0 } },
+  // Both fans blowing, a windbreak and an anchor behind the traveller.
+  'two-fans': {
+    puzzle: 'n4-two-fans',
+    left: { shape: 'spread', x: -0.5, y: -0.07 },
+    right: { shape: 'fist', x: -0.7, y: 0.0 },
+  },
   // A fist swaying just above the counterweight (never resting on it) and a flat hand off the moat.
-  castle: { puzzle: 4, left: { shape: 'fist', x: -0.3, y: 0.2 }, right: { shape: 'flat', x: 0.5, y: 0.2 } },
+  castle: { puzzle: 'n5-castle', left: { shape: 'fist', x: -0.3, y: 0.2 }, right: { shape: 'flat', x: 0.5, y: 0.2 } },
 };
 
 /** A function that plays one display frame (72 Hz) of the named scene each time it is called. */
 export function busyScene(name: BusySceneName): () => void {
   const scene = SCENES[name];
+  const puzzles = createNight();
   const save = newSave();
-  save.puzzle = scene.puzzle;
-  const game = new Game({ puzzles: createNight(), save });
+  save.puzzle = puzzles.findIndex((p) => p.id === scene.puzzle);
+  const game = new Game({ puzzles, save });
   const l = createHandShadow('left'),
     r = createHandShadow('right');
   const q = new ShapeEventQueue();

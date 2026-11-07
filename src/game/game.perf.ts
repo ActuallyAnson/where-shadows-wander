@@ -6,6 +6,8 @@ import { busyScene } from './busy-scenes';
 
 describe('game frame', () => {
   bench('dripping plant: drops, a cup, a roof', busyScene('drip'));
+  bench('hanging plant: a long strip of drops, swaying', busyScene('hanging'));
   bench('fan: wind, a windbreak, a fist anchor', busyScene('fan'));
+  bench('two fans: two winds, a windbreak, a fist anchor', busyScene('two-fans'));
   bench('castle: the counterweight and a bridge', busyScene('castle'));
 });

@@ -44,6 +44,7 @@ import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-p
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
+import type { CutsceneData } from '../engine/sim/cutscene';
 import { ENDING_MOOD } from './ending';
 import { OPENING, OPENING_S, openingFoxAlpha } from './opening';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
@@ -494,6 +495,28 @@ async function start(): Promise<void> {
     kindredOn = on;
     if (!on) kindredView.hide();
   };
+  // The interludes between the night's scenes (src/game/story.ts): a short cutscene on the wall while the game holds. One that
+  // comes while the view is elsewhere (the travel scene's walk) waits until the wall is back.
+  let pendingInterlude: { data: CutsceneData; onDone: () => void } | null = null;
+  /** The playing interlude's end (not the opening's, which starts the night), so a session that ends can end it too. */
+  let interludeDone: (() => void) | null = null;
+  const playInterlude = (data: CutsceneData, onDone: () => void) => {
+    if (travelRun || inVoid) {
+      pendingInterlude = { data, onDone };
+      return;
+    }
+    const done = () => {
+      if (interludeDone === done) interludeDone = null;
+      onDone();
+    };
+    const problems = cutscenes.play(data, done);
+    if (problems.length > 0) {
+      failures.report('interlude', new Error(`${data.id}: ${problems.join('; ')}`));
+      onDone();
+      return;
+    }
+    interludeDone = done;
+  };
   const playOpening = () => {
     const problems = cutscenes.play(OPENING, () => {
       readingPage.clear();
@@ -708,6 +731,7 @@ async function start(): Promise<void> {
     },
     wake: (index) => wakeSleeper(index),
     travel: (from, to) => void travelTo(from, to),
+    interlude: playInterlude,
     note: (text) => captionLine.say(text, 3.2, 2.6),
     setAwake: (count) => {
       sleepersAwake = count;
@@ -1249,6 +1273,13 @@ async function start(): Promise<void> {
     guard('sessionend: story', () => {
       prologue.skip();
       finale.skip();
+      pendingInterlude = null;
+      // An interlude ends with the session, and the night stops holding for it.
+      const done = interludeDone;
+      if (done) {
+        cutscenes.stop(false);
+        done();
+      }
       cancelLater(); // skipping runs the end-of-finale step, which must not show the end screen now
       fade.setBlack(false); // and a dim that was waiting to lift must not stay
     });
@@ -1796,8 +1827,15 @@ async function start(): Promise<void> {
             shadowsVisible && !menu.group.visible && !cutscenes.playing
               ? shadowRenderer.baseOpacity * candleView.occlusion
               : 0;
-          storyLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
-          captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          // A line said as a scene begins waits out its interlude, so it is not lost under the cutscene.
+          const linesWait = paused || sessionState !== 'playing' || cutscenes.playing;
+          storyLine.update(linesWait ? 0 : step, stage, lineOpacity);
+          captionLine.update(linesWait ? 0 : step, stage, lineOpacity);
+          if (pendingInterlude && !travelRun && !inVoid) {
+            const waiting = pendingInterlude;
+            pendingInterlude = null;
+            playInterlude(waiting.data, waiting.onDone);
+          }
           if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing || (travelRun && inVoid)) {
             // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
             let tips = 0;

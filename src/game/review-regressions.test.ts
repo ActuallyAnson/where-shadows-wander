@@ -8,9 +8,15 @@ import { Role } from './abilities';
 import { Game, type GameInput } from './game';
 import { Headless } from './headless';
 import { OTHER_SOLUTION } from './puzzle';
-import { createNight } from './puzzles/index';
+import { createNightLevels } from './puzzles/index';
 import { InputRecorder, replay } from './replay';
 import { newSave } from './save-state';
+
+/**
+ * The first stage of each level: the five puzzles these tests of the game's mechanics play (resume,
+ * restart, the outro, saves). The levels' later stages are played in src/game/puzzles/stages.test.ts.
+ */
+const createNight = () => createNightLevels().map((stages) => stages[0]);
 
 const opts = (puzzle = 0, seed = 1) => {
   const save = newSave();

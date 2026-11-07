@@ -16,7 +16,13 @@ import { GameEventQueue } from './game-events';
 import { Headless } from './headless';
 import { LEDGE_TOP } from './puzzles/bedroom';
 import { TABLE_RISE } from './puzzles/n2-ledge';
-import { createNight } from './puzzles/index';
+import { createNightLevels } from './puzzles/index';
+
+/**
+ * The first stage of each level: the five puzzles these tests of the game's mechanics play (resume,
+ * restart, the outro, saves). The levels' later stages are played in src/game/puzzles/stages.test.ts.
+ */
+const createNight = () => createNightLevels().map((stages) => stages[0]);
 
 const STATES = Object.keys(FLOW_STATES) as FlowState[];
 

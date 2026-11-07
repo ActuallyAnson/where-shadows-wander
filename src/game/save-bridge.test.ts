@@ -6,8 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { Game } from './game';
 import { Headless } from './headless';
 import { LEDGE_TOP } from './puzzles/bedroom';
-import { createNight } from './puzzles/index';
+import { createNightLevels } from './puzzles/index';
 import { NIGHT_CHAPTER, SaveBridge, saveStateFrom, type SaveStore } from './save-bridge';
+
+/**
+ * The first stage of each level: the five puzzles these tests of the game's mechanics play (resume,
+ * restart, the outro, saves). The levels' later stages are played in src/game/puzzles/stages.test.ts.
+ */
+const createNight = () => createNightLevels().map((stages) => stages[0]);
 
 interface Data {
   progress: { chapter: number; puzzle: number; chaptersCompleted: number[] };

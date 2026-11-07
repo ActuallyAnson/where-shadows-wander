@@ -9,12 +9,18 @@ import { Headless } from '../headless';
 import { PROP_TAG_BASE } from '../props';
 import { newSave } from '../save-state';
 import { LEDGE_TOP } from './bedroom';
-import { createNight } from './index';
+import { createNight, firstStageOf } from './index';
 import { BOOKS_END_X, TABLE_RISE } from './n2-ledge';
 import { DRIP_LEFT } from './n3-drip';
 import { GATE_X, MOAT_RIGHT } from './n5-castle';
 
-function at(index: number, seed = 1) {
+/** A game at the first stage of `level` (0 = the books). */
+function at(level: number, seed = 1) {
+  return stage(firstStageOf(level), seed);
+}
+
+/** A game at puzzle `index` of the night's list (every stage of every level). */
+function stage(index: number, seed = 1) {
   const save = newSave();
   save.puzzle = index;
   return new Headless({ puzzles: createNight(), save, seed });
@@ -31,11 +37,17 @@ const BRIDGE_Y = LEDGE_TOP - 0.01;
 const solved = (h: Headless) => () => h.saw('puzzle-solved');
 
 describe('the night', () => {
-  it('has five puzzles, each loading with no problems and the traveller standing on a prop', () => {
+  it('has five levels, each stage loading with no problems and the traveller standing on a prop', () => {
     const night = createNight();
-    expect(night.map((p) => p.id)).toEqual(['n1-books', 'n2-ledge', 'n3-drip', 'n4-fan', 'n5-castle']);
+    expect([0, 1, 2, 3, 4].map((l) => night[firstStageOf(l)].id)).toEqual([
+      'n1-books',
+      'n2-ledge',
+      'n3-drip',
+      'n4-fan',
+      'n5-castle',
+    ]);
     for (let i = 0; i < night.length; i++) {
-      const h = at(i);
+      const h = stage(i);
       h.run(0.5);
       const g = h.game;
       expect(g.layout.problems).toEqual([]);
@@ -243,70 +255,37 @@ describe('5: the castle', () => {
     expect(h.saw('puzzle-event', 'gate-open')).toBe(false);
   });
 
-  it('ends the night after the outro and lights the window', () => {
+  it('moves on to the next stage after the outro, the window still dark', () => {
     const h = at(4);
     h.pose('right', 'fist', ...ON_PLATE).run(1.5);
     h.hide('right').pose('left', 'flat', ...MOAT_BRIDGE);
-    expect(h.runUntil(() => h.saw('chapter-complete'), 50)).toBe(true);
-    expect(h.game.complete).toBe(true);
-    expect(h.game.save.chapterComplete).toBe(true);
-    expect(h.game.fixtures.find('window')?.active).toBe(true);
+    expect(h.runUntil(() => h.game.puzzle.id === 'n5-wide-moat', 50)).toBe(true);
+    expect(h.saw('chapter-complete')).toBe(false);
+    expect(h.game.fixtures.find('window')).toBeNull();
   });
 });
 
-describe('the whole night', () => {
-  it('plays start to finish with the intended solutions, recording each', () => {
-    const save = newSave();
-    const h = new Headless({ puzzles: createNight(), save });
-    const ids = createNight().map((p) => p.id);
-    const until = (id: string) => () => h.game.puzzle.id === id;
-    // 1: a bridge over the books' gap, lowered once the outro moves on.
-    h.pose('right', 'flat', 0, BRIDGE_Y);
-    expect(h.runUntil(until('n2-ledge'), 30)).toBe(true);
-    h.hide('right').run(0.5);
-    // 2: a fist in the gap, lifted to the bedside table with the traveller on it.
-    let y = LEDGE_TOP - 0.065;
-    h.pose('right', 'fist', 0, y);
-    const lift = () => {
-      if (h.game.traveller.standingOn(h.game) !== Touch.Hand || y >= LEDGE_TOP + TABLE_RISE) return;
-      y += 0.002;
-      h.move('right', 0, y);
-    };
-    expect(h.runUntil(until('n3-drip'), 45, lift)).toBe(true);
-    h.hide('right').run(0.5);
-    // 3: a roof over the drips.
-    h.pose('left', 'flat', 0.05, 0.12);
-    expect(h.runUntil(until('n4-fan'), 45)).toBe(true);
-    h.hide('left').run(0.5);
-    // 4: a windbreak walked along with the traveller.
-    expect(
-      h.runUntil(until('n5-castle'), 45, () => h.pose('right', 'spread', travellerX(h) + 0.15, LEDGE_TOP + 0.19)),
-    ).toBe(true);
-    h.hide('right').run(0.5);
-    // 5: the counterweight, then the bridge over the moat.
-    h.pose('right', 'fist', -0.3, 0.07).run(1.5);
-    h.hide('right').pose('left', 'flat', 0.01, BRIDGE_Y);
-    expect(h.runUntil(() => h.saw('chapter-complete'), 50)).toBe(true);
-    expect(Object.keys(h.game.save.solutions)).toEqual(ids);
-    expect(h.game.save.solutions['n2-ledge']).toEqual(['rock']);
-    expect(h.game.save.solutions['n5-castle']).toEqual(['gate-first']);
-  });
-});
+// The whole night, every stage of every level, and its ending are played in stages.test.ts.
 
 describe('the hint ladder', () => {
   /** Seconds from the start of a puzzle's log entry for `what`, or NaN if it never came. */
   const firstAt = (h: Headless, what: string) => h.log.find((e) => e.what.startsWith(what))?.t ?? NaN;
 
-  it('climbs on every puzzle with no hands: the outline, the kindred 20 s later, then the obstacle eases', () => {
-    for (let i = 0; i < 5; i++) {
-      const h = at(i);
-      h.run(130);
-      const shown = firstAt(h, 'hint-show');
-      expect(shown, `puzzle ${i + 1} shows its outline`).toBeLessThan(40);
-      expect(firstAt(h, 'hint-kindred') - shown).toBeCloseTo(20, 0);
-      expect(firstAt(h, 'hint-ease') - shown).toBeCloseTo(80, 0);
-    }
-  });
+  // 15 stages of 130 simulated seconds each: about 3 s alone, longer with the whole suite running.
+  it(
+    'climbs on every stage with no hands: the outline, the kindred 20 s later, then the obstacle eases',
+    { timeout: 30_000 },
+    () => {
+      for (let i = 0; i < createNight().length; i++) {
+        const h = stage(i);
+        h.run(130);
+        const shown = firstAt(h, 'hint-show');
+        expect(shown, `puzzle ${i + 1} shows its outline`).toBeLessThan(40);
+        expect(firstAt(h, 'hint-kindred') - shown).toBeCloseTo(20, 0);
+        expect(firstAt(h, 'hint-ease') - shown).toBeCloseTo(80, 0);
+      }
+    },
+  );
 
   it('eases the fan to a breeze the traveller walks through on its own', () => {
     const h = at(3);

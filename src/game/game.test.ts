@@ -6,8 +6,14 @@ import { flatShadow } from '../engine/sim/shadow-shapes';
 import { Role } from './abilities';
 import { Game, MAX_STEPS_PER_FRAME, type GameInput } from './game';
 import { Headless } from './headless';
-import { createNight } from './puzzles/index';
+import { createNightLevels } from './puzzles/index';
 import { newSave } from './save-state';
+
+/**
+ * The first stage of each level: the five puzzles these tests of the game's mechanics play (resume,
+ * restart, the outro, saves). The levels' later stages are played in src/game/puzzles/stages.test.ts.
+ */
+const createNight = () => createNightLevels().map((stages) => stages[0]);
 
 const opts = () => ({ puzzles: createNight() });
 

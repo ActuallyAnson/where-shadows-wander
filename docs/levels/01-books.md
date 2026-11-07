@@ -69,3 +69,14 @@ Right after the opening: two low stacks of books on the wall, with a gap between
 
 - `src/game/tutorial-flow.ts` (shared with Anson) plays this same scene on its own today, until the app drives `Game`.
 - This is the only puzzle the GDD's "first five minutes" times: the player should solve it within about 60 s of launching.
+
+## Stages
+
+The page above is stage 1. Level 1 has two harder stages after it (`src/game/puzzles/n1-books.ts`). The outline comes after 10 s on both, sooner than later levels, as the night has only just begun.
+
+| Stage | Id | Layout | Solutions | Hint | Doesn't work |
+|---|---|---|---|---|---|
+| 2 Stepping stones | `n1-stones` | books, a 0.2 m gap, a toy block, a second 0.2 m gap, more books | `bridge`: one flat hand over the first gap, then moved to the second | flat, over the next gap ahead | a bridge left over the first gap: the traveller waits at the second |
+| 3 The wide gap | `n1-wide` | a 0.44 m gap, wider than a flat hand's 0.3 m shadow | `bridge`: the traveller steps onto a flat hand at the near edge, stops at its end, and is carried across. `rock`: the same on a fist | flat, at the near edge | a bridge held still: the traveller waits at its far end |
+
+Stage 3 teaches what the later levels rely on: a shape can **move** with the traveller on it.
