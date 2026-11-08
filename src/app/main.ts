@@ -356,7 +356,17 @@ async function start(): Promise<void> {
   // The travel scenes between puzzles: the traveller walks into the next land (and the land it has just left wakes), in the same void.
   const walkScene = new WalkSceneView();
   let travelDemo = 0;
-  const walkHost = voidHost(walkScene);
+  // (A scene that fails to build is dropped at once, so the game is never left waiting on it: see abortTravel.)
+  const walkHost = voidHost({
+    enter: (head, dirX, dirZ) => {
+      try {
+        walkScene.enter(head, dirX, dirZ);
+      } catch (e) {
+        abortTravel(e);
+      }
+    },
+    leave: () => walkScene.leave(),
+  });
   // The walk's sounds: footsteps in time with the traveller (from ahead of where the head faced), and the sleeper's note as its land wakes.
   const walkPoint = new Vector3();
   const walkAt = () => {
@@ -382,13 +392,40 @@ async function start(): Promise<void> {
     resume: SessionState;
   }
   let travelRun: TravelRun | null = null;
+  /** What the travel scenes have done, for the report (so a headset that shows none can say why). */
+  const travelStats = { asked: 0, started: 0, finished: 0, last: 'not asked yet', error: null as string | null };
+  /** Drops a travel scene that went wrong: the room comes back and the game goes on. */
+  const abortTravel = (error: unknown) => {
+    travelStats.error = error instanceof Error ? error.message : String(error);
+    diagnostics.error(`travel scene failed: ${travelStats.error}`);
+    const run = travelRun;
+    if (!run) return;
+    run.leaving = true;
+    try {
+      walkScene.leave();
+    } catch {
+      // the scene is being thrown away anyway
+    }
+    walkHost.leave();
+    later(() => {
+      sessionState = run.resume;
+      travelRun = null;
+    }, 1300);
+  };
 
   const reducedMotion = () =>
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** Plays the walk from puzzle `from` (its land wakes) to puzzle `to` (the traveller walks into its land), if travel scenes are on. */
   const travelTo = (from: number, to: number): 'started' | 'busy' | 'off' => {
-    if (travelRun || inVoid || prologue.playing || finale.playing) return 'busy';
-    if (!settings.value.travelScenes || reducedMotion()) return 'off';
+    travelStats.asked++;
+    if (travelRun || inVoid || prologue.playing || finale.playing) {
+      travelStats.last = `busy (${travelRun ? 'a travel scene is playing' : inVoid ? 'a full-view scene is showing' : 'the opening or finale is playing'})`;
+      return 'busy';
+    }
+    if (!settings.value.travelScenes) {
+      travelStats.last = 'off: Travel scenes is off in Settings';
+      return 'off';
+    }
     const segments: TravelRun['segments'] = [];
     if (from >= 0 && LAND_OF_PUZZLE[from]) segments.push({ land: LAND_OF_PUZZLE[from], mode: 'wake' });
     if (LAND_OF_PUZZLE[to]) segments.push({ land: LAND_OF_PUZZLE[to], mode: 'arrive' });
@@ -397,16 +434,15 @@ async function start(): Promise<void> {
     sessionState = 'opening'; // the game holds still while the traveller walks
     walkScene.prepare(segments[0].land, segments[0].mode);
     walkHost.enter();
+    travelStats.started++;
+    travelStats.last = `started: ${segments.map((s) => `${s.mode} ${s.land}`).join(', then ')}`;
     return 'started';
   };
   /** For the Testing switch: waits while another full-view scene (the first-time opening) is playing, and says in the report why it did not play. */
   const travelWhenFree = (from: number, to: number, triesLeft = 60) => {
     const result = travelTo(from, to);
     if (result === 'busy' && triesLeft > 0) later(() => travelWhenFree(from, to, triesLeft - 1), 500);
-    else if (result === 'off')
-      diagnostics.error(
-        `travel scene did not play: ${settings.value.travelScenes ? 'the device asks for less motion' : 'Travel scenes is off in Settings'}`,
-      );
+    else if (result === 'off') diagnostics.error('travel scene did not play: Travel scenes is off in Settings');
   };
   // The finale plays in the hall of the great crystal, the last thing the night shows.
   const hall = new CinematicScene(CRYSTAL, 'hall');
@@ -1062,6 +1098,39 @@ async function start(): Promise<void> {
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
+    // Story scenes you can start from the headset's own Settings screen (its debug pages), with no timer or switch involved.
+    const lands = ['Broken Pass', 'Stair of Stone', 'Weeping Cave', 'Windy Heights', 'Sleeping Castle'];
+    for (let from = 0; from < 4; from++) {
+      debug.controller.actions.register({
+        id: `travel-${from}`,
+        group: 'Story scenes',
+        label: `Travel: ${lands[from]} to ${lands[from + 1]}`,
+        help: 'The land wakes and the traveller walks into the next one.',
+        run: () => {
+          if (settingsPanel.isOpen) settingsPanel.close();
+          const result = travelTo(from, from + 1);
+          if (result !== 'started') diagnostics.error(`travel scene did not play: ${travelStats.last}`);
+        },
+      });
+    }
+    debug.controller.actions.register({
+      id: 'story-prologue',
+      group: 'Story scenes',
+      label: 'The opening',
+      run: () => {
+        if (settingsPanel.isOpen) settingsPanel.close();
+        prologue.start();
+      },
+    });
+    debug.controller.actions.register({
+      id: 'story-finale',
+      group: 'Story scenes',
+      label: 'The finale',
+      run: () => {
+        if (settingsPanel.isOpen) settingsPanel.close();
+        finale.start();
+      },
+    });
     for (const [view, overlay] of [
       ['shadow', 'capsules'],
       ['colliders', 'colliders'],
@@ -1086,6 +1155,12 @@ async function start(): Promise<void> {
       capabilities,
     }),
     saves: { ...saves.status },
+    travel: {
+      ...travelStats,
+      setting: settings.value.travelScenes,
+      reducedMotion: reducedMotion(),
+      running: travelRun !== null,
+    },
     capture: capture.enabled ? { foveation: capture.foveation, scale: capture.scale } : null,
     settings: { ...settings.value, panelOpen: settingsPanel.isOpen, panelError: settingsPanel.lastError },
     frameErrors: failures.toJSON(),
@@ -1768,7 +1843,11 @@ async function start(): Promise<void> {
           finale.update(step);
           if (travelRun && inVoid) {
             const run = travelRun;
-            walkScene.update(step);
+            try {
+              walkScene.update(step);
+            } catch (e) {
+              abortTravel(e);
+            }
             if (walkScene.finished && !run.dipping && !run.leaving) {
               if (run.at + 1 < run.segments.length && !run.skipRest) {
                 // The next scene (the walk into the new land) follows the waking: a quick dip to black, so the repaint is not seen.
@@ -1783,6 +1862,7 @@ async function start(): Promise<void> {
                 });
               } else {
                 run.leaving = true;
+                travelStats.finished++;
                 walkHost.leave();
                 later(() => {
                   sessionState = run.resume;
