@@ -10,3 +10,5 @@ package-lock.json
 *.md
 # Scene files are written by IWSDK's editor in its own format; Prettier would fight it on every save.
 public/scenes/
+# The room layout is written by the dev room editor in its own one-piece-per-line format (src/engine/stage/room-layout.ts).
+content/rooms/

@@ -96,6 +96,7 @@ import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
+import { readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -258,6 +259,9 @@ async function start(): Promise<void> {
   const candleView = new CandleView();
   candleView.lit = false;
   const titleLighter = new TitleLighterView();
+  // Where the room's static pieces stand (content/rooms/bedroom.json); the dev room editor edits this same object.
+  const bedroomLayout = readBedroomLayout();
+  for (const p of bedroomLayout.problems) console.warn(`room layout: ${p}`);
   const bedTray = new BedTrayView();
   const bedroomView = new BedroomView();
   // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
@@ -274,6 +278,7 @@ async function start(): Promise<void> {
   const roomModels = new RoomModels(
     (id) => id in assetManifest,
     (part) => roomDressing.hideStandIn(part),
+    bedroomLayout.layout,
   );
   roomDressing.group.add(roomModels.group);
   void roomModels.load(candleLight);
