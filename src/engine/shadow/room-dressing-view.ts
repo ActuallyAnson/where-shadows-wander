@@ -42,6 +42,7 @@ import {
 import { RenderOrder } from './pure/render-order';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
 import { CANDLE_REACH_M, type CandleLight } from './candle-light';
+import type { StandIn } from './room-models';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -170,8 +171,8 @@ export class RoomDressingView {
   /** The room art the candle lights (the walls, and everything on and by them), and the props that cast its shadows. */
   private readonly lit: Mesh[] = [];
   private readonly casters: Mesh[] = [];
-  /** The painted bed and bookcase, hidden when real models take their place (room-models.ts). */
-  private readonly standIns: Record<'bed' | 'bookcase', Mesh[]> = { bed: [], bookcase: [] };
+  /** The painted bed, bookcase and rug, hidden when real models take their place (room-models.ts). */
+  private readonly standIns: Record<StandIn, Mesh[]> = { bed: [], bookcase: [], rug: [] };
 
   private flameOn = false;
   /** The candle as a light (candle-light.ts), once `useCandleLight` is called: it lights the art per pixel and casts the shadows. */
@@ -359,6 +360,7 @@ export class RoomDressingView {
     rugMat.polygonOffset = true;
     rugMat.polygonOffsetFactor = -2;
     rugMat.polygonOffsetUnits = -2;
+    this.standIns.rug = [rug];
 
     // None of them moves inside the room: their matrices are made once (and `place` makes the wall's again), and they are
     // culled when out of view, so looking away from the bookcase or the window does not draw them.
@@ -511,8 +513,8 @@ export class RoomDressingView {
     for (const m of this.casters) candle.cast(m);
   }
 
-  /** Hides the painted bed or bookcase (a real model stands there now); hidden, it casts no shadow either. */
-  hideStandIn(part: 'bed' | 'bookcase'): void {
+  /** Hides a painted bed, bookcase or rug (a real model stands there now); hidden, it casts no shadow either. */
+  hideStandIn(part: StandIn): void {
     for (const m of this.standIns[part]) m.visible = false;
     this.candle?.rebake();
   }
