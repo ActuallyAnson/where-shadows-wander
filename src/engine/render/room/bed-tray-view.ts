@@ -6,6 +6,9 @@
 // - Lightweight static mesh (<= 400 triangles total).
 // - Single Three.js imports through @iwsdk/core.
 // - Zero allocations per frame.
+//
+// The tray (with its rims and legs) and the quilt are pieces of the room layout's `lap` section
+// (content/rooms/bedroom.json), in the tray's own space: the room editor moves them, and the candle stands on the tray.
 import {
   BoxGeometry,
   CanvasTexture,
@@ -15,7 +18,10 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
   SRGBColorSpace,
+  Vector3,
 } from '@iwsdk/core';
+import { placement, placementOr, type Placement, type RoomLayout } from '../../stage/room-layout';
+import { applyPlacement, type EditablePiece, type EditableSource } from '../../shadow/room-placement';
 import { paintQuilt } from '../../shadow/room-art';
 import type { CandleLight } from '../../shadow/candle-light';
 
@@ -42,8 +48,21 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   return texture;
 }
 
-export class BedTrayView {
+/** The lap pieces' ids in the layout file's `lap` section. */
+export const LAP_PIECE_IDS = ['tray', 'quilt'] as const;
+
+/** Where the code puts the quilt when the layout file says nothing: draped across the lap, just below the tray. */
+const QUILT_DEFAULT: Placement = placement([0, -0.07, 0.14], [-180 / 2.3, 0, 0]);
+
+export class BedTrayView implements EditableSource {
+  /** Placed in front of the player by `place`; the tray and the quilt are placed inside it by the layout. */
   readonly group = new Group();
+  /** The tray, its rims and its legs: one piece. The candle stands on it. */
+  private readonly tray = new Group();
+  private readonly pieces: EditablePiece[];
+  private readonly saucer = new Vector3();
+  /** Called after the room editor moves a piece (the candle is put back on the tray). */
+  onPieceMoved: (() => void) | null = null;
 
   private readonly traySurfaceGeo: BoxGeometry;
   private readonly rimFrontBackGeo: BoxGeometry;
@@ -57,7 +76,8 @@ export class BedTrayView {
 
   private _triangleCount = 0;
 
-  constructor() {
+  /** @param layout where the tray and the quilt sit (the room layout file's `lap` section); defaults where it says nothing */
+  constructor(layout: Readonly<RoomLayout> | null = null) {
     this.woodMat = new MeshBasicMaterial({
       color: 0x3d2c1e,
     });
@@ -108,11 +128,19 @@ export class BedTrayView {
     this.blanketGeo.computeVertexNormals();
 
     const blanketMesh = new Mesh(this.blanketGeo, this.blanketMat);
-    // Orient blanket to lay gently draped across the lap
-    blanketMesh.rotation.x = -Math.PI / 2.3;
-    blanketMesh.position.set(0, -0.07, 0.14);
+    blanketMesh.name = 'quilt';
 
-    this.group.add(trayMesh, rimFront, rimBack, rimLeft, rimRight, legLeft, legRight, blanketMesh);
+    this.tray.name = 'tray';
+    this.tray.add(trayMesh, rimFront, rimBack, rimLeft, rimRight, legLeft, legRight);
+    this.group.add(this.tray, blanketMesh);
+    const trayDefault = placement([0, 0, 0]);
+    applyPlacement(this.tray, placementOr(layout, 'lap', 'tray', trayDefault));
+    // Orient blanket to lay gently draped across the lap
+    applyPlacement(blanketMesh, placementOr(layout, 'lap', 'quilt', QUILT_DEFAULT));
+    this.pieces = [
+      { id: 'tray', section: 'lap', object: this.tray, fallback: trayDefault },
+      { id: 'quilt', section: 'lap', object: blanketMesh, fallback: QUILT_DEFAULT },
+    ];
 
     // Count triangles
     this._triangleCount =
@@ -126,6 +154,15 @@ export class BedTrayView {
     this.group.position.set(0, 0.65, -0.45);
   }
 
+  /** The tray and the quilt, for the room editor. */
+  editables(): readonly EditablePiece[] {
+    return this.pieces;
+  }
+
+  moved(): void {
+    this.onPieceMoved?.();
+  }
+
   get triangleCount(): number {
     return this._triangleCount;
   }
@@ -136,7 +173,9 @@ export class BedTrayView {
     this.woodMat.color.multiplyScalar(3.5);
     candle.light(this.woodMat);
     candle.light(this.blanketMat);
-    for (const child of this.group.children) if (child instanceof Mesh) candle.cast(child);
+    this.group.traverse((o) => {
+      if (o instanceof Mesh) candle.cast(o);
+    });
   }
 
   /** Positions and rotates the bed tray and blanket relative to the player. */
@@ -145,11 +184,13 @@ export class BedTrayView {
     this.group.rotation.y = yaw;
   }
 
-  /** Copies world position of the candle saucer resting spot on top of the tray. */
+  /** Copies world position of the candle saucer resting spot on top of the tray (wherever the layout puts the tray). */
   getCandleSaucerPosition(out: Float64Array | number[]): void {
-    out[0] = this.group.position.x;
-    out[1] = this.group.position.y + 0.01;
-    out[2] = this.group.position.z;
+    this.group.updateMatrixWorld(true);
+    this.tray.localToWorld(this.saucer.set(0, 0.01, 0));
+    out[0] = this.saucer.x;
+    out[1] = this.saucer.y;
+    out[2] = this.saucer.z;
   }
 
   dispose(): void {

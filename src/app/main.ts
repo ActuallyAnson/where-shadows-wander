@@ -262,7 +262,7 @@ async function start(): Promise<void> {
   // Where the room's static pieces stand (content/rooms/bedroom.json); the dev room editor edits this same object.
   const bedroomLayout = readBedroomLayout();
   for (const p of bedroomLayout.problems) console.warn(`room layout: ${p}`);
-  const bedTray = new BedTrayView();
+  const bedTray = new BedTrayView(bedroomLayout.layout);
   const bedroomView = new BedroomView();
   // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
   const roomDressing = new RoomDressingView();
@@ -1133,7 +1133,7 @@ async function start(): Promise<void> {
       canvas: world.renderer.domElement,
       scene: world.scene,
       room: bedroomView.group,
-      sources: [roomModels],
+      sources: [roomModels, bedTray],
       layout: bedroomLayout.layout,
       fileName: BEDROOM_LAYOUT_FILE,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
@@ -1142,6 +1142,10 @@ async function start(): Promise<void> {
         if (mock) mock.paused = on;
       },
     });
+    // The candle stands on the tray: when the tray moves, the rig is placed again so the candle (the light) follows it.
+    bedTray.onPieceMoved = () => {
+      if (rigPlaced) placeRig(lastHead, lastYaw);
+    };
     roomEditor.show();
   }
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
