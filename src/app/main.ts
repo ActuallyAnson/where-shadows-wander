@@ -95,6 +95,8 @@ import { lightArea } from '../engine/shadow/stage-edge-glsl';
 import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
+import { RoomModels } from '../engine/shadow/room-models';
+import assetManifest from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
 import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
@@ -268,6 +270,13 @@ async function start(): Promise<void> {
   roomDressing.useCandleLight(candleLight);
   bedroomView.useCandleLight(candleLight);
   bedTray.useCandleLight(candleLight);
+  // Real furniture (Kenney's Furniture Kit, CC0) wherever its .glb is in src/assets/models; the painted pieces stay where one is not.
+  const roomModels = new RoomModels(
+    (id) => id in assetManifest,
+    (part) => roomDressing.hideStandIn(part),
+  );
+  roomDressing.group.add(roomModels.group);
+  void roomModels.load(candleLight);
   const vrTitle = new VrTitleView();
   /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;

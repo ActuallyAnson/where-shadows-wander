@@ -10,9 +10,17 @@ The game's twenty-six sounds (the effects, the room tone, the clock, the wind, t
 
 When real sounds replace them, add a row for each file here: what it is, who made it, where it came from (a link), and its licence (CC0 or another that allows use in a game). Do not add a file whose licence is not recorded here.
 
+## 3D models
+
+The bedroom's furniture models in `src/assets/models/` (the bed, bookcase, bedside table, lamp and plant; loaded by `src/engine/shadow/room-models.ts`) come from Kenney's [Furniture Kit](https://kenney.nl/assets/furniture-kit) by Kenney (kenney.nl), under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required; it is given here anyway.
+
+| Model | Made by | Source | Licence |
+|---|---|---|---|
+| Furniture Kit `.glb` files in `src/assets/models/` | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
+
 ## Other assets
 
-None. All pictures (the room, the paper scenery, the cinematic scenes, the effects) are painted in code at start-up from `src/engine/shadow`, `src/engine/render` and `src/ui`; no image files are imported.
+None besides the models above. All pictures (the room, the paper scenery, the cinematic scenes, the effects) are painted in code at start-up from `src/engine/shadow`, `src/engine/render` and `src/ui`; no image files are imported.
 
 ## Fonts
 

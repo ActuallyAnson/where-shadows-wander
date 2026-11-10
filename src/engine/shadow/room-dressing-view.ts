@@ -170,6 +170,8 @@ export class RoomDressingView {
   /** The room art the candle lights (the walls, and everything on and by them), and the props that cast its shadows. */
   private readonly lit: Mesh[] = [];
   private readonly casters: Mesh[] = [];
+  /** The painted bed and bookcase, hidden when real models take their place (room-models.ts). */
+  private readonly standIns: Record<'bed' | 'bookcase', Mesh[]> = { bed: [], bookcase: [] };
 
   private flameOn = false;
   /** The candle as a light (candle-light.ts), once `useCandleLight` is called: it lights the art per pixel and casts the shadows. */
@@ -297,6 +299,7 @@ export class RoomDressingView {
     this.materials.push(caseBox.material as MeshBasicMaterial);
     caseBox.position.set(1.988 - CASE_DEPTH / 2, 0.83, -1.25);
     const bookcase = this.quad(1.0, 1.8, this.texture(paintedCanvas(400, 720, paintBookcase)), true);
+    this.standIns.bookcase = [caseBox, bookcase];
     bookcase.rotation.y = -Math.PI / 2;
     bookcase.position.set(1.988 - CASE_DEPTH - 0.002, 0.93, -1.25);
 
@@ -345,6 +348,7 @@ export class RoomDressingView {
       this.materials.push(m.material as MeshBasicMaterial);
     }
     const bed = [frame, mattress, quilt, pillow];
+    this.standIns.bed = bed;
 
     // The rug under the bed tray, a hair above the floor.
     const rug = this.quad(2.2, 1.55, this.texture(paintedCanvas(512, 360, paintRug)), true);
@@ -505,6 +509,12 @@ export class RoomDressingView {
       candle.light(material);
     }
     for (const m of this.casters) candle.cast(m);
+  }
+
+  /** Hides the painted bed or bookcase (a real model stands there now); hidden, it casts no shadow either. */
+  hideStandIn(part: 'bed' | 'bookcase'): void {
+    for (const m of this.standIns[part]) m.visible = false;
+    this.candle?.rebake();
   }
 
   /** How far the lighting of the candle has got (0..1, the title's hold on the wick): the room starts to glow before it catches. */
