@@ -209,7 +209,7 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('keeps the window one cool colour whatever the room does, and dims the moon patch under the candle', () => {
+  it('keeps the window and the moonlight on the floor as they are whatever the candle does', () => {
     const v = new RoomDressingView();
     const meshes = v.group.children as unknown as { material: { color: { r: number; g: number; b: number } } }[];
     const night = meshes[3].material.color;
@@ -219,7 +219,7 @@ describe('RoomDressingView', () => {
     const patchDark = { ...patch };
     v.update(light(true, 1), 1);
     expect({ ...night }).toEqual(nightDark);
-    expect(patch.b).toBeLessThan(patchDark.b);
+    expect({ ...patch }).toEqual(patchDark); // the candle adds light; it never takes the moon's away
     v.dispose();
   });
 

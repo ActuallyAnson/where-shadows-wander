@@ -276,6 +276,7 @@ async function start(): Promise<void> {
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
   let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
+  // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
   const ambientLight = new AmbientLight(0x101422, 0.05);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
@@ -1308,8 +1309,6 @@ async function start(): Promise<void> {
       stageRenderer.mesh.visible = false;
       kindredView.group.visible = false;
       ghostTarget.mesh.visible = false;
-      ambientLight.color.setHex(0x101422);
-      ambientLight.intensity = 0.05;
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -1563,23 +1562,12 @@ async function start(): Promise<void> {
           candleView.ignitionProgress = ignitionProgress;
           roomDressing.ignition = ignitionProgress; // the room starts to glow as the wick is held
 
-          // Warm ambient and bedroom light gradually as flame grows from small to big
-          if (ignitionProgress > 0) {
-            ambientLight.intensity = 0.05 + 0.11 * ignitionProgress;
-            bedroomView.update(lanternLight.light, cameraQuat, ignitionProgress);
-            roomDressing.update(lanternLight.light, ignitionProgress, candleView.flamePosition);
-          } else {
-            ambientLight.intensity = 0.05;
-          }
-
           if (ignitionHoldTimer >= 3.0) {
             sessionState = 'opening';
             candleView.ignitionProgress = 0;
             roomDressing.ignition = 0;
             candleView.lit = true;
             titleLighter.visible = false;
-            ambientLight.color.setHex(0x35281e);
-            ambientLight.intensity = 0.16;
             gameAudio.candleIgnited(candleView.flamePosition);
             vrTitle.ignite();
             playOpening();
@@ -1594,8 +1582,6 @@ async function start(): Promise<void> {
               simWasPaused = true;
               candleView.lit = false;
               candleView.resetCover();
-              ambientLight.color.setHex(0x101422);
-              ambientLight.intensity = 0.05;
               audio.mixer.setLift(Bus.Ambience, 0.15);
               audio.mixer.setLift(Bus.Music, 0.25);
               wallPauseView.show();
@@ -1609,8 +1595,6 @@ async function start(): Promise<void> {
               candleView.resetCover();
               candleView.lit = true;
               candleView.setLocked(true);
-              ambientLight.color.setHex(0x35281e);
-              ambientLight.intensity = 0.16;
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);
@@ -1621,8 +1605,6 @@ async function start(): Promise<void> {
               candleView.resetCover();
               candleView.lit = true;
               candleView.setLocked(true);
-              ambientLight.color.setHex(0x35281e);
-              ambientLight.intensity = 0.16;
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);
@@ -2134,8 +2116,6 @@ async function start(): Promise<void> {
           if (sessionState === 'title_vr') {
             sessionState = 'opening';
             candleView.lit = true;
-            ambientLight.color.setHex(0x2a1c12);
-            ambientLight.intensity = 0.04;
             gameAudio.candleIgnited(candleView.flamePosition);
             vrTitle.ignite();
             playOpening();

@@ -347,11 +347,9 @@ export class BedroomView {
    */
   update(light: Readonly<LanternLight>, _cameraQuaternion?: Readonly<Quaternion>, occlusion = 1.0): void {
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
-    // With the candle as a light (useCandleLight) the light does the colouring: the surfaces keep their own colours.
-    if (this.candleLit) {
-      this.moonlight.intensity = light.lit && brightness > 0.05 ? 0.2 : 0.05;
-      return;
-    }
+    // With the candle as a light (useCandleLight) the light does the colouring: the surfaces keep their own colours, and the
+    // moonlight stays as it is (the candle adds to it).
+    if (this.candleLit) return;
 
     if (light.lit && brightness > 0.05) {
       // Lit phase: Warm timber glow

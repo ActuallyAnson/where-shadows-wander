@@ -85,6 +85,8 @@ export const SPREAD_S = 8;
 export const DARKEN_S = 2;
 /** The room art's own colour, as a share of its painted colour (the light multiplies it). */
 const LIT_PEAK = 1.0;
+/** How bright the moonlight's patch on the floor is (it is added to the floor). */
+const MOON_PATCH = 0.3;
 /** How bright the candle's glow is at the end of the hold that lights it, before it catches (its full brightness is about 1). */
 const IGNITION_GLOW = 0.5;
 
@@ -513,9 +515,8 @@ export class RoomDressingView {
     this.flameOn = brightness > 0 && flame !== undefined;
     this.candle?.set(brightness, flame ?? null, this.reachNow);
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
-    // The moonlight on the floor shrinks into the room's light when the candle is bright.
-    const moonK = 0.3 - 0.2 * this.warmNow;
-    this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
+    // The moonlight on the floor stays as it is: the candle adds its light, it never takes the moon's away.
+    this.moonPatch.color.setRGB(0.5 * MOON_PATCH, 0.62 * MOON_PATCH, MOON_PATCH);
   }
   /**
    * The candle's light spreading through the room: while `lit` it grows out from the flame to the whole room over SPREAD_S, and
