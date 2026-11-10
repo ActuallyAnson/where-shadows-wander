@@ -47,8 +47,11 @@ import { CANDLE_REACH_M, type CandleLight } from './candle-light';
 /** Before everything else in the scene (Damon's plain front wall is -10). */
 const WALL_ORDER = -11;
 
-/** What the window shows is lit by the moon, not the candle, so it keeps one cool colour. */
-const OUTSIDE_TINT = new Color(0.95, 0.98, 1.0);
+/**
+ * What the window shows is lit by the moon, not the candle, so it keeps one cool colour: a deep, dim night blue, so the window
+ * is a faint shape in the dark room rather than its brightest thing.
+ */
+const OUTSIDE_TINT = new Color(0.22, 0.26, 0.38);
 /** Seconds a snowflake takes to fall the height of one tile of each layer, and how far each sways. */
 const SNOW_FALL = [0.075, 0.045] as const;
 const SNOW_SWAY = [0.03, 0.02] as const;

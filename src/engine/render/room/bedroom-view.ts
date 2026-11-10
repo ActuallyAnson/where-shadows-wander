@@ -217,7 +217,7 @@ export class BedroomView {
     const moonWashMat = new MeshBasicMaterial({
       color: MOONLIGHT_COLOR,
       transparent: true,
-      opacity: 0.14,
+      opacity: 0.04, // faint: the night outside is dark
       depthWrite: false,
       side: DoubleSide,
     });
