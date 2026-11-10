@@ -1,3 +1,4 @@
+import { Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
 import {
@@ -74,9 +75,9 @@ describe('room art painters', () => {
 });
 
 describe('RoomDressingView', () => {
-  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the pictures and shelves held off the wall', () => {
+  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(25);
+    expect(v.group.children).toHaveLength(24);
     v.dispose();
   });
 
@@ -90,14 +91,16 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('holds the pictures and then the shelves off the wall, further out each, and moves them with the wall', () => {
+  it('keeps the wall behind the stage clear: the pictures hang on the right wall and the shelf on the left, held off them, and their wonders wake there', () => {
     const v = new RoomDressingView();
-    const [pictures, shelves] = [v.group.children[14], v.group.children[16]];
-    v.place(2.0);
-    expect(pictures.position.z).toBeGreaterThan(v.wall.position.z + 0.02);
-    expect(shelves.position.z).toBeGreaterThan(pictures.position.z + 0.04);
-    v.place(0.75);
-    expect(shelves.position.z).toBeCloseTo(v.wall.position.z + 0.1, 3);
+    v.place(0.75); // the wall at its nearest
+    const at = (x: number) => v.group.children.filter((m) => Math.abs(m.position.x - x) < 1e-6);
+    expect(at(1.995 - 0.03)).toHaveLength(2); // the two pictures, 3 cm off the right wall
+    expect(at(-1.995 + 0.1)).toHaveLength(1); // the shelf and its keepsakes, 10 cm off the left wall
+    for (const m of [...at(1.965), ...at(-1.895)]) expect(Math.abs(m.rotation.y)).toBeCloseTo(Math.PI / 2, 6);
+    const p = new Vector3();
+    expect(v.wakePoint(0, p).x).toBeLessThan(-1.8); // the lamp on the shelf
+    expect(v.wakePoint(2, p).x).toBeGreaterThan(1.8); // the moon picture
     v.dispose();
   });
 

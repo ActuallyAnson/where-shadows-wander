@@ -60,6 +60,16 @@ const SNOW_SWAY = [0.03, 0.02] as const;
 /** How far the framed pictures and the shelves stand out from the wallpaper, in metres (the shelves' keepsakes stand further). */
 const PICTURES_OUT = 0.03;
 const SHELVES_OUT = 0.1;
+/**
+ * Where each cluster of WALL_THINGS hangs (by its index there): on the right wall (`-x`, facing into the room) or the left (`+x`),
+ * its middle at (z, y) metres, or `null` to leave it out. None hangs on the wall behind the stage, which is kept clear for play.
+ */
+const HUNG: readonly ({ readonly wall: '+x' | '-x'; readonly z: number; readonly y: number } | null)[] = [
+  { wall: '-x', z: -1.05, y: 1.45 }, // the bird and the moon, over the bed
+  { wall: '-x', z: -0.2, y: 1.6 }, // the hill, over the bed's foot
+  { wall: '+x', z: 0.8, y: 1.35 }, // the shelf of books, boat and lamp, on the left wall behind the window
+  null, // the jar and plant shelf
+];
 /** How deep the bookcase is, front to wall. */
 /** (Slim, so it stands clear of the bed, whose edge is 2 cm from it.) */
 const CASE_DEPTH = 0.14;
@@ -121,16 +131,18 @@ interface GlowSpec {
 
 /**
  * What lights up, in order: the lamp on the shelf, the bunting along the rail, the two pictures (the moon and the hill of stars),
- * the globe on the bookcase, then the window (the sill's candle, and the night outside brightening). `wall` is (x, y, lift in
- * metres off the paper).
+ * the globe on the bookcase, then the window (the sill's candle, and the night outside brightening). The shelf and the pictures
+ * hang on the side walls (HUNG); only the bunting is on the wall behind the stage. `wall` is (x, y, lift in metres off the paper).
  */
 const GLOWS: readonly GlowSpec[] = [
-  { wonder: 0, wall: [889, 292, 0.12], size: [0.5, 0.5], facing: 'z', colour: [1, 0.72, 0.36] },
+  // The lamp on the shelf (left wall, HUNG[2]), the moon and the hill (right wall, HUNG[0] and HUNG[1]).
+  { wonder: 0, at: [-1.875, 1.45, 0.55], size: [0.5, 0.5], facing: '+x', colour: [1, 0.72, 0.36] },
   { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
   { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
-  { wonder: 2, wall: [220, 391, 0.06], size: [0.55, 0.45], facing: 'z', colour: [0.7, 0.8, 1] },
-  { wonder: 2, wall: [875, 210, 0.06], size: [0.72, 0.58], facing: 'z', colour: [0.5, 0.65, 1] },
-  { wonder: 3, at: [1.8, 1.76, -1.25], size: [0.42, 0.42], facing: '-x', colour: [0.45, 0.95, 0.75] },
+  { wonder: 2, at: [1.935, 1.05, -1.05], size: [0.55, 0.45], facing: '-x', colour: [0.7, 0.8, 1] },
+  { wonder: 2, at: [1.935, 1.6, -0.2], size: [0.72, 0.58], facing: '-x', colour: [0.5, 0.65, 1] },
+  // The bookcase (room-models.ts: its open front at x 1.61, 1.32 m high).
+  { wonder: 3, at: [1.58, 1.0, 0.55], size: [0.42, 0.42], facing: '-x', colour: [0.45, 0.95, 0.75] },
   { wonder: 4, at: [-1.9, 0.99, -0.71], size: [0.3, 0.3], facing: '+x', colour: [1, 0.7, 0.35] },
   { wonder: 4, at: [-1.96, 1.45, -0.8], size: [1.1, 1.3], facing: '+x', colour: [0.3, 0.5, 0.6] },
 ];
@@ -196,12 +208,9 @@ export class RoomDressingView {
   constructor() {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
     // to draw; everything on a wall sits a hair in front of it.
-    // What hangs on the wall behind the stage stands out from it, in two layers (frames, then shelves with their keepsakes). The
-    // candle casts their shadows on the wall (candle-light.ts), so the gap between them shows when the head moves, and the shadows
-    // move with the flame.
-    const thingCanvases = WALL_THINGS.map((spec) =>
-      paintedCanvas(spec.area.w, spec.area.h, (g, w, h) => paintWallThings(g, w, h, spec.layer, spec.area)),
-    );
+    // The pictures and the shelf hang on the side walls (HUNG), standing out from them (frames, then the shelf with its
+    // keepsakes); the wall behind the stage is left clear for the shadows. The candle casts their shadows (candle-light.ts), so
+    // the gap between them and the wall shows when the head moves, and the shadows move with the flame.
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
       paintWall(g, w, h, false); // the bunting here is alive (bunting-view.ts)
@@ -210,7 +219,16 @@ export class RoomDressingView {
     this.wall.position.set(0, 1.25, -2.4);
     this.wall.renderOrder = WALL_ORDER;
     WALL_THINGS.forEach((spec, i) => {
-      this.things.push(this.quad(spec.area.w / 256, spec.area.h / 256, this.texture(thingCanvases[i]), true));
+      const hung = HUNG[i];
+      if (!hung) return;
+      const canvas = paintedCanvas(spec.area.w, spec.area.h, (g, w, h) =>
+        paintWallThings(g, w, h, spec.layer, spec.area),
+      );
+      const m = this.quad(spec.area.w / 256, spec.area.h / 256, this.texture(canvas), true);
+      const out = spec.layer === 'shelves' ? SHELVES_OUT : PICTURES_OUT;
+      m.rotation.y = hung.wall === '+x' ? Math.PI / 2 : -Math.PI / 2;
+      m.position.set(hung.wall === '+x' ? -1.995 + out : 1.995 - out, hung.y, hung.z);
+      this.things.push(m);
     });
 
     // The same paper and panelling on the two side walls (one material for both).
@@ -484,15 +502,6 @@ export class RoomDressingView {
     this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
-    WALL_THINGS.forEach((spec, i) => {
-      const m = this.things[i];
-      m.position.set(
-        ((spec.area.x + spec.area.w / 2) / 1024) * 4 - 2,
-        2.5 - ((spec.area.y + spec.area.h / 2) / 640) * 2.5,
-        z + (spec.layer === 'shelves' ? SHELVES_OUT : PICTURES_OUT),
-      );
-      m.updateMatrix();
-    });
     this.bunting.place(z + 0.05);
     this.buildWonders(z);
     this.candle?.rebake(); // the props moved with the wall

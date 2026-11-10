@@ -50,14 +50,9 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     yaw: -Math.PI / 2,
     replaces: 'bookcase',
   },
-  // A small table by the bed's head (its top at 0.36 m), with a lamp and a stack of books on it.
-  { ids: ['sidetable', 'side-table', 'sidetabledrawers'], at: [0.66, 0, -1.4], size: [0.5, 0.21] },
-  { ids: ['lamproundtable', 'lamp-round-table', 'lampsquaretable'], at: [0.55, 0.36, -1.4], size: [0.15, 0.174] },
-  { ids: ['books'], at: [0.8, 0.36, -1.4], size: [0.15, 0.095], yaw: -0.3 },
+  // (Nothing stands along the wall ahead: the whole of it is kept clear for the shadows.)
   // A round rug under the player and the tray, in place of the painted one (its top 4 mm above the floor, under the moonlight on it).
   { ids: ['ruground', 'rug-round', 'rugrounded'], at: [0.1, -0.012, -0.4], size: [1.5, 1.5], replaces: 'rug' },
-  // A teddy bear on the floor by the bed, between the lap blanket and the side table, turned to the player: 0.29 m high.
-  { ids: ['bear'], at: [0.72, 0, -1.05], size: [0.25, 0.16], yaw: -0.6 },
   // A chair in front of the window, facing into the room, and a plant just this side of the window.
   { ids: ['chair', 'chaircushion'], at: [-1.45, 0, -0.8], size: [0.4, 0.4], yaw: Math.PI / 2 },
   { ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [-1.75, 0, 0.05], size: [0.35, 0.4] },
