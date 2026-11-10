@@ -41,6 +41,7 @@ import {
   WALL_THINGS,
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
+import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -78,6 +79,15 @@ const SLIDE_LIMIT = 0.9;
 /** Candlelight on the room: what is left of the colour far from the flame, and the distance (m) at which the light is half gone. */
 const FLAME_AMBIENT = 0.08;
 const FLAME_REACH = 0.85;
+/**
+ * The light spreading out from a newly lit candle: its reach (m) the moment it catches, and the seconds it takes to grow from that
+ * to FLAME_REACH. When the candle goes out (covered, paused) the light draws back to the flame in DARKEN_S.
+ */
+const SPREAD_FROM_M = 0.12;
+export const SPREAD_S = 8;
+export const DARKEN_S = 2;
+/** The reach has to change this much (m) before the walls' light is worked out again. */
+const REACH_STEP = 0.015;
 /** The most of its brightness the room art has at full candlelight (the paper stage is the brightest thing), and how far the flame's flicker moves it. */
 const LIT_PEAK = 0.8;
 const FLICKER = 0.1;
@@ -167,6 +177,9 @@ export class RoomDressingView {
   private readonly flame = new Vector3();
   private readonly spot = new Vector3();
   private flameOn = false;
+  /** How far the candle's light has spread into the room, 0 (only by the flame) .. 1 (the whole room), and the reach last lit with. */
+  private spreadLevel = 0;
+  private reachNow = SPREAD_FROM_M;
   /** The wonders' glow: how lit each is (0..1), how many should be lit, and the one mesh that draws them all. */
   private readonly levels = new Float32Array(WONDERS);
   private awakeCount = 0;
@@ -477,7 +490,7 @@ export class RoomDressingView {
 
   /** Puts the wallpaper wall just in front of Damon's front wall, and the pictures and shelves in front of that (`stageDist` is how far the stage is from the player). */
   place(stageDist = 2.0): void {
-    const z = -(Math.max(stageDist, 1.5) + 0.35) + 0.012;
+    const z = -(Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M) + 0.012;
     this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
@@ -537,9 +550,32 @@ export class RoomDressingView {
     this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
   }
 
+  /**
+   * The candle's light spreading through the room: while `lit` it grows out from the flame to the whole room over SPREAD_S, and
+   * when the candle goes out it draws back in DARKEN_S. Call once a frame. Allocates nothing.
+   */
+  spread(lit: boolean, dt: number): void {
+    const step = dt > 0 ? Math.min(dt, 0.1) : 0;
+    this.spreadLevel = lit
+      ? Math.min(1, this.spreadLevel + step / SPREAD_S)
+      : Math.max(0, this.spreadLevel - step / DARKEN_S);
+    const s = this.spreadLevel;
+    const eased = s * s * (3 - 2 * s);
+    const want = SPREAD_FROM_M + (FLAME_REACH - SPREAD_FROM_M) * eased;
+    if (Math.abs(want - this.reachNow) >= REACH_STEP || (s >= 1 && want !== this.reachNow)) {
+      this.reachNow = want;
+      if (this.flameOn) this.relight();
+    }
+  }
+
+  /** How far the candle's light has spread into the room, 0 .. 1. */
+  get spreadAmount(): number {
+    return this.spreadLevel;
+  }
+
   /** How much of the candle's light reaches a point `d2` (squared metres) from the flame: all of it close by, little far away. */
-  private static reach(d2: number): number {
-    return FLAME_AMBIENT + (1 - FLAME_AMBIENT) / (1 + d2 / (FLAME_REACH * FLAME_REACH));
+  private reach(d2: number): number {
+    return FLAME_AMBIENT + (1 - FLAME_AMBIENT) / (1 + d2 / (this.reachNow * this.reachNow));
   }
 
   /** Works out the candle's light on every wall vertex and on the middle of each other piece (when the flame moves or goes out). */
@@ -551,7 +587,7 @@ export class RoomDressingView {
         let f = 1;
         if (this.flameOn) {
           this.spot.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
-          f = RoomDressingView.reach(this.spot.distanceToSquared(this.flame));
+          f = this.reach(this.spot.distanceToSquared(this.flame));
         }
         color.setXYZ(i, f, f, f);
       }
@@ -560,7 +596,7 @@ export class RoomDressingView {
     for (const mesh of this.centreLit) {
       this.falloff.set(
         mesh.material as MeshBasicMaterial,
-        this.flameOn ? RoomDressingView.reach(mesh.position.distanceToSquared(this.flame)) : 1,
+        this.flameOn ? this.reach(mesh.position.distanceToSquared(this.flame)) : 1,
       );
     }
   }

@@ -1,6 +1,7 @@
 // Draws both hands' shadows on the stage from their capsules (HandShadow), in
 // one draw call: a quad over the stage rectangle, so shadows are clipped to the
 // stage for free, with soft edges that widen as the hand moves away from it.
+// Toward the stage's own rounded edge they fade out with the paper (stage-edge-glsl.ts).
 // No allocation per frame.
 import { Color, DoubleSide, Matrix4, Mesh, PlaneGeometry, ShaderMaterial, Vector2 } from '@iwsdk/core';
 import type { Handedness } from '../hands/hand';
@@ -10,6 +11,7 @@ import type { StagePlane } from './pure/stage-plane';
 import { MAX_CAPSULES, packShadowUniforms, type ShadowUniformArrays } from './pure/shadow-uniforms';
 import { shadowFragment, shadowVertex } from './shadow-shader';
 import { RenderOrder } from './pure/render-order';
+import { STAGE_EDGE_FADE_M } from './stage-edge-glsl';
 
 /** Shadows draw after the stage paper (1) and before sprites drawn on top. */
 export const SHADOW_RENDER_ORDER = RenderOrder.shadow;
@@ -43,6 +45,7 @@ export class ShadowRenderer {
         uSize: { value: new Vector2(1, 1) },
         uColor: { value: new Color(0x000000) },
         uOpacity: { value: this.uniforms.opacity },
+        uEdgeFade: { value: STAGE_EDGE_FADE_M },
       },
       vertexShader: shadowVertex,
       fragmentShader: shadowFragment,

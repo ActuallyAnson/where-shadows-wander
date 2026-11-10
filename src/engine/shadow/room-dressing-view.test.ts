@@ -79,12 +79,13 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('puts the wallpaper wall just in front of the stage-side wall, never nearer than 1.5 m plus its margin', () => {
+  it('puts the wallpaper wall just behind the stage (the stage is on it), never nearer than 1.5 m', () => {
     const v = new RoomDressingView();
     v.place(2.0);
-    expect(v.wall.position.z).toBeCloseTo(-2.35 + 0.012, 3);
+    expect(v.wall.position.z).toBeCloseTo(-2.02 + 0.012, 3);
+    expect(v.wall.position.z).toBeLessThan(-2.0); // behind the stage, not through it
     v.place(0.75); // the tabletop stage: the wall stays behind it
-    expect(v.wall.position.z).toBeCloseTo(-1.85 + 0.012, 3);
+    expect(v.wall.position.z).toBeCloseTo(-1.52 + 0.012, 3);
     v.dispose();
   });
 
@@ -118,6 +119,7 @@ describe('RoomDressingView', () => {
     const v = new RoomDressingView();
     const vertexColour = (i: number) =>
       (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
+    for (let i = 0; i < 200; i++) v.spread(true, 0.1); // the light has spread all the way
     v.update(light(true, 1), 1, [0, 1.2, -1.9]); // the flame just in front of the wall
     const near = vertexColour(0);
     v.update(light(true, 1), 1, [0, 1.2, 3]); // the flame far behind the player
@@ -126,6 +128,26 @@ describe('RoomDressingView', () => {
     expect(far).toBeGreaterThan(0.05); // never pitch black
     v.update(light(false), 0);
     expect(vertexColour(0)).toBe(1);
+    v.dispose();
+  });
+
+  it('spreads the candlelight out from the flame once lit, and draws it back when the flame goes out', () => {
+    const v = new RoomDressingView();
+    const vertexColour = (i: number) =>
+      (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
+    v.update(light(true, 1), 1, [0, 1.2, -1.2]); // the flame a metre from the wall
+    const first = vertexColour(0);
+    expect(v.spreadAmount).toBe(0);
+    for (let i = 0; i < 40; i++) v.spread(true, 0.1); // half way
+    const half = vertexColour(0);
+    expect(half).toBeGreaterThan(first);
+    for (let i = 0; i < 60; i++) v.spread(true, 0.1); // all the way (SPREAD_S)
+    const full = vertexColour(0);
+    expect(v.spreadAmount).toBe(1);
+    expect(full).toBeGreaterThan(half);
+    for (let i = 0; i < 20; i++) v.spread(false, 0.1); // covered: dark again in DARKEN_S
+    expect(v.spreadAmount).toBe(0);
+    expect(vertexColour(0)).toBeCloseTo(first, 3);
     v.dispose();
   });
 

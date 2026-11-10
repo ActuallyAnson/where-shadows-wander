@@ -29,8 +29,8 @@ describe('BedroomView', () => {
     expect(room.group.position.y).toBeCloseTo(0, 3);
     expect(room.group.position.z).toBeCloseTo(-0.2, 3);
     expect(room.group.rotation.y).toBeCloseTo(Math.PI / 4, 3);
-    // 2.0m stage distance -> front wall at -(2.0 + 0.35) = -2.35m
-    expect(room.frontWallMesh.position.z).toBeCloseTo(-2.35, 3);
+    // 2.0m stage distance -> the front wall just behind the stage, which is on it: -(2.0 + 0.02) = -2.02m
+    expect(room.frontWallMesh.position.z).toBeCloseTo(-2.02, 3);
   });
 
   it('transitions between lit warm candlelight and unlit blue moonlight', () => {

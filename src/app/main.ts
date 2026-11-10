@@ -1973,6 +1973,9 @@ async function start(): Promise<void> {
         stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
+        // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
+        // back when the flame is covered (the pause).
+        roomDressing.spread(candleView.lit, step);
         world.camera.getWorldPosition(settingsHead);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);

@@ -22,6 +22,11 @@ export const WALL_WIDTH_M = 1.6;
 export const WALL_HEIGHT_M = 1.0;
 /** How far the wall's centre sits below the player's eyes, metres, so the stage is in a relaxed gaze. */
 export const WALL_CENTRE_BELOW_EYES_M = 0.2;
+/**
+ * How far the room's wall is behind the stage, metres. The stage is a patch of the bedroom's own wall (the shadows
+ * fall on the wallpaper), so the wall sits just behind it: far enough not to fight it in depth, too near to see a gap.
+ */
+export const ROOM_WALL_BEHIND_STAGE_M = 0.02;
 
 export class StageFrame {
   /** The wall's centre, scene space, metres. */

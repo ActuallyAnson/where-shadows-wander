@@ -6,6 +6,7 @@
 // hands; overlaps never darken twice, which matters over passthrough.
 
 import { CAPSULES_PER_SLOT, MAX_CAPSULES } from './pure/shadow-uniforms';
+import { stageEdgeGlsl } from './stage-edge-glsl';
 
 export { CAPSULES_PER_SLOT, MAX_CAPSULES };
 
@@ -25,7 +26,9 @@ export const shadowFragment = /* glsl */ `
   uniform vec2 uSize;  // stage width, height
   uniform vec3 uColor;
   uniform float uOpacity[2];  // per hand: the base opacity plus its sharpen boost
+  uniform float uEdgeFade;  // metres the shadows fade over at the stage's soft edge (0: a hard edge)
   varying vec2 vUv;
+${stageEdgeGlsl}
 
   float segmentDistance(vec2 p, vec2 a, vec2 b) {
     vec2 ab = b - a;
@@ -55,6 +58,7 @@ export const shadowFragment = /* glsl */ `
         alpha = max(alpha, a);
       }
     }
+    alpha *= stageEdge(p, uSize, uEdgeFade);
     if (alpha < 0.003) discard;
     gl_FragColor = vec4(uColor, alpha);
   }

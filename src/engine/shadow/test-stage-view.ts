@@ -31,6 +31,7 @@ import {
 import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 import { RenderOrder } from './pure/render-order';
+import { STAGE_EDGE_FADE_M, stageEdgeGlsl } from './stage-edge-glsl';
 
 const PAPER = new Color(0xf2e6c9);
 
@@ -62,7 +63,9 @@ const fragment = /* glsl */ `
   uniform vec2 uHead;      // the head's place across and up from the stage's centre, metres (the scenery's layers shift with it)
   uniform float uBackdrop; // how much of the paper the painted scenery replaces, 0..1
   uniform float uMidShift; // how far the near scenery has slid sideways (a set change), in widths of the paper
+  uniform float uEdgeFade; // metres the paper fades over at its soft edge (0: a hard sheet with a darkened rim)
   varying vec2 vUv;
+${stageEdgeGlsl}
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -133,12 +136,17 @@ const fragment = /* glsl */ `
       col = mix(col, scene, uBackdrop);
     }
 
-    // The rim of the sheet darkens a little, unevenly.
-    float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
-    float rim = smoothstep(0.0, 0.035 + 0.01 * blot, edge);
-    col *= mix(0.7, 1.0, rim);
+    // The stage is the candle's light on the room's wall, not a sheet pinned to it: it fades into the wallpaper at a soft,
+    // rounded edge (a little uneven, like light through a worn shade). With no fade, the rim of a sheet darkens instead.
+    float alpha = uOpacity;
+    if (uEdgeFade > 0.0) {
+      alpha *= stageEdge(p, uSize, uEdgeFade * (0.9 + 0.2 * blot));
+    } else {
+      float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
+      col *= mix(0.7, 1.0, smoothstep(0.0, 0.035 + 0.01 * blot, edge));
+    }
 
-    gl_FragColor = vec4(col, uOpacity);
+    gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
 `;
@@ -190,6 +198,7 @@ export class TestStageView {
         uHead: { value: new Vector2(0, 0) },
         uBackdrop: { value: BACKDROP },
         uMidShift: { value: 0 },
+        uEdgeFade: { value: STAGE_EDGE_FADE_M },
       },
       vertexShader: vertex,
       fragmentShader: fragment,
@@ -209,6 +218,7 @@ export class TestStageView {
       o.matrixAutoUpdate = false;
       o.frustumCulled = false;
     }
+    this.border.visible = false; // the soft edge needs no line round it; high contrast brings it back
     this.group.add(this.paper, this.border, this.flame.mesh);
     this.group.visible = false;
   }
@@ -345,6 +355,9 @@ export class TestStageView {
     this.paperMaterial.uniforms.uOpacity.value = on ? 1 : PAPER_OPACITY;
     this.paperMaterial.uniforms.uHigh.value = on ? 1 : 0;
     (this.border.material as LineBasicMaterial).color.setHex(on ? 0x000000 : BORDER);
+    // High contrast keeps a hard, outlined sheet: the clearest edge there is.
+    this.border.visible = on;
+    this.paperMaterial.uniforms.uEdgeFade.value = on ? 0 : STAGE_EDGE_FADE_M;
   }
 
   get highContrast(): boolean {

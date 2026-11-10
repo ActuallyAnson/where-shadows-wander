@@ -22,6 +22,7 @@ import {
 import type { BufferGeometry, Material, Quaternion } from '@iwsdk/core';
 import { mergeBoxes } from '../../shadow/merge-boxes';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
+import { ROOM_WALL_BEHIND_STAGE_M } from '../../stage/stage-frame';
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
 export const NIGHT_AMBIENT = 0x141d2e;
@@ -312,8 +313,8 @@ export class BedroomView {
   place(head: ArrayLike<number>, yaw: number, stageDist = 2.0): void {
     this.group.position.set(head[0], 0, head[2]);
     this.group.rotation.y = yaw;
-    // Always place front wall backdrop 35 cm behind the stage plane
-    const wallZ = -(Math.max(stageDist, 1.5) + 0.35);
+    // The front wall is the wall the stage is on: just behind the stage plane.
+    const wallZ = -(Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M);
     this.frontWallMesh.position.set(0, 1.25, wallZ);
   }
 
