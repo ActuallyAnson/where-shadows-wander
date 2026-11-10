@@ -39,9 +39,9 @@ export interface RoomPiece {
  * Heights noted below follow from each Kenney model's proportions at its size, so a piece standing on another uses that height.
  */
 export const ROOM_PIECES: readonly RoomPiece[] = [
-  // The bed along the right wall, its headboard toward the wall ahead: 0.86 x 1.7 m, 0.57 m high. (15 cm nearer than the painted
-  // one, whose head went through the wall when the wall is at its nearest.)
-  { ids: ['bedsingle', 'bed-single', 'beddouble'], at: [1.4, 0, -0.65], size: [0.9, 1.7], replaces: 'bed' },
+  // The bed the player sits up in: under them, its headboard just behind their back, its foot toward the wall ahead (ending at
+  // z -1.2, short of the wall at its nearest): 0.86 x 1.7 m, 0.57 m high.
+  { ids: ['bedsingle', 'bed-single', 'beddouble'], at: [0, 0, -0.35], size: [0.9, 1.7], yaw: Math.PI, replaces: 'bed' },
   // The bookcase on the right wall past the bed's foot, its open side to the room: 0.6 m wide, 1.32 m high.
   {
     ids: ['bookcaseopen', 'bookcase-open', 'bookcaseclosedwide', 'bookcaseclosed'],
@@ -51,8 +51,8 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     replaces: 'bookcase',
   },
   // (Nothing stands along the wall ahead: the whole of it is kept clear for the shadows.)
-  // A round rug under the player and the tray, in place of the painted one (its top 4 mm above the floor, under the moonlight on it).
-  { ids: ['ruground', 'rug-round', 'rugrounded'], at: [0.1, -0.012, -0.4], size: [1.5, 1.5], replaces: 'rug' },
+  // A round rug beside the bed, between it and the right wall, in place of the painted one (its top 4 mm above the floor).
+  { ids: ['ruground', 'rug-round', 'rugrounded'], at: [1.2, -0.012, -0.35], size: [1.2, 1.2], replaces: 'rug' },
   // A chair in front of the window, facing into the room, and a plant just this side of the window.
   { ids: ['chair', 'chaircushion'], at: [-1.45, 0, -0.8], size: [0.4, 0.4], yaw: Math.PI / 2 },
   { ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [-1.75, 0, 0.05], size: [0.35, 0.4] },
