@@ -163,7 +163,34 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 
 ## 12. Edit the room and puzzle layouts
 
-The room (`public/scenes/main.iwsdk.scene.json`) and the puzzle layouts (`public/scenes/chapter-1.iwsdk.scene.json`) are IWSDK scene files, edited in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). With `npm run dev` running, the editor is in the browser window IWSDK manages (it opens the scene from the editor's own file list). From a terminal: `npx iwsdk scene open --input-json '{"path":"public/scenes/chapter-1.iwsdk.scene.json"}'`, and `npx iwsdk scene state` shows the open file and any problems.
+### The bedroom: the room editor
+
+Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). Arrange them in the running game:
+
+1. `npm run dev`, then open the Hand Lab with the editor: `https://localhost:8081/?mock=1&edit=room`.
+2. Click a piece, or pick it from the **Pieces** list. Drag the gizmo, or type exact numbers into Position (metres), Rotation (degrees) and Scale.
+3. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change. Saving doesn't reload the page; the next reload reads the saved file.
+
+| Key or button | Does |
+|---|---|
+| W / E / R | Move, rotate, scale |
+| Q | The gizmo's axes: the piece's own (Local) or the room's (World) |
+| Hold Shift while dragging | Snap: 1 cm, 5°, 0.05 of scale |
+| Esc | Deselect |
+| Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
+| Revert / Reset | Back to where the file has it / to the code's default |
+| Eye, Overview, Left, Right | View presets (drag empty space to orbit, scroll to zoom) |
+| Room only | Hides the stage, the reading page and the story's views (on when the editor opens) |
+| Close editor | Hands the view back to the Hand Lab |
+
+- **Spaces.** Pieces in the room are in room space: x right, y up from the floor, -z toward the wall the shadows play on, with the player at the origin. Keep everything short of z -1.5, the nearest the wall ahead comes. The lap pieces (`tray`, `quilt`) are in the tray's own space.
+- **Things that follow.** Moving the tray moves the candle, which is the light the gameplay shadows are cast from. A wonder's glow moves with the piece it is on.
+- **Not in the editor:** the window, the walls and the wall ahead (which follows the stage distance). To make another piece editable, give it an id in its view and list it in `BEDROOM_PIECE_IDS` (`src/engine/shadow/bedroom-layout.ts`).
+- A file the game can't read is reported in the console (`room layout: ...`), and the affected pieces stand at their defaults. The dev server refuses to save one.
+
+### Puzzle layouts: IWSDK's scene editor
+
+The puzzle layouts (`public/scenes/chapter-1.iwsdk.scene.json`) are IWSDK scene files, edited in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). `public/scenes/main.iwsdk.scene.json` is IWSDK's start scene and stays empty. With `npm run dev` running, the editor is in the browser window IWSDK manages (it opens the scene from the editor's own file list). From a terminal: `npx iwsdk scene open --input-json '{"path":"public/scenes/chapter-1.iwsdk.scene.json"}'`, and `npx iwsdk scene state` shows the open file and any problems.
 
 Everything the game needs is set with the inspector's own fields, so you never edit the file by hand:
 
@@ -176,7 +203,7 @@ Everything the game needs is set with the inspector's own fields, so you never e
 | **Add Component, `Piece`** (optional) | Starting speed `vx`, `vy` and the flags `isStatic`, `isSensor`, `hidden` |
 | **Visible** off | The node, and everything under it, is left out |
 
-### What the editor offers, and what it does not
+#### What IWSDK's editor offers, and what it does not
 
 Checked on 11 Oct 2026 by driving a running editor (reading its panels, opening files, selecting nodes, `scene render-stats` and a screenshot), not from memory. The editor is IWSDK 1.0.0's.
 
