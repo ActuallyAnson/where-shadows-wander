@@ -91,6 +91,7 @@ import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { StageFrame } from '../engine/stage/stage-frame';
+import { lightArea } from '../engine/shadow/stage-edge-glsl';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
@@ -228,6 +229,8 @@ async function start(): Promise<void> {
   // tabletop theatre was tuned with full perspective (blend 0).
   const projector = new ShadowProjector(stageChoice === 'real' ? REAL_WALL_SHADOW_SETTINGS : { blend: 0.0 });
   const shadowRenderer = new ShadowRenderer();
+  // On the room's wall the stage is the middle of the candle's round pool of light, drawn over most of the wall (stage-edge-glsl.ts).
+  const lightPoolArea = new Float64Array(4);
   // The shadows of the invisible props (the game's level calls propShadows.setProps when a puzzle loads).
   const propShadows = new PropShadowView();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
@@ -945,6 +948,9 @@ async function start(): Promise<void> {
     lantern[1] = saucerPos[1];
     lantern[2] = saucerPos[2];
 
+    stageView.setPool(
+      stageChoice === 'real' ? lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea) : null,
+    );
     stageView.place(stage, lantern);
     candleView.place(lantern);
 
@@ -1632,6 +1638,11 @@ async function start(): Promise<void> {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
             handTrail.onShapeEvents(shapes.events, projector.shadows);
           }
+          shadowRenderer.setPool(
+            stageChoice === 'real' ? lightPoolArea : null,
+            stageView.flameOnWall.x,
+            stageView.flameOnWall.y,
+          );
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.

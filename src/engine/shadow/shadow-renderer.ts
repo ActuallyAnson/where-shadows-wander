@@ -1,9 +1,9 @@
 // Draws both hands' shadows on the stage from their capsules (HandShadow), in
 // one draw call: a quad over the stage rectangle, so shadows are clipped to the
 // stage for free, with soft edges that widen as the hand moves away from it.
-// Toward the stage's own rounded edge they fade out with the paper (stage-edge-glsl.ts).
+// On the room's wall the quad covers the candle's whole pool of light instead, and the shadows fade with it (stage-edge-glsl.ts).
 // No allocation per frame.
-import { Color, DoubleSide, Matrix4, Mesh, PlaneGeometry, ShaderMaterial, Vector2 } from '@iwsdk/core';
+import { Color, DoubleSide, Matrix4, Mesh, PlaneGeometry, ShaderMaterial, Vector2, Vector3 } from '@iwsdk/core';
 import type { Handedness } from '../hands/hand';
 import type { HandShadow } from '../hands/hand-shadow';
 import type { ShadowLook } from './pure/shadow-sharpen';
@@ -11,7 +11,7 @@ import type { StagePlane } from './pure/stage-plane';
 import { MAX_CAPSULES, packShadowUniforms, type ShadowUniformArrays } from './pure/shadow-uniforms';
 import { shadowFragment, shadowVertex } from './shadow-shader';
 import { RenderOrder } from './pure/render-order';
-import { STAGE_EDGE_FADE_M } from './stage-edge-glsl';
+import { LIGHT_POOL_RX_M, LIGHT_POOL_RY_M } from './stage-edge-glsl';
 
 /** Shadows draw after the stage paper (1) and before sprites drawn on top. */
 export const SHADOW_RENDER_ORDER = RenderOrder.shadow;
@@ -32,6 +32,8 @@ export class ShadowRenderer {
     opacity: new Float32Array(2),
   };
   private readonly m = new Matrix4();
+  /** Where the candle's pool of light is drawn ([width, height, centre x, centre y], stage metres), or null: just the stage. */
+  private pool: Float64Array | null = null;
 
   /** `baseOpacity` can change while running: high contrast makes the shadows fully solid. */
   constructor(public baseOpacity = DEFAULT_SHADOW_OPACITY) {
@@ -45,7 +47,9 @@ export class ShadowRenderer {
         uSize: { value: new Vector2(1, 1) },
         uColor: { value: new Color(0x000000) },
         uOpacity: { value: this.uniforms.opacity },
-        uEdgeFade: { value: STAGE_EDGE_FADE_M },
+        uAreaC: { value: new Vector2(0, 0) },
+        uPool: { value: new Vector3(0, 0, 0) },
+        uPoolR: { value: new Vector2(LIGHT_POOL_RX_M, LIGHT_POOL_RY_M) },
       },
       vertexShader: shadowVertex,
       fragmentShader: shadowFragment,
@@ -82,17 +86,38 @@ export class ShadowRenderer {
       u = stage.up,
       n = stage.normal,
       o = stage.origin;
-    const w = stage.width,
-      ht = stage.height;
+    const a = this.pool;
+    const w = a ? a[0] : stage.width,
+      ht = a ? a[1] : stage.height,
+      cx = a ? a[2] : 0,
+      cy = a ? a[3] : 0;
     // prettier-ignore
     this.m.set(
-      r[0] * w, u[0] * ht, n[0], o[0] + n[0] * LIFT_M,
-      r[1] * w, u[1] * ht, n[1], o[1] + n[1] * LIFT_M,
-      r[2] * w, u[2] * ht, n[2], o[2] + n[2] * LIFT_M,
+      r[0] * w, u[0] * ht, n[0], o[0] + r[0] * cx + u[0] * cy + n[0] * LIFT_M,
+      r[1] * w, u[1] * ht, n[1], o[1] + r[1] * cx + u[1] * cy + n[1] * LIFT_M,
+      r[2] * w, u[2] * ht, n[2], o[2] + r[2] * cx + u[2] * cy + n[2] * LIFT_M,
       0, 0, 0, 1,
     );
     this.mesh.matrix.copy(this.m);
     this.mesh.matrixWorldNeedsUpdate = true;
     (this.material.uniforms.uSize.value as Vector2).set(w, ht);
+    (this.material.uniforms.uAreaC.value as Vector2).set(cx, cy);
+  }
+
+  /**
+   * Draws the shadows over the candle's pool of light (`area`: [width, height, centre x, centre y], metres from the stage's
+   * centre; lightArea in stage-edge-glsl.ts), fading with it; `flameX`, `flameY` are the flame's place across and up the wall
+   * from the stage's centre. `null` draws them on the stage only, with a hard edge. Allocates nothing.
+   */
+  setPool(area: Readonly<ArrayLike<number>> | null, flameX = 0, flameY = 0): void {
+    const pool = this.material.uniforms.uPool.value as Vector3;
+    if (!area) {
+      this.pool = null;
+      pool.set(0, 0, 0);
+      return;
+    }
+    this.pool ??= new Float64Array(4);
+    for (let i = 0; i < 4; i++) this.pool[i] = area[i];
+    pool.set(flameX, flameY, 1);
   }
 }
