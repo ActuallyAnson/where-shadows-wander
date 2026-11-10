@@ -101,21 +101,31 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('is dark and blue unlit, and warmer and brighter with the candle', () => {
+  it('has one lighting model: the art keeps its own colour, and the candle light glows as it is lit, then burns', () => {
     const v = new RoomDressingView();
-    const colour = () => (v.wall.material as unknown as { color: { r: number; g: number; b: number } }).color;
-    v.update(light(false), 1);
-    const dark = { ...colour() };
-    expect(dark.b).toBeGreaterThan(dark.r); // blue by moonlight
-    v.update(light(true, 1), 1);
-    const warm = { ...colour() };
-    expect(warm.r).toBeGreaterThan(dark.r * 2);
-    expect(warm.r).toBeGreaterThan(warm.b); // warm by candlelight
-    v.update(light(true, 1), 0); // the flame covered: back to the dark
-    expect(colour().r).toBeLessThan(warm.r);
+    const candle = new CandleLight();
+    v.useCandleLight(candle);
+    const intensity = () => candle.uniforms.uCandleIntensity.value;
+    const wallColour = () => (v.wall.material as unknown as { color: { r: number; b: number } }).color;
+    const flame = [0, 1.2, -1.9];
+    v.update(light(false), 0, flame);
+    expect(intensity()).toBe(0); // only the moon
+    const own = { ...wallColour() };
+    v.ignition = 0.5;
+    v.update(light(false), 0, flame);
+    const holding = intensity();
+    expect(holding).toBeGreaterThan(0); // it glows as the wick is held
+    v.ignition = 1;
+    v.update(light(false), 0, flame);
+    expect(intensity()).toBeGreaterThan(holding);
+    v.update(light(true, 1), 1, flame);
+    expect(intensity()).toBeGreaterThan(0.9); // it burns
+    expect(wallColour()).toEqual(own); // the light changes, never the art's colour
+    v.update(light(true, 1), 0, flame); // covered
+    expect(intensity()).toBe(0);
+    candle.dispose();
     v.dispose();
   });
-
   it('lights the room with the candle as a light: on where the flame is, off with it out, and its art and props registered', () => {
     const v = new RoomDressingView();
     const candle = new CandleLight();
@@ -127,10 +137,10 @@ describe('RoomDressingView', () => {
     expect(lit).toContain(v.wall.material);
     expect(cast.length).toBeGreaterThanOrEqual(8); // the pictures and shelves, the bookcase and the bed's four parts
     v.update(light(true, 1), 1, [0, 1.2, -1.9]);
-    expect(candle.uniforms.uCandleOn.value).toBe(1);
+    expect(candle.uniforms.uCandleIntensity.value).toBeGreaterThan(0.5);
     expect(candle.uniforms.uCandlePos.value.z).toBeCloseTo(-1.9, 5);
     v.update(light(false), 0, [0, 1.2, -1.9]);
-    expect(candle.uniforms.uCandleOn.value).toBe(0);
+    expect(candle.uniforms.uCandleIntensity.value).toBe(0);
     candle.dispose();
     v.dispose();
   });
@@ -151,29 +161,21 @@ describe('RoomDressingView', () => {
     expect(v.reach).toBeCloseTo(first, 5);
     v.dispose();
   });
-  it('flickers with the flame, differently from piece to piece, and holds steady without one', () => {
+  it('flickers with the flame (the light follows the lantern), and holds steady without one', () => {
     const v = new RoomDressingView();
-    const wallColour = () => (v.wall.material as unknown as { color: { r: number } }).color.r;
-    const seen = new Set<number>();
-    for (let i = 0; i < 30; i++) {
-      v.update(light(true, 1), 1, [0, 1.2, -1.9]);
-      seen.add(Math.round(wallColour() * 1000));
-      v.tick(0.05);
-    }
-    expect(seen.size).toBeGreaterThan(5); // it moves
-    const lo = Math.min(...seen) / 1000;
-    const hi = Math.max(...seen) / 1000;
-    expect(hi / lo).toBeLessThan(1.4); // but only a little
-    seen.clear();
-    for (let i = 0; i < 10; i++) {
-      v.update(light(false), 0);
-      seen.add(Math.round(wallColour() * 1000));
-      v.tick(0.05);
-    }
-    expect(seen.size).toBe(1);
+    const candle = new CandleLight();
+    v.useCandleLight(candle);
+    const intensity = () => candle.uniforms.uCandleIntensity.value;
+    v.update(light(true, 1), 1, [0, 1.2, -1.9]);
+    const full = intensity();
+    v.update(light(true, 0.8), 1, [0, 1.2, -1.9]);
+    expect(intensity()).toBeLessThan(full);
+    expect(intensity() / full).toBeGreaterThan(0.75); // only a little
+    v.update(light(false), 0);
+    expect(intensity()).toBe(0);
+    candle.dispose();
     v.dispose();
   });
-
   it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
     const v = new RoomDressingView();
     const glow = () => {

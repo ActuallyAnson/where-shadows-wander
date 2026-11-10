@@ -26,9 +26,11 @@ const SHADOW_NEAR = 0.01;
 const SHADOW_FAR = 8;
 /** The flame has to move this far (m) before the shadows are baked again. */
 const REBAKE_MOVE = 0.01;
-/** The candle's light where it is half gone (m), what is left far from it, and its colour's strength. */
+/** The candle's light where it is half gone (m). */
 export const CANDLE_REACH_M = 1.6;
-export const CANDLE_AMBIENT = 0.1;
+/** The two lights in the room: the moon's, faint, blue and everywhere (the room's ambient), and the candle's, warm, from the flame. */
+export const MOON_LIGHT = new Color(0.2, 0.25, 0.4);
+export const CANDLE_COLOUR = new Color(1.0, 0.82, 0.6);
 
 const packGlsl = /* glsl */ `
   vec4 candlePack(float v) {
@@ -72,9 +74,10 @@ const distanceFragment = /* glsl */ `
 /** What a patched material adds to its fragment shader: the candle's light at this point, shadows included. */
 const lightGlsl = /* glsl */ `
   uniform vec3 uCandlePos;
-  uniform float uCandleOn;
+  uniform float uCandleIntensity;
+  uniform vec3 uCandleColour;
   uniform float uCandleReach;
-  uniform float uCandleAmbient;
+  uniform vec3 uMoonLight;
   uniform samplerCube uCandleShadow;
   uniform float uCandleShadowOn;
   uniform float uCandleFar;
@@ -85,7 +88,8 @@ const lightGlsl = /* glsl */ `
     float stored = candleUnpack(textureCube(uCandleShadow, dir)) * uCandleFar;
     return dist - (0.03 + 0.015 * dist) <= stored ? 1.0 : 0.0;
   }
-  float candleLight() {
+  vec3 candleLight() {
+    if (uCandleIntensity <= 0.0) return uMoonLight;
     vec3 toFlame = uCandlePos - vCandleWorld;
     float d2 = max(dot(toFlame, toFlame), 1e-6);
     float dist = sqrt(d2);
@@ -105,8 +109,8 @@ const lightGlsl = /* glsl */ `
       lit = (candleShadowTap(dir, dist) + candleShadowTap(dir + t1 * o, dist) + candleShadowTap(dir - t1 * o, dist) +
              candleShadowTap(dir + t2 * o, dist) + candleShadowTap(dir - t2 * o, dist)) / 5.0;
     }
-    float light = uCandleAmbient + (1.0 - uCandleAmbient) * reach * facing * lit;
-    return mix(1.0, light, uCandleOn);
+    // One model, two lights: the moon's everywhere, and the candle's added where it reaches.
+    return uMoonLight + uCandleColour * (uCandleIntensity * reach * facing * lit);
   }
 `;
 
@@ -114,9 +118,10 @@ export class CandleLight {
   /** Shared by every patched material, so setting one value here sets it everywhere. */
   readonly uniforms = {
     uCandlePos: { value: new Vector3() },
-    uCandleOn: { value: 0 },
+    uCandleIntensity: { value: 0 },
+    uCandleColour: { value: CANDLE_COLOUR.clone() },
     uCandleReach: { value: CANDLE_REACH_M },
-    uCandleAmbient: { value: CANDLE_AMBIENT },
+    uMoonLight: { value: MOON_LIGHT.clone() },
     uCandleShadow: { value: null as Texture | null },
     uCandleShadowOn: { value: 0 },
     uCandleFar: { value: SHADOW_FAR },
@@ -142,7 +147,10 @@ export class CandleLight {
     this.uniforms.uCandleShadow.value = this.target.texture;
   }
 
-  /** Makes `material` lit by the candle (its colour is multiplied by the light; with the candle out it is as it was). */
+  /**
+   * Makes `material` lit by the room's light: its colour (the surface's own, its albedo) is multiplied by the moon's light plus
+   * the candle's. This is the room's only lighting: nothing else should tint the material for the light.
+   */
   light(material: MeshBasicMaterial): void {
     const u = this.uniforms;
     material.onBeforeCompile = (shader) => {
@@ -165,7 +173,7 @@ export class CandleLight {
         .replace('#include <common>', `#include <common>\n${lightGlsl}`)
         .replace('#include <opaque_fragment>', 'outgoingLight *= candleLight();\n#include <opaque_fragment>');
     };
-    material.customProgramCacheKey = () => 'candle-light-1';
+    material.customProgramCacheKey = () => 'candle-light-2';
     material.needsUpdate = true;
   }
 
@@ -195,10 +203,13 @@ export class CandleLight {
     this.dirty = true;
   }
 
-  /** The flame: whether it lights the room, where it is (world, m), and how far its light reaches (m). Call once a frame. */
-  set(on: boolean, flame: ArrayLike<number> | null, reach = CANDLE_REACH_M): void {
+  /**
+   * The flame: how bright it is (0 out .. 1 full, flicker and covering included), where it is (world, m), and how far its light
+   * reaches (m). Call once a frame.
+   */
+  set(intensity: number, flame: ArrayLike<number> | null, reach = CANDLE_REACH_M): void {
     const u = this.uniforms;
-    u.uCandleOn.value = on && flame ? 1 : 0;
+    u.uCandleIntensity.value = flame && intensity > 0 ? intensity : 0;
     u.uCandleReach.value = reach;
     if (!flame) return;
     u.uCandlePos.value.set(flame[0], flame[1], flame[2]);

@@ -83,9 +83,10 @@ const SLIDE_LIMIT = 0.9;
 const SPREAD_FROM_M = 0.12;
 export const SPREAD_S = 8;
 export const DARKEN_S = 2;
-/** The most of its brightness the room art has at full candlelight (the wall the shadows fall on is the brightest thing), and how far the flame's flicker moves it. */
+/** The room art's own colour, as a share of its painted colour (the light multiplies it). */
 const LIT_PEAK = 1.0;
-const FLICKER = 0.1;
+/** How bright the candle's glow is at the end of the hold that lights it, before it catches (its full brightness is about 1). */
+const IGNITION_GLOW = 0.5;
 
 /** Things in the room that light up as the night goes, one more for each puzzle solved. */
 const WONDERS = 5;
@@ -124,9 +125,6 @@ const GLOWS: readonly GlowSpec[] = [
   { wonder: 4, at: [-1.96, 1.45, -0.8], size: [1.1, 1.3], facing: '+x', colour: [0.3, 0.5, 0.6] },
 ];
 
-const MOON_TINT = new Color(0.2, 0.25, 0.4);
-const CANDLE_TINT = new Color(1.0, 0.82, 0.6);
-
 function paintedCanvas(
   w: number,
   h: number,
@@ -160,12 +158,10 @@ export class RoomDressingView {
   private readonly head = new Vector3();
   private time = 0;
   private readonly textures: CanvasTexture[] = [];
-  private readonly tint = new Color();
   /** The room art the candle lights (the walls, and everything on and by them), and the props that cast its shadows. */
   private readonly lit: Mesh[] = [];
   private readonly casters: Mesh[] = [];
-  /** Where in the flicker each piece is, so the light seems to dance across the room rather than blink all at once. */
-  private readonly phase = new Map<MeshBasicMaterial, number>();
+
   private flameOn = false;
   /** The candle as a light (candle-light.ts), once `useCandleLight` is called: it lights the art per pixel and casts the shadows. */
   private candle: CandleLight | null = null;
@@ -414,10 +410,8 @@ export class RoomDressingView {
     this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
     // The props that stand in the candle's light and stay still (the bunting swings, so it casts none).
     this.casters.push(...this.things, caseBox, ...bed);
-    for (const m of this.lit) {
-      this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
-    }
     this.place();
+
     this.update({ lit: false, intensity: 0 } as Readonly<LanternLight>, 0);
   }
 
@@ -490,48 +484,39 @@ export class RoomDressingView {
   }
 
   /**
-   * Makes the candle a real light for the room (candle-light.ts): the art is lit by it per pixel, by how far each point is from the
-   * flame and how squarely it faces it, and the pictures, shelves, bookcase and bed cast its shadows. Call once.
+   * Makes the candle a real light for the room (candle-light.ts), the room's one lighting model: the art keeps its own colours,
+   * lit per pixel by the moon's faint blue light everywhere plus the candle's, by how far each point is from the flame and how
+   * squarely it faces it; and the pictures, shelves, bookcase and bed cast the candle's shadows. Call once.
    */
   useCandleLight(candle: CandleLight): void {
     this.candle = candle;
-    for (const m of this.lit) candle.light(m.material as MeshBasicMaterial);
+    for (const m of this.lit) {
+      const material = m.material as MeshBasicMaterial;
+      material.color.setScalar(LIT_PEAK); // the art's own colour; the light does the rest
+      candle.light(material);
+    }
     for (const m of this.casters) candle.cast(m);
   }
 
+  /** How far the lighting of the candle has got (0..1, the title's hold on the wick): the room starts to glow before it catches. */
+  ignition = 0;
+
   /**
-   * Lights the art like the room: dark and blue by moonlight, and warm by candlelight (`flame` is the flame's world position;
-   * with the candle as a light, it lights each point by its distance and casts the props' shadows). Same other arguments as
+   * Sets the candle's light on the room from the lantern (`flame` is the flame's world position): its brightness, flicker and
+   * covering (`occlusion`) included, and while it is being lit, a glow that grows with `ignition`. Same other arguments as
    * BedroomView.update.
    */
   update(light: Readonly<LanternLight>, occlusion = 1, flame?: ArrayLike<number>): void {
-    const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
-    const warm = Math.min(1, Math.max(0, (brightness - 0.04) / 0.5));
-    this.warmNow = warm;
-    this.tint.copy(MOON_TINT).lerp(CANDLE_TINT, warm);
-    const k = 0.5 + 0.5 * Math.min(1, brightness);
-    this.tint.multiplyScalar(warm > 0 ? k * LIT_PEAK : 1);
-    this.flameOn = light.lit && flame !== undefined;
-    this.candle?.set(this.flameOn, flame ?? null, this.reachNow);
-    // The flame's flicker: a few sines of different speeds, a different moment for each piece, only when the candle lights the room.
-    const time = this.time;
-    for (const m of this.materials) {
-      const p = this.phase.get(m) ?? 0;
-      const flicker = this.flameOn
-        ? 1 +
-          FLICKER *
-            (0.5 * Math.sin(time * 6.1 + p) +
-              0.3 * Math.sin(time * 9.7 + 1.7 * p) +
-              0.2 * Math.sin(time * 2.3 + 0.6 * p))
-        : 1;
-      m.color.copy(this.tint).multiplyScalar(flicker);
-    }
+    const ig = this.ignition > 0 ? Math.min(1, this.ignition) : 0;
+    const brightness = light.lit ? occlusion * (0.2 + 0.8 * light.intensity) : IGNITION_GLOW * ig * ig;
+    this.warmNow = Math.min(1, Math.max(0, brightness / 0.5));
+    this.flameOn = brightness > 0 && flame !== undefined;
+    this.candle?.set(brightness, flame ?? null, this.reachNow);
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
     // The moonlight on the floor shrinks into the room's light when the candle is bright.
-    const moonK = 0.3 - 0.2 * warm;
+    const moonK = 0.3 - 0.2 * this.warmNow;
     this.moonPatch.color.setRGB(0.5 * moonK, 0.62 * moonK, moonK);
   }
-
   /**
    * The candle's light spreading through the room: while `lit` it grows out from the flame to the whole room over SPREAD_S, and
    * when the candle goes out it draws back in DARKEN_S. Call once a frame. Allocates nothing.

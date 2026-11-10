@@ -33,6 +33,8 @@ const BASE_RAFTER = new Color(0x1a120b);
 const BASE_WALL = new Color(0x1c1713);
 const CANDLE_AMBER = new Color(0xff9933);
 const MOON_BLUE = new Color(MOONLIGHT_COLOR);
+/** How much brighter the shell's own colours are than its old moonlit look, under the candle light's moonlight (about 1 / 0.28). */
+const ALBEDO_GAIN = 3.5;
 
 function createFloorTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   let canvas = customCanvas;
@@ -99,6 +101,8 @@ export class BedroomView {
   private readonly wallMat: MeshBasicMaterial;
 
   private readonly scratchColor = new Color();
+  /** Whether the candle lights the room (useCandleLight): then update() leaves the colours alone. */
+  private candleLit = false;
 
   constructor() {
     // -------------------------------------------------------------
@@ -306,8 +310,15 @@ export class BedroomView {
    * by it per pixel and take the props' shadows. The night sky and the moon's wash keep their own light. Call once.
    */
   useCandleLight(candle: CandleLight): void {
+    this.candleLit = true;
+    this.floorMat.color.copy(BASE_FLOOR);
+    this.rafterMat.color.copy(BASE_RAFTER);
+    this.wallMat.color.copy(BASE_WALL);
     for (const m of this.materials) {
       if (!(m instanceof MeshBasicMaterial) || m.transparent || m === this.skyMesh.material) continue;
+      // The colours were picked as the final, moonlit look; as the surfaces' own colours under the faint moonlight they are
+      // brightened so the unlit room looks as it did.
+      m.color.multiplyScalar(ALBEDO_GAIN);
       candle.light(m);
     }
   }
@@ -336,6 +347,11 @@ export class BedroomView {
    */
   update(light: Readonly<LanternLight>, _cameraQuaternion?: Readonly<Quaternion>, occlusion = 1.0): void {
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
+    // With the candle as a light (useCandleLight) the light does the colouring: the surfaces keep their own colours.
+    if (this.candleLit) {
+      this.moonlight.intensity = light.lit && brightness > 0.05 ? 0.2 : 0.05;
+      return;
+    }
 
     if (light.lit && brightness > 0.05) {
       // Lit phase: Warm timber glow

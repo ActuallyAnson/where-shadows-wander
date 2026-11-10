@@ -1561,6 +1561,7 @@ async function start(): Promise<void> {
 
           const ignitionProgress = ignitionHoldTimer / 3.0;
           candleView.ignitionProgress = ignitionProgress;
+          roomDressing.ignition = ignitionProgress; // the room starts to glow as the wick is held
 
           // Warm ambient and bedroom light gradually as flame grows from small to big
           if (ignitionProgress > 0) {
@@ -1574,6 +1575,7 @@ async function start(): Promise<void> {
           if (ignitionHoldTimer >= 3.0) {
             sessionState = 'opening';
             candleView.ignitionProgress = 0;
+            roomDressing.ignition = 0;
             candleView.lit = true;
             titleLighter.visible = false;
             ambientLight.color.setHex(0x35281e);

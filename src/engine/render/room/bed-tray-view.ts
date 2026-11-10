@@ -132,6 +132,8 @@ export class BedTrayView {
 
   /** Makes the candle on the tray a real light for it (candle-light.ts): the tray and blanket are lit by it and cast its shadows. */
   useCandleLight(candle: CandleLight): void {
+    // The wood's colour was its final look; as its own colour under the faint moonlight it is brightened (as BedroomView's).
+    this.woodMat.color.multiplyScalar(3.5);
     candle.light(this.woodMat);
     candle.light(this.blanketMat);
     for (const child of this.group.children) if (child instanceof Mesh) candle.cast(child);
