@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, normalizePath, type Plugin } from 'vite';
 import { parseRoomLayout } from './src/engine/stage/room-layout';
 
 function buildId(): string {
@@ -55,9 +55,16 @@ function saveRecordings(): Plugin {
  */
 function saveRoomLayouts(): Plugin {
   const dir = fileURLToPath(new URL('./content/rooms/', import.meta.url));
+  const rooms = normalizePath(dir);
   return {
     name: 'wsw-save-room-layouts',
     apply: 'serve',
+    enforce: 'pre',
+    // A change to a room layout (a save from the editor, or an edit by hand) doesn't reload the page, which would throw away
+    // the editor's session; Vite still drops its cached copy, so the next reload reads the file as it is now.
+    hotUpdate({ file }) {
+      if (normalizePath(file).startsWith(rooms)) return [];
+    },
     configureServer(server) {
       server.middlewares.use('/__wsw/rooms/', (req, res) => {
         const name = (req.url ?? '').replace(/^\//, '');
@@ -95,8 +102,7 @@ function saveRoomLayouts(): Plugin {
 
 export default defineConfig(({ mode }) => ({
   plugins: [iwsdkDev(), saveRecordings(), saveRoomLayouts()],
-  // The room editor saves content/rooms/ while the game is open; reloading on that save would throw its edits away.
-  server: { host: '0.0.0.0', port: 8081, open: false, watch: { ignored: ['**/content/rooms/**'] } },
+  server: { host: '0.0.0.0', port: 8081, open: false },
   // Relative URLs so the build works under a GitHub Pages project subpath.
   base: './',
   publicDir: 'public',

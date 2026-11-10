@@ -263,9 +263,9 @@ async function start(): Promise<void> {
   const bedroomLayout = readBedroomLayout();
   for (const p of bedroomLayout.problems) console.warn(`room layout: ${p}`);
   const bedTray = new BedTrayView(bedroomLayout.layout);
-  const bedroomView = new BedroomView();
+  const bedroomView = new BedroomView(bedroomLayout.layout);
   // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
-  const roomDressing = new RoomDressingView();
+  const roomDressing = new RoomDressingView(bedroomLayout.layout);
   bedroomView.group.add(roomDressing.group);
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
   bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
@@ -281,7 +281,10 @@ async function start(): Promise<void> {
     bedroomLayout.layout,
   );
   roomDressing.group.add(roomModels.group);
-  void roomModels.load(candleLight);
+  // The globe's glow on the bookcase follows the bookcase model wherever the layout puts it.
+  void roomModels.load(candleLight).then(() => {
+    for (const piece of roomModels.editables()) roomDressing.follow(piece);
+  });
   const vrTitle = new VrTitleView();
   /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;
@@ -1133,7 +1136,7 @@ async function start(): Promise<void> {
       canvas: world.renderer.domElement,
       scene: world.scene,
       room: bedroomView.group,
-      sources: [roomModels, bedTray],
+      sources: [roomModels, roomDressing, bedroomView, bedTray],
       layout: bedroomLayout.layout,
       fileName: BEDROOM_LAYOUT_FILE,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],

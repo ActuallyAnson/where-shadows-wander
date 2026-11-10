@@ -1,6 +1,7 @@
 import { Quaternion } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
+import { emptyRoomLayout, placement } from '../../stage/room-layout';
 import { BedroomView, MOONLIGHT_COLOR } from './bedroom-view';
 
 describe('BedroomView', () => {
@@ -62,5 +63,15 @@ describe('BedroomView', () => {
   it('disposes resources cleanly', () => {
     const room = new BedroomView();
     expect(() => room.dispose()).not.toThrow();
+  });
+
+  it('stands the tin can where the room layout says (its default by the bed)', () => {
+    expect(new BedroomView().tinCanGroup.position.toArray()).toEqual([0.95, 0, -0.4]);
+    const layout = emptyRoomLayout();
+    layout.room['tin-can'] = placement([1.1, 0, 0.2], [0, 30, 0]);
+    const v = new BedroomView(layout);
+    expect(v.editables().map((p) => p.id)).toEqual(['tin-can']);
+    expect(v.tinCanGroup.position.toArray()).toEqual([1.1, 0, 0.2]);
+    expect(v.tinCanGroup.rotation.y).toBeCloseTo(Math.PI / 6, 6);
   });
 });

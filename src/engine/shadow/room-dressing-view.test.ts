@@ -16,6 +16,8 @@ import {
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
 import { RoomDressingView } from './room-dressing-view';
+import { emptyRoomLayout, placement } from '../stage/room-layout';
+import { applyPlacement } from './room-placement';
 import { CANDLE_REACH_M, CandleLight } from './candle-light';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
@@ -299,5 +301,29 @@ describe('RoomDressingView', () => {
     for (let i = 0; i < 20; i++) v.tick(1 / 60);
     expect(motion()).toBeGreaterThan(quiet);
     v.dispose();
+  });
+});
+
+describe('RoomDressingView and the room layout', () => {
+  it('puts the pictures, the shelf, the sill and the moonlight where the layout says, and keeps the children in order', () => {
+    const layout = emptyRoomLayout();
+    layout.room['picture-moon'] = placement([1.965, 1.2, -0.9], [0, -90, 0]);
+    const v = new RoomDressingView(layout);
+    expect(v.editables().map((p) => p.id)).toEqual(['picture-moon', 'picture-hill', 'shelf', 'sill', 'moon-patch']);
+    const moon = v.editables()[0];
+    expect(moon.object.name).toBe('picture-moon');
+    expect(moon.object.position.y).toBeCloseTo(1.2, 6);
+    expect(moon.fallback.pos).toEqual([1.965, 1.45, -1.05]);
+    expect(v.group.children).toHaveLength(new RoomDressingView().group.children.length);
+  });
+
+  it('moves a glow with the piece it is on', () => {
+    const at = new Vector3();
+    const v = new RoomDressingView();
+    const before = v.wakePoint(2, at).clone();
+    const moon = v.editables()[0];
+    applyPlacement(moon.object, placement([1.965, 1.45, -0.75], [0, -90, 0]));
+    v.moved();
+    expect(v.wakePoint(2, at).z - before.z).toBeCloseTo(0.3, 6);
   });
 });

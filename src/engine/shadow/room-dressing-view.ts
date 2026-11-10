@@ -18,7 +18,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from '@iwsdk/core';
-import type { Material } from '@iwsdk/core';
+import type { Material, Object3D } from '@iwsdk/core';
 import { BuntingView } from './bunting-view';
 import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
@@ -43,6 +43,8 @@ import { RenderOrder } from './pure/render-order';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
 import { CANDLE_REACH_M, type CandleLight } from './candle-light';
 import type { StandIn } from './room-models';
+import { placementOr, type RoomLayout } from '../stage/room-layout';
+import { applyPlacement, readPlacement, type EditablePiece, type EditableSource } from './room-placement';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -120,6 +122,8 @@ const WONDER_GAIN = 0.75;
 interface GlowSpec {
   /** Which wonder (0 .. WONDERS - 1) lights it. */
   readonly wonder: number;
+  /** The room piece it glows on (a layout id): it moves with that piece when the room layout moves it from its default. */
+  readonly follows?: string;
   /** Where its middle is: on the wall behind the stage in that wall's 1024 by 640 units (`wall`), or in the room in metres. */
   readonly wall?: readonly [number, number, number];
   readonly at?: readonly [number, number, number];
@@ -136,15 +140,46 @@ interface GlowSpec {
  */
 const GLOWS: readonly GlowSpec[] = [
   // The lamp on the shelf (left wall, HUNG[2]), the moon and the hill (right wall, HUNG[0] and HUNG[1]).
-  { wonder: 0, at: [-1.875, 1.45, 0.55], size: [0.5, 0.5], facing: '+x', colour: [1, 0.72, 0.36] },
+  { wonder: 0, follows: 'shelf', at: [-1.875, 1.45, 0.55], size: [0.5, 0.5], facing: '+x', colour: [1, 0.72, 0.36] },
   { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
   { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
-  { wonder: 2, at: [1.935, 1.05, -1.05], size: [0.55, 0.45], facing: '-x', colour: [0.7, 0.8, 1] },
-  { wonder: 2, at: [1.935, 1.6, -0.2], size: [0.72, 0.58], facing: '-x', colour: [0.5, 0.65, 1] },
+  {
+    wonder: 2,
+    follows: 'picture-moon',
+    at: [1.935, 1.05, -1.05],
+    size: [0.55, 0.45],
+    facing: '-x',
+    colour: [0.7, 0.8, 1],
+  },
+  {
+    wonder: 2,
+    follows: 'picture-hill',
+    at: [1.935, 1.6, -0.2],
+    size: [0.72, 0.58],
+    facing: '-x',
+    colour: [0.5, 0.65, 1],
+  },
   // The bookcase (room-models.ts: its open front at x 1.61, 1.32 m high).
-  { wonder: 3, at: [1.58, 1.0, 0.55], size: [0.42, 0.42], facing: '-x', colour: [0.45, 0.95, 0.75] },
-  { wonder: 4, at: [-1.9, 0.99, -0.71], size: [0.3, 0.3], facing: '+x', colour: [1, 0.7, 0.35] },
+  {
+    wonder: 3,
+    follows: 'bookcase',
+    at: [1.58, 1.0, 0.55],
+    size: [0.42, 0.42],
+    facing: '-x',
+    colour: [0.45, 0.95, 0.75],
+  },
+  { wonder: 4, follows: 'sill', at: [-1.9, 0.99, -0.71], size: [0.3, 0.3], facing: '+x', colour: [1, 0.7, 0.35] },
   { wonder: 4, at: [-1.96, 1.45, -0.8], size: [1.1, 1.3], facing: '+x', colour: [0.3, 0.5, 0.6] },
+];
+
+/** The hung pieces' ids in the room layout file, by their index in HUNG (null where nothing hangs). */
+const HUNG_IDS: readonly (string | null)[] = ['picture-moon', 'picture-hill', 'shelf', null];
+
+/** The pieces of the room dressing the room layout file places (`room` section). */
+export const DRESSING_PIECE_IDS: readonly string[] = [
+  ...HUNG_IDS.filter((id): id is string => id !== null),
+  'sill',
+  'moon-patch',
 ];
 
 function paintedCanvas(
@@ -162,8 +197,13 @@ function paintedCanvas(
   return canvas;
 }
 
-export class RoomDressingView {
+export class RoomDressingView implements EditableSource {
   readonly group = new Group();
+  /** The pieces the room layout places (the pictures, the shelf, the sill, the moonlight's patch), for the room editor. */
+  private readonly pieces: EditablePiece[] = [];
+  /** Pieces the glows follow (these and the furniture), by id: a glow moves as far as its piece is from its default. */
+  private readonly followed = new Map<string, EditablePiece>();
+  private readonly scratch = new Vector3();
   /** The wallpaper wall behind the stage, kept to move it when the stage's distance is known. */
   readonly wall: Mesh;
   /** The hung pictures and shelves, held off the wall (one quad per cluster, as in WALL_THINGS); `place` keeps them in front of it. */
@@ -205,7 +245,8 @@ export class RoomDressingView {
   private readonly wonderMat: MeshBasicMaterial;
   private readonly wonderTexture: CanvasTexture;
 
-  constructor() {
+  /** @param layout where the pictures, the shelf, the sill and the moonlight's patch are (the room layout file); defaults where it says nothing */
+  constructor(private readonly layout: Readonly<RoomLayout> | null = null) {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
     // to draw; everything on a wall sits a hair in front of it.
     // The pictures and the shelf hang on the side walls (HUNG), standing out from them (frames, then the shelf with its
@@ -228,6 +269,7 @@ export class RoomDressingView {
       const out = spec.layer === 'shelves' ? SHELVES_OUT : PICTURES_OUT;
       m.rotation.y = hung.wall === '+x' ? Math.PI / 2 : -Math.PI / 2;
       m.position.set(hung.wall === '+x' ? -1.995 + out : 1.995 - out, hung.y, hung.z);
+      this.editable(HUNG_IDS[i]!, m);
       this.things.push(m);
     });
 
@@ -293,12 +335,14 @@ export class RoomDressingView {
     sill.rotation.y = Math.PI / 2;
     sill.position.set(-1.9, 0.875 + 0.15, -0.55);
     sill.renderOrder = 3;
+    this.editable('sill', sill);
 
     // The window's light on the floor: a slanted patch of cool moonlight cut by the cross bars, added to the floor.
     const patch = this.quad(1.7, 1.7, this.texture(paintedCanvas(256, 256, paintMoonPatch)), true);
     patch.rotation.x = -Math.PI / 2;
     patch.position.set(-0.95, 0.008, -0.8);
     patch.renderOrder = 3;
+    this.editable('moon-patch', patch);
     (patch.material as MeshBasicMaterial).map!.anisotropy = 4; // the floor is seen at a slant
     this.moonPatch = patch.material as MeshBasicMaterial;
     this.moonPatch.blending = AdditiveBlending;
@@ -448,6 +492,47 @@ export class RoomDressingView {
     this.update({ lit: false, intensity: 0 } as Readonly<LanternLight>, 0);
   }
 
+  /** Makes a piece editable: where the code just put it is its default, and the layout file may put it elsewhere. */
+  private editable(id: string, o: Object3D): void {
+    o.name = id;
+    const fallback = readPlacement(o);
+    applyPlacement(o, placementOr(this.layout, 'room', id, fallback));
+    const piece: EditablePiece = { id, section: 'room', object: o, fallback };
+    this.pieces.push(piece);
+    this.followed.set(id, piece);
+  }
+
+  /** The pictures, the shelf, the sill and the moonlight's patch, for the room editor. */
+  editables(): readonly EditablePiece[] {
+    return this.pieces;
+  }
+
+  /** A piece moved (in the editor): the glows that follow it go with it, and the candle's shadows are cast again. */
+  moved(): void {
+    this.buildWonders(this.wallZ);
+    this.candle?.rebake();
+  }
+
+  /** Lets a glow follow a piece another view owns (the bookcase model, room-models.ts). */
+  follow(piece: EditablePiece): void {
+    this.followed.set(piece.id, piece);
+    this.buildWonders(this.wallZ);
+  }
+
+  /** Where a glow authored at `at` is now: moved as far as the piece it follows is from that piece's default. */
+  private glowAt(spec: GlowSpec, out: Vector3): Vector3 {
+    out.set(spec.at![0], spec.at![1], spec.at![2]);
+    const piece = spec.follows ? this.followed.get(spec.follows) : undefined;
+    if (piece) {
+      const p = piece.object.position,
+        d = piece.fallback.pos;
+      out.x += p.x - d[0];
+      out.y += p.y - d[1];
+      out.z += p.z - d[2];
+    }
+    return out;
+  }
+
   /** Moves a quad's material from the room's tinted ones to the window's own. */
   private moveToOutdoor(m: Mesh): void {
     const mat = m.material as MeshBasicMaterial;
@@ -588,7 +673,7 @@ export class RoomDressingView {
     const i = Math.max(0, Math.min(WONDERS - 1, Math.floor(index) || 0));
     const spec = GLOWS.find((g) => g.wonder === i) ?? GLOWS[0];
     if (spec.wall) out.set((spec.wall[0] / 1024) * 4 - 2, 2.5 - (spec.wall[1] / 640) * 2.5, this.wallZ + spec.wall[2]);
-    else out.set(spec.at![0], spec.at![1], spec.at![2]);
+    else this.glowAt(spec, out);
     this.group.updateWorldMatrix(true, false);
     return this.group.localToWorld(out);
   }
@@ -623,7 +708,8 @@ export class RoomDressingView {
           z: z + spec.wall[2],
         });
       } else {
-        parts.push({ geo, x: spec.at![0], y: spec.at![1], z: spec.at![2] });
+        const at = this.glowAt(spec, this.scratch);
+        parts.push({ geo, x: at.x, y: at.y, z: at.z });
       }
     }
     const merged = mergeBoxes(parts);

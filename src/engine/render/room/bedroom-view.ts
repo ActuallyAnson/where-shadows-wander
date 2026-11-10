@@ -24,6 +24,11 @@ import { mergeBoxes } from '../../shadow/merge-boxes';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../../stage/stage-frame';
 import type { CandleLight } from '../../shadow/candle-light';
+import { placement, placementOr, type RoomLayout } from '../../stage/room-layout';
+import { applyPlacement, type EditablePiece, type EditableSource } from '../../shadow/room-placement';
+
+/** The bedroom view's pieces the room layout file places (`room` section). */
+export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['tin-can'];
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
 export const NIGHT_AMBIENT = 0x141d2e;
@@ -77,7 +82,7 @@ function createFloorTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   return texture;
 }
 
-export class BedroomView {
+export class BedroomView implements EditableSource {
   readonly group = new Group();
   readonly moonlight: DirectionalLight;
 
@@ -104,7 +109,11 @@ export class BedroomView {
   /** Whether the candle lights the room (useCandleLight): then update() leaves the colours alone. */
   private candleLit = false;
 
-  constructor() {
+  private readonly pieces: EditablePiece[] = [];
+  private candle: CandleLight | null = null;
+
+  /** @param layout where the tin can stands (the room layout file); its default where it says nothing */
+  constructor(layout: Readonly<RoomLayout> | null = null) {
     // -------------------------------------------------------------
     // 1. Floor with Baked Plank Seams (Zero Z-Fighting, No Flickering)
     // -------------------------------------------------------------
@@ -258,7 +267,7 @@ export class BedroomView {
     const canGeo = new CylinderGeometry(0.045, 0.045, 0.075, 10, 1, true);
     const canMat = new MeshBasicMaterial({ color: 0x5a5d62 });
     const canMesh = new Mesh(canGeo, canMat);
-    canMesh.position.set(0.95, 0.038, -0.4);
+    canMesh.position.set(0, 0.038, 0);
     this.register(canGeo, canMat);
 
     // Whittled wooden spoon tilted in can
@@ -266,10 +275,14 @@ export class BedroomView {
     spoonGeo.rotateZ(0.35);
     const spoonMat = new MeshBasicMaterial({ color: 0x6e5238 });
     const spoonMesh = new Mesh(spoonGeo, spoonMat);
-    spoonMesh.position.set(0.96, 0.07, -0.4);
+    spoonMesh.position.set(0.01, 0.07, 0);
     this.register(spoonGeo, spoonMat);
 
     this.tinCanGroup.add(canMesh, spoonMesh);
+    this.tinCanGroup.name = 'tin-can';
+    const canDefault = placement([0.95, 0, -0.4]);
+    applyPlacement(this.tinCanGroup, placementOr(layout, 'room', 'tin-can', canDefault));
+    this.pieces.push({ id: 'tin-can', section: 'room', object: this.tinCanGroup, fallback: canDefault });
 
     // -------------------------------------------------------------
     // 7. Directional Moonlight (Entering through the Left Window)
@@ -294,6 +307,16 @@ export class BedroomView {
     );
   }
 
+  /** The tin can, for the room editor. */
+  editables(): readonly EditablePiece[] {
+    return this.pieces;
+  }
+
+  /** A piece moved (in the editor): the candle's shadows are cast again. */
+  moved(): void {
+    this.candle?.rebake();
+  }
+
   /**
    * Hides the plain left, right and front walls and the sky quad behind the window, for when something painted covers them (the
    * room dressing's own walls sit just in front of them and are drawn first): they would be drawn only to fail the depth test.
@@ -310,6 +333,7 @@ export class BedroomView {
    * by it per pixel and take the props' shadows. The night sky and the moon's wash keep their own light. Call once.
    */
   useCandleLight(candle: CandleLight): void {
+    this.candle = candle;
     this.candleLit = true;
     this.floorMat.color.copy(BASE_FLOOR);
     this.rafterMat.color.copy(BASE_RAFTER);
