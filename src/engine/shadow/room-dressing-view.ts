@@ -77,18 +77,22 @@ const OUTSIDE_LAYERS: readonly { layer: NightLayer; slide: number; w: number; h:
 const SLIDE_LIMIT = 0.9;
 
 /**
- * The light spreading out from a newly lit candle: its reach (m) the moment it catches, and the seconds it takes to grow from that
- * to CANDLE_REACH_M. When the candle goes out (covered, paused) the light draws back to the flame in DARKEN_S.
+ * The light spreading out from the candle: its reach (m) with no flame, and the seconds it takes to grow from that to
+ * CANDLE_REACH_M when the candle is relit with no hold (after the pause). The first time, it grows with the hold on the wick
+ * instead, so the room is lit as the candle catches, not after. When the candle goes out (covered, paused) the light draws back
+ * to the flame in DARKEN_S.
  */
 const SPREAD_FROM_M = 0.12;
-export const SPREAD_S = 8;
+export const SPREAD_S = 1.5;
 export const DARKEN_S = 2;
 /** The room art's own colour, as a share of its painted colour (the light multiplies it). */
 const LIT_PEAK = 1.0;
 /** How bright the moonlight's patch on the floor is (it is added to the floor). */
-const MOON_PATCH = 0.15;
-/** How bright the candle's glow is at the end of the hold that lights it, before it catches (its full brightness is about 1). */
-const IGNITION_GLOW = 0.5;
+const MOON_PATCH = 0.07;
+/** How bright the candle's glow is at the end of the hold that lights it, as it catches (its full brightness is about 1). */
+const IGNITION_GLOW = 0.9;
+/** Seconds the glow from the hold takes to hand over to the burning flame's light (which fades in), so there is no dip. */
+const HANDOVER_S = 0.6;
 
 /** Things in the room that light up as the night goes, one more for each puzzle solved. */
 const WONDERS = 5;
@@ -502,6 +506,8 @@ export class RoomDressingView {
 
   /** How far the lighting of the candle has got (0..1, the title's hold on the wick): the room starts to glow before it catches. */
   ignition = 0;
+  /** The glow the hold had reached, held while the newly lit flame's own light fades in (see HANDOVER_S). */
+  private glowCarry = 0;
 
   /**
    * Sets the candle's light on the room from the lantern (`flame` is the flame's world position): its brightness, flicker and
@@ -510,7 +516,15 @@ export class RoomDressingView {
    */
   update(light: Readonly<LanternLight>, occlusion = 1, flame?: ArrayLike<number>): void {
     const ig = this.ignition > 0 ? Math.min(1, this.ignition) : 0;
-    const brightness = light.lit ? occlusion * (0.2 + 0.8 * light.intensity) : IGNITION_GLOW * ig * ig;
+    // The glow grows with the hold as a wick catching does: slowly at first, then quickly.
+    const glow = IGNITION_GLOW * ig * ig * (3 - 2 * ig);
+    let brightness: number;
+    if (light.lit) {
+      brightness = Math.max(occlusion * (0.2 + 0.8 * light.intensity), this.glowCarry * occlusion);
+    } else {
+      brightness = glow;
+      this.glowCarry = glow;
+    }
     this.warmNow = Math.min(1, Math.max(0, brightness / 0.5));
     this.flameOn = brightness > 0 && flame !== undefined;
     this.candle?.set(brightness, flame ?? null, this.reachNow);
@@ -524,9 +538,13 @@ export class RoomDressingView {
    */
   spread(lit: boolean, dt: number): void {
     const step = dt > 0 ? Math.min(dt, 0.1) : 0;
-    this.spreadLevel = lit
-      ? Math.min(1, this.spreadLevel + step / SPREAD_S)
-      : Math.max(0, this.spreadLevel - step / DARKEN_S);
+    this.glowCarry = Math.max(0, this.glowCarry - step / HANDOVER_S);
+    if (lit) this.spreadLevel = Math.min(1, this.spreadLevel + step / SPREAD_S);
+    else {
+      // Unlit, the light reaches as far as the hold on the wick has got (it follows the hold both ways), else draws back.
+      const ig = this.ignition > 0 ? Math.min(1, this.ignition) : 0;
+      this.spreadLevel = Math.max(ig, this.spreadLevel - step / DARKEN_S);
+    }
     const s = this.spreadLevel;
     const eased = s * s * (3 - 2 * s);
     this.reachNow = SPREAD_FROM_M + (CANDLE_REACH_M - SPREAD_FROM_M) * eased;

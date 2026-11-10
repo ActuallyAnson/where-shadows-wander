@@ -277,7 +277,7 @@ async function start(): Promise<void> {
   let ignitionHoldTimer = 0;
   let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
-  const ambientLight = new AmbientLight(0x101422, 0.02);
+  const ambientLight = new AmbientLight(0x101422, 0.008);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
@@ -950,6 +950,7 @@ async function start(): Promise<void> {
     const trayZ = head[2] - Math.cos(yaw) * trayDist;
     bedTray.place(trayX, trayY, trayZ, yaw);
     candleLight.rebake(); // the room and the tray moved: their shadows are cast again
+    candleLight.aimAt(stage.origin); // its light is thrown at the wall the shadows play on
 
     bedTray.getCandleSaucerPosition(saucerPos);
     lantern[0] = saucerPos[0];

@@ -149,16 +149,43 @@ describe('RoomDressingView', () => {
     const v = new RoomDressingView();
     const first = v.reach;
     expect(v.spreadAmount).toBe(0);
-    for (let i = 0; i < 40; i++) v.spread(true, 0.1); // half way
+    for (let i = 0; i < 7; i++) v.spread(true, 0.1); // about half way
     const half = v.reach;
     expect(half).toBeGreaterThan(first);
-    for (let i = 0; i < 60; i++) v.spread(true, 0.1); // all the way (SPREAD_S)
+    for (let i = 0; i < 20; i++) v.spread(true, 0.1); // all the way (SPREAD_S)
     expect(v.spreadAmount).toBe(1);
     expect(v.reach).toBeCloseTo(CANDLE_REACH_M, 5);
     expect(v.reach).toBeGreaterThan(half);
     for (let i = 0; i < 20; i++) v.spread(false, 0.1); // covered: dark again in DARKEN_S
     expect(v.spreadAmount).toBe(0);
     expect(v.reach).toBeCloseTo(first, 5);
+    v.dispose();
+  });
+  it('grows the light with the hold on the wick, so the room is lit as the candle catches, with no dip after', () => {
+    const v = new RoomDressingView();
+    const candle = new CandleLight();
+    v.useCandleLight(candle);
+    const intensity = () => candle.uniforms.uCandleIntensity.value;
+    const flame = [0, 1.2, -1.9];
+    let lastReach = v.reach;
+    let lastGlow = 0;
+    for (let i = 1; i <= 10; i++) {
+      v.ignition = i / 10;
+      v.update(light(false), 0, flame);
+      v.spread(false, 0.1);
+      expect(v.reach).toBeGreaterThan(lastReach);
+      expect(intensity()).toBeGreaterThan(lastGlow);
+      lastReach = v.reach;
+      lastGlow = intensity();
+    }
+    expect(v.reach).toBeCloseTo(CANDLE_REACH_M, 5); // the whole room by the time it catches
+    expect(lastGlow).toBeGreaterThan(0.8);
+    v.ignition = 0;
+    v.update(light(true, 0), 1, flame); // caught: the flame's own light is only starting to fade in
+    expect(intensity()).toBeGreaterThan(0.8 * lastGlow);
+    v.spread(true, 0.1);
+    expect(v.reach).toBeCloseTo(CANDLE_REACH_M, 5);
+    candle.dispose();
     v.dispose();
   });
   it('flickers with the flame (the light follows the lantern), and holds steady without one', () => {

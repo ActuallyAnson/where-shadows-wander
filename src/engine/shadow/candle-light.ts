@@ -14,6 +14,7 @@ import {
   NearestFilter,
   ShaderMaterial,
   Vector3,
+  Vector4,
   WebGLCubeRenderTarget,
 } from '@iwsdk/core';
 import type { Material, MeshBasicMaterial, Scene, Texture, WebGLRenderer } from '@iwsdk/core';
@@ -29,8 +30,19 @@ const REBAKE_MOVE = 0.01;
 /** The candle's light where it is half gone (m). */
 export const CANDLE_REACH_M = 1.6;
 /** The two lights in the room: the moon's, faint, blue and everywhere (the room's ambient), and the candle's, warm, from the flame. */
-export const MOON_LIGHT = new Color(0.06, 0.075, 0.13);
+export const MOON_LIGHT = new Color(0.025, 0.03, 0.055);
 export const CANDLE_COLOUR = new Color(1.0, 0.82, 0.6);
+/**
+ * The candle's light is thrown forward, at the wall the shadows play on (as if shaded behind): full within BEAM_INNER_DEG of
+ * where it is aimed, fading to BEAM_SIDE by BEAM_OUTER_DEG and beyond, so the wall is bright and the room round it dark. Within
+ * BEAM_NEAR_M of the flame (the tray, the blanket) it lights every way.
+ */
+const BEAM_INNER_DEG = 28;
+const BEAM_OUTER_DEG = 70;
+const BEAM_SIDE = 0.12;
+const BEAM_NEAR_M = 0.35;
+/** The candle's brightness on the axis of its beam, as a share of its brightness unaimed (the beam's light is gathered there). */
+const BEAM_GAIN = 1.5;
 
 const packGlsl = /* glsl */ `
   vec4 candlePack(float v) {
@@ -81,6 +93,8 @@ const lightGlsl = /* glsl */ `
   uniform samplerCube uCandleShadow;
   uniform float uCandleShadowOn;
   uniform float uCandleFar;
+  uniform vec3 uCandleDir;
+  uniform vec4 uCandleBeam;
   varying vec3 vCandleWorld;
   varying vec3 vCandleNormal;
   ${packGlsl}
@@ -99,6 +113,10 @@ const lightGlsl = /* glsl */ `
     float nl = length(vCandleNormal);
     float facing = nl > 1e-4 ? 0.35 + 0.65 * abs(dot(vCandleNormal / nl, l)) : 1.0;
     float reach = 1.0 / (1.0 + d2 / (uCandleReach * uCandleReach));
+    // The beam: x, y the cosines of its inner and outer angles, z the light off to the side, w its brightness on the axis.
+    float cone = smoothstep(uCandleBeam.y, uCandleBeam.x, dot(-l, uCandleDir));
+    float beam = mix(uCandleBeam.z, uCandleBeam.w, cone);
+    beam = mix(1.0, beam, smoothstep(${(BEAM_NEAR_M * 0.5).toFixed(3)}, ${BEAM_NEAR_M.toFixed(3)}, dist));
     float lit = 1.0;
     if (uCandleShadowOn > 0.5) {
       // Five taps round the direction, a little apart, so the shadows' edges are soft (wider the further they fall).
@@ -110,7 +128,7 @@ const lightGlsl = /* glsl */ `
              candleShadowTap(dir + t2 * o, dist) + candleShadowTap(dir - t2 * o, dist)) / 5.0;
     }
     // One model, two lights: the moon's everywhere, and the candle's added where it reaches.
-    return uMoonLight + uCandleColour * (uCandleIntensity * reach * facing * lit);
+    return uMoonLight + uCandleColour * (uCandleIntensity * reach * facing * beam * lit);
   }
 `;
 
@@ -125,7 +143,19 @@ export class CandleLight {
     uCandleShadow: { value: null as Texture | null },
     uCandleShadowOn: { value: 0 },
     uCandleFar: { value: SHADOW_FAR },
+    uCandleDir: { value: new Vector3(0, 0, -1) },
+    uCandleBeam: {
+      value: new Vector4(
+        Math.cos((BEAM_INNER_DEG * Math.PI) / 180),
+        Math.cos((BEAM_OUTER_DEG * Math.PI) / 180),
+        BEAM_SIDE,
+        BEAM_GAIN,
+      ),
+    },
   };
+  /** Where the beam is aimed (world, m), or null to aim it straight ahead (-z). */
+  private readonly aim = new Vector3();
+  private aimSet = false;
   private readonly target: WebGLCubeRenderTarget;
   private readonly camera: CubeCamera;
   private readonly casters: Mesh[] = [];
@@ -173,7 +203,7 @@ export class CandleLight {
         .replace('#include <common>', `#include <common>\n${lightGlsl}`)
         .replace('#include <opaque_fragment>', 'outgoingLight *= candleLight();\n#include <opaque_fragment>');
     };
-    material.customProgramCacheKey = () => 'candle-light-2';
+    material.customProgramCacheKey = () => 'candle-light-3';
     material.needsUpdate = true;
   }
 
@@ -198,6 +228,12 @@ export class CandleLight {
     this.dirty = true;
   }
 
+  /** Aims the candle's beam at `target` (world, m): the middle of the wall the shadows play on. */
+  aimAt(target: ArrayLike<number>): void {
+    this.aim.set(target[0], target[1], target[2]);
+    this.aimSet = true;
+  }
+
   /** Marks the shadows to be baked again (the room or its props moved). */
   rebake(): void {
     this.dirty = true;
@@ -213,6 +249,11 @@ export class CandleLight {
     u.uCandleReach.value = reach;
     if (!flame) return;
     u.uCandlePos.value.set(flame[0], flame[1], flame[2]);
+    if (this.aimSet) {
+      const dir = u.uCandleDir.value.subVectors(this.aim, u.uCandlePos.value);
+      if (dir.lengthSq() > 1e-6) dir.normalize();
+      else dir.set(0, 0, -1);
+    }
     if (u.uCandlePos.value.distanceToSquared(this.baked) > REBAKE_MOVE * REBAKE_MOVE) this.dirty = true;
   }
 
