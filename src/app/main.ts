@@ -92,6 +92,7 @@ import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
 import { StageFrame } from '../engine/stage/stage-frame';
 import { lightArea } from '../engine/shadow/stage-edge-glsl';
+import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
@@ -262,6 +263,11 @@ async function start(): Promise<void> {
   bedroomView.group.add(roomDressing.group);
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
   bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
+  // The candle as a real light for the room: everything in it is lit per pixel by the flame, and the props cast baked shadows.
+  const candleLight = new CandleLight();
+  roomDressing.useCandleLight(candleLight);
+  bedroomView.useCandleLight(candleLight);
+  bedTray.useCandleLight(candleLight);
   const vrTitle = new VrTitleView();
   /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;
@@ -942,6 +948,7 @@ async function start(): Promise<void> {
     const trayY = Math.max(0.4, head[1] - 0.5);
     const trayZ = head[2] - Math.cos(yaw) * trayDist;
     bedTray.place(trayX, trayY, trayZ, yaw);
+    candleLight.rebake(); // the room and the tray moved: their shadows are cast again
 
     bedTray.getCandleSaucerPosition(saucerPos);
     lantern[0] = saucerPos[0];
@@ -1987,6 +1994,7 @@ async function start(): Promise<void> {
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).
         roomDressing.spread(candleView.lit, step);
+        candleLight.bakeIfDirty(world.renderer, world.scene);
         world.camera.getWorldPosition(settingsHead);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
@@ -2103,6 +2111,7 @@ async function start(): Promise<void> {
         sharpen,
         lanternLight,
         candleView,
+        candleLight,
         stageGroup,
         stageRenderer,
         ghostTarget,

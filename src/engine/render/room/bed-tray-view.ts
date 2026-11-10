@@ -17,6 +17,7 @@ import {
   SRGBColorSpace,
 } from '@iwsdk/core';
 import { paintQuilt } from '../../shadow/room-art';
+import type { CandleLight } from '../../shadow/candle-light';
 
 function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   let canvas = customCanvas;
@@ -127,6 +128,13 @@ export class BedTrayView {
 
   get triangleCount(): number {
     return this._triangleCount;
+  }
+
+  /** Makes the candle on the tray a real light for it (candle-light.ts): the tray and blanket are lit by it and cast its shadows. */
+  useCandleLight(candle: CandleLight): void {
+    candle.light(this.woodMat);
+    candle.light(this.blanketMat);
+    for (const child of this.group.children) if (child instanceof Mesh) candle.cast(child);
   }
 
   /** Positions and rotates the bed tray and blanket relative to the player. */

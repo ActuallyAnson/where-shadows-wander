@@ -377,6 +377,9 @@ export class TestStageView {
     (uniforms.uStage.value as Vector2).set(stage.width, stage.height);
     uniforms.uPoolOn.value = a && !this._highContrast ? 1 : 0;
     this.border.visible = !a || this._highContrast; // a pool of light has no outline; a sheet (and high contrast) does
+    // On the room's wall the candle lights the wallpaper itself (candle-light.ts) and the shadows fall on it: no paper is drawn,
+    // except the plain, hard sheet of high contrast.
+    this.paper.visible = !a || this._highContrast;
     this.flame.mesh.position.set(lantern[0], lantern[1], lantern[2]);
     this.setFlameOnWall(lantern);
     this.group.visible = true;
@@ -413,6 +416,7 @@ export class TestStageView {
     (this.border.material as LineBasicMaterial).color.setHex(on ? 0x000000 : BORDER);
     // High contrast keeps a hard, outlined sheet: the clearest edge there is.
     this.border.visible = on || !this.pool;
+    this.paper.visible = on || !this.pool;
     this.paperMaterial.uniforms.uPoolOn.value = on || !this.pool ? 0 : 1;
   }
 

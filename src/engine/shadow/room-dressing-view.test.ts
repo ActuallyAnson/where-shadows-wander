@@ -15,6 +15,7 @@ import {
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
 import { RoomDressingView } from './room-dressing-view';
+import { CANDLE_REACH_M, CandleLight } from './candle-light';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
 function recordingContext(): { g: CanvasRenderingContext2D; calls: () => number } {
@@ -115,42 +116,41 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('lights the room from the flame: bright near it, dark far from it, and evenly when there is no flame', () => {
+  it('lights the room with the candle as a light: on where the flame is, off with it out, and its art and props registered', () => {
     const v = new RoomDressingView();
-    const vertexColour = (i: number) =>
-      (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
-    for (let i = 0; i < 200; i++) v.spread(true, 0.1); // the light has spread all the way
-    v.update(light(true, 1), 1, [0, 1.2, -1.9]); // the flame just in front of the wall
-    const near = vertexColour(0);
-    v.update(light(true, 1), 1, [0, 1.2, 3]); // the flame far behind the player
-    const far = vertexColour(0);
-    expect(near).toBeGreaterThan(far * 1.5);
-    expect(far).toBeGreaterThan(0.05); // never pitch black
-    v.update(light(false), 0);
-    expect(vertexColour(0)).toBe(1);
+    const candle = new CandleLight();
+    const lit: unknown[] = [];
+    const cast: unknown[] = [];
+    candle.light = (m) => void lit.push(m);
+    candle.cast = (m) => void cast.push(m);
+    v.useCandleLight(candle);
+    expect(lit).toContain(v.wall.material);
+    expect(cast.length).toBeGreaterThanOrEqual(8); // the pictures and shelves, the bookcase and the bed's four parts
+    v.update(light(true, 1), 1, [0, 1.2, -1.9]);
+    expect(candle.uniforms.uCandleOn.value).toBe(1);
+    expect(candle.uniforms.uCandlePos.value.z).toBeCloseTo(-1.9, 5);
+    v.update(light(false), 0, [0, 1.2, -1.9]);
+    expect(candle.uniforms.uCandleOn.value).toBe(0);
+    candle.dispose();
     v.dispose();
   });
 
   it('spreads the candlelight out from the flame once lit, and draws it back when the flame goes out', () => {
     const v = new RoomDressingView();
-    const vertexColour = (i: number) =>
-      (v.wall.geometry.attributes.color as unknown as { getX: (n: number) => number }).getX(i);
-    v.update(light(true, 1), 1, [0, 1.2, -1.2]); // the flame a metre from the wall
-    const first = vertexColour(0);
+    const first = v.reach;
     expect(v.spreadAmount).toBe(0);
     for (let i = 0; i < 40; i++) v.spread(true, 0.1); // half way
-    const half = vertexColour(0);
+    const half = v.reach;
     expect(half).toBeGreaterThan(first);
     for (let i = 0; i < 60; i++) v.spread(true, 0.1); // all the way (SPREAD_S)
-    const full = vertexColour(0);
     expect(v.spreadAmount).toBe(1);
-    expect(full).toBeGreaterThan(half);
+    expect(v.reach).toBeCloseTo(CANDLE_REACH_M, 5);
+    expect(v.reach).toBeGreaterThan(half);
     for (let i = 0; i < 20; i++) v.spread(false, 0.1); // covered: dark again in DARKEN_S
     expect(v.spreadAmount).toBe(0);
-    expect(vertexColour(0)).toBeCloseTo(first, 3);
+    expect(v.reach).toBeCloseTo(first, 5);
     v.dispose();
   });
-
   it('flickers with the flame, differently from piece to piece, and holds steady without one', () => {
     const v = new RoomDressingView();
     const wallColour = () => (v.wall.material as unknown as { color: { r: number } }).color.r;

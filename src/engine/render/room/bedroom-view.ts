@@ -23,6 +23,7 @@ import type { BufferGeometry, Material, Quaternion } from '@iwsdk/core';
 import { mergeBoxes } from '../../shadow/merge-boxes';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../../stage/stage-frame';
+import type { CandleLight } from '../../shadow/candle-light';
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
 export const NIGHT_AMBIENT = 0x141d2e;
@@ -298,6 +299,17 @@ export class BedroomView {
     this.rightWallMesh.visible = !covered;
     this.frontWallMesh.visible = !covered;
     this.skyMesh.visible = !covered;
+  }
+
+  /**
+   * Makes the candle a real light for the room's shell (candle-light.ts): the floor, ceiling, rafters, walls and window frame are lit
+   * by it per pixel and take the props' shadows. The night sky and the moon's wash keep their own light. Call once.
+   */
+  useCandleLight(candle: CandleLight): void {
+    for (const m of this.materials) {
+      if (!(m instanceof MeshBasicMaterial) || m.transparent || m === this.skyMesh.material) continue;
+      candle.light(m);
+    }
   }
 
   private register(geo: BufferGeometry, mat?: Material): void {

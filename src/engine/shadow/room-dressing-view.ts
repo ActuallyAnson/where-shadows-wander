@@ -23,7 +23,6 @@ import { BuntingView } from './bunting-view';
 import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
-  castShadow,
   NIGHT_MARGIN,
   type NightLayer,
   paintBookcase,
@@ -42,6 +41,7 @@ import {
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
+import { CANDLE_REACH_M, type CandleLight } from './candle-light';
 
 /** Colours the art is multiplied by: dark and blue by moonlight, warm and bright by the candle. */
 /** Before everything else in the scene (Damon's plain front wall is -10). */
@@ -76,23 +76,16 @@ const OUTSIDE_LAYERS: readonly { layer: NightLayer; slide: number; w: number; h:
 /** Share of a painted margin a layer may slide into, so a bare edge never shows. */
 const SLIDE_LIMIT = 0.9;
 
-/** Candlelight on the room: what is left of the colour far from the flame, and the distance (m) at which the light is half gone. */
-const FLAME_AMBIENT = 0.08;
-const FLAME_REACH = 0.85;
 /**
  * The light spreading out from a newly lit candle: its reach (m) the moment it catches, and the seconds it takes to grow from that
- * to FLAME_REACH. When the candle goes out (covered, paused) the light draws back to the flame in DARKEN_S.
+ * to CANDLE_REACH_M. When the candle goes out (covered, paused) the light draws back to the flame in DARKEN_S.
  */
 const SPREAD_FROM_M = 0.12;
 export const SPREAD_S = 8;
 export const DARKEN_S = 2;
-/** The reach has to change this much (m) before the walls' light is worked out again. */
-const REACH_STEP = 0.015;
-/** The most of its brightness the room art has at full candlelight (the paper stage is the brightest thing), and how far the flame's flicker moves it. */
-const LIT_PEAK = 0.8;
+/** The most of its brightness the room art has at full candlelight (the wall the shadows fall on is the brightest thing), and how far the flame's flicker moves it. */
+const LIT_PEAK = 1.0;
 const FLICKER = 0.1;
-/** The flame has to move this far (m) before the walls' light is worked out again. */
-const FLAME_MOVE = 0.02;
 
 /** Things in the room that light up as the night goes, one more for each puzzle solved. */
 const WONDERS = 5;
@@ -168,16 +161,15 @@ export class RoomDressingView {
   private time = 0;
   private readonly textures: CanvasTexture[] = [];
   private readonly tint = new Color();
-  /** The walls, lit per vertex by the candle, and the rest of the room art, lit by how far its middle is from the flame. */
-  private readonly vertexLit: Mesh[] = [];
-  private readonly centreLit: Mesh[] = [];
-  private readonly falloff = new Map<MeshBasicMaterial, number>();
+  /** The room art the candle lights (the walls, and everything on and by them), and the props that cast its shadows. */
+  private readonly lit: Mesh[] = [];
+  private readonly casters: Mesh[] = [];
   /** Where in the flicker each piece is, so the light seems to dance across the room rather than blink all at once. */
   private readonly phase = new Map<MeshBasicMaterial, number>();
-  private readonly flame = new Vector3();
-  private readonly spot = new Vector3();
   private flameOn = false;
-  /** How far the candle's light has spread into the room, 0 (only by the flame) .. 1 (the whole room), and the reach last lit with. */
+  /** The candle as a light (candle-light.ts), once `useCandleLight` is called: it lights the art per pixel and casts the shadows. */
+  private candle: CandleLight | null = null;
+  /** How far the candle's light has spread into the room, 0 (only by the flame) .. 1 (the whole room), and its reach now (m). */
   private spreadLevel = 0;
   private reachNow = SPREAD_FROM_M;
   /** The wonders' glow: how lit each is (0..1), how many should be lit, and the one mesh that draws them all. */
@@ -196,27 +188,15 @@ export class RoomDressingView {
   constructor() {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
     // to draw; everything on a wall sits a hair in front of it.
-    // What hangs on the wall behind the stage stands out from it, in two layers (frames, then shelves with their keepsakes); their
-    // shadows are painted onto the paper, so the gap between them shows when the head moves.
+    // What hangs on the wall behind the stage stands out from it, in two layers (frames, then shelves with their keepsakes). The
+    // candle casts their shadows on the wall (candle-light.ts), so the gap between them shows when the head moves, and the shadows
+    // move with the flame.
     const thingCanvases = WALL_THINGS.map((spec) =>
       paintedCanvas(spec.area.w, spec.area.h, (g, w, h) => paintWallThings(g, w, h, spec.layer, spec.area)),
     );
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
       paintWall(g, w, h, false); // the bunting here is alive (bunting-view.ts)
-      WALL_THINGS.forEach((spec, i) => {
-        const far = spec.layer === 'shelves';
-        castShadow(
-          g,
-          thingCanvases[i],
-          spec.area.x,
-          spec.area.y,
-          far ? 16 : 6,
-          far ? 22 : 9,
-          far ? 16 : 7,
-          far ? 0.55 : 0.5,
-        );
-      });
     });
     this.wall = this.quad(4, 2.5, this.texture(wallCanvas), false, true, undefined, [16, 10]);
     this.wall.position.set(0, 1.25, -2.4);
@@ -429,11 +409,12 @@ export class RoomDressingView {
     this.wonders.frustumCulled = false; // its glows are spread over the whole room
     this.wonders.matrixAutoUpdate = false;
     this.group.add(this.wonders);
-    this.vertexLit.push(this.wall, left, right);
     this.group.add(this.bunting.mesh);
     this.materials.push(this.bunting.material);
-    this.centreLit.push(sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
-    for (const m of [...this.vertexLit, ...this.centreLit]) {
+    this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
+    // The props that stand in the candle's light and stay still (the bunting swings, so it casts none).
+    this.casters.push(...this.things, caseBox, ...bed);
+    for (const m of this.lit) {
       this.phase.set(m.material as MeshBasicMaterial, m.position.x * 1.3 + m.position.z * 0.9 + m.position.y * 0.4);
     }
     this.place();
@@ -505,12 +486,23 @@ export class RoomDressingView {
     });
     this.bunting.place(z + 0.05);
     this.buildWonders(z);
-    this.relight();
+    this.candle?.rebake(); // the props moved with the wall
   }
 
   /**
-   * Lights the art like the room: dark and blue by moonlight, and by candlelight warm near the flame and dark far from it (`flame` is
-   * the flame's world position; without it the candle lights everything evenly). Same other arguments as BedroomView.update.
+   * Makes the candle a real light for the room (candle-light.ts): the art is lit by it per pixel, by how far each point is from the
+   * flame and how squarely it faces it, and the pictures, shelves, bookcase and bed cast its shadows. Call once.
+   */
+  useCandleLight(candle: CandleLight): void {
+    this.candle = candle;
+    for (const m of this.lit) candle.light(m.material as MeshBasicMaterial);
+    for (const m of this.casters) candle.cast(m);
+  }
+
+  /**
+   * Lights the art like the room: dark and blue by moonlight, and warm by candlelight (`flame` is the flame's world position;
+   * with the candle as a light, it lights each point by its distance and casts the props' shadows). Same other arguments as
+   * BedroomView.update.
    */
   update(light: Readonly<LanternLight>, occlusion = 1, flame?: ArrayLike<number>): void {
     const brightness = light.lit ? Math.max(0.04, occlusion * (0.2 + 0.8 * light.intensity)) : 0.04;
@@ -519,18 +511,8 @@ export class RoomDressingView {
     this.tint.copy(MOON_TINT).lerp(CANDLE_TINT, warm);
     const k = 0.5 + 0.5 * Math.min(1, brightness);
     this.tint.multiplyScalar(warm > 0 ? k * LIT_PEAK : 1);
-    // Where the flame is (in the room's own space), and whether it lights the room at all.
-    if (light.lit && flame) {
-      this.group.worldToLocal(this.spot.set(flame[0], flame[1], flame[2]));
-      if (!this.flameOn || this.spot.distanceToSquared(this.flame) > FLAME_MOVE * FLAME_MOVE) {
-        this.flame.copy(this.spot);
-        this.flameOn = true;
-        this.relight();
-      }
-    } else if (this.flameOn) {
-      this.flameOn = false;
-      this.relight();
-    }
+    this.flameOn = light.lit && flame !== undefined;
+    this.candle?.set(this.flameOn, flame ?? null, this.reachNow);
     // The flame's flicker: a few sines of different speeds, a different moment for each piece, only when the candle lights the room.
     const time = this.time;
     for (const m of this.materials) {
@@ -542,7 +524,7 @@ export class RoomDressingView {
               0.3 * Math.sin(time * 9.7 + 1.7 * p) +
               0.2 * Math.sin(time * 2.3 + 0.6 * p))
         : 1;
-      m.color.copy(this.tint).multiplyScalar((this.falloff.get(m) ?? 1) * flicker);
+      m.color.copy(this.tint).multiplyScalar(flicker);
     }
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
     // The moonlight on the floor shrinks into the room's light when the candle is bright.
@@ -561,11 +543,7 @@ export class RoomDressingView {
       : Math.max(0, this.spreadLevel - step / DARKEN_S);
     const s = this.spreadLevel;
     const eased = s * s * (3 - 2 * s);
-    const want = SPREAD_FROM_M + (FLAME_REACH - SPREAD_FROM_M) * eased;
-    if (Math.abs(want - this.reachNow) >= REACH_STEP || (s >= 1 && want !== this.reachNow)) {
-      this.reachNow = want;
-      if (this.flameOn) this.relight();
-    }
+    this.reachNow = SPREAD_FROM_M + (CANDLE_REACH_M - SPREAD_FROM_M) * eased;
   }
 
   /** How far the candle's light has spread into the room, 0 .. 1. */
@@ -573,34 +551,10 @@ export class RoomDressingView {
     return this.spreadLevel;
   }
 
-  /** How much of the candle's light reaches a point `d2` (squared metres) from the flame: all of it close by, little far away. */
-  private reach(d2: number): number {
-    return FLAME_AMBIENT + (1 - FLAME_AMBIENT) / (1 + d2 / (this.reachNow * this.reachNow));
+  /** How far the candle's light reaches now, metres (its half-light distance; it grows as the light spreads). */
+  get reach(): number {
+    return this.reachNow;
   }
-
-  /** Works out the candle's light on every wall vertex and on the middle of each other piece (when the flame moves or goes out). */
-  private relight(): void {
-    for (const mesh of this.vertexLit) {
-      const position = mesh.geometry.attributes.position;
-      const color = mesh.geometry.attributes.color;
-      for (let i = 0; i < position.count; i++) {
-        let f = 1;
-        if (this.flameOn) {
-          this.spot.fromBufferAttribute(position, i).applyMatrix4(mesh.matrix);
-          f = this.reach(this.spot.distanceToSquared(this.flame));
-        }
-        color.setXYZ(i, f, f, f);
-      }
-      color.needsUpdate = true;
-    }
-    for (const mesh of this.centreLit) {
-      this.falloff.set(
-        mesh.material as MeshBasicMaterial,
-        this.flameOn ? this.reach(mesh.position.distanceToSquared(this.flame)) : 1,
-      );
-    }
-  }
-
   /** Where the sleeper `index` (0 = the lamp .. 4 = the window) is, in the world: the point the spark flies to. Writes into `out` and returns it. */
   wakePoint(index: number, out: Vector3): Vector3 {
     const i = Math.max(0, Math.min(WONDERS - 1, Math.floor(index) || 0));
