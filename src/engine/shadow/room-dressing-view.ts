@@ -86,7 +86,7 @@ export const DARKEN_S = 2;
 /** The room art's own colour, as a share of its painted colour (the light multiplies it). */
 const LIT_PEAK = 1.0;
 /** How bright the moonlight's patch on the floor is (it is added to the floor). */
-const MOON_PATCH = 0.3;
+const MOON_PATCH = 0.15;
 /** How bright the candle's glow is at the end of the hold that lights it, before it catches (its full brightness is about 1). */
 const IGNITION_GLOW = 0.5;
 

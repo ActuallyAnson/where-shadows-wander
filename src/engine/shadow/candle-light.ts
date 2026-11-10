@@ -29,7 +29,7 @@ const REBAKE_MOVE = 0.01;
 /** The candle's light where it is half gone (m). */
 export const CANDLE_REACH_M = 1.6;
 /** The two lights in the room: the moon's, faint, blue and everywhere (the room's ambient), and the candle's, warm, from the flame. */
-export const MOON_LIGHT = new Color(0.2, 0.25, 0.4);
+export const MOON_LIGHT = new Color(0.06, 0.075, 0.13);
 export const CANDLE_COLOUR = new Color(1.0, 0.82, 0.6);
 
 const packGlsl = /* glsl */ `

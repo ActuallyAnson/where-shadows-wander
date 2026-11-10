@@ -33,7 +33,7 @@ const BASE_RAFTER = new Color(0x1a120b);
 const BASE_WALL = new Color(0x1c1713);
 const CANDLE_AMBER = new Color(0xff9933);
 const MOON_BLUE = new Color(MOONLIGHT_COLOR);
-/** How much brighter the shell's own colours are than its old moonlit look, under the candle light's moonlight (about 1 / 0.28). */
+/** How much brighter the shell's own colours are than its old final look (they are lit now: dim moonlight, the candle's light). */
 const ALBEDO_GAIN = 3.5;
 
 function createFloorTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
