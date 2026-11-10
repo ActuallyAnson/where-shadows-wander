@@ -12,11 +12,13 @@ When real sounds replace them, add a row for each file here: what it is, who mad
 
 ## 3D models
 
-The bedroom's furniture models in `src/assets/models/` (the bed, bookcase, bedside table, lamp and plant; loaded by `src/engine/shadow/room-models.ts`) come from Kenney's [Furniture Kit](https://kenney.nl/assets/furniture-kit) by Kenney (kenney.nl), under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required; it is given here anyway.
+The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. All of them are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): no attribution is required, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSET-SOURCES.md`).
 
 | Model | Made by | Source | Licence |
 |---|---|---|---|
-| Furniture Kit `.glb` files in `src/assets/models/` | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
+| `bedSingle.glb`, `bookcaseOpen.glb`, `books.glb`, `sideTable.glb`, `lampRoundTable.glb`, `rugRound.glb`, `bear.glb`, `chair.glb`, `pottedPlant.glb` (Furniture Kit 2.0) | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
+| `candleStick.glb` ("Candlestick") | CreativeTrio | https://poly.pizza/m/tknOVwxT8B | CC0 1.0 |
+| `candles.glb` ("Candles") | Quaternius | https://poly.pizza/m/AnzHB44wlW | CC0 1.0 |
 
 ## Other assets
 
