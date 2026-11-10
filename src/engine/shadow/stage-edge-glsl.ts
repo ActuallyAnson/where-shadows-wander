@@ -51,9 +51,12 @@ export const stageEdgeGlsl = /* glsl */ `
     float inside = -(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r);
     return smoothstep(0.0, fade, inside);
   }
-  float lightPool(vec2 p, vec2 flame, vec2 radius) {
+  // How far out in the pool \`p\` is: 0 at its centre, 1 at its rim.
+  float poolDist(vec2 p, vec2 flame, vec2 radius) {
     vec2 c = clamp(flame * 0.5, vec2(-0.4), vec2(0.4));
-    float e = length((p - c) / radius);
-    return 1.0 - smoothstep(0.5, 1.0, e);
+    return length((p - c) / radius);
+  }
+  float lightPool(vec2 p, vec2 flame, vec2 radius) {
+    return 1.0 - smoothstep(0.5, 1.0, poolDist(p, flame, radius));
   }
 `;

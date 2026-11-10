@@ -34,8 +34,8 @@ import { RenderOrder } from './pure/render-order';
 import { LIGHT_POOL_RX_M, LIGHT_POOL_RY_M, stageEdgeGlsl } from './stage-edge-glsl';
 
 const PAPER = new Color(0xf2e6c9);
-/** How opaque the candle's light is round the paper, on the room's wall (the wallpaper shows through it). */
-const OFF_PAPER_ALPHA = 0.5;
+/** On the room's wall: how far out (a share of the pool's radius) the candle's light stays solid before it starts to thin. */
+const POOL_SOLID = 0.3;
 
 const vertex = /* glsl */ `
   varying vec2 vUv;
@@ -142,20 +142,22 @@ ${stageEdgeGlsl}
       }
       vec3 sceneTint = mix(vec3(0.84, 0.92, 1.08), vec3(1.1, 0.95, 0.8), uMood);
       vec3 scene = bg * sceneTint * light * tooth * (0.97 + 0.03 * blot);
-      // The scenery belongs to the stage: it fades out into plain candlelight round it.
-      float sceneryMask = uPoolOn > 0.5 ? stageEdge(p, uStage, 0.3) : 1.0;
+      // The scenery belongs to the stage: on the wall it fades out in an oval inside the stage, into the plain candlelight, so no
+      // edge of it shows.
+      float sceneryMask = uPoolOn > 0.5 ? 1.0 - smoothstep(0.45, 1.0, length(p / (0.5 * uStage))) : 1.0;
       col = mix(col, scene, uBackdrop * sceneryMask);
     }
 
-    // On the room's wall the stage is the middle of the candle's pool of light: round, covering most of the wall, leaning toward
-    // the flame, and fading into the wallpaper (a little unevenly, like light through a worn shade). Round the stage the light is
-    // thinner, so the wallpaper shows through it; the floor, ceiling and side walls cut it off. Otherwise the rim of a sheet darkens.
+    // On the room's wall the stage is the middle of the candle's pool of light: one light, round, covering most of the wall, leaning
+    // toward the flame. Everything about it falls off smoothly with the distance from its centre, with no step anywhere (the stage
+    // has no edge of its own): it thins into the wallpaper, dims, and warms toward the rim, a little unevenly, like light through a
+    // worn shade. The floor, ceiling and side walls cut it off. Otherwise (a sheet) the rim of the sheet darkens.
     float alpha = uOpacity;
     if (uPoolOn > 0.5) {
-      float reach = lightPool(p, uFlame.xy, uPoolR * (0.97 + 0.06 * blot));
-      float onPaper = stageEdge(p, uStage, 0.35);
-      col *= mix(vec3(1.0, 0.86, 0.66), vec3(1.0), onPaper); // plain candlelight round the paper is warmer
-      alpha = reach * mix(${OFF_PAPER_ALPHA.toFixed(3)}, uOpacity, onPaper) * stageEdge(p - uAreaC, uSize, 0.03);
+      float r = poolDist(p, uFlame.xy, uPoolR * (0.97 + 0.06 * blot));
+      float core = 1.0 - smoothstep(0.0, 1.0, r);
+      col *= (0.7 + 0.3 * core) * mix(vec3(1.0, 0.8, 0.58), vec3(1.0), 1.0 - smoothstep(0.15, 0.95, r));
+      alpha = uOpacity * (1.0 - smoothstep(${POOL_SOLID.toFixed(3)}, 1.0, r)) * stageEdge(p - uAreaC, uSize, 0.03);
     } else {
       float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
       col *= mix(0.7, 1.0, smoothstep(0.0, 0.035 + 0.01 * blot, edge));
