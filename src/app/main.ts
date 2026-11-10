@@ -96,7 +96,7 @@ import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
-import { readBedroomLayout } from '../engine/shadow/bedroom-layout';
+import { BEDROOM_LAYOUT_FILE, readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -1122,6 +1122,28 @@ async function start(): Promise<void> {
     ] as const)
       if (debugViews.has(view)) debug.showOverlay(overlay);
   }
+  // The room editor (src/debug/room-editor.ts): ?mock=1&edit=room arranges the bedroom's static pieces in the Hand Lab and
+  // saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
+  let roomEditor: import('../debug/room-editor').RoomEditor | null = null;
+  if (DEBUG_TOOLS && lab && params.get('edit') === 'room') {
+    const { RoomEditor } = await import('../debug/room-editor');
+    const desk = lab;
+    roomEditor = new RoomEditor({
+      camera: world.camera,
+      canvas: world.renderer.domElement,
+      scene: world.scene,
+      room: bedroomView.group,
+      sources: [roomModels],
+      layout: bedroomLayout.layout,
+      fileName: BEDROOM_LAYOUT_FILE,
+      roomRoots: [bedroomView.group, bedTray.group, candleView.group],
+      suspendDesk: (on) => {
+        desk.suspend(on);
+        if (mock) mock.paused = on;
+      },
+    });
+    roomEditor.show();
+  }
   // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
   // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
   const occluder = new HandOccluder();
@@ -2124,6 +2146,8 @@ async function start(): Promise<void> {
         bedTray,
         bedroomView,
         roomDressing,
+        roomModels,
+        roomEditor,
         vrTitle,
         wallPauseView,
         sessionState: () => sessionState,

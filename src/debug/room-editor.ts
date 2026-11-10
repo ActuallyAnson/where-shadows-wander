@@ -1,0 +1,548 @@
+// The room editor: arrange the bedroom's static pieces in the running game and save them to the room layout file
+// (content/rooms/bedroom.json, src/engine/stage/room-layout.ts). Development and tester builds only; it opens in the Hand Lab
+// with `?mock=1&edit=room`, and main.ts loads it with a dynamic import behind DEBUG_TOOLS.
+//
+// Click a piece to select it (or pick it from the list), then drag the gizmo or type exact numbers. The numbers are the
+// piece's placement as the file stores it: position in metres, rotation in degrees and scale, in the piece's own space
+// (room space for the room, the tray's space for the lap). Save writes the file through the dev server.
+//
+//   W move · E rotate · R scale · Q local/world · hold Shift to snap (1 cm, 5°, 0.05) · Esc deselect
+//   Ctrl+Z undo · Ctrl+Y or Ctrl+Shift+Z redo · Ctrl+S save
+import { Object3D, Raycaster, Vector2, Vector3, type PerspectiveCamera } from '@iwsdk/core';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { copyPlacement, placementOr, roundPlacement, serializeRoomLayout } from '../engine/stage/room-layout';
+import type { Placement, RoomLayout, Vec3 } from '../engine/stage/room-layout';
+import { applyPlacement, readPlacement } from '../engine/shadow/room-placement';
+import type { EditablePiece, EditableSource } from '../engine/shadow/room-placement';
+import { RoomEditHistory } from './room-edit-history';
+
+export interface RoomEditorDeps {
+  camera: PerspectiveCamera;
+  canvas: HTMLCanvasElement;
+  scene: Object3D;
+  /** The room's root (room space): the view presets are placed in it. */
+  room: Object3D;
+  /** What owns the pieces: each view of the room. */
+  sources: readonly EditableSource[];
+  /** The layout the game was built from; Save writes the pieces' placements into it and then to the file. */
+  layout: RoomLayout;
+  /** The file's name under content/rooms/. */
+  fileName: string;
+  /** Scene roots that are part of the room, still shown with "Room only" on (everything else at the top of the scene is hidden). */
+  roomRoots: readonly Object3D[];
+  /** Takes the desk view from the Hand Lab (true) or gives it back (false). */
+  suspendDesk(on: boolean): void;
+}
+
+type Mode = 'translate' | 'rotate' | 'scale';
+
+const SNAP = { translate: 0.01, rotateDeg: 5, scale: 0.05 };
+const FIELDS = ['pos', 'rotDeg', 'scale'] as const;
+const FIELD_LABEL = { pos: 'Position (m)', rotDeg: 'Rotation (°)', scale: 'Scale' } as const;
+const PANEL_W = 300;
+
+/** View presets, in room space: where the camera stands and what it looks at. */
+const VIEWS: Readonly<Record<string, readonly [Vec3, Vec3]>> = {
+  Eye: [
+    [0, 1.15, 0.05],
+    [0, 0.85, -1.6],
+  ],
+  Overview: [
+    [0.2, 2.2, 1.7],
+    [0, 0.6, -0.5],
+  ],
+  Left: [
+    [1.7, 1.4, 0.6],
+    [-1.9, 1.1, -0.6],
+  ],
+  Right: [
+    [-1.7, 1.4, 0.6],
+    [1.9, 1.1, -0.4],
+  ],
+};
+
+const keyOf = (p: EditablePiece): string => `${p.section}:${p.id}`;
+
+export class RoomEditor {
+  private readonly orbit: OrbitControls;
+  private readonly gizmo: TransformControls;
+  private readonly helper: Object3D;
+  private readonly raycaster = new Raycaster();
+  private readonly pointer = new Vector2();
+  private readonly downAt = new Vector2();
+  private readonly history = new RoomEditHistory();
+  private readonly root = document.createElement('aside');
+  /** What "Room only" hid, to show again when it is turned off. */
+  private readonly hiddenByRoomOnly = new Set<Object3D>();
+  private restoreBeforeRender: Object3D['onBeforeRender'] | null = null;
+  private selected: EditablePiece | null = null;
+  /** The selected piece's placement when the current drag began. */
+  private dragStart: Placement | null = null;
+  private savedText: string;
+  private status = '';
+  private roomOnly = false;
+  private open = false;
+  /** The piece the selection section was last built for (it is rebuilt only when that changes, so typing keeps its focus). */
+  private shownKey: string | null | undefined = undefined;
+  private readonly onKeyDown = (e: KeyboardEvent) => this.key(e, true);
+  private readonly onKeyUp = (e: KeyboardEvent) => this.key(e, false);
+  private readonly onPointerDown = (e: PointerEvent) => this.downAt.set(e.clientX, e.clientY);
+  private readonly onPointerUp = (e: PointerEvent) => this.click(e);
+  private readonly onResize = () => this.fitCamera();
+  private readonly onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (this.dirty) e.preventDefault();
+  };
+
+  constructor(private readonly deps: RoomEditorDeps) {
+    this.savedText = serializeRoomLayout(this.collect());
+    this.orbit = new OrbitControls(deps.camera, deps.canvas);
+    this.orbit.enabled = false;
+    this.gizmo = new TransformControls(deps.camera, deps.canvas);
+    this.gizmo.enabled = false;
+    this.helper = this.gizmo.getHelper();
+    this.gizmo.addEventListener('dragging-changed', (e) => {
+      const dragging = (e as unknown as { value: boolean }).value;
+      this.orbit.enabled = this.open && !dragging;
+    });
+    this.gizmo.addEventListener('mouseDown', () => {
+      if (this.selected) this.dragStart = readPlacement(this.selected.object);
+    });
+    this.gizmo.addEventListener('objectChange', () => {
+      if (this.selected) this.selected.object.updateMatrix();
+      this.renderFields();
+    });
+    this.gizmo.addEventListener('mouseUp', () => {
+      const piece = this.selected;
+      if (!piece || !this.dragStart) return;
+      this.commit(piece, this.dragStart, readPlacement(piece.object));
+      this.dragStart = null;
+    });
+    this.mount();
+  }
+
+  /** Opens the editor: it takes the desk view, and the Hand Lab's panel, orbit and keys stand aside. */
+  show(): void {
+    if (this.open) return;
+    this.open = true;
+    this.deps.suspendDesk(true);
+    this.deps.scene.add(this.helper);
+    this.orbit.enabled = true;
+    this.gizmo.enabled = true;
+    this.root.style.display = '';
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('beforeunload', this.onBeforeUnload);
+    this.deps.canvas.addEventListener('pointerdown', this.onPointerDown);
+    this.deps.canvas.addEventListener('pointerup', this.onPointerUp);
+    this.fitCamera();
+    this.view('Overview');
+    this.setRoomOnly(true);
+    this.render();
+  }
+
+  /** Closes the editor and gives the desk view back to the Hand Lab. Unsaved changes stay in the room until reload. */
+  hide(): void {
+    if (!this.open) return;
+    this.open = false;
+    this.select(null);
+    this.setRoomOnly(false);
+    this.deps.scene.remove(this.helper);
+    this.orbit.enabled = false;
+    this.gizmo.enabled = false;
+    this.root.style.display = 'none';
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
+    this.deps.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    this.deps.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.deps.camera.clearViewOffset();
+    this.deps.suspendDesk(false);
+  }
+
+  get isOpen(): boolean {
+    return this.open;
+  }
+
+  /** Whether there are changes not yet in the file. */
+  get dirty(): boolean {
+    return serializeRoomLayout(this.collect()) !== this.savedText;
+  }
+
+  /** Every piece there is now (models that load late are added as they arrive). */
+  pieces(): EditablePiece[] {
+    return this.deps.sources.flatMap((s) => [...s.editables()]);
+  }
+
+  /** Selects a piece by id (`bed`, or `lap:quilt` for another section), for scripts and tests. */
+  selectId(id: string): boolean {
+    const key = id.includes(':') ? id : `room:${id}`;
+    const piece = this.pieces().find((p) => keyOf(p) === key) ?? null;
+    this.select(piece);
+    return piece !== null;
+  }
+
+  /** Moves a piece to a placement, as one undoable step. */
+  set(piece: EditablePiece, to: Readonly<Placement>): void {
+    this.commit(piece, readPlacement(piece.object), to);
+  }
+
+  /** The layout as Save would write it: the file's own entries, with every piece there now at its current placement. */
+  collect(): RoomLayout {
+    const out: RoomLayout = {
+      version: this.deps.layout.version,
+      room: { ...this.deps.layout.room },
+      lap: { ...this.deps.layout.lap },
+    };
+    for (const p of this.pieces()) out[p.section][p.id] = roundPlacement(readPlacement(p.object));
+    return out;
+  }
+
+  /** Writes the layout file through the dev server; on a built page (no dev server) it downloads it instead. */
+  async save(): Promise<string> {
+    const layout = this.collect();
+    const text = serializeRoomLayout(layout);
+    let result: string;
+    try {
+      const res = await fetch(`./__wsw/rooms/${this.deps.fileName}`, { method: 'POST', body: text });
+      if (res.ok) {
+        this.deps.layout.room = layout.room;
+        this.deps.layout.lap = layout.lap;
+        this.savedText = text;
+        result = `Saved content/rooms/${this.deps.fileName}`;
+      } else result = `Not saved: ${await res.text()}`;
+    } catch {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      Object.assign(document.createElement('a'), { href: url, download: this.deps.fileName }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      result = `No dev server: downloaded ${this.deps.fileName} (put it in content/rooms/)`;
+    }
+    this.status = result;
+    this.render();
+    return result;
+  }
+
+  private commit(piece: EditablePiece, before: Readonly<Placement>, after: Readonly<Placement>): void {
+    this.place(piece, after);
+    this.history.push(keyOf(piece), before, after);
+    this.status = '';
+    this.render();
+  }
+
+  private place(piece: EditablePiece, p: Readonly<Placement>): void {
+    applyPlacement(piece.object, p);
+    this.deps.sources.find((s) => s.editables().includes(piece))?.moved?.(piece);
+  }
+
+  private step(undo: boolean): void {
+    const e = undo ? this.history.undo() : this.history.redo();
+    if (!e) return;
+    const piece = this.pieces().find((p) => keyOf(p) === e.key);
+    if (piece) {
+      this.place(piece, undo ? e.before : e.after);
+      this.select(piece);
+    }
+    this.render();
+  }
+
+  private reset(): void {
+    const piece = this.selected;
+    if (!piece) return;
+    this.commit(piece, readPlacement(piece.object), piece.fallback);
+  }
+
+  /** Puts the selected piece back where the file had it when the page loaded (or last saved). */
+  private revert(): void {
+    const piece = this.selected;
+    if (!piece) return;
+    this.commit(
+      piece,
+      readPlacement(piece.object),
+      placementOr(this.deps.layout, piece.section, piece.id, piece.fallback),
+    );
+  }
+
+  private select(piece: EditablePiece | null): void {
+    this.selected = piece;
+    if (piece) this.gizmo.attach(piece.object);
+    else this.gizmo.detach();
+    this.render();
+  }
+
+  private setMode(mode: Mode): void {
+    this.gizmo.setMode(mode);
+    this.render();
+  }
+
+  private setSnap(on: boolean): void {
+    this.gizmo.setTranslationSnap(on ? SNAP.translate : null);
+    this.gizmo.setRotationSnap(on ? (SNAP.rotateDeg * Math.PI) / 180 : null);
+    this.gizmo.setScaleSnap(on ? SNAP.scale : null);
+  }
+
+  /**
+   * "Room only" hides everything at the top of the scene that is not part of the room (the stage, the reading page, the
+   * story's views). The game sets some of those visible every frame, so it is done again just before each render.
+   */
+  private setRoomOnly(on: boolean): void {
+    if (on === this.roomOnly) return;
+    this.roomOnly = on;
+    const scene = this.deps.scene;
+    if (on) {
+      const before = scene.onBeforeRender;
+      this.restoreBeforeRender = before;
+      scene.onBeforeRender = (...args) => {
+        before.apply(scene, args);
+        this.hideNonRoom();
+      };
+      this.hideNonRoom();
+    } else {
+      if (this.restoreBeforeRender) scene.onBeforeRender = this.restoreBeforeRender;
+      this.restoreBeforeRender = null;
+      for (const child of this.hiddenByRoomOnly) child.visible = true;
+      this.hiddenByRoomOnly.clear();
+    }
+    this.render();
+  }
+
+  private hideNonRoom(): void {
+    for (const child of this.deps.scene.children)
+      if (child.visible && child !== this.helper && !this.deps.roomRoots.includes(child) && !isCameraOrLight(child)) {
+        child.visible = false;
+        this.hiddenByRoomOnly.add(child);
+      }
+  }
+
+  /** Puts the camera at a view preset (room space). */
+  private view(name: string): void {
+    const v = VIEWS[name];
+    if (!v) return;
+    const room = this.deps.room;
+    room.updateMatrixWorld(true);
+    const eye = room.localToWorld(new Vector3(...v[0]));
+    const target = room.localToWorld(new Vector3(...v[1]));
+    this.deps.camera.position.copy(eye);
+    this.orbit.target.copy(target);
+    this.orbit.update();
+  }
+
+  /** The view fills the part of the window the panel doesn't cover. */
+  private fitCamera(): void {
+    const w = window.innerWidth,
+      h = window.innerHeight;
+    if (w < 700) this.deps.camera.clearViewOffset();
+    else this.deps.camera.setViewOffset(w, h, PANEL_W / 2, 0, w, h);
+  }
+
+  /** A click on the canvas (not a drag of the view or the gizmo) selects the piece under it, or nothing. */
+  private click(e: PointerEvent): void {
+    if (e.button !== 0 || this.gizmo.dragging || this.gizmo.axis !== null) return;
+    if (Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > 4) return;
+    const rect = this.deps.canvas.getBoundingClientRect();
+    this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.deps.camera.updateMatrixWorld();
+    this.raycaster.setFromCamera(this.pointer, this.deps.camera);
+    const pieces = this.pieces().filter((p) => p.object.visible);
+    const hits = this.raycaster.intersectObjects(
+      pieces.map((p) => p.object),
+      true,
+    );
+    for (const hit of hits) {
+      if (!isShown(hit.object)) continue;
+      const piece = pieces.find((p) => isWithin(hit.object, p.object));
+      if (piece) return this.select(piece);
+    }
+    this.select(null);
+  }
+
+  private key(e: KeyboardEvent, down: boolean): void {
+    if (e.key === 'Shift') return this.setSnap(down);
+    if (!down || e.altKey || e.metaKey) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const k = e.key.toLowerCase();
+    if (e.ctrlKey) {
+      if (k === 'z') this.step(!e.shiftKey);
+      else if (k === 'y') this.step(false);
+      else if (k === 's') void this.save();
+      else return;
+    } else if (k === 'w') this.setMode('translate');
+    else if (k === 'e') this.setMode('rotate');
+    else if (k === 'r') this.setMode('scale');
+    else if (k === 'q') {
+      this.gizmo.setSpace(this.gizmo.space === 'local' ? 'world' : 'local');
+      this.render();
+    } else if (e.key === 'Escape') this.select(null);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  private mount(): void {
+    const style = document.createElement('style');
+    style.textContent = CSS;
+    document.head.append(style);
+    this.root.className = 'room-ed';
+    this.root.style.display = 'none';
+    this.root.innerHTML = `
+      <header><h1>Room editor</h1>
+        <p>Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
+        Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+S saves. Drag empty space to look around.</p></header>
+      <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
+      <section id="re-piece"></section>
+      <section><h2>Pieces</h2><div class="list" id="re-list"></div></section>
+      <section class="save"><button id="re-save" class="primary">Save room layout</button>
+        <p id="re-status"></p><button id="re-close">Close editor</button></section>`;
+    this.root.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+      if (!b) return;
+      const [act, arg] = (b.dataset.act ?? '').split(':');
+      if (act === 'mode') this.setMode(arg as Mode);
+      else if (act === 'space') {
+        this.gizmo.setSpace(this.gizmo.space === 'local' ? 'world' : 'local');
+        this.render();
+      } else if (act === 'view') this.view(arg);
+      else if (act === 'roomonly') this.setRoomOnly(!this.roomOnly);
+      else if (act === 'pick') this.selectId(b.dataset.key ?? '');
+      else if (act === 'undo') this.step(true);
+      else if (act === 'redo') this.step(false);
+      else if (act === 'reset') this.reset();
+      else if (act === 'revert') this.revert();
+    });
+    this.root.addEventListener('change', (e) => {
+      const input = e.target as HTMLInputElement;
+      const piece = this.selected;
+      if (!piece || !input.dataset.field) return;
+      const value = Number(input.value);
+      if (!Number.isFinite(value)) return this.renderFields();
+      const field = input.dataset.field as (typeof FIELDS)[number];
+      const before = readPlacement(piece.object);
+      const after = copyPlacement(before);
+      after[field][Number(input.dataset.axis)] = value;
+      this.commit(piece, before, roundPlacement(after));
+    });
+    // Enter keeps the number and hands the keys back to the editor (so Ctrl+Z undoes the edit, not the typing).
+    this.root.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target instanceof HTMLInputElement) e.target.blur();
+    });
+    this.root.querySelector('#re-save')!.addEventListener('click', () => void this.save());
+    this.root.querySelector('#re-close')!.addEventListener('click', () => this.hide());
+    document.body.append(this.root);
+  }
+
+  private render(): void {
+    if (!this.open) return;
+    const mode = this.gizmo.mode as Mode;
+    this.root.querySelector('#re-modes')!.innerHTML =
+      (['translate', 'rotate', 'scale'] as const)
+        .map(
+          (m, i) =>
+            `<button data-act="mode:${m}" class="${m === mode ? 'on' : ''}">${['Move W', 'Rotate E', 'Scale R'][i]}</button>`,
+        )
+        .join('') + `<button data-act="space">${this.gizmo.space === 'local' ? 'Local' : 'World'} Q</button>`;
+    this.root.querySelector('#re-views')!.innerHTML =
+      Object.keys(VIEWS)
+        .map((v) => `<button data-act="view:${v}">${v}</button>`)
+        .join('') + `<button data-act="roomonly" class="${this.roomOnly ? 'on' : ''}">Room only</button>`;
+
+    const piece = this.selected;
+    const shown = piece ? keyOf(piece) : null;
+    if (shown !== this.shownKey) {
+      this.shownKey = shown;
+      this.root.querySelector('#re-piece')!.innerHTML = piece
+        ? `<h2>Selected <span>${piece.id}</span> <small>${piece.section === 'lap' ? 'tray space' : 'room space'}</small></h2>
+          ${FIELDS.map(
+            (f) =>
+              `<div class="field"><label>${FIELD_LABEL[f]}</label>${[0, 1, 2]
+                .map(
+                  (a) =>
+                    `<input type="number" step="${f === 'rotDeg' ? 1 : 0.01}" data-field="${f}" data-axis="${a}" aria-label="${FIELD_LABEL[f]} ${'xyz'[a]}">`,
+                )
+                .join('')}</div>`,
+          ).join('')}
+          <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button>
+            <button data-act="revert" title="Back to where the file has it">Revert</button>
+            <button data-act="reset" title="Back to the code's default">Reset</button></div>`
+        : `<h2>Selected <span>nothing</span></h2><p class="hint">Click a piece in the room, or pick one below.</p>
+          <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div>`;
+    }
+    this.root.querySelector<HTMLButtonElement>('[data-act="undo"]')!.disabled = !this.history.canUndo;
+    this.root.querySelector<HTMLButtonElement>('[data-act="redo"]')!.disabled = !this.history.canRedo;
+    this.renderFields();
+
+    const list = this.pieces()
+      .slice()
+      .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+    this.root.querySelector('#re-list')!.innerHTML = list
+      .map((p) => {
+        const key = keyOf(p);
+        const on = piece && keyOf(piece) === key ? 'on' : '';
+        return `<button data-act="pick" data-key="${key}" class="${on}">${p.section === 'lap' ? 'lap · ' : ''}${p.id}</button>`;
+      })
+      .join('');
+
+    const dirty = this.dirty;
+    this.root.querySelector('#re-save')!.textContent = dirty ? 'Save room layout ●' : 'Save room layout';
+    this.root.querySelector('#re-status')!.textContent =
+      this.status || (dirty ? 'Unsaved changes' : 'Everything saved');
+  }
+
+  /** Fills the number boxes from the selected piece (skipping the one being typed in). */
+  private renderFields(): void {
+    const piece = this.selected;
+    if (!piece) return;
+    const p = roundPlacement(readPlacement(piece.object));
+    for (const input of this.root.querySelectorAll<HTMLInputElement>('input[data-field]')) {
+      if (input === document.activeElement) continue;
+      const field = input.dataset.field as (typeof FIELDS)[number];
+      input.value = String(p[field][Number(input.dataset.axis)]);
+    }
+  }
+}
+
+function isCameraOrLight(o: Object3D): boolean {
+  const flags = o as { isCamera?: boolean; isLight?: boolean };
+  return !!flags.isCamera || !!flags.isLight;
+}
+
+/** Whether `o` is `ancestor` or under it. */
+function isWithin(o: Object3D, ancestor: Object3D): boolean {
+  for (let p: Object3D | null = o; p; p = p.parent) if (p === ancestor) return true;
+  return false;
+}
+
+/** Whether `o` and everything above it is visible (a hidden painted stand-in is not picked). */
+function isShown(o: Object3D): boolean {
+  for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
+  return true;
+}
+
+const CSS = `
+.room-ed {
+  --ink: #ece6d8; --muted: #a8a294; --panel: #1b1e26; --line: #2e333f; --accent: #f0a24a;
+  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 11; overflow-y: auto;
+  box-sizing: border-box; padding: 14px; display: grid; gap: 14px; align-content: start;
+  background: #14161c; color: var(--ink); border-left: 1px solid var(--line);
+  font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (max-width: 699px) { .room-ed { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); } }
+.room-ed h1 { margin: 0; font-size: 18px; font-weight: 650; }
+.room-ed header p, .room-ed .hint, .room-ed #re-status { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.room-ed h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.room-ed h2 span { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 13px; margin-left: 6px; }
+.room-ed h2 small { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.room-ed .row, .room-ed .list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.room-ed button { font: 500 12.5px inherit; font-family: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; cursor: pointer; }
+.room-ed button:hover:not(:disabled) { border-color: var(--muted); }
+.room-ed button:disabled { opacity: .4; cursor: default; }
+.room-ed button.on { border-color: var(--accent); color: var(--accent); }
+.room-ed button.primary { width: 100%; background: var(--accent); border-color: var(--accent); color: #1b1307; font-weight: 650; }
+.room-ed .save { display: grid; gap: 6px; }
+.room-ed .field { display: grid; grid-template-columns: 82px repeat(3, 1fr); gap: 4px; align-items: center; margin-bottom: 6px; }
+.room-ed .field label { font-size: 12px; color: var(--muted); }
+.room-ed input { width: 100%; box-sizing: border-box; font: 12.5px ui-monospace, Consolas, monospace; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 4px 5px; }
+.room-ed input:focus { outline: none; border-color: var(--accent); }
+`;

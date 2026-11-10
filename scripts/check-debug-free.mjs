@@ -15,6 +15,7 @@ const MARKERS = [
   'Copy report', // the report panel (report-panel.ts)
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
   'Copy Logs', // the launcher's log button (enter-ar-button.ts)
+  'Save room layout', // the room editor (room-editor.ts)
 ];
 
 const jsIn = (dir) =>

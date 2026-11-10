@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
 import { defineConfig, type Plugin } from 'vite';
+import { parseRoomLayout } from './src/engine/stage/room-layout';
 
 function buildId(): string {
   try {
@@ -47,9 +48,55 @@ function saveRecordings(): Plugin {
   };
 }
 
+/**
+ * Dev server only: POST /__wsw/rooms/<name>.json writes a room layout to content/rooms/, so the room editor
+ * (src/debug/room-editor.ts, ?mock=1&edit=room) saves straight into the repository. The body must read as a
+ * layout with no problems (src/engine/stage/room-layout.ts); anything else is refused and nothing is written.
+ */
+function saveRoomLayouts(): Plugin {
+  const dir = fileURLToPath(new URL('./content/rooms/', import.meta.url));
+  return {
+    name: 'wsw-save-room-layouts',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__wsw/rooms/', (req, res) => {
+        const name = (req.url ?? '').replace(/^\//, '');
+        if (req.method !== 'POST' || !/^[a-z0-9-]+\.json$/.test(name)) {
+          res.statusCode = 400;
+          return res.end('bad request');
+        }
+        const chunks: Buffer[] = [];
+        let size = 0;
+        req.on('data', (c: Buffer) => {
+          size += c.length;
+          if (size > 256e3) req.destroy();
+          else chunks.push(c);
+        });
+        req.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          let problems: string[];
+          try {
+            problems = parseRoomLayout(JSON.parse(text)).problems;
+          } catch (e) {
+            problems = [`not JSON: ${String(e)}`];
+          }
+          if (problems.length > 0) {
+            res.statusCode = 422;
+            return res.end(problems.join('; '));
+          }
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(dir + name, text);
+          res.end('ok');
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [iwsdkDev(), saveRecordings()],
-  server: { host: '0.0.0.0', port: 8081, open: false },
+  plugins: [iwsdkDev(), saveRecordings(), saveRoomLayouts()],
+  // The room editor saves content/rooms/ while the game is open; reloading on that save would throw its edits away.
+  server: { host: '0.0.0.0', port: 8081, open: false, watch: { ignored: ['**/content/rooms/**'] } },
   // Relative URLs so the build works under a GitHub Pages project subpath.
   base: './',
   publicDir: 'public',

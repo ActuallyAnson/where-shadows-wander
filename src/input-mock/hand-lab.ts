@@ -84,6 +84,8 @@ export class HandLab {
   private recordStart = 0;
   private busy = false;
   private message = '';
+  /** Another desk tool (the room editor) has the view: the panel is hidden, and the orbit and keys are off. */
+  private suspended = false;
 
   constructor(
     private readonly mode: MockMode,
@@ -136,8 +138,23 @@ export class HandLab {
     else if (this.guided) this.lockToPrompt();
   }
 
+  /**
+   * Hands the desk view to another tool (the room editor, src/debug/room-editor.ts) or takes it back: while suspended the
+   * panel is hidden, the orbit and the lab's keys are off, and the view is no longer shifted for the panel.
+   */
+  suspend(on: boolean): void {
+    this.suspended = on;
+    this.orbit.enabled = !on;
+    this.root.style.display = on ? 'none' : '';
+    this.fitView();
+  }
+
   /** Keeps the hands centred in the part of the window the panel doesn't cover. */
   private fitView(): void {
+    if (this.suspended) {
+      this.view.camera.clearViewOffset();
+      return;
+    }
     const w = window.innerWidth,
       h = window.innerHeight;
     const narrow = w < 700;
@@ -522,7 +539,7 @@ export class HandLab {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (this.suspended || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === 'Space') {
       if (this.guided) return e.preventDefault();
       this.mode.paused = !this.mode.paused;
