@@ -263,11 +263,12 @@ async function start(): Promise<void> {
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
   /**
-   * Before the candle is first lit the room is not pitch dark: the moon's light is this many times its night level, so the room
-   * and the candle can be made out. Once the candle catches it eases back to the night level over MOON_SETTLE_S, under the
-   * candle's own light spreading out.
+   * Before the candle is first lit, the moon's light is this many times its night level (below 1: darker than the night, so
+   * the waiting candle's small pool of light stands out more; above 1: lighter). Once the candle catches it eases to the night
+   * level over MOON_SETTLE_S, under the candle's own light spreading out. The candle's pool: WAITING_GLOW in
+   * room-dressing-view.ts.
    */
-  const START_MOON_LIFT = 1;
+  const START_MOON_LIFT = 0.35;
   const MOON_SETTLE_S = 3;
   let moonLift = START_MOON_LIFT;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
@@ -1164,8 +1165,10 @@ async function start(): Promise<void> {
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).
         roomDressing.spread(candleView.lit, step);
-        if (sessionState !== 'title_vr' && moonLift > 1)
-          moonLift = Math.max(1, moonLift - (step * (START_MOON_LIFT - 1)) / MOON_SETTLE_S);
+        if (sessionState !== 'title_vr' && moonLift !== 1) {
+          const settle = (step * Math.abs(START_MOON_LIFT - 1)) / MOON_SETTLE_S;
+          moonLift = moonLift > 1 ? Math.max(1, moonLift - settle) : Math.min(1, moonLift + settle);
+        }
         candleLight.setMoon(moonLift);
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
