@@ -61,7 +61,9 @@ export class XRHandReader {
   /** The last frame each hand was fully tracked (joints, radii and when), kept to hold a hand through a short dropout. */
   private readonly lastGood = { left: new Float32Array(JOINT_COUNT * 3), right: new Float32Array(JOINT_COUNT * 3) };
   private readonly lastGoodRadii = { left: new Float32Array(JOINT_COUNT), right: new Float32Array(JOINT_COUNT) };
-  private readonly lastFullAt = { left: -Infinity, right: -Infinity };
+  /** When each hand (0 left, 1 right) was last fully tracked. A typed array: a time stored in a plain object field
+   *  is boxed on the heap, 32 B a frame, which broke the allocation budget (xr-hands.alloc.test.ts). */
+  private readonly lastFullAt = new Float64Array([-Infinity, -Infinity]);
   /** Milliseconds a lost hand is held (0 turns it off). */
   lossGraceMs = LOSS_GRACE_MS;
   /** Input sources this frame that are hands (not controllers); 0 when hand tracking is off or the browser gives no joints. */
@@ -295,11 +297,12 @@ export class XRHandReader {
     const now = performance.now();
     for (const side of ['left', 'right'] as const) {
       const hand = this.hands[side];
+      const at = side === 'left' ? 0 : 1;
       if (hand.tracked) {
         this.lastGood[side].set(hand.positions);
         this.lastGoodRadii[side].set(hand.radii);
-        this.lastFullAt[side] = now;
-      } else if (now - this.lastFullAt[side] < this.lossGraceMs) {
+        this.lastFullAt[at] = now;
+      } else if (now - this.lastFullAt[at]! < this.lossGraceMs) {
         hand.positions.set(this.lastGood[side]);
         hand.radii.set(this.lastGoodRadii[side]);
         hand.validJoints = JOINT_COUNT;
