@@ -12,13 +12,14 @@ When real sounds replace them, add a row for each file here: what it is, who mad
 
 ## 3D models
 
-The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. All of them are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): no attribution is required, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSET-SOURCES.md`).
+The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. All of them are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) except the gloves, which are [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and must keep their credit. The CC0 ones need no attribution, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSET-SOURCES.md`).
 
 | Model | Made by | Source | Licence |
 |---|---|---|---|
 | `bedSingle.glb`, `bookcaseOpen.glb`, `books.glb`, `sideTable.glb`, `lampRoundTable.glb`, `rugRound.glb`, `bear.glb`, `chair.glb`, `pottedPlant.glb` (Furniture Kit 2.0) | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
 | `candleStick.glb` ("Candlestick") | CreativeTrio | https://poly.pizza/m/tknOVwxT8B | CC0 1.0 |
 | `candles.glb` ("Candles") | Quaternius | https://poly.pizza/m/AnzHB44wlW | CC0 1.0 |
+| `hands/glove-right.glb`, `hands/glove-left.glb` ("Welding Glove"; changes: rigged to the WebXR hand joints by `scripts/blender/rig-glove.py`, the left hand mirrored from the right, textures resized to 512 px WebP) | vr.district.0 | https://skfb.ly/oQvDI | CC BY 4.0 |
 
 ## Other assets
 
