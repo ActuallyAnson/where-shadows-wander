@@ -3,7 +3,7 @@
 // src/engine/stage) never imports IWSDK or three.js; this is enforced by
 // ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 //
-// What runs (docs/adr/0016-story-shadow-theatre.md): the bedroom, the VR title and lighting the candle, the hands' shadows on the
+// What runs (docs/adr/0016-story-shadow-theatre.md): the bedroom, lighting the candle, the hands' shadows on the
 // wall, and covering the flame to pause. The story told in shadow puppets on the wall comes next.
 import {
   AmbientLight,
@@ -24,7 +24,6 @@ import { CandleView } from '../engine/render/candle-view';
 import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
-import { VrTitleView } from '../ui/title-screen/vr-title-view';
 import { RoomDressingView } from '../engine/shadow/room-dressing-view';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
@@ -260,14 +259,17 @@ async function start(): Promise<void> {
     bedroomLayout.layout,
   );
   void placedModels.load(candleLight);
-  const vrTitle = new VrTitleView();
-  /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
-  const TITLE_HINT_AFTER_S = 6;
-  const TITLE_HINT_PLAIN_AFTER_S = 16;
   type SessionState = 'title_vr' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
-  let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
+  /**
+   * Before the candle is first lit the room is not pitch dark: the moon's light is this many times its night level, so the room
+   * and the candle can be made out. Once the candle catches it eases back to the night level over MOON_SETTLE_S, under the
+   * candle's own light spreading out.
+   */
+  const START_MOON_LIFT = 4;
+  const MOON_SETTLE_S = 3;
+  let moonLift = START_MOON_LIFT;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
   const ambientLight = new AmbientLight(0x101422, 0.008);
   // The captions (a setting): a small line of ink low on the wall that names the sounds.
@@ -331,7 +333,6 @@ async function start(): Promise<void> {
     candleView.group,
     titleLighter.group,
     bedTray.group,
-    vrTitle.group,
     ambientLight,
   );
   let rigPlaced = false;
@@ -507,12 +508,6 @@ async function start(): Promise<void> {
     stageView.place(stage, lantern);
     candleView.place(lantern);
 
-    // Place floating VR title emblem above the tray
-    const titleDist = 0.55;
-    const titleX = head[0] - Math.sin(yaw) * titleDist;
-    const titleY = head[1] - 0.15;
-    const titleZ = head[2] - Math.cos(yaw) * titleDist;
-    vrTitle.place(titleX, titleY, titleZ, yaw);
     // The pause menu is drawn on the wall: it lives in the stage's frame.
     const r = stage.right,
       u = stage.up,
@@ -775,7 +770,7 @@ async function start(): Promise<void> {
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
-      titleStallT = 0;
+      moonLift = START_MOON_LIFT;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
       candleView.setLocked(false);
@@ -861,7 +856,7 @@ async function start(): Promise<void> {
     }
     return false;
   };
-  /** Lights the candle: the title dissolves, the room warms and the hands' shadows come onto the wall. */
+  /** Lights the candle: the room warms and the hands' shadows come onto the wall. */
   const igniteCandle = () => {
     sessionState = 'playing';
     ignitionHoldTimer = 0;
@@ -871,7 +866,6 @@ async function start(): Promise<void> {
     candleView.setLocked(true);
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
-    vrTitle.ignite();
     if (!prologuePlayed) prologueWait = PROLOGUE_AFTER_LIGHT_S;
   };
 
@@ -996,7 +990,6 @@ async function start(): Promise<void> {
         }
         world.camera.getWorldQuaternion(cameraQuat);
         if (sessionState === 'title_vr') {
-          vrTitle.update(step);
           titleLighter.visible = true;
           titleLighter.update(hands.hands.right, cameraQuat, clock);
 
@@ -1028,11 +1021,6 @@ async function start(): Promise<void> {
             ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
           }
 
-          // Nobody told them what to do: after a few seconds with no progress, a riddle under the title says it, and a plainer line later.
-          if (ignitionHoldTimer > 0) titleStallT = 0;
-          else titleStallT += step;
-          vrTitle.setHint(titleStallT > TITLE_HINT_PLAIN_AFTER_S ? 2 : titleStallT > TITLE_HINT_AFTER_S ? 1 : 0);
-
           const ignitionProgress = ignitionHoldTimer / 3.0;
           candleView.ignitionProgress = ignitionProgress;
           roomDressing.ignition = ignitionProgress; // the room starts to glow as the wick is held
@@ -1040,8 +1028,6 @@ async function start(): Promise<void> {
           if (ignitionHoldTimer >= 3.0) igniteCandle();
         } else {
           titleLighter.visible = false;
-          // The title dissolves once the candle is lit.
-          if (!vrTitle.isDissolved) vrTitle.update(step);
           if (sessionState === 'playing') {
             if (candleView.isCovered) {
               sessionState = 'paused';
@@ -1176,6 +1162,9 @@ async function start(): Promise<void> {
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).
         roomDressing.spread(candleView.lit, step);
+        if (sessionState !== 'title_vr' && moonLift > 1)
+          moonLift = Math.max(1, moonLift - (step * (START_MOON_LIFT - 1)) / MOON_SETTLE_S);
+        candleLight.setMoon(moonLift);
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
@@ -1278,7 +1267,6 @@ async function start(): Promise<void> {
         roomModels,
         placedModels,
         roomEditor,
-        vrTitle,
         wallPauseView,
         sessionState: () => sessionState,
         igniteCandle: () => {

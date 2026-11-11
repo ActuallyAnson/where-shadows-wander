@@ -257,6 +257,11 @@ export class CandleLight {
     if (u.uCandlePos.value.distanceToSquared(this.baked) > REBAKE_MOVE * REBAKE_MOVE) this.dirty = true;
   }
 
+  /** Sets the moon's light as a multiple of its night level (MOON_LIGHT): 1 is the night, more is a brighter moon. */
+  setMoon(scale: number): void {
+    this.uniforms.uMoonLight.value.copy(MOON_LIGHT).multiplyScalar(scale);
+  }
+
   /** Bakes the shadows if the flame or the room has moved since the last time. Call once a frame, before the scene is drawn. */
   bakeIfDirty(renderer: WebGLRenderer, scene: Scene): void {
     if (!this.dirty || this.casters.length === 0) return;
