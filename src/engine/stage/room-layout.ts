@@ -7,6 +7,10 @@
 // A placement is a position (metres), a rotation (degrees, applied x then y then z, as three.js's default Euler order)
 // and a scale (a multiplier on the piece's own size, so 1 is the size the code gives it).
 //
+// An entry may also name a `model`: the id of a .glb under src/assets (its file name in lower case with hyphens, as the asset
+// manifest names it). Such an entry is an added piece: a model placed in the room editor rather than built by the code, so its
+// id is free (`chair-2`) and need not be one the code knows. The built-in pieces never take a model.
+//
 // Anything missing from the file falls back to the code's own default, so a missing or broken file never breaks the room.
 // Things placed at run time (the room's root, the wall ahead, the bunting on it) are not in the layout.
 //
@@ -28,10 +32,16 @@ export type LayoutSection = (typeof LAYOUT_SECTIONS)[number];
 
 export const ROOM_LAYOUT_VERSION = 1;
 
+/** One piece in a layout section: its placement, and for an added piece the asset it shows. */
+export interface LayoutEntry extends Placement {
+  /** The asset id of the .glb an added piece shows; absent for the code's own pieces. */
+  model?: string;
+}
+
 export interface RoomLayout {
   version: typeof ROOM_LAYOUT_VERSION;
-  room: Record<string, Placement>;
-  lap: Record<string, Placement>;
+  room: Record<string, LayoutEntry>;
+  lap: Record<string, LayoutEntry>;
 }
 
 export interface ParsedRoomLayout {
@@ -40,7 +50,7 @@ export interface ParsedRoomLayout {
   problems: string[];
 }
 
-/** A piece id: lower case words joined by hyphens (`bed`, `hung-books`). */
+/** A piece id: lower case words joined by hyphens (`bed`, `hung-books`). Asset ids have the same form. */
 export const PIECE_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** Rounding the file uses: 1 mm, 0.1°, and a thousandth of scale. */
@@ -157,12 +167,22 @@ export function parseRoomLayout(
         problems.push(`${where}: not a piece id (lower case words joined by hyphens)`);
         continue;
       }
-      if (allowed && !allowed.includes(id)) {
-        problems.push(`${where}: no such piece`);
-        continue;
-      }
       if (!isObj(value)) {
         problems.push(`${where}: not an object`);
+        continue;
+      }
+      const builtIn = !allowed || allowed.includes(id);
+      let model: string | undefined;
+      if (value.model !== undefined) {
+        if (typeof value.model !== 'string' || !PIECE_ID.test(value.model)) {
+          problems.push(`${where}: model must be an asset id (lower case words joined by hyphens)`);
+          if (!allowed || !allowed.includes(id)) continue;
+        } else if (allowed && allowed.includes(id)) {
+          problems.push(`${where}: a built-in piece cannot show a model; model "${value.model}" ignored`);
+        } else model = value.model;
+      }
+      if (!builtIn && model === undefined) {
+        if (value.model === undefined) problems.push(`${where}: no such piece`);
         continue;
       }
       const { pos, rotDeg = [0, 0, 0], scale = [1, 1, 1] } = value;
@@ -179,8 +199,11 @@ export function parseRoomLayout(
         continue;
       }
       for (const k of Object.keys(value))
-        if (k !== 'pos' && k !== 'rotDeg' && k !== 'scale') problems.push(`${where}: unknown field "${k}" ignored`);
-      layout[section][id] = placement(pos, rotDeg, scale);
+        if (k !== 'pos' && k !== 'rotDeg' && k !== 'scale' && k !== 'model')
+          problems.push(`${where}: unknown field "${k}" ignored`);
+      const entry: LayoutEntry = placement(pos, rotDeg, scale);
+      if (model !== undefined) entry.model = model;
+      layout[section][id] = entry;
     }
   }
   return { layout, problems };
@@ -204,14 +227,72 @@ export function serializeRoomLayout(layout: Readonly<RoomLayout>): string {
     }
     lines.push(`  "${section}": {`);
     ids.forEach((id, i) => {
-      const p = roundPlacement(layout[section][id]);
+      const entry = layout[section][id];
+      const p = roundPlacement(entry);
       const comma = i === ids.length - 1 ? '' : ',';
-      lines.push(`    "${id}": { "pos": ${vec(p.pos)}, "rotDeg": ${vec(p.rotDeg)}, "scale": ${vec(p.scale)} }${comma}`);
+      const model = entry.model !== undefined ? `"model": ${JSON.stringify(entry.model)}, ` : '';
+      lines.push(
+        `    "${id}": { ${model}"pos": ${vec(p.pos)}, "rotDeg": ${vec(p.rotDeg)}, "scale": ${vec(p.scale)} }${comma}`,
+      );
     });
     lines.push(`  }${tail}`);
   });
   lines.push('}');
   return lines.join('\n') + '\n';
+}
+
+/** The asset ids a layout's added pieces show, sorted, each once. */
+export function modelIdsOf(layout: Readonly<RoomLayout>): string[] {
+  const ids = new Set<string>();
+  for (const section of LAYOUT_SECTIONS)
+    for (const entry of Object.values(layout[section])) if (entry.model !== undefined) ids.add(entry.model);
+  return [...ids].sort();
+}
+
+/** A piece standing in the room now, as the room editor sees it. */
+export interface CurrentPiece {
+  readonly section: LayoutSection;
+  readonly id: string;
+  readonly placement: Readonly<Placement>;
+  /** The asset an added piece shows. */
+  readonly model?: string;
+}
+
+/**
+ * The layout to save: the file's own entries (`base`), less the pieces taken out (`removed`, as `section:id`), with every piece
+ * standing now at its current placement. Entries of pieces that never loaded (a model whose file is missing) are kept as they
+ * were, so saving never quietly drops them.
+ */
+export function mergeLayout(
+  base: Readonly<RoomLayout>,
+  current: readonly CurrentPiece[],
+  removed: ReadonlySet<string> = new Set(),
+): RoomLayout {
+  const out = emptyRoomLayout();
+  for (const section of LAYOUT_SECTIONS)
+    for (const [id, entry] of Object.entries(base[section])) {
+      if (removed.has(`${section}:${id}`)) continue;
+      const copy: LayoutEntry = copyPlacement(entry);
+      if (entry.model !== undefined) copy.model = entry.model;
+      out[section][id] = copy;
+    }
+  for (const piece of current) {
+    const entry: LayoutEntry = roundPlacement(piece.placement);
+    if (piece.model !== undefined) entry.model = piece.model;
+    out[piece.section][piece.id] = entry;
+  }
+  return out;
+}
+
+/**
+ * A free id for a new piece made from `name` (an asset id, or the id of a piece being copied): the name itself if it is free,
+ * else the name with the next free number (`chair` → `chair-2`; copying `lamp-2` gives `lamp-3`).
+ */
+export function nextPieceId(name: string, taken: (id: string) => boolean): string {
+  let base = name.replace(/-\d+$/, '');
+  if (!PIECE_ID.test(base)) base = 'piece';
+  if (!taken(base)) return base;
+  for (let n = 2; ; n++) if (!taken(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 /** The room's floor, which every piece's footprint must stay on: the side walls at x ±2, the back wall at z 1.85, and the

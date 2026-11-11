@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   emptyRoomLayout,
   footprint,
+  mergeLayout,
+  modelIdsOf,
+  nextPieceId,
   onFloor,
   parseRoomLayout,
   placement,
@@ -62,6 +65,44 @@ describe('parseRoomLayout', () => {
     expect(problems).toEqual(['room.sofa: no such piece']);
   });
 
+  it('takes an added piece (one with a model) even though its id is not one it knows', () => {
+    const { layout, problems } = parseRoomLayout(
+      {
+        version: 1,
+        room: { bed: { pos: [0, 0, 0] }, 'lamp-2': { model: 'lamp-round-table', pos: [1, 0, -1], rotDeg: [0, 90, 0] } },
+        lap: { mug: { model: 'mug', pos: [0, 0.02, 0] } },
+      },
+      { room: ['bed'], lap: [] },
+    );
+    expect(problems).toEqual([]);
+    expect(layout.room['lamp-2']).toEqual({ ...placement([1, 0, -1], [0, 90, 0]), model: 'lamp-round-table' });
+    expect(layout.lap.mug.model).toBe('mug');
+    expect(layout.room.bed.model).toBeUndefined();
+    expect(modelIdsOf(layout)).toEqual(['lamp-round-table', 'mug']);
+  });
+
+  it('refuses a model that is not an asset id, and a model on a built-in piece', () => {
+    const { layout, problems } = parseRoomLayout(
+      {
+        version: 1,
+        room: {
+          bed: { model: 'chair', pos: [0, 0, 0] },
+          chair: { model: 'Chair.glb', pos: [0, 0, 0] },
+          stool: { model: 7, pos: [0, 0, 0] },
+          lamp: { model: 'lamp', pos: [0, 0] },
+        },
+      },
+      { room: ['bed', 'chair'] },
+    );
+    // The built-ins keep their placements without the model; the added pieces with a bad model or placement are left out.
+    expect(Object.keys(layout.room).sort()).toEqual(['bed', 'chair']);
+    expect(layout.room.bed.model).toBeUndefined();
+    expect(layout.room.chair.model).toBeUndefined();
+    expect(problems).toHaveLength(4);
+    expect(problems.join('\n')).toMatch(/room\.bed: a built-in piece cannot show a model/);
+    expect(problems.join('\n')).toMatch(/room\.stool: model must be an asset id/);
+  });
+
   it('cannot be tricked by a "__proto__" key', () => {
     const doc = JSON.parse('{"version":1,"room":{"__proto__":{"pos":[0,0,0]}}}') as unknown;
     const { layout, problems } = parseRoomLayout(doc);
@@ -92,6 +133,18 @@ describe('serializeRoomLayout', () => {
         '}',
         '',
       ].join('\n'),
+    );
+    const back = parseRoomLayout(JSON.parse(text));
+    expect(back.problems).toEqual([]);
+    expect(serializeRoomLayout(back.layout)).toBe(text);
+  });
+
+  it("writes an added piece's model first, and reads it back", () => {
+    const layout = emptyRoomLayout();
+    layout.room['chair-2'] = { ...placement([1, 0, -0.5]), model: 'chair' };
+    const text = serializeRoomLayout(layout);
+    expect(text).toContain(
+      '    "chair-2": { "model": "chair", "pos": [1, 0, -0.5], "rotDeg": [0, 0, 0], "scale": [1, 1, 1] }',
     );
     const back = parseRoomLayout(JSON.parse(text));
     expect(back.problems).toEqual([]);
@@ -137,5 +190,52 @@ describe('placements', () => {
     expect(onFloor(f)).toBe(true);
     expect(onFloor(footprint([1.8, 0, 0], [0.6, 0.2], 0))).toBe(false);
     expect(onFloor(footprint([0, 0, -1.4], [0.4, 0.4], 0))).toBe(false);
+  });
+});
+
+describe('merging what the editor holds into the layout', () => {
+  const base = () => {
+    const l = emptyRoomLayout();
+    l.room.bed = placement([0, 0, 0]);
+    l.room['lamp-2'] = { ...placement([1, 0, 0]), model: 'lamp' };
+    l.room.ghost = { ...placement([2, 0, 0]), model: 'missing-file' };
+    l.lap.tray = placement([0, 0, 0]);
+    return l;
+  };
+
+  it("keeps the file's entries, drops the removed ones and writes every piece standing now", () => {
+    const out = mergeLayout(
+      base(),
+      [
+        { section: 'room', id: 'bed', placement: placement([0.5, 0, 0]) },
+        { section: 'room', id: 'chair-2', placement: placement([1.23456, 0, 0]), model: 'chair' },
+      ],
+      new Set(['room:lamp-2']),
+    );
+    expect(Object.keys(out.room).sort()).toEqual(['bed', 'chair-2', 'ghost']);
+    expect(out.room.bed).toEqual(placement([0.5, 0, 0]));
+    expect(out.room['chair-2']).toEqual({ ...placement([1.235, 0, 0]), model: 'chair' });
+    // A piece whose model never loaded is kept as the file had it.
+    expect(out.room.ghost).toEqual({ ...placement([2, 0, 0]), model: 'missing-file' });
+    expect(out.lap.tray).toEqual(placement([0, 0, 0]));
+  });
+
+  it('does not change the layout it was given', () => {
+    const b = base();
+    const before = serializeRoomLayout(b);
+    mergeLayout(b, [{ section: 'room', id: 'bed', placement: placement([9, 0, 0]) }], new Set(['room:ghost']));
+    expect(serializeRoomLayout(b)).toBe(before);
+  });
+});
+
+describe('nextPieceId', () => {
+  it('uses the name when it is free, else the next number', () => {
+    const taken = new Set(['chair', 'chair-2', 'lamp', 'lamp-2']);
+    const isTaken = (id: string) => taken.has(id);
+    expect(nextPieceId('rug', isTaken)).toBe('rug');
+    expect(nextPieceId('chair', isTaken)).toBe('chair-3');
+    expect(nextPieceId('lamp-2', isTaken)).toBe('lamp-3');
+    expect(nextPieceId('chair-9', isTaken)).toBe('chair-3');
+    expect(nextPieceId('', isTaken)).toBe('piece');
   });
 });
