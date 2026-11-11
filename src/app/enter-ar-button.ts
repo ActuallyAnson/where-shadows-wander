@@ -1,5 +1,4 @@
 import type { World } from '@iwsdk/core';
-import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import { captureOptions, loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
@@ -38,7 +37,7 @@ export async function mountEnterArButtonIfNeeded(
   // Live log window
   const logBox = document.createElement('div');
   logBox.style.cssText =
-    'width:100%;max-height:160px;overflow-y:auto;background:rgba(15,18,24,0.95);' +
+    'width:100%;flex:none;max-height:160px;overflow-y:auto;background:rgba(15,18,24,0.95);' +
     'border:1px solid #3a4459;border-radius:10px;padding:10px 14px;font:11px/1.45 ui-monospace,monospace;' +
     'color:#c9d1d9;box-sizing:border-box;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);';
 
@@ -238,27 +237,20 @@ export async function mountEnterArButtonIfNeeded(
     }
   };
 
-  const [arSupported, vrSupported] = await Promise.all([
-    xr.isSessionSupported('immersive-ar').catch(() => false),
-    xr.isSessionSupported('immersive-vr').catch(() => false),
-  ]);
+  const vrSupported = await xr.isSessionSupported('immersive-vr').catch(() => false);
 
-  appendLog(`XR Support: immersive-vr=${vrSupported}, immersive-ar=${arSupported}`);
+  appendLog(`XR Support: immersive-vr=${vrSupported}`);
 
-  // The judges' build shows one Enter VR button; the other ways in (a Pico browser sometimes needs them) are behind
-  // "Trouble starting?". Dev and tester builds show them all, with their technical names.
+  // The title screen's BEGIN is the way in. The other ways in (a Pico browser sometimes needs them) are behind
+  // "Trouble starting?", in every build; dev and tester builds give them their technical names.
   const otherWays = document.createElement('div');
   otherWays.style.cssText =
     'display:none;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;pointer-events:auto;';
   const openOtherWays = (): void => {
     otherWays.style.display = 'flex';
   };
-  const waysTarget = DEBUG_TOOLS ? buttonRow : otherWays;
-  if (DEBUG_TOOLS) openOtherWays();
 
-  // The title screen is the way in: BEGIN starts VR. The judges' build has "Trouble starting?" under it; dev and tester
-  // builds keep the debug row at the bottom, on top of it. Without VR support the title is not shown, so the no-XR
-  // notice (no-xr-notice.ts) stays readable.
+  // Without VR support the title is not shown, so the no-XR notice (no-xr-notice.ts) stays readable.
   if (vrSupported) {
     title = createTitleScreen(
       [
@@ -270,7 +262,7 @@ export async function mountEnterArButtonIfNeeded(
           },
         },
         { label: 'SETTINGS', onPress: () => hooks.openSettings?.() },
-        ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
+        { label: 'Trouble starting?', quiet: true, onPress: openOtherWays },
       ],
       {
         onReach: () => sound?.hover(),
@@ -287,82 +279,39 @@ export async function mountEnterArButtonIfNeeded(
     world.scene.visible = false;
     const choice = loadCaptureChoice();
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
-  }
 
-  if (vrSupported && (DEBUG_TOOLS || !title)) {
-    const vrDirectBtn = makeBtn(
-      DEBUG_TOOLS ? '▶ Enter VR (Direct Hands)' : 'Enter VR',
-      '#163824',
-      '#3fb950',
-      '#2ea043',
-      () => {
-        void launchDirect('immersive-vr', false);
-      },
+    otherWays.append(
+      makeWayBtn(
+        DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
+        ['#1c2d42', '#58a6ff', '#388bfd'],
+        () => {
+          void launchDirect('immersive-vr', true);
+        },
+      ),
     );
-    buttonRow.append(vrDirectBtn);
-
-    const vrSafeBtn = makeWayBtn(
-      DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
-      ['#1c2d42', '#58a6ff', '#388bfd'],
-      () => {
-        void launchDirect('immersive-vr', true);
-      },
-    );
-    waysTarget.append(vrSafeBtn);
   }
 
-  // The older passthrough mode is for testing; the game is a VR room (ADR 0005).
-  if (arSupported && (DEBUG_TOOLS || xrModeFromUrl(location.search) === 'ar')) {
-    const arDirectBtn = makeBtn('👁️ Enter AR (Passthrough)', '#3b2300', '#f0883e', '#d29922', () => {
-      void launchDirect('immersive-ar', false);
-    });
-    buttonRow.append(arDirectBtn);
-  }
-
-  const iwsdkBtn = makeWayBtn(
-    DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)',
-    ['#2d1840', '#bc8cff', '#a371f7'],
-    () => {
+  otherWays.append(
+    makeWayBtn(DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)', ['#2d1840', '#bc8cff', '#a371f7'], () => {
       statusLine.textContent = '● Launching via IWSDK...';
       statusLine.style.color = '#bc8cff';
-      const mode = sessionModeOf(xrModeFromUrl(location.search));
-      appendLog(`Calling world.launchXR({ sessionMode: "${mode}", features: { handTracking: true } })...`);
+      appendLog('Calling world.launchXR({ sessionMode: "immersive-vr", features: { handTracking: true } })...');
       try {
         world.launchXR({
-          sessionMode: mode as unknown as import('@iwsdk/core').SessionMode,
+          sessionMode: 'immersive-vr' as unknown as import('@iwsdk/core').SessionMode,
           features: { handTracking: true },
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         appendLog(`IWSDK launch threw: ${msg}`, '#ff7b72');
       }
-    },
-  );
-  waysTarget.append(iwsdkBtn);
-
-  const reloadBtn = makeWayBtn(
-    DEBUG_TOOLS ? '🔄 Reload Page' : 'Reload page',
-    ['#3d1f24', '#f85149', '#da3633'],
-    () => {
+    }),
+    makeWayBtn(DEBUG_TOOLS ? '🔄 Reload Page' : 'Reload page', ['#3d1f24', '#f85149', '#da3633'], () => {
       location.reload();
-    },
+    }),
   );
-  waysTarget.append(reloadBtn);
 
-  // Copy logs button: a debug tool, not in the judges' build.
-  if (DEBUG_TOOLS) {
-    const copyBtn = makeBtn('📋 Copy Logs', '#21262d', '#c9d1d9', '#30363d', async () => {
-      try {
-        await navigator.clipboard.writeText(logs.join('\n'));
-        appendLog('Logs copied to clipboard!', '#7ee787');
-      } catch {
-        appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
-      }
-    });
-    buttonRow.append(copyBtn);
-  }
-
-  if (!DEBUG_TOOLS && !title) {
+  if (!title) {
     const trouble = document.createElement('button');
     trouble.type = 'button';
     trouble.textContent = 'Trouble starting?';
@@ -373,18 +322,27 @@ export async function mountEnterArButtonIfNeeded(
     buttonRow.append(trouble);
   }
 
-  // Testing: the address switches (?debug=joints, ?flicker=0, ?record ...) as buttons, for headsets with no easy address
-  // bar. A debug tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
-  let testingElement: HTMLElement | null = null;
+  // Developer: the other modes (Hand Lab, room editor), the testing switches and the launch log, in one panel. A debug
+  // tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
+  let developerElement: HTMLElement | null = null;
   if (DEBUG_TOOLS) {
-    const { createTestingPanel } = await import('./testing-panel');
-    const testing = createTestingPanel();
-    testingElement = testing.element;
-    buttonRow.append(makeBtn('🧪 Testing', '#2b2410', '#e3b341', '#9e6a03', testing.toggle));
+    const { createDeveloperPanel } = await import('./developer-panel');
+    const developer = createDeveloperPanel({
+      log: logBox,
+      copyLogs: async () => {
+        try {
+          await navigator.clipboard.writeText(logs.join('\n'));
+          appendLog('Logs copied to clipboard!', '#7ee787');
+        } catch {
+          appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
+        }
+      },
+    });
+    developerElement = developer.element;
+    buttonRow.append(makeBtn('🛠 Developer', '#2b2410', '#e3b341', '#9e6a03', developer.toggle));
   }
 
-  if (testingElement) uiContainer.append(testingElement);
-  if (DEBUG_TOOLS) uiContainer.append(logBox);
+  if (developerElement) uiContainer.append(developerElement);
   uiContainer.append(note, buttonRow, otherWays);
   document.body.append(uiContainer);
 

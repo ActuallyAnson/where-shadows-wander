@@ -1,19 +1,19 @@
 // On a browser that can't start the session the game asks for (a laptop, a phone), the game
 // page is otherwise blank and IWSDK shows no Enter XR button. This explains what the page is
-// and where to go. It checks the session the page will really request: VR by default, AR for
-// ?xr=ar (ADR 0005). The emulator in `npm run dev` supports both, so it never shows there.
+// and where to go. It checks the session the page really requests, immersive-vr (ADR 0005). The emulator in
+// `npm run dev` supports it, so it never shows there.
 
-import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+import { switchLaunch } from './launch-mode';
 
 /** The part of `navigator.xr` this reads. */
 export interface XrSupport {
   isSessionSupported(mode: 'immersive-vr' | 'immersive-ar'): Promise<boolean>;
 }
 
-/** Whether the browser can start the session `search` asks for. False when WebXR is missing or the check throws. */
-export async function xrSessionSupported(xr: XrSupport | undefined, search: string): Promise<boolean> {
+/** Whether the browser can start a VR session. False when WebXR is missing or the check throws. */
+export async function xrSessionSupported(xr: XrSupport | undefined): Promise<boolean> {
   try {
-    return (await xr?.isSessionSupported(sessionModeOf(xrModeFromUrl(search)))) ?? false;
+    return (await xr?.isSessionSupported('immersive-vr')) ?? false;
   } catch {
     return false;
   }
@@ -45,9 +45,9 @@ export function landingHtml(link: string): string {
         background:var(--gold);color:#1a1008;font-weight:700;text-align:center;line-height:26px}
       #wsw-landing code{display:block;margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.4);
         font:13px ui-monospace,monospace;word-break:break-all}
-      #wsw-landing button,#wsw-landing a.cta{font:inherit;cursor:pointer;border-radius:10px;padding:8px 14px;text-decoration:none;
+      #wsw-landing button{font:inherit;cursor:pointer;border-radius:10px;padding:8px 14px;text-decoration:none;
         border:1px solid var(--gold);background:transparent;color:var(--gold)}
-      #wsw-landing button:hover,#wsw-landing a.cta:hover{background:var(--gold);color:#1a1008}
+      #wsw-landing button:hover{background:var(--gold);color:#1a1008}
       #wsw-landing .small{font-size:14px;color:#b9b3a4;margin:0}
     </style>
     <div class="moon"></div><div class="snow"></div>
@@ -62,13 +62,14 @@ export function landingHtml(link: string): string {
         <li>Press <b>BEGIN</b> and sit down with your hands in front of you.</li>
         <li>Light the candle with your hand, then shape rabbits, birds and foxes in its light.</li>
       </ol>
-      <p style="margin:0">No headset? <a class="cta" href="./?mock=1">Try the Hand Lab</a></p>
+      <p style="margin:0">No headset? <button type="button" data-lab>Try the Hand Lab</button></p>
       <p class="small">The Hand Lab shows the hand shapes the game reads, with mock or webcam hands. It is a test bench, not the game.</p>
     </main>`;
 }
 
-export async function showNoXrNoticeIfNeeded(search: string = location.search): Promise<void> {
-  if (await xrSessionSupported(navigator.xr, search)) return;
+/** `debugTools`: whether the build has the debug tools (the launch choice is read with it). */
+export async function showNoXrNoticeIfNeeded(debugTools: boolean): Promise<void> {
+  if (await xrSessionSupported(navigator.xr)) return;
 
   const box = document.createElement('section');
   box.id = 'wsw-landing';
@@ -81,5 +82,6 @@ export async function showNoXrNoticeIfNeeded(search: string = location.search): 
       .then(() => (button.textContent = 'Copied'))
       .catch(() => (button.textContent = 'Select the link above and copy it'));
   });
+  box.querySelector('[data-lab]')?.addEventListener('click', () => switchLaunch('lab', debugTools));
   document.body.append(box);
 }

@@ -1,24 +1,30 @@
-// The testing switches (joint dots, shadow capsules, open the settings panel when VR starts, record hands) as a plain
-// object. The launcher's Testing panel changes them and they are remembered in the browser (`wsw.testing`), so nobody
-// types an address; the older address forms (?debug=joints, ?record ...) still parse to the same object, for the
-// scripts that drive the page. Plain TypeScript.
+// The testing switches (joint dots, shadow capsules, open the settings panel when VR starts, record hands, the lantern's
+// flicker) as a plain object. The launcher's Developer panel changes them and they are remembered in the browser
+// (`wsw.testing`), so nobody types an address; the probe scripts write the same key before the page loads. Plain
+// TypeScript.
 
 export type RecordChoice = 'off' | 'free' | 'shapes';
 /** Which menu screen to show in the room (menu-panel), or none. */
 export type MenuChoice = 'off' | 'pause';
 export const MENU_CHOICES: readonly MenuChoice[] = ['off', 'pause'];
 
+/** The lantern's flicker, 0 (steady) to 1, in place of the player's setting; null leaves the setting alone. */
+export type FlickerChoice = number | null;
+export const FLICKER_CHOICES: readonly FlickerChoice[] = [null, 0, 0.5, 1];
+
 export interface TestingOptions {
-  /** A dot on every tracked hand joint (?debug=joints). */
+  /** A dot on every tracked hand joint. */
   joints: boolean;
-  /** The shadow's collision capsules (?debug=shadow). */
+  /** The shadow's collision capsules. */
   shadow: boolean;
-  /** The settings panel opens a second after the headset session starts (?settings). */
+  /** The settings panel opens a second after the headset session starts. */
   settings: boolean;
-  /** Hand recording: 20 s of free hands (?record=20), or the guided shape script, 84 s (?record&script=shapes). */
+  /** Hand recording when VR starts: 20 s of free hands, or the guided shape script (84 s). */
   record: RecordChoice;
-  /** A menu screen showing in the room, to look at it (set in the Testing panel; there is no address form). */
+  /** A menu screen showing in the room, to look at it. */
   menu: MenuChoice;
+  /** The lantern's flicker for testing (a steady light for screenshots); read when the page starts. */
+  flicker: FlickerChoice;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
@@ -27,48 +33,11 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   settings: false,
   record: 'off',
   menu: 'off',
+  flicker: null,
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
 export const FREE_RECORD_SECONDS = 20;
-
-/** Reads the switches out of an address's query string (with or without the leading "?"). */
-export function parseTesting(search: string): TestingOptions {
-  const p = new URLSearchParams(search);
-  const debug = new Set(p.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  return {
-    joints: debug.has('joints'),
-    shadow: debug.has('shadow'),
-    settings: p.has('settings'),
-    record: !p.has('record') ? 'off' : p.get('script') === 'shapes' ? 'shapes' : 'free',
-    menu: 'off',
-  };
-}
-
-/** The query string (with its "?", or "" when there is nothing) for `options`, keeping everything else in `search`. */
-export function buildTesting(search: string, options: Readonly<TestingOptions>): string {
-  const p = new URLSearchParams(search);
-  // Drop the switches this owns, and any other debug views stay.
-  const keepDebug = p
-    .getAll('debug')
-    .flatMap((v) => v.split(',').map((x) => x.trim()))
-    .filter((v) => v && v !== 'joints' && v !== 'shadow');
-  for (const k of ['debug', 'settings', 'record', 'script', 'note']) p.delete(k);
-  const debug = [...(options.joints ? ['joints'] : []), ...(options.shadow ? ['shadow'] : []), ...keepDebug];
-  if (debug.length) p.set('debug', debug.join(','));
-  if (options.settings) p.set('settings', '');
-  if (options.record === 'free') p.set('record', String(FREE_RECORD_SECONDS));
-  if (options.record === 'shapes') {
-    p.set('record', '');
-    p.set('script', 'shapes');
-  }
-  // "?settings=" reads the same as "?settings" (the game only asks whether it is there), but the short form is kept readable.
-  const text = p
-    .toString()
-    .replace(/(^|&)(settings|record)=(?=&|$)/g, '$1$2')
-    .replace(/%2C/g, ',');
-  return text ? `?${text}` : '';
-}
 
 /** What each button says about its current value. */
 export function describeTesting(o: Readonly<TestingOptions>): string[] {
@@ -79,6 +48,7 @@ export function describeTesting(o: Readonly<TestingOptions>): string[] {
   if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
   if (o.record === 'shapes') on.push('guided shape recording (84 s)');
   if (o.menu !== 'off') on.push(`${o.menu} screen`);
+  if (o.flicker !== null) on.push(`lantern flicker ${o.flicker}`);
   return on;
 }
 
@@ -87,7 +57,7 @@ export function nextChoice<T>(list: readonly T[], current: T): T {
   return list[(list.indexOf(current) + 1) % list.length];
 }
 
-/** Where the switches are remembered, and the event the Testing panel raises when one changes. */
+/** Where the switches are remembered, and the event the Developer panel raises when one changes. */
 export const TESTING_KEY = 'wsw.testing';
 export const TESTING_EVENT = 'wsw-testing';
 
@@ -116,6 +86,8 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       settings: raw.settings === true,
       record: (RECORD_CHOICES as readonly string[]).includes(raw.record ?? '') ? (raw.record as RecordChoice) : 'off',
       menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
+      flicker:
+        typeof raw.flicker === 'number' && Number.isFinite(raw.flicker) ? Math.min(Math.max(raw.flicker, 0), 1) : null,
     };
   } catch {
     return { ...DEFAULT_TESTING };

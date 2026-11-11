@@ -1,4 +1,4 @@
-// Live webcam hands in mock mode (?mock=1&src=webcam), through MediaPipe.
+// Live webcam hands in mock mode (the Hand Lab's Webcam source), through MediaPipe.
 // Loaded with a dynamic import, so the game only downloads MediaPipe when asked.
 // Hands appear about 0.5 m in front of the desktop view, turned 180° so you
 // see them from your own side, as a headset would: your right hand on the

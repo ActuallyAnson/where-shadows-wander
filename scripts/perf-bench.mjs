@@ -6,8 +6,9 @@
 //   npm run dev                                   (in another terminal, then:)
 //   node scripts/perf-bench.mjs [url] [--label name] [--out file.json] [--runs 3]
 //
-// The default address is https://localhost:5173/?mock=1 (the Vite dev server). Compare two runs with `--out`.
+// The default address is https://localhost:5173/ (the Vite dev server); it opens in the Hand Lab. Compare two runs with `--out`.
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 import { writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -15,7 +16,7 @@ const flag = (name, fallback) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const url = args.find((a) => a.startsWith('http')) ?? 'https://localhost:5173/?mock=1';
+const url = args.find((a) => a.startsWith('http')) ?? 'https://localhost:5173/';
 const label = flag('--label', 'run');
 const out = flag('--out', null);
 const runs = Number(flag('--runs', '3'));
@@ -35,6 +36,7 @@ async function once() {
       for (const e of list.getEntries()) window.__longTasks.push(e.duration);
     }).observe({ entryTypes: ['longtask'] });
   });
+  await launchIn(page, { mode: 'lab' });
   const t0 = Date.now();
   await page.goto(url);
   await page.waitForFunction(() => window.__wsw);

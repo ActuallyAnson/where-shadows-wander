@@ -5,10 +5,11 @@
 // In headless Chromium it checks that:
 //   a save made in one page load is there in the next (a setting);
 //   it is written when the page is hidden or flushed, but not while nothing changed;
-//   a damaged slot is recovered from the other and kept under wsw.save.mock.corrupt.* (the Hand Lab, ?mock=1, keeps its own save under wsw.save.mock.*);
+//   a damaged slot is recovered from the other and kept under wsw.save.mock.corrupt.* (the Hand Lab keeps its own save under wsw.save.mock.*);
 //   with localStorage blocked (as in some private modes) the game still starts and the save works in memory;
 //   with writes failing (a full disk) the game carries on and saves again when they work.
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const browser = await chromium.launch({
@@ -24,8 +25,9 @@ async function open(context, init) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
+  await launchIn(page, { mode: 'lab', flicker: 0 });
   if (init) await page.addInitScript(init);
-  await page.goto(`${base}/?mock=1&flicker=0`);
+  await page.goto(`${base}/`);
   await page.waitForFunction(() => window.__wsw?.saves, null, { timeout: 90000 });
   return { page, errors };
 }

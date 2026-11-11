@@ -5,6 +5,7 @@
 // It presses the keys (Alt+1 to 5, Alt+K, Alt+J, Alt+R), switches each system off and on, shows the overlays, replays
 // the demo recording, and drives the hands-only menu's buttons.
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const shot = process.argv[3];
@@ -22,7 +23,8 @@ const page = await (
 ).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`${base}/?mock=1&flicker=0.5`);
+await launchIn(page, { mode: 'lab', flicker: 0.5 });
+await page.goto(`${base}/`);
 await page.waitForFunction(() => window.__wsw?.debug, null, { timeout: 90000 });
 const w = (fn, arg) => page.evaluate(fn, arg);
 const key = (code) => page.keyboard.press(`Alt+${code}`);

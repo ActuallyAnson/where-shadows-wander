@@ -1,82 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildTesting,
   DEFAULT_TESTING,
   describeTesting,
   loadTesting,
   saveTesting,
   TESTING_KEY,
   nextChoice,
-  parseTesting,
   RECORD_CHOICES,
   type TestingOptions,
 } from './testing-options';
-
-describe('parseTesting', () => {
-  it('reads nothing from a plain address', () => {
-    expect(parseTesting('')).toEqual(DEFAULT_TESTING);
-    expect(parseTesting('?')).toEqual(DEFAULT_TESTING);
-  });
-
-  it('reads each switch the way the game reads it', () => {
-    expect(parseTesting('?debug=joints,shadow&settings&record=20').record).toBe('free');
-    const o = parseTesting('?debug=joints,shadow&settings&record&script=shapes');
-    expect(o).toEqual({
-      joints: true,
-      shadow: true,
-      settings: true,
-      record: 'shapes',
-      menu: 'off',
-    });
-  });
-
-  it('accepts a repeated debug parameter', () => {
-    expect(parseTesting('?debug=joints&debug=shadow')).toMatchObject({ joints: true, shadow: true });
-  });
-});
-
-describe('buildTesting', () => {
-  it('gives an empty address when nothing is on', () => {
-    expect(buildTesting('?debug=joints&settings', DEFAULT_TESTING)).toBe('');
-  });
-
-  it('builds the short forms the docs use', () => {
-    const all: TestingOptions = {
-      joints: true,
-      shadow: true,
-      settings: true,
-      record: 'free',
-      menu: 'off',
-    };
-    expect(buildTesting('', all)).toBe('?debug=joints,shadow&settings&record=20');
-    expect(buildTesting('', { ...DEFAULT_TESTING, record: 'shapes' })).toBe('?record&script=shapes');
-  });
-
-  it('keeps parameters it does not own, and unknown debug views', () => {
-    const out = buildTesting('?mock=1&stage=real&debug=other,joints', { ...DEFAULT_TESTING, shadow: true });
-    expect(out).toBe('?mock=1&stage=real&debug=shadow,other');
-  });
-
-  it('removes a note and script when recording is switched off', () => {
-    expect(buildTesting('?record=20&note=hi&script=shapes', DEFAULT_TESTING)).toBe('');
-  });
-
-  it('round-trips every combination through the game reading it back', () => {
-    for (const joints of [false, true])
-      for (const shadow of [false, true])
-        for (const settings of [false, true])
-          for (const record of RECORD_CHOICES) {
-            const o: TestingOptions = {
-              joints,
-              shadow,
-              settings,
-              record,
-              menu: 'off',
-            };
-            expect(parseTesting(buildTesting('?mock=1', o))).toEqual(o);
-          }
-  });
-});
 
 describe('describeTesting and nextChoice', () => {
   it('lists what is on, in words', () => {
@@ -85,6 +17,7 @@ describe('describeTesting and nextChoice', () => {
       'joint dots',
       'guided shape recording (84 s)',
     ]);
+    expect(describeTesting({ ...DEFAULT_TESTING, flicker: 0 })).toEqual(['lantern flicker 0']);
   });
 
   it('cycles through a list and wraps', () => {
@@ -94,6 +27,15 @@ describe('describeTesting and nextChoice', () => {
 });
 
 describe('remembering the switches (no address needed)', () => {
+  it('keeps the flicker between 0 and 1, and ignores anything but a number', () => {
+    const s = new Map<string, string>();
+    const st = { getItem: (k: string) => s.get(k) ?? null, setItem: (k: string, v: string) => void s.set(k, v) };
+    s.set(TESTING_KEY, JSON.stringify({ flicker: 3 }));
+    expect(loadTesting(st).flicker).toBe(1);
+    s.set(TESTING_KEY, JSON.stringify({ flicker: '0' }));
+    expect(loadTesting(st).flicker).toBeNull();
+  });
+
   const store = () => {
     const m = new Map<string, string>();
     return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m };
@@ -109,6 +51,7 @@ describe('remembering the switches (no address needed)', () => {
           settings: joints,
           record,
           menu: 'pause',
+          flicker: joints ? 0 : null,
         };
         expect(saveTesting(o, s)).toBe(true);
         expect(loadTesting(s)).toEqual(o);
@@ -128,6 +71,7 @@ describe('remembering the switches (no address needed)', () => {
       settings: true,
       record: 'off',
       menu: 'off',
+      flicker: null,
     });
     expect(loadTesting(null)).toEqual(DEFAULT_TESTING);
     const throwing = {

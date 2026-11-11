@@ -1,5 +1,5 @@
 // The bedroom's layout: where each static piece of the room stands, read from a data file (content/rooms/bedroom.json)
-// so the room can be arranged in the dev room editor (?mock=1&edit=room) rather than by editing numbers in code.
+// so the room can be arranged in the dev room editor (Developer panel) rather than by editing numbers in code.
 //
 // A layout has two sections, each a map from a piece's id to its placement:
 //   room  room space: x right, y up from the floor, -z toward the wall the shadows play on (the player sits at the origin).

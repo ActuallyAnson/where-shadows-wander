@@ -8,7 +8,7 @@ a headset**. Nothing has been measured on a Pico or a Quest yet.
 
 | Tool | What it does |
 | --- | --- |
-| `node scripts/perf-bench.mjs "https://localhost:PORT/?mock=1" --label NAME --out FILE --runs 2` | Opens the game in a browser, measures the lit room with and without the decoration the quality governor sheds, and records render time, draw calls, textures, texture memory, our own allocation per frame and long main-thread stalls. A calibration loop scales the time to this machine's speed so two runs on different days can be compared. |
+| `node scripts/perf-bench.mjs "https://localhost:PORT/" --label NAME --out FILE --runs 2` | Opens the game in a browser, measures the lit room with and without the decoration the quality governor sheds, and records render time, draw calls, textures, texture memory, our own allocation per frame and long main-thread stalls. A calibration loop scales the time to this machine's speed so two runs on different days can be compared. |
 | `npm run perf` | Micro-benchmarks: the per-frame hand pipeline (shape recognizer, gesture detector, shadow projector), the Verlet rope and the quality governor. |
 | Debug bar (`FrameInspector`) | Live frame time, draw calls and the governor's level in the headset. |
 

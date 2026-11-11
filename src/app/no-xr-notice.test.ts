@@ -13,31 +13,25 @@ function fakeXr(supported: readonly string[]): XrSupport & { asked: string[] } {
 }
 
 describe('xrSessionSupported', () => {
-  it('asks for immersive-vr by default', async () => {
+  it('asks for immersive-vr', async () => {
     const xr = fakeXr(['immersive-vr']);
-    expect(await xrSessionSupported(xr, '')).toBe(true);
+    expect(await xrSessionSupported(xr)).toBe(true);
     expect(xr.asked).toEqual(['immersive-vr']);
   });
 
   it('is not fooled by AR support when the page wants VR', async () => {
-    expect(await xrSessionSupported(fakeXr(['immersive-ar']), '')).toBe(false);
-  });
-
-  it('asks for immersive-ar with ?xr=ar', async () => {
-    const xr = fakeXr(['immersive-ar']);
-    expect(await xrSessionSupported(xr, '?xr=ar')).toBe(true);
-    expect(xr.asked).toEqual(['immersive-ar']);
+    expect(await xrSessionSupported(fakeXr(['immersive-ar']))).toBe(false);
   });
 
   it('is false when WebXR is missing', async () => {
-    expect(await xrSessionSupported(undefined, '')).toBe(false);
+    expect(await xrSessionSupported(undefined)).toBe(false);
   });
 
   it('is false when the check throws', async () => {
     const xr: XrSupport = {
       isSessionSupported: () => Promise.reject(new Error('blocked')),
     };
-    expect(await xrSessionSupported(xr, '')).toBe(false);
+    expect(await xrSessionSupported(xr)).toBe(false);
   });
 });
 
@@ -46,7 +40,8 @@ describe('landingHtml', () => {
     const html = landingHtml('https://example.test/game/');
     expect(html).toContain('Where Shadows Wander');
     expect(html).toContain('https://example.test/game/');
-    expect(html).toContain('./?mock=1');
+    expect(html).toContain('data-lab');
+    expect(html).not.toContain('?mock');
     expect(html).toContain('Meta Quest');
   });
 

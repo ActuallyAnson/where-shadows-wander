@@ -31,7 +31,7 @@ npx iwsdk browser run scripts/read-report.mjs   # diagnostics report
 npx iwsdk browser run scripts/census.mjs        # what is drawn (IWSDK hand meshes and rays should be hidden)
 ```
 
-**Test hands without a headset (Hand Lab):** with `npm run dev` running, open https://localhost:8081/?mock=1 in a normal browser tab, or press **Open Hand Lab** on the game page. Pick a source: **Synthetic** (click a shape or press 0–6), **Script** (every shape on each hand in turn), **Replay…** (a `.handrec.json`) or **Webcam** (your own hands, through MediaPipe). It shows the hands in 3D (drag to look around) and the game's hand features live; **Record** saves a `.handrec.json`. Webcam depth is approximate, so use it for shapes, not tracking quality. The older webcam bench (https://localhost:8081/webcam.html) shows the camera image with the tracked landmarks drawn on it.
+**Test hands without a headset (Hand Lab):** with `npm run dev` running, open https://localhost:8081/ in a normal browser tab, press **Developer** at the bottom of the title screen, then **Hand Lab**. The address never changes: the mode is kept in the tab, and the lab's **Back to the game** button returns. Pick a source: **Synthetic** (click a shape or press 0–6), **Script** (every shape on each hand in turn), **Replay…** (a `.handrec.json`) or **Webcam** (your own hands, through MediaPipe). It shows the hands in 3D (drag to look around) and the game's hand features live; **Record** saves a `.handrec.json`. Webcam depth is approximate, so use it for shapes, not tracking quality. The older webcam bench (https://localhost:8081/webcam.html) shows the camera image with the tracked landmarks drawn on it.
 
 To check a production build the way GitHub Pages serves it: `node scripts/serve-pages.mjs dist 4173`, then open `http://localhost:4173/where-shadows-wander/`.
 
@@ -52,9 +52,9 @@ We have a Pico now and no Quest yet. Develop on the Pico; confirm on a Quest bef
 Steps on the headset (Pico or Quest):
 
 1. Open the link in the headset browser. Make sure the headset's room or space setup is done.
-2. Press **Enter VR** (on the Pico: **Enter VR (Direct Hands)**) and allow hand tracking. Put the controllers down.
-3. Look around the room for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle on the table, and your hands as dark gloves with their shadows on the wall. (To see a dot on every joint instead, add `?debug=joints` to the link.)
+2. Press **BEGIN** and allow hand tracking (if it won't start, **Trouble starting?** has other ways in). Put the controllers down.
+3. Look around the room for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle on the table, and your hands as dark gloves with their shadows on the wall. (To see a dot on every joint instead, press **Developer**, then **Joint dots**, before BEGIN; dev and tester builds only.)
 4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
 5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This checks that your settings are saved between sessions (the report's `saves` section).
 
-To record hand data, add `?record=20` to the link (`?record=20&note=fist then flat hand` to label it). After leaving XR, press **Download recording**, then open the file in the Hand Recording Player.
+To record hand data (dev and tester builds), press **Developer**, then **Recording hands when VR starts** (20 s of free hands, or the guided shapes), then BEGIN. After leaving XR, the file is saved through the dev server, or press **Download recording**, then open the file in the Hand Recording Player.

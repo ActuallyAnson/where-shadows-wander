@@ -1,4 +1,4 @@
-// A hand source fills both HandFrames each frame in mock mode (?mock=1), in
+// A hand source fills both HandFrames each frame in mock mode (the Hand Lab), in
 // place of the headset. Every source writes the same HandFrame format as
 // XRHandReader, so the rest of the game can't tell the difference.
 import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';

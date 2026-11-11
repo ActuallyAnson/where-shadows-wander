@@ -21,7 +21,7 @@ Night, pale and one candle colour. Nothing else on UI.
 | Glow | `#ffc46e` at 30% | the light that follows the fingertip |
 
 The settings panel (`src/ui/settings-panel/markup.ts`) and the pause, solved and end screens
-(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. To look at them: the Hand Lab's **Menu** button steps through pause, solved and end, and the launcher's Testing panel has the same switch (no address to type). The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
+(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. To look at them: the Hand Lab's **Menu** button steps through pause, solved and end, and the launcher's Developer panel has the same switch (no address to type). The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
 and reads presses from `menu.onPress`. High contrast stays pure black on pure white
 with black outlines (`PALETTE.high`), and every new screen needs a high-contrast version.
 
@@ -77,9 +77,9 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 - Debug is a separate small panel, never part of a title or pause screen, and exists only when
   `DEBUG_TOOLS` is true (dev and `--mode tester` builds). The release build has none of it
   (`check:debug-free`).
-- In a dev or tester build the debug bar (log box, Testing, the other ways in) sits at the bottom
-  on top of the title screen, so a tester build is never mistaken for the release.
-- The judges' build shows only BEGIN and a dim "Trouble starting?" under the title.
+- In a dev or tester build one **Developer** button (modes, testing switches, the launch log) sits at
+  the bottom on top of the title screen, so a tester build is never mistaken for the release.
+- Every build shows BEGIN, SETTINGS and a dim "Trouble starting?" under the title.
 
 ## Not doing
 

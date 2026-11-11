@@ -1,4 +1,4 @@
-// A scripted sequence of shapes for mock mode (?mock=1&src=script). The pose
+// A scripted sequence of shapes for mock mode (the Hand Lab's Script source). The pose
 // is a pure function of mock time, so the same script gives the same hands
 // every run, whatever the frame rate. It runs on the same ShapeScript as
 // guided recordings, so a guided recording of it gives labelled synthetic data.

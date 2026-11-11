@@ -1,6 +1,6 @@
 // Synthetic hands: builds a 25-joint HandFrame from a few numbers (curl and
 // splay per finger, thumb placement, wrist orientation). Used by mock input
-// (?mock=1) and by the classifier's unit tests, so shapes can be tested without
+// (the Hand Lab) and by the classifier's unit tests, so shapes can be tested without
 // a headset. Plain TypeScript: no IWSDK, no three.js.
 //
 // The hand is built as a right hand in a local frame, palm down:

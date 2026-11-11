@@ -25,7 +25,7 @@ export interface SettingsStoreOptions {
   /**
    * Settings the player has not chosen yet are left to the game's own defaults rather than forced: the lantern
    * flicker, say, follows the device's reduced-motion preference until the player moves its slider.
-   * Keys listed here are never applied (a `?flicker=` address overrides the setting, for testing).
+   * Keys listed here are never applied (the Developer panel's flicker switch overrides the setting, for testing).
    */
   neverApply?: readonly (keyof Settings)[];
   /** Keys applied only once the player has changed them this session or saved a non-default value. */

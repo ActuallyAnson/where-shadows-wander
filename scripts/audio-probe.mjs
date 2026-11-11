@@ -11,6 +11,7 @@
 //   pausing suspends the context and resuming runs it again;
 //   the per-frame update costs well under 0.5 ms.
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8081';
 const browser = await chromium.launch({
@@ -27,7 +28,8 @@ const page = await (
 ).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`${base}/?mock=1&flicker=0`);
+await launchIn(page, { mode: 'lab', flicker: 0 });
+await page.goto(`${base}/`);
 await page.waitForFunction(() => window.__wsw?.audio, null, { timeout: 90000 });
 
 const before = await page.evaluate(() => ({

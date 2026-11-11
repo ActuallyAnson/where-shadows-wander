@@ -1,4 +1,4 @@
-// ?debug=shadow: draws what the hands give the wall, on the stage: each
+// The shadow capsules switch: draws what the hands give the wall, on the stage: each
 // capsule's axis (red), each hand's outline (green), and every joint projected
 // separately by three.js's own matrix maths (blue dots). At shadow size 1 the
 // blue dots sit on the red lines' ends: a check of the projector's maths, stage

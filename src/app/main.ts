@@ -12,7 +12,6 @@ import {
   Color,
   Matrix4,
   Quaternion,
-  SessionMode,
   Vector3,
   World,
   createSystem,
@@ -33,7 +32,7 @@ import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
-import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
+import { loadTesting, MENU_CHOICES, nextChoice, TESTING_EVENT, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
@@ -66,34 +65,35 @@ import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
 import { BEDROOM_LAYOUT_FILE, BEDROOM_PIECE_IDS, readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest, { assetFiles } from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
-import { HandOccluder } from '../engine/xr/hand-occluder';
 import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
 import { HandsStatus, MAX_STEP_S } from '../engine/xr/hands-status';
 import { HandRecorder, offerDownload } from '../engine/xr/hand-recorder';
 import { disableIwsdkRays, hideIwsdkHandMeshes } from '../engine/xr/iwsdk-input-visuals';
 import { PromptPanel } from '../engine/xr/prompt-panel';
-import { clearFor, occluderDefault, sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+import { clearFor } from '../engine/xr/session-mode';
 import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
-import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
+import { createMockSource, MockMode, mockOptionsFor } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
 import { SettingsScreen } from '../ui/settings-panel/settings-screen';
-import { probePixels } from './composite-probe';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
 import { createUiSound } from './ui-sound';
-import { mountLabLink } from './lab-link';
+import { isDeskMode, loadLaunch, saveLaunch, switchLaunch } from './launch-mode';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
-const mockOptions = mockOptionsFromUrl(location.search);
+// What the page starts as (launch-mode.ts): the game, or the Hand Lab with mock hands (and in it the dev room editor).
+// The address is always the plain page; the choice is kept in the tab and changed from the page.
+const launch = loadLaunch(DEBUG_TOOLS);
+const mockOptions = isDeskMode(launch.mode) ? mockOptionsFor(launch.source) : null;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -106,16 +106,13 @@ function audioContextRate(): number {
     return 48000;
   }
 }
-// The game is a virtual room (immersive-vr, ADR 0005). ?xr=ar starts the passthrough mode instead.
-const xrMode = xrModeFromUrl(location.search);
 const diagnostics = new Diagnostics();
 // One part of the frame throwing must not stop the rest, or the next frame (failure-reporter.ts).
 const failures = new FailureReporter((message) => diagnostics.error(message));
 // The "Copy report" panel is a debug tool: only in dev and tester builds (src/debug/debug-flag.ts).
 if (DEBUG_TOOLS) void import('../debug/report-panel').then((m) => m.mountReportPanel(diagnostics));
 // Mock mode runs on any browser, so it skips the "open this on a headset" notice.
-if (!mockOptions) void showNoXrNoticeIfNeeded(location.search);
-if (!mockOptions && import.meta.env.DEV) mountLabLink();
+if (!mockOptions) void showNoXrNoticeIfNeeded(DEBUG_TOOLS);
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.
@@ -125,12 +122,8 @@ start().catch((e) => {
 });
 
 async function start(): Promise<void> {
-  // iwsdk.config.json says VR; ?xr=ar overrides the session mode before the world (and its enter offer) is made.
-  const worldOptions =
-    projectOptions.xr && xrMode === 'ar'
-      ? { ...projectOptions, xr: { ...projectOptions.xr, sessionMode: SessionMode.ImmersiveAR } }
-      : projectOptions;
-  const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, worldOptions);
+  // The game is a virtual room: iwsdk.config.json asks for immersive-vr (ADR 0005).
+  const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
   // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
   if (import.meta.env.DEV) {
     const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
@@ -139,7 +132,7 @@ async function start(): Promise<void> {
   // The critical assets have loaded; from here IWSDK gives up on any one request after 8 s, not 30 s.
   shortenAssetTimeout();
   diagnostics.mark('worldCreated');
-  // The page's own Enter VR / Enter AR buttons: the only way in on browsers with no enter prompt (Pico Browser).
+  // The page's own title screen and Enter VR buttons: the only way in on browsers with no enter prompt (Pico Browser).
   // The title screen's sounds play through the audio engine, which is made further down.
   let uiAudio: AudioEngine | null = null;
   const uiSound = createUiSound(() => uiAudio);
@@ -155,7 +148,7 @@ async function start(): Promise<void> {
   // The session's visibility: the frame holds still on it and saves can listen to it.
   const visibility = new SessionVisibility();
   // The save (the settings), read once now and written only on events (headset off, page hidden), never per frame.
-  // The Hand Lab (?mock=1) keeps its own save, so a development session never touches a real one.
+  // The Hand Lab keeps its own save, so a development session never touches a real one.
   const saves = new SaveManager({
     store: browserStore() ?? new MemoryStore(),
     prefix: mockOptions ? 'wsw.save.mock' : 'wsw.save',
@@ -174,9 +167,7 @@ async function start(): Promise<void> {
   let clock = 0;
 
   // Hand shadows land on the stage: StageFrame, the virtual room's paper wall, 2 m ahead and 1.6 x 1.0 m (ADR 0005). The
-  // Hand Lab (?mock=1) uses the same wall as a headset; only where the hands and the head come from differs.
-  // ?debug=shadow shows the capsules.
-  const params = new URLSearchParams(location.search);
+  // Hand Lab uses the same wall as a headset; only where the hands and the head come from differs.
   // Capture mode (five taps on the title's emblem, or the Testing panel): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
   // before the session starts, so it is set here; the foveation is set when the session starts.
   const capture = captureOptions(loadCaptureChoice());
@@ -196,14 +187,15 @@ async function start(): Promise<void> {
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
   const handStates = { left: shapes.left.state, right: shapes.right.state };
-  // The lantern's flicker: ?flicker=0..1 sets how much (0 is steady); the default is gentler under reduced motion.
-  const flickerRaw = params.get('flicker');
-  const flickerParam = flickerRaw === null || flickerRaw.trim() === '' ? NaN : Number(flickerRaw); // ?flicker with no value is ignored, not 0
+  // The lantern's flicker: the Developer panel's flicker switch (0..1, 0 is steady) overrides it for testing; the default is
+  // gentler under reduced motion.
+  const flickerTest = DEBUG_TOOLS ? loadTesting().flicker : null;
+  const flickerParam = flickerTest ?? NaN;
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lanternLight = new LanternLightModel({
     amplitude: Number.isFinite(flickerParam) ? Math.min(Math.max(flickerParam, 0), 1) : reduceMotion ? 0.3 : 1,
   });
-  // Follow the OS reduced-motion setting while the page is open, unless ?flicker= was given.
+  // Follow the OS reduced-motion setting while the page is open, unless the flicker switch is set.
   if (!Number.isFinite(flickerParam) && typeof matchMedia === 'function')
     matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
       lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
@@ -265,8 +257,6 @@ async function start(): Promise<void> {
   let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
   const ambientLight = new AmbientLight(0x101422, 0.008);
-  // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
-  const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
   // The captions (a setting): a small line of ink low on the wall that names the sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
@@ -342,7 +332,7 @@ async function start(): Promise<void> {
   document.addEventListener('visibilitychange', syncAudioPause);
   // The accessibility settings (docs/adr/0010-saves.md): loaded from the save, applied live to the recognizer,
   // shadows, lantern and mixer, and saved on change. The lantern flicker follows the device's reduced-motion
-  // default until the player moves its slider, and ?flicker= overrides the setting for testing.
+  // default until the player moves its slider, and the Developer panel's flicker switch overrides the setting for testing.
   const settings = new SettingsStore(
     { recognizer: shapes, projector, sharpen, lantern: lanternLight, mixer: audio.mixer },
     { applyOnlyWhenChosen: ['flicker'], neverApply: Number.isFinite(flickerParam) ? ['flicker'] : [] },
@@ -503,7 +493,7 @@ async function start(): Promise<void> {
   // In mock mode the player's eyes are the desktop camera; in XR initialize with a default seated rig so the scene is immediately visible.
   if (mockOptions) placeRig(MOCK_HEAD, 0);
   else placeRig([0, 1.2, 0], 0);
-  // Mock mode (?mock=1): a HandSource fills the same HandFrames instead of WebXR.
+  // Mock mode (the Hand Lab): a HandSource fills the same HandFrames instead of WebXR.
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
   if (mockOptions) {
@@ -525,6 +515,9 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
+      // The lab remembers its source for the next reload, and leaves for the game's title screen.
+      onSourceKind: (kind) => saveLaunch({ ...loadLaunch(DEBUG_TOOLS), source: kind }),
+      exit: () => switchLaunch('game', DEBUG_TOOLS),
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
@@ -535,7 +528,6 @@ async function start(): Promise<void> {
   world.scene.add(handVisual.object);
   // Debug tools (src/debug, ADR 0012, getting-started section 17): only when DEBUG_TOOLS is on (the dev server, or a build made with
   // `vite build --mode tester`), and loaded on demand, so a normal build does not contain them. `debug` is null otherwise.
-  // ?debug=shadow,joints still turns the overlays on at start.
   const handFlags = { handVisual: true };
   let debug: DebugTools | null = null;
   if (DEBUG_TOOLS) {
@@ -556,16 +548,11 @@ async function start(): Promise<void> {
       flame: () => (rigPlaced ? candleView.flamePosition : null),
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
-    for (const [view, overlay] of [
-      ['shadow', 'capsules'],
-      ['joints', 'joints'],
-    ] as const)
-      if (debugViews.has(view)) debug.showOverlay(overlay);
   }
-  // The room editor (src/debug/room-editor.ts): ?mock=1&edit=room arranges the bedroom's static pieces in the Hand Lab and
-  // saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
+  // The room editor (src/debug/room-editor.ts), chosen in the Developer panel: arranges the bedroom's static pieces in the
+  // Hand Lab and saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
   let roomEditor: import('../debug/room-editor').RoomEditor | null = null;
-  if (DEBUG_TOOLS && lab && params.get('edit') === 'room') {
+  if (DEBUG_TOOLS && lab && launch.mode === 'room-editor') {
     const { RoomEditor } = await import('../debug/room-editor');
     const desk = lab;
     roomEditor = new RoomEditor({
@@ -589,6 +576,8 @@ async function start(): Promise<void> {
       suspendDesk: (on) => {
         desk.suspend(on);
         if (mock) mock.paused = on;
+        // Closing the editor leaves the plain Hand Lab, and a reload keeps it there.
+        if (!on) saveLaunch({ ...loadLaunch(DEBUG_TOOLS), mode: 'lab' });
       },
     });
     // The candle stands on the tray: when the tray moves, the rig is placed again so the candle (the light) follows it.
@@ -597,12 +586,6 @@ async function start(): Promise<void> {
     };
     roomEditor.show();
   }
-  // The occluder keeps real hands in front of the paper over passthrough. It follows the session: off in VR
-  // (it would cut a hole in the room), on over passthrough. ?occlude=1 or 0 overrides it for testing.
-  const occluder = new HandOccluder();
-  const occludeParam = params.get('occlude');
-  occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
-  world.scene.add(...occluder.meshes);
 
   // addSource keeps only one source, so everything we report goes through it.
   diagnostics.addSource(() => ({
@@ -676,8 +659,6 @@ async function start(): Promise<void> {
       outputColorSpace: world.renderer.outputColorSpace,
       blendMode: session?.environmentBlendMode ?? null,
       layer: session ? (layers && layers.length ? 'projection' : 'webgl') : null,
-      handOccluder: occluder.enabled,
-      urlMode: sessionModeOf(xrMode),
     };
   };
   // Each step of a session start or end is guarded on its own: a throw in one (say the diagnostics) must not skip
@@ -704,9 +685,8 @@ async function start(): Promise<void> {
       guard('sessionstart: audio session unlock', () => audio.attachSessionUnlock(session as unknown as SessionEvents));
     if (session) {
       guard('sessionstart: display', () => {
-        occluder.enabled = occluderDefault(session.environmentBlendMode, !!mockOptions, occludeParam);
         passthrough = session.environmentBlendMode !== undefined && session.environmentBlendMode !== 'opaque';
-        const clear = clearFor(session.environmentBlendMode, xrMode);
+        const clear = clearFor(session.environmentBlendMode);
         world.scene.background = clear.background === null ? null : new Color(clear.background);
         world.renderer.setClearColor(clear.background ?? 0x000000, clear.alpha);
       });
@@ -728,7 +708,6 @@ async function start(): Promise<void> {
     guard('sessionend: display', () => {
       world.scene.background = null;
       world.renderer.setClearColor(0x000000, 0);
-      occluder.enabled = occluderDefault(undefined, !!mockOptions, occludeParam);
       passthrough = false;
     });
     if (!mock) {
@@ -769,15 +748,13 @@ async function start(): Promise<void> {
     });
   });
 
-  let recorder: HandRecorder | null = HandRecorder.fromUrl(!mock);
-  if (recorder) recorder.onFinished = offerDownload;
+  let recorder: HandRecorder | null = null;
   const head: [number, number, number] = [0, 0, 0];
   const headTurn = { x: 0, y: 0, z: 0, w: 1 };
   // Guided recording on a headset: prompts on a panel in front of the wearer,
   // placed on the first XR frame and again when recording starts.
-  let panel: PromptPanel | null = recorder?.script ? new PromptPanel() : null;
   // The head pose is in reference space, which is the XR origin's space.
-  if (panel) world.player.add(panel.mesh);
+  let panel: PromptPanel | null = null;
   let panelAtStart = false;
   /** Starts a hand recording for the session that is starting (armed by the launcher's Testing panel, no address needed). */
   const armRecording = (choice: 'off' | 'free' | 'shapes') => {
@@ -794,10 +771,9 @@ async function start(): Promise<void> {
   // the recording begin when VR starts. All remembered in the browser, so no address is ever typed.
   if (DEBUG_TOOLS && debug) {
     const tools = debug;
-    const { loadTesting, TESTING_EVENT } = await import('./testing-options');
     const applyOverlays = (t: { joints: boolean; shadow: boolean }) => {
-      tools.showOverlay('capsules', t.shadow || debugViews.has('shadow'));
-      tools.showOverlay('joints', t.joints || debugViews.has('joints'));
+      tools.showOverlay('capsules', t.shadow);
+      tools.showOverlay('joints', t.joints);
     };
     applyOverlays(loadTesting());
     showMenuChoice(loadTesting().menu);
@@ -1130,7 +1106,6 @@ async function start(): Promise<void> {
       }
       timings.end(SLOT.audio);
       try {
-        occluder.update(handList);
         timings.begin(SLOT.handVisual);
         handVisual.object.visible = !passthrough && handFlags.handVisual;
         world.camera.getWorldPosition(settingsHead);
@@ -1194,7 +1169,6 @@ async function start(): Promise<void> {
         projector,
         stage,
         stageFrame,
-        occluder,
         sharpen,
         lanternLight,
         candleView,
@@ -1216,8 +1190,6 @@ async function start(): Promise<void> {
         igniteCandle: () => {
           if (sessionState === 'title_vr') igniteCandle();
         },
-        probe: (points: readonly (readonly number[])[]) =>
-          probePixels(world.renderer, world.scene, world.camera, points),
       },
     });
 }

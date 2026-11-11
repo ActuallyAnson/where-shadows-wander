@@ -7,6 +7,7 @@
 // It works in src/assets/models/probe-tmp/ and puts content/rooms/bedroom.json back as it was at the end.
 import { readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const shot = process.argv[3];
@@ -29,8 +30,9 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('dialog', (d) => d.accept());
 const w = (fn, arg) => page.evaluate(fn, arg);
+await launchIn(page, { mode: 'room-editor' });
 const open = async () => {
-  await page.goto(`${base}/?mock=1&edit=room`);
+  await page.goto(`${base}/`);
   await page.waitForFunction(
     () => window.__wsw?.roomEditor && document.querySelector('.room-assets .tree .item'),
     null,

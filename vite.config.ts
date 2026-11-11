@@ -105,7 +105,7 @@ function saveRecordings(): Plugin {
 
 /**
  * Dev server only: POST /__wsw/rooms/<name>.json writes a room layout to content/rooms/, so the room editor
- * (src/debug/room-editor.ts, ?mock=1&edit=room) saves straight into the repository. The body must read as a
+ * (src/debug/room-editor.ts, opened from the launcher's Developer panel) saves straight into the repository. The body must read as a
  * layout with no problems (src/engine/stage/room-layout.ts); anything else is refused and nothing is written.
  */
 function saveRoomLayouts(): Plugin {

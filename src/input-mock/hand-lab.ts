@@ -1,4 +1,4 @@
-// The Hand Lab: mock mode's control panel (?mock=1). One page to try hand
+// The Hand Lab: mock mode's control panel (src/app/launch-mode.ts). One page to try hand
 // sources (synthetic, scripted, replay, webcam), make shapes, read the
 // classifier's features, record, and look around the hands in 3D.
 import type { PerspectiveCamera, Scene } from '@iwsdk/core';
@@ -39,6 +39,10 @@ export interface LabView {
   settings?: { toggle(): void; isOpen(): boolean };
   /** The pause screen: the Menu button shows and hides it, and says whether it is showing. */
   menu?: { cycle(): void; label(): string };
+  /** Told the kind of source in use whenever it changes, so the page can start with it again after a reload. */
+  onSourceKind?(kind: MockSourceKind): void;
+  /** Leaves the lab for the game (the "Back to the game" button). */
+  exit?(): void;
 }
 
 export class HandLab {
@@ -157,9 +161,7 @@ export class HandLab {
     if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
     // Synthetic hands start one-handed, like a player gesturing.
     this.synthetic?.setShape('left', null);
-    const url = new URL(location.href);
-    url.searchParams.set('src', kindOf(this.mode.source.name));
-    history.replaceState(null, '', url);
+    this.view.onSourceKind?.(kindOf(this.mode.source.name));
   }
 
   private async switchSource(kind: MockSourceKind, file?: File): Promise<void> {
@@ -257,7 +259,7 @@ export class HandLab {
     this.root.className = 'lab';
     this.root.innerHTML = `
       <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
-        <a href="./">Back to the game</a></p></header>
+        </p><button type="button" data-act="exit" data-arg="">Back to the game</button></header>
       <section id="lab-controls"></section>
       <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
@@ -306,6 +308,7 @@ export class HandLab {
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'menu') this.view.menu?.cycle();
+      else if (act === 'exit') return this.view.exit?.();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);

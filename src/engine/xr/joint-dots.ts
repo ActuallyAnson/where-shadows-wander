@@ -12,7 +12,7 @@ export class JointDots {
   private readonly scratchColor = new Color();
 
   constructor() {
-    // Drawn last and without a depth test, so the hand occluder (hand-occluder.ts) can't hide them.
+    // Drawn last and without a depth test, so nothing in the room can hide them.
     this.mesh = new InstancedMesh(
       new SphereGeometry(1, 8, 6),
       new MeshBasicMaterial({ depthTest: false }),

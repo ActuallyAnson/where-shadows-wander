@@ -101,7 +101,7 @@ export class DebugTools {
     if (o.joints) this.dots.update(this.ctx.handList, rigPlaced ? this.ctx.flame() : null);
   }
 
-  /** Switches an overlay from outside (the ?debug= address). */
+  /** Switches an overlay from outside (the Developer panel's switches). */
   showOverlay(key: OverlayKey, on = true): void {
     this.controller.setOverlay(key, on);
   }

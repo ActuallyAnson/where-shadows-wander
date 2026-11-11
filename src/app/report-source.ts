@@ -4,7 +4,7 @@ import type { CapabilityDetector } from '../engine/xr/capabilities';
 
 export interface ReportInputs {
   handReadMethod: Readonly<Record<string, number>>;
-  /** The mock source's name in mock mode (?mock=1), else null. */
+  /** The mock source's name in mock mode (the Hand Lab), else null. */
   mockSource: string | null;
   capabilities: CapabilityDetector;
 }

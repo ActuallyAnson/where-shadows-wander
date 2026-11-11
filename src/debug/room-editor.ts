@@ -1,6 +1,6 @@
 // The room editor: arrange the bedroom's static pieces in the running game and save them to the room layout file
 // (content/rooms/bedroom.json, src/engine/stage/room-layout.ts). Development and tester builds only; it opens in the Hand Lab
-// with `?mock=1&edit=room`, and main.ts loads it with a dynamic import behind DEBUG_TOOLS.
+// from the launcher's Developer panel (src/app/launch-mode.ts), and main.ts loads it with a dynamic import behind DEBUG_TOOLS.
 //
 // Click a piece to select it (or pick it from the list), then drag the gizmo or type exact numbers. The numbers are the
 // piece's placement as the file stores it: position in metres, rotation in degrees and scale, in the piece's own space
