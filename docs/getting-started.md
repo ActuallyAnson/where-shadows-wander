@@ -168,7 +168,7 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). Arrange them in the running game:
 
 1. `npm run dev`, then open the Hand Lab with the editor: `https://localhost:8081/?mock=1&edit=room`.
-2. Click a piece, or pick it from the **Scene** tree on the right (Room and Lap, grouped by Furniture, Dressing, Room, Tray and Added). Drag the gizmo, or type exact numbers into Position (metres), Rotation (degrees) and Scale.
+2. Click a piece, or pick it in the right panel's **Scene** tab (Room and Lap, grouped by Furniture, Dressing, Room, Tray and Added). In the **Inspector** tab, drag the gizmo or type exact numbers into Position (metres), Rotation (degrees) and Scale. Drag the panel's left edge to widen it (double-click the edge for the default width; the width is remembered).
 3. To add a model, use the **Assets** panel along the bottom (below).
 4. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change, with any model files you imported or exported. Saving doesn't reload the page; the next reload reads the saved file.
 

@@ -74,9 +74,16 @@ export class AssetPanel {
   constructor(
     private readonly client: AssetClient,
     private readonly host: AssetPanelHost,
-    private readonly right: number,
+    private right: number,
   ) {
     this.mount();
+  }
+
+  /** Follows the editor's panel when it is resized. */
+  setRight(px: number): void {
+    if (px === this.right) return;
+    this.right = px;
+    this.root.style.right = `${px}px`;
   }
 
   /** How much of the window's bottom the browser covers (0 when hidden). */

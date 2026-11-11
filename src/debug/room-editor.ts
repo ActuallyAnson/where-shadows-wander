@@ -82,6 +82,9 @@ const SNAP = { translate: 0.01, rotateDeg: 5, scale: 0.05 };
 const FIELDS = ['pos', 'rotDeg', 'scale'] as const;
 const FIELD_LABEL = { pos: 'Position (m)', rotDeg: 'Rotation (°)', scale: 'Scale' } as const;
 const PANEL_W = 300;
+const PANEL_MIN_W = 240;
+const PANEL_W_KEY = 'wsw.roomEditor.panelWidth';
+type Tab = 'inspect' | 'scene';
 
 /** The headset's field of view (a Quest 3's is about 110° across and 96° up and down). */
 const HEADSET_FOV_DEG = { across: 110, upDown: 96 };
@@ -161,7 +164,10 @@ export class RoomEditor {
   private readonly onKeyUp = (e: KeyboardEvent) => this.key(e, false);
   private readonly onPointerDown = (e: PointerEvent) => this.downAt.set(e.clientX, e.clientY);
   private readonly onPointerUp = (e: PointerEvent) => this.click(e);
-  private readonly onResize = () => this.fitCamera();
+  private readonly onResize = () => this.applyPanelWidth();
+  /** The panel's width as last dragged (kept for the next time the editor opens), and the tab it shows. */
+  private panelW = readStoredWidth();
+  private tab: Tab = 'inspect';
   private readonly onBeforeUnload = (e: BeforeUnloadEvent) => {
     if (this.dirty) e.preventDefault();
   };
@@ -261,7 +267,7 @@ export class RoomEditor {
     this.gameLoader = this.deps.placed.currentLoader;
     this.deps.placed.setLoader(this.editorLoader);
     this.assets.show();
-    this.fitCamera();
+    this.applyPanelWidth();
     this.view('Overview');
     this.setRoomOnly(true);
     this.render();
@@ -655,7 +661,46 @@ export class RoomEditor {
     const w = window.innerWidth,
       h = window.innerHeight;
     if (w < 700) this.deps.camera.clearViewOffset();
-    else this.deps.camera.setViewOffset(w, h, PANEL_W / 2, this.assets.height / 2, w, h);
+    else this.deps.camera.setViewOffset(w, h, this.panelWidth() / 2, this.assets.height / 2, w, h);
+  }
+
+  private panelWidth(): number {
+    return Math.round(Math.min(Math.max(this.panelW, PANEL_MIN_W), Math.max(PANEL_MIN_W, window.innerWidth * 0.5)));
+  }
+
+  /** Sizes the panel (narrow windows put it along the bottom instead, at full width), the asset dock beside it, and the view. */
+  private applyPanelWidth(): void {
+    const narrow = window.innerWidth < 700;
+    this.root.style.width = narrow ? '' : `${this.panelWidth()}px`;
+    this.assets.setRight(this.panelWidth());
+    this.fitCamera();
+  }
+
+  /** Dragging the panel's left edge sets its width. */
+  private startResize(e: PointerEvent, grip: HTMLElement): void {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    this.root.classList.add('resizing');
+    const move = (ev: PointerEvent) => {
+      this.panelW = window.innerWidth - ev.clientX;
+      this.applyPanelWidth();
+    };
+    const up = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      this.root.classList.remove('resizing');
+      this.panelW = this.panelWidth();
+      try {
+        localStorage.setItem(PANEL_W_KEY, String(this.panelW));
+      } catch {
+        // No storage (a private window): the width is kept for this page only.
+      }
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
   }
 
   private findFile(path: string): AssetFileInfo | undefined {
@@ -753,20 +798,39 @@ export class RoomEditor {
     this.root.className = 'room-ed';
     this.root.style.display = 'none';
     this.root.innerHTML = `
-      <header><h1>Room editor</h1>
-        <p>Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
+      <div class="grip" title="Drag to resize (double-click: default width)"></div>
+      <header><h1>Room editor</h1></header>
+      <nav class="tabs"><button data-act="tab:inspect">Inspector</button>
+        <button data-act="tab:scene">Scene <small id="re-count"></small></button></nav>
+      <div class="pane" data-tab="inspect">
+        <p class="hint">Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
         Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
-        Drag empty space to look around.</p></header>
-      <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
-      <section class="card" id="re-piece"></section>
-      <section class="card scene"><h2>Scene <small id="re-count"></small></h2><div class="tree" id="re-tree"></div></section>
+        Drag empty space to look around.</p>
+        <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
+        <section class="card" id="re-piece"></section>
+      </div>
+      <div class="pane" data-tab="scene"><div class="tree" id="re-tree"></div></div>
       <section class="save"><button id="re-save" class="primary">Save room layout</button>
         <p id="re-status"></p><button id="re-close">Close editor</button></section>`;
+    const grip = this.root.querySelector<HTMLElement>('.grip')!;
+    grip.addEventListener('pointerdown', (e) => this.startResize(e, grip));
+    grip.addEventListener('dblclick', () => {
+      this.panelW = PANEL_W;
+      this.applyPanelWidth();
+      try {
+        localStorage.removeItem(PANEL_W_KEY);
+      } catch {
+        // No storage.
+      }
+    });
     this.root.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!b) return;
       const [act, arg] = (b.dataset.act ?? '').split(':');
-      if (act === 'mode') this.setMode(arg as Mode);
+      if (act === 'tab') {
+        this.tab = arg as Tab;
+        this.render();
+      } else if (act === 'mode') this.setMode(arg as Mode);
       else if (act === 'space') {
         this.gizmo.setSpace(this.gizmo.space === 'local' ? 'world' : 'local');
         this.render();
@@ -809,6 +873,10 @@ export class RoomEditor {
 
   private render(): void {
     if (!this.open) return;
+    for (const b of this.root.querySelectorAll<HTMLElement>('.tabs [data-act]'))
+      b.classList.toggle('on', b.dataset.act === `tab:${this.tab}`);
+    for (const p of this.root.querySelectorAll<HTMLElement>('.pane'))
+      p.classList.toggle('active', p.dataset.tab === this.tab);
     const mode = this.gizmo.mode as Mode;
     this.root.querySelector('#re-modes')!.innerHTML =
       (['translate', 'rotate', 'scale'] as const)
@@ -849,7 +917,7 @@ export class RoomEditor {
               : `<div class="row"><button data-act="export"
                   title="Write it as a .glb to src/assets/models/exported/, to place copies or edit it in Blender">Export .glb</button></div>`
           }</div>`
-        : `<h2>Selected <span>nothing</span></h2><div class="body"><p class="hint">Click a piece in the room, or pick one below.</p>
+        : `<h2>Selected <span>nothing</span></h2><div class="body"><p class="hint">Click a piece in the room, or pick one in the Scene tab.</p>
           <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div></div>`;
     }
     this.root.querySelector<HTMLButtonElement>('[data-act="undo"]')!.disabled = !this.history.canUndo;
@@ -912,6 +980,15 @@ export class RoomEditor {
   }
 }
 
+function readStoredWidth(): number {
+  try {
+    const w = Number(localStorage.getItem(PANEL_W_KEY));
+    return Number.isFinite(w) && w > 0 ? w : PANEL_W;
+  } catch {
+    return PANEL_W;
+  }
+}
+
 function isCameraOrLight(o: Object3D): boolean {
   const flags = o as { isCamera?: boolean; isLight?: boolean };
   return !!flags.isCamera || !!flags.isLight;
@@ -932,14 +1009,30 @@ function isShown(o: Object3D): boolean {
 const CSS = `
 .room-ed {
   --ink: #ece6d8; --muted: #a8a294; --panel: #1b1e26; --line: #2e333f; --accent: #f0a24a;
-  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 11; overflow-y: auto;
-  box-sizing: border-box; padding: 14px; display: grid; gap: 14px; align-content: start;
+  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 11;
+  box-sizing: border-box; display: flex; flex-direction: column;
   background: #14161c; color: var(--ink); border-left: 1px solid var(--line);
   font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
-@media (max-width: 699px) { .room-ed { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); } }
+@media (max-width: 699px) { .room-ed { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); }
+  .room-ed .grip { display: none; } }
+.room-ed .grip { position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; cursor: ew-resize; z-index: 2; }
+.room-ed .grip:hover, .room-ed.resizing .grip { background: linear-gradient(90deg, transparent 3px, var(--accent) 3px, var(--accent) 5px, transparent 5px); }
+.room-ed.resizing { user-select: none; }
+.room-ed header { flex: none; padding: 12px 14px 8px; }
 .room-ed h1 { margin: 0; font-size: 18px; font-weight: 650; }
-.room-ed header p, .room-ed .hint, .room-ed #re-status { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.room-ed .tabs { flex: none; display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--line); }
+.room-ed .tabs button { flex: 1; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none;
+  color: var(--muted); padding: 7px 8px; margin-bottom: -1px; }
+.room-ed .tabs button:hover:not(:disabled) { border-color: transparent; color: var(--ink); }
+.room-ed .tabs button.on { background: #1b1e26; border-color: var(--line); border-bottom: 1px solid #1b1e26; color: var(--ink); }
+.room-ed .tabs small { color: var(--muted); font-weight: 400; margin-left: 3px; }
+.room-ed .pane { flex: 1; min-height: 0; overflow-y: auto; background: #1b1e26; }
+.room-ed .pane:not(.active) { display: none; }
+.room-ed .pane[data-tab="inspect"] { padding: 12px 14px; display: none; flex-direction: column; gap: 14px; }
+.room-ed .pane[data-tab="inspect"].active { display: flex; }
+.room-ed .save { flex: none; padding: 12px 14px; border-top: 1px solid var(--line); }
+.room-ed .hint, .room-ed #re-status { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .room-ed h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .room-ed h2 span { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 13px; margin-left: 6px; }
 .room-ed h2 small { text-transform: none; letter-spacing: 0; margin-left: 6px; }
@@ -956,13 +1049,12 @@ const CSS = `
 .room-ed input { width: 100%; box-sizing: border-box; font: 12.5px ui-monospace, Consolas, monospace; color: var(--ink);
   background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 4px 5px; }
 .room-ed input:focus { outline: none; border-color: var(--accent); }
-.room-ed .card { background: #181b22; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.room-ed .card { background: #15171d; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .room-ed .card > h2 { margin: 0; padding: 7px 10px; background: #1f232c; border-bottom: 1px solid var(--line); }
 .room-ed .card > .body { padding: 10px 10px 4px; }
-.room-ed .card.scene { display: flex; flex-direction: column; min-height: 160px; max-height: 46vh; }
-.room-ed .tree { flex: 1; overflow-y: auto; padding-bottom: 6px; }
+.room-ed .tree { padding-bottom: 8px; }
 .room-ed .tree .sec { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between;
-  padding: 5px 10px; background: #262b36; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 650;
+  padding: 6px 12px; background: #262b36; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 650;
   text-transform: uppercase; letter-spacing: .07em; }
 .room-ed .tree .sec:not(:first-child) { border-top: 1px solid var(--line); margin-top: 4px; }
 .room-ed .tree .sec small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
