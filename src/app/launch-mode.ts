@@ -1,8 +1,9 @@
 // What the page starts as, and whose hands play it (ADR 0018). The mode is the game (the default) or the room editor (a desk
 // tool, development and tester builds only). The hands are the device's (a headset, or the emulator's) or, for testing, a mock
-// source the Hand Lab panel drives inside the same session: synthetic, scripted, a replay or the webcam. The address is always
-// the plain page: the choice is kept in the tab's sessionStorage, so a reload keeps it while a new tab, or the link sent to a
-// headset, opens the plain game. Choosing saves it and reloads the page. Plain TypeScript, with the storage passed in for the
+// source the Hand Lab panel drives inside the same session: synthetic, scripted, a replay or the webcam. The hands and the
+// panel change live (the Developer panel's Hand Lab button sends HAND_LAB_EVENT; the panel picks the source); only a mode
+// change reloads. The address is always the plain page: the choice is kept in the tab's sessionStorage, so a reload keeps it
+// while a new tab, or the link sent to a headset, opens the plain game. Plain TypeScript, with the storage passed in for the
 // tests.
 import { MOCK_SOURCES, type MockSourceKind } from '../input-mock/mock-mode';
 
@@ -16,10 +17,14 @@ export const HANDS_CHOICES: readonly HandsChoice[] = ['device', ...MOCK_SOURCES]
 export interface LaunchChoice {
   mode: LaunchMode;
   hands: HandsChoice;
+  /** Whether the Hand Lab panel shows. Hiding it keeps the hands it picked. */
+  lab: boolean;
 }
 
-export const DEFAULT_LAUNCH: Readonly<LaunchChoice> = { mode: 'game', hands: 'device' };
+export const DEFAULT_LAUNCH: Readonly<LaunchChoice> = { mode: 'game', hands: 'device', lab: false };
 export const LAUNCH_KEY = 'wsw.launch';
+/** Sent on the window to show (detail true) or hide (false) the Hand Lab panel, live. */
+export const HAND_LAB_EVENT = 'wsw-hand-lab';
 
 /** The part of sessionStorage this uses. */
 export interface LaunchStorage {
@@ -47,9 +52,9 @@ export function loadLaunch(debugTools: boolean, storage: LaunchStorage | null = 
   try {
     const raw = JSON.parse(storage?.getItem(LAUNCH_KEY) ?? 'null') as Record<string, unknown> | null;
     if (!raw || typeof raw !== 'object') return { ...DEFAULT_LAUNCH };
-    if (raw.mode === 'lab') return { mode: 'game', hands: isHands(raw.source) ? raw.source : 'synthetic' };
+    if (raw.mode === 'lab') return { mode: 'game', hands: isHands(raw.source) ? raw.source : 'synthetic', lab: true };
     const mode = (LAUNCH_MODES as readonly unknown[]).includes(raw.mode) ? (raw.mode as LaunchMode) : 'game';
-    return { mode, hands: isHands(raw.hands) ? raw.hands : DEFAULT_LAUNCH.hands };
+    return { mode, hands: isHands(raw.hands) ? raw.hands : DEFAULT_LAUNCH.hands, lab: raw.lab === true };
   } catch {
     return { ...DEFAULT_LAUNCH };
   }
@@ -59,23 +64,22 @@ export function loadLaunch(debugTools: boolean, storage: LaunchStorage | null = 
 export function saveLaunch(choice: Readonly<LaunchChoice>, storage: LaunchStorage | null = browserStorage()): boolean {
   try {
     if (!storage) return false;
-    storage.setItem(LAUNCH_KEY, JSON.stringify({ mode: choice.mode, hands: choice.hands }));
+    storage.setItem(LAUNCH_KEY, JSON.stringify({ mode: choice.mode, hands: choice.hands, lab: choice.lab }));
     return true;
   } catch {
     return false;
   }
 }
 
-/** Saves `mode` (keeping the hands) and reloads the page into it. */
+/** Saves `mode` (keeping the hands and the panel) and reloads the page into it. */
 export function switchLaunch(mode: LaunchMode, debugTools: boolean): void {
   saveLaunch({ ...loadLaunch(debugTools), mode });
   location.reload();
 }
 
-/** Saves whose hands play (keeping the mode) and reloads the page with them. */
-export function switchHands(hands: HandsChoice, debugTools: boolean): void {
-  saveLaunch({ ...loadLaunch(debugTools), hands });
-  location.reload();
+/** Saves part of the choice, keeping the rest (no reload). */
+export function updateLaunch(change: Partial<LaunchChoice>, debugTools: boolean): void {
+  saveLaunch({ ...loadLaunch(debugTools), ...change });
 }
 
 /** Whether `mode` runs at a desk with no session (the room editor). The game always runs in one. */

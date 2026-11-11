@@ -4,8 +4,8 @@
 //   node scripts/testing-probe.mjs https://localhost:8097 [screenshot.png]
 // It opens the plain game (the dev server's emulator gives the page navigator.xr, so the launcher shows), presses the
 // testing switches and checks that each takes effect at once (nothing reloads, the address stays plain), is remembered
-// across a reload, and that the settings panel and the recording begin when a VR session starts. Then it gives the game the
-// Hand Lab's mock hands (in a session), gives them back, and opens the room editor, the address plain all the while.
+// across a reload, and that the settings panel and the recording begin when a VR session starts. Then it shows the Hand
+// Lab panel, switches to mock hands and back live in a session, and opens the room editor, the address plain all the while.
 import { chromium } from 'playwright';
 import { enterVr } from './lib/launch.mjs';
 
@@ -116,34 +116,56 @@ check(
   JSON.stringify(cleared),
 );
 
-// Hands and modes (ADR 0018): the Hands button gives the game the Hand Lab's mock hands, in the game itself (its launcher and
-// BEGIN are there) and in a real session; Device hands gives them back. The room editor opens from the panel too. The address
-// stays plain throughout.
+// Hands (ADR 0018): the Developer panel's Hand Lab button shows the panel at once, with no reload, and the panel switches whose
+// hands play live, in the session: Script plays mock hands, Device gives the device's back. A reload keeps the panel and the
+// source. The room editor is a mode, and reloads. The address stays plain throughout.
 const plain = () => new URL(page.url()).search === '' && new URL(page.url()).hash === '';
+const labPanel = page.locator('aside.lab');
+const labButton = (name) => labPanel.getByRole('button', { name, exact: true });
 if (await panel.isHidden()) await page.getByRole('button', { name: /Developer/ }).click();
-await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Hands/ }).click()]);
-await page.waitForFunction(() => window.__wsw?.lab, null, { timeout: 90000 });
-check('Hands gives the game mock hands, with a plain address', plain(), page.url());
-check('the game keeps its launcher with mock hands', (await page.locator('#xr-launcher-ui').count()) === 1);
+let before = navigations;
+await page.getByRole('button', { name: /^Hand Lab panel/ }).click();
+await labPanel.waitFor({ state: 'visible', timeout: 10000 });
+check('the Hand Lab panel shows at once, with no reload', navigations === before && plain(), page.url());
+check('and starts with the device hands', await page.evaluate(() => !window.__wsw.lab.mockActive));
 await page.reload();
 await page.waitForFunction(() => window.__wsw?.lab, null, { timeout: 90000 });
-check('a reload keeps the mock hands', true);
+check('a reload keeps the panel', await labPanel.isVisible());
 await enterVr(page);
-await page.waitForFunction(() => window.__wsw.hands.hands.right.tracked, null, { timeout: 30000 });
+before = navigations;
+await labButton('Script').click();
+await page.waitForFunction(() => window.__wsw.lab.mockActive && window.__wsw.hands.hands.right.tracked, null, {
+  timeout: 30000,
+});
 const inSession = await page.evaluate(() => ({
   bg: window.__wsw.world.scene.background?.getHexString() ?? null,
   alpha: window.__wsw.world.renderer.getClearAlpha(),
+  presenting: window.__wsw.world.renderer.xr.isPresenting,
 }));
 check(
-  'mock hands play in a real session, with the room backdrop a headset has',
-  inSession.bg === '14161c' && inSession.alpha === 1,
+  'Script switches to mock hands live, in the session, with the room backdrop a headset has',
+  inSession.presenting && inSession.bg === '14161c' && inSession.alpha === 1 && navigations === before,
   JSON.stringify(inSession),
 );
+await labButton('Device').click();
+const back = await page.evaluate(() => ({
+  mock: window.__wsw.lab.mockActive,
+  presenting: window.__wsw.world.renderer.xr.isPresenting,
+  stored: JSON.parse(sessionStorage.getItem('wsw.launch')),
+}));
+check(
+  'Device gives the hands back live, still in the session',
+  !back.mock && back.presenting && back.stored.hands === 'device' && navigations === before,
+  JSON.stringify(back),
+);
+await labButton('Hide panel').click();
+check(
+  'Hide panel hides it, remembered for the tab',
+  (await labPanel.isHidden()) &&
+    (await page.evaluate(() => JSON.parse(sessionStorage.getItem('wsw.launch')).lab)) === false,
+);
 await page.evaluate(() => window.__wsw.world.renderer.xr.getSession()?.end());
-await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Device hands' }).click()]);
-await page.waitForSelector('#xr-launcher-ui', { timeout: 90000 });
-await page.waitForFunction(() => window.__wsw, null, { timeout: 90000 });
-check('Device hands gives the hands back', (await page.evaluate(() => window.__wsw.lab)) === null && plain());
+await page.waitForSelector('#xr-launcher-ui', { timeout: 30000 });
 await page.getByRole('button', { name: /Developer/ }).click();
 await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Room editor/ }).click()]);
 await page.waitForFunction(() => window.__wsw?.roomEditor, null, { timeout: 90000 });

@@ -1,6 +1,7 @@
-// The Hand Lab: the panel for mock hands (ADR 0018, src/app/launch-mode.ts). The game runs in its normal session (the
-// emulator at a desk) and the lab only changes whose hands play: try hand sources (synthetic, scripted, replay, webcam), make
-// shapes, read the classifier's features and record. Everything in the room is the game's own, as on a headset.
+// The Hand Lab: the panel that picks whose hands play (ADR 0018, src/app/launch-mode.ts). The game runs in its normal session
+// (the emulator at a desk) and the lab only changes where the hands come from, live, with no reload: the device's own, or a mock
+// source (synthetic, scripted, replay, webcam). It also makes shapes, reads the classifier's features and records. Everything in
+// the room is the game's own, as on a headset.
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
@@ -14,7 +15,7 @@ import type { PresetName } from '../engine/hands/synthetic-hand';
 import type { DeskFrame } from './desk-frame';
 import { downloadRecording, handCardHtml } from './hand-card';
 import type { HandSource } from './hand-source';
-import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
+import { createMockSource, mockOptionsFor, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
 import { ScriptedSource } from './scripted-source';
 import { SyntheticSource } from './synthetic-source';
@@ -26,15 +27,18 @@ const TURN_DEG = 15;
 const JITTER_M = 0.003;
 const SHAPE_KEYS: PresetName[] = ['relaxed', ...SHAPES];
 
+/** Where the hands come from: the device's own (headset or emulator), or a mock source. */
+export type LabSource = 'device' | MockSourceKind;
+
 export interface LabView {
   /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
   settings?: { toggle(): void; isOpen(): boolean };
   /** The pause screen: the Menu button shows and hides it, and says whether it is showing. */
   menu?: { cycle(): void; label(): string };
-  /** Told the kind of source in use whenever it changes, so the page can start with it again after a reload. */
-  onSourceKind?(kind: MockSourceKind): void;
-  /** Gives the hands back to the device (the "Device hands" button). */
-  exit?(): void;
+  /** Told the source in use whenever it changes, so the page can start with it again after a reload. */
+  onSourceKind?(kind: LabSource): void;
+  /** Hides the panel (its Hide button). The hands stay with the source picked. */
+  hide?(): void;
 }
 
 export class HandLab {
@@ -54,6 +58,8 @@ export class HandLab {
   private recordStart = 0;
   private busy = false;
   private message = '';
+  /** The device's own hands play (the Device source): the mock source is kept but not used. */
+  private device = true;
 
   constructor(
     private readonly mode: MockMode,
@@ -67,9 +73,27 @@ export class HandLab {
     private readonly view: LabView,
   ) {
     loadCalibration(shapes);
-    this.onSourceChanged();
     this.mount();
+    this.show(false);
     setInterval(() => this.renderLive(), 100);
+  }
+
+  /** Whether a mock source plays (false: the device's own hands, read by the game as usual). */
+  get mockActive(): boolean {
+    return !this.device;
+  }
+
+  get shown(): boolean {
+    return this.root.style.display !== 'none';
+  }
+
+  show(on: boolean): void {
+    this.root.style.display = on ? '' : 'none';
+  }
+
+  /** Starts with `kind` (a reload's saved choice): a replay plays the emulator demo. */
+  start(kind: LabSource): Promise<void> {
+    return this.switchSource(kind);
   }
 
   /**
@@ -100,27 +124,43 @@ export class HandLab {
   }
 
   private get synthetic(): SyntheticSource | null {
-    return this.mode.source instanceof SyntheticSource ? this.mode.source : null;
+    return !this.device && this.mode.source instanceof SyntheticSource ? this.mode.source : null;
+  }
+
+  private get kind(): LabSource {
+    return this.device ? 'device' : kindOf(this.mode.source.name);
   }
 
   private onSourceChanged(): void {
-    // The guide matters most with real hands (webcam, replays); synthetic hands show the shape anyway.
+    // The guide matters most with real hands (webcam, replays, the device); synthetic hands show the shape anyway.
     const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
-    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
+    if (guide) guide.open = this.synthetic === null;
     // Synthetic hands start one-handed, like a player gesturing.
     this.synthetic?.setShape('left', null);
-    this.view.onSourceKind?.(kindOf(this.mode.source.name));
+    this.view.onSourceKind?.(this.kind);
   }
 
-  private async switchSource(kind: MockSourceKind, file?: File): Promise<void> {
+  /** `file`: a recording to replay. Without one, Replay plays the emulator demo. */
+  private async switchSource(kind: LabSource, file?: File): Promise<void> {
     if (this.busy) return;
+    if (kind === 'device') {
+      // The game reads the device's hands again from the next frame; the classifier starts fresh on its clock.
+      this.device = true;
+      this.shapes.reset();
+      this.gestures.reset();
+      this.gestureLog.length = 0;
+      this.message = '';
+      this.onSourceChanged();
+      return this.renderControls();
+    }
     this.busy = true;
     this.message =
       kind === 'webcam' ? 'Starting the camera. The first start downloads the hand model (about 8 MB)…' : '';
     this.renderControls();
     try {
-      const source = file ? await replayFromFile(file) : await createMockSource({ source: kind, file: '' });
+      const source = file ? await replayFromFile(file) : await createMockSource(mockOptionsFor(kind));
       this.setSource(source);
+      this.device = false;
       this.onSourceChanged();
       this.message = '';
     } catch (e) {
@@ -204,8 +244,8 @@ export class HandLab {
     document.head.append(Object.assign(document.createElement('style'), { textContent: CSS }));
     this.root.className = 'lab';
     this.root.innerHTML = `
-      <header><h1>Hand Lab</h1><p>Mock hands in the game's own session. Press BEGIN, and move the head with the
-        emulator's controls.</p><button type="button" data-act="exit" data-arg="">Device hands</button></header>
+      <header><h1>Hand Lab</h1><p>Whose hands play the game, in its own session. Press BEGIN, and move the head with the
+        emulator's controls.</p><button type="button" data-act="hide-panel" data-arg="">Hide panel</button></header>
       <section id="lab-controls"></section>
       <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
@@ -229,7 +269,7 @@ export class HandLab {
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
     const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
-    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
+    if (guide) guide.open = this.synthetic === null;
 
     const file = this.root.querySelector<HTMLInputElement>('#lab-file')!;
     file.addEventListener('change', () => {
@@ -243,18 +283,18 @@ export class HandLab {
       const s = this.synthetic;
       if (act === 'source') {
         if (arg === 'replay') file.click();
-        else void this.switchSource(arg as MockSourceKind);
+        else void this.switchSource(arg as LabSource);
       } else if (act === 'hand') this.selected = arg as Handedness;
       else if (act === 'lock' && this.mode.source.name === 'webcam')
         (this.mode.source as WebcamSource).lockSide = arg === 'auto' ? null : (arg as Handedness);
       else if (act === 'shape') s?.setShape(this.selected, arg as PresetName);
+      else if (act === 'hide-panel') return this.view.hide?.();
       else if (act === 'hide') s?.setShape(this.selected, s.shapeOf(this.selected) === null ? 'relaxed' : null);
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'menu') this.view.menu?.cycle();
-      else if (act === 'exit') return this.view.exit?.();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -285,13 +325,23 @@ export class HandLab {
 
   private renderControls(): void {
     const s = this.synthetic;
-    const kind = kindOf(this.mode.source.name);
-    // While a guided recording runs, its clock must keep moving forward: no source changes or pausing.
-    const locked = new Set(this.guided ? ['source', 'pause', 'record'] : this.recording ? ['guided'] : []);
+    const kind = this.kind;
+    // While a guided recording runs, its clock must keep moving forward: no source changes or pausing. A recording keeps its
+    // source. The device's hands are read by the game itself: the lab neither pauses nor records them.
+    const locked = new Set(
+      this.guided
+        ? ['source', 'pause', 'record']
+        : this.recording
+          ? ['guided', 'source']
+          : this.device
+            ? ['pause', 'record', 'guided']
+            : [],
+    );
     const btn = (act: string, arg: string, label: string, on = false, title = '') =>
       `<button type="button" data-act="${act}" data-arg="${arg}" class="${on ? 'on' : ''}" ${title ? `title="${title}"` : ''} ${this.busy || locked.has(act) ? 'disabled' : ''}>${label}</button>`;
     const sources = (
       [
+        ['device', 'Device', "The emulator's or the headset's own hands"],
         ['synthetic', 'Synthetic', 'Hands you pose with buttons or keys'],
         ['script', 'Script', 'Every shape on each hand, in a loop'],
         ['replay', 'Replay…', 'Play a .handrec.json (or drop one on the page)'],
@@ -311,7 +361,7 @@ export class HandLab {
       <h2>Source</h2><div class="row">${sources}</div>
       ${this.message ? `<p class="msg">${this.message}</p>` : ''}
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
-      ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
+      ${kind === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show and hide the pause screen') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
@@ -337,7 +387,7 @@ export class HandLab {
         el.innerHTML = handCardHtml(
           this.hands[side],
           ['toward you', 'away from you'],
-          this.mode.source.shapeOf?.(side) ?? null,
+          this.device ? null : (this.mode.source.shapeOf?.(side) ?? null),
           this.shapes[side].state,
           this.shapes[side].margins,
         );
@@ -399,7 +449,7 @@ export class HandLab {
     const time = this.root.querySelector('#lab-time');
     if (time) {
       const rec = this.recording ? ` · recording ${(this.mode.time - this.recordStart).toFixed(1)} s` : '';
-      const status = this.mode.source.status?.() ?? this.mode.source.name;
+      const status = this.device ? 'device hands' : (this.mode.source.status?.() ?? this.mode.source.name);
       time.textContent = `${status} · ${this.mode.time.toFixed(1)} s${rec}`;
     }
   }

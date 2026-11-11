@@ -6,15 +6,19 @@
 //   await launchIn(page, { hands: 'synthetic', flicker: 0 });
 //   await page.goto(`${base}/`);
 //   await enterVr(page);
-// mode: 'game' | 'room-editor'; hands: 'device' or a Hand Lab source ('synthetic', 'script', 'replay', 'webcam');
-// flicker: 0..1, the lantern's flicker (0 is steady). The other switches are left off.
+// mode: 'game' | 'room-editor'; hands: 'device' or a Hand Lab source ('synthetic', 'script', 'replay', 'webcam'); lab: whether
+// the Hand Lab panel shows (by default, whenever the hands are mock); flicker: 0..1, the lantern's flicker (0 is steady). The
+// other switches are left off.
 
 /** Makes every later load of `page` (or of every page in a browser context) start with this choice. */
-export async function launchIn(target, { mode = 'game', hands = 'synthetic', flicker = null } = {}) {
+export async function launchIn(
+  target,
+  { mode = 'game', hands = 'synthetic', lab = hands !== 'device', flicker = null } = {},
+) {
   await target.addInitScript(
-    ({ mode, hands, flicker }) => {
+    ({ mode, hands, lab, flicker }) => {
       try {
-        sessionStorage.setItem('wsw.launch', JSON.stringify({ mode, hands }));
+        sessionStorage.setItem('wsw.launch', JSON.stringify({ mode, hands, lab }));
       } catch {
         // a probe that blocks the storage gets the plain game
       }
@@ -26,7 +30,7 @@ export async function launchIn(target, { mode = 'game', hands = 'synthetic', fli
         // blocked localStorage: the lantern keeps its setting
       }
     },
-    { mode, hands, flicker },
+    { mode, hands, lab, flicker },
   );
 }
 

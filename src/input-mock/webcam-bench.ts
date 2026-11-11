@@ -186,4 +186,6 @@ function toggleRecording(): void {
 }
 
 // The Hand Lab link opens the game with webcam hands: the page's choice is kept in the tab, not the address.
-document.getElementById('lab-link')?.addEventListener('click', () => saveLaunch({ mode: 'game', hands: 'webcam' }));
+document
+  .getElementById('lab-link')
+  ?.addEventListener('click', () => saveLaunch({ mode: 'game', hands: 'webcam', lab: true }));

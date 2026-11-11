@@ -80,7 +80,7 @@ import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { DeskFrame } from '../input-mock/desk-frame';
 import { HandLab } from '../input-mock/hand-lab';
-import { createMockSource, MockMode, mockOptionsFor } from '../input-mock/mock-mode';
+import { MockMode } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
 import { SettingsScreen } from '../ui/settings-panel/settings-screen';
@@ -89,7 +89,7 @@ import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
 import { createUiSound } from './ui-sound';
-import { isDeskMode, loadLaunch, saveLaunch, switchHands, switchLaunch } from './launch-mode';
+import { HAND_LAB_EVENT, isDeskMode, loadLaunch, switchLaunch, updateLaunch } from './launch-mode';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
@@ -98,11 +98,10 @@ import { showStartFailure } from './start-failure';
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
 // What the page starts as (launch-mode.ts, ADR 0018): the game, always in a session (a headset, or the emulator at a desk),
-// played by the device's hands or by mock ones from the Hand Lab; or the dev room editor, the one desk mode, with no session.
-// The address is always the plain page; the choice is kept in the tab and changed from the page.
+// played by the device's hands or, switched live in the Hand Lab panel, by mock ones; or the dev room editor, the one desk
+// mode, with no session. The address is always the plain page; the choice is kept in the tab and changed from the page.
 const launch = loadLaunch(DEBUG_TOOLS);
 const desk = isDeskMode(launch.mode);
-const mockHands = !desk && launch.hands !== 'device' ? launch.hands : null;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -162,10 +161,10 @@ async function start(): Promise<void> {
   // The session's visibility: the frame holds still on it and saves can listen to it.
   const visibility = new SessionVisibility();
   // The save (the settings), read once now and written only on events (headset off, page hidden), never per frame.
-  // Mock hands and the room editor keep their own save, so a development session never touches a real one.
+  // A desk session (the emulator, mock hands, the room editor) keeps its own save, so development never touches a real one.
   const saves = new SaveManager({
     store: browserStore() ?? new MemoryStore(),
-    prefix: mockHands || desk ? 'wsw.save.mock' : 'wsw.save',
+    prefix: emulated || desk || launch.hands !== 'device' ? 'wsw.save.mock' : 'wsw.save',
     onError: (message) => diagnostics.error(`save: ${message}`),
   });
   saves.load();
@@ -460,7 +459,7 @@ async function start(): Promise<void> {
     world.camera.getWorldDirection(settingsLook);
     return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z, line);
   };
-  /** Where mock hands go: the rig placeRig last placed (only with the Hand Lab's hands). */
+  /** Where mock hands go: the rig placeRig last placed (made with the Hand Lab). */
   let deskFrame: DeskFrame | null = null;
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
@@ -542,16 +541,14 @@ async function start(): Promise<void> {
   // scene is immediately visible, until the head pose places it.
   if (desk) placeRig(MOCK_HEAD, 0);
   else placeRig([0, 1.2, 0], 0);
-  // Mock hands (the Hand Lab, debug builds only): a HandSource fills the same HandFrames in the session in
-  // place of the device's, posed for the desk rig and moved into the wearer's (desk-frame.ts).
+  // The Hand Lab (debug builds only, in the game): its panel picks whose hands play, live. With a mock source, a HandSource fills
+  // the same HandFrames in the session in place of the device's, posed for the desk rig and moved into the wearer's
+  // (desk-frame.ts). Made the first time the panel is asked for (the Developer panel, or a reload that had it).
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
-  if (DEBUG_TOOLS && mockHands) {
-    const source = await createMockSource(mockOptionsFor(mockHands)).catch((e) => {
-      diagnostics.error(`mock source "${mockHands}" failed, using synthetic hands: ${String(e)}`);
-      return new SyntheticSource();
-    });
-    mock = new MockMode(source);
+  const openLab = (): HandLab => {
+    if (lab) return lab;
+    mock = new MockMode(new SyntheticSource());
     deskFrame = new DeskFrame();
     deskFrame.set(lastHead, lastYaw);
     // The lab's lantern is the candle on the tray: `lantern` is where placeRig (and picking the candle up) put it.
@@ -564,10 +561,24 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
-      // The lab remembers its source for the next reload, and gives the hands back to the device.
-      onSourceKind: (kind) => saveLaunch({ ...loadLaunch(DEBUG_TOOLS), hands: kind }),
-      exit: () => switchHands('device', DEBUG_TOOLS),
+      // The lab remembers its source and whether it shows, for the next reload in this tab.
+      onSourceKind: (kind) => updateLaunch({ hands: kind }, DEBUG_TOOLS),
+      hide: () => showLab(false),
     });
+    return lab;
+  };
+  const showLab = (on: boolean) => {
+    if (on) openLab().show(true);
+    else lab?.show(false);
+    updateLaunch({ lab: on }, DEBUG_TOOLS);
+  };
+  if (DEBUG_TOOLS && !desk) {
+    if (launch.lab || launch.hands !== 'device') {
+      const l = openLab();
+      l.show(launch.lab);
+      void l.start(launch.hands);
+    }
+    window.addEventListener(HAND_LAB_EVENT, (e) => showLab((e as CustomEvent<boolean>).detail));
   }
   const handList = [hands.hands.left, hands.hands.right];
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR (whoever's hands they
@@ -904,7 +915,7 @@ async function start(): Promise<void> {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
         debug.replay.fill(step, hands.hands.left, hands.hands.right);
         handsStatus.update(step, true, 1);
-      } else if (mock && frame) {
+      } else if (mock && lab?.mockActive && frame) {
         // The Hand Lab's hands, in the session in place of the device's: the lab records them as posed (the desk rig's space),
         // then they move into the wearer's rig. The hands cue sees them like any tracked hands.
         if (!paused) {
@@ -927,7 +938,7 @@ async function start(): Promise<void> {
       timings.end(SLOT.read);
       // Mock time with mock hands, so pausing the Hand Lab freezes holds too.
       if (!paused) clock += step;
-      const handsT = mock ? mock.time : clock;
+      const handsT = mock && lab?.mockActive ? mock.time : clock;
       if (!paused) {
         timings.begin(SLOT.classify);
         shapes.update(hands.hands, handsT);
@@ -1225,8 +1236,12 @@ async function start(): Promise<void> {
         hands,
         diagnostics,
         recorder,
-        mock,
-        lab,
+        get mock() {
+          return mock;
+        },
+        get lab() {
+          return lab;
+        },
         capabilities,
         handsStatus,
         visibility,
