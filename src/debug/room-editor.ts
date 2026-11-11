@@ -350,7 +350,7 @@ export class RoomEditor {
 
   private step(undo: boolean): void {
     const e = undo ? this.history.undo() : this.history.redo();
-    if (!e) return;
+    if (!e || e.kind !== 'move') return;
     const piece = this.pieces().find((p) => keyOf(p) === e.key);
     if (piece) {
       this.place(piece, undo ? e.before : e.after);
