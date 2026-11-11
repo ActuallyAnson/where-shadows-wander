@@ -169,7 +169,7 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 
 1. `npm run dev`, then open the Hand Lab with the editor: `https://localhost:8081/?mock=1&edit=room`.
 2. Click a piece, or pick it from the **Scene** tree on the right (Room and Lap, grouped by Furniture, Dressing, Room, Tray and Added). Drag the gizmo, or type exact numbers into Position (metres), Rotation (degrees) and Scale.
-3. To add a model, use the **Assets** panel on the left (below).
+3. To add a model, use the **Assets** panel along the bottom (below).
 4. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change, with any model files you imported or exported. Saving doesn't reload the page; the next reload reads the saved file.
 
 | Key or button | Does |
@@ -194,7 +194,7 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 
 #### The asset browser
 
-The **Assets** panel on the left is `src/assets/models` as a tree of folders (it is hidden in windows narrower than 1000 px; ‹ folds it away).
+The **Assets** panel along the bottom shows `src/assets/models`: the folder tree on the left, and the folder picked in it as tiles with a thumbnail of each model on the right (double-click a folder tile to open it; the path above the tiles goes back up). Drag its top edge to resize it (double-click the edge for the default height; the height is remembered), and ▾ folds it down to its title bar. It is hidden in windows narrower than 700 px.
 
 - **Import:** **Import…**, or drag `.glb` files from your computer onto a folder. A name with spaces or odd characters is tidied (`Chair (1).GLB` becomes `Chair-1.glb`). The dev server refuses a file over the 500 KB model budget, bytes that are not a self-contained `.glb`, and a name whose asset id another file under `src/assets` already has (the id is the file name in lower case with hyphens, in any folder: `Chair.glb` clashes with `chair.glb`).
 - **Organise:** **New folder**, **Rename**, **Delete**, and drag a file or folder onto another folder to move it. Moving keeps a model's id, so the layout still finds it; a model placed in the room (marked ●) can't be renamed or deleted until it's removed there and saved. Git doesn't keep empty folders.

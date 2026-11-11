@@ -84,7 +84,7 @@ try {
     dt.setData('application/x-wsw-asset', JSON.stringify({ path: 'probe-tmp/probe-chair.glb', folder: false }));
     const c = document.querySelector('canvas');
     const r = c.getBoundingClientRect();
-    const at = { clientX: r.left + r.width * 0.25, clientY: r.top + r.height * 0.85, dataTransfer: dt, bubbles: true };
+    const at = { clientX: r.left + r.width * 0.25, clientY: r.top + r.height * 0.6, dataTransfer: dt, bubbles: true };
     c.dispatchEvent(new DragEvent('dragover', { ...at, cancelable: true }));
     c.dispatchEvent(new DragEvent('drop', { ...at, cancelable: true }));
     await new Promise((done) => setTimeout(done, 2000));

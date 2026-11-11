@@ -226,11 +226,15 @@ export class RoomEditor {
     this.marker.matrixAutoUpdate = false;
     this.orbit.addEventListener('change', () => this.fadeMarker());
     this.client = new AssetClient(deps.assetFiles);
-    this.assets = new AssetPanel(this.client, {
-      addToRoom: (file) => void this.addInView(file),
-      changed: () => this.render(),
-      resized: () => this.fitCamera(),
-    });
+    this.assets = new AssetPanel(
+      this.client,
+      {
+        addToRoom: (file) => void this.addInView(file),
+        changed: () => this.render(),
+        resized: () => this.fitCamera(),
+      },
+      PANEL_W,
+    );
     this.mount();
   }
 
@@ -646,12 +650,12 @@ export class RoomEditor {
     this.orbit.update();
   }
 
-  /** The view fills the part of the window the panels don't cover (the editor's on the right, the assets' on the left). */
+  /** The view is centred in the part of the window the panels don't cover (the editor's on the right, the assets' below). */
   private fitCamera(): void {
     const w = window.innerWidth,
       h = window.innerHeight;
     if (w < 700) this.deps.camera.clearViewOffset();
-    else this.deps.camera.setViewOffset(w, h, (PANEL_W - this.assets.width) / 2, 0, w, h);
+    else this.deps.camera.setViewOffset(w, h, PANEL_W / 2, this.assets.height / 2, w, h);
   }
 
   private findFile(path: string): AssetFileInfo | undefined {
@@ -754,8 +758,8 @@ export class RoomEditor {
         Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
         Drag empty space to look around.</p></header>
       <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
-      <section id="re-piece"></section>
-      <section><h2>Scene</h2><div class="tree" id="re-tree"></div></section>
+      <section class="card" id="re-piece"></section>
+      <section class="card scene"><h2>Scene <small id="re-count"></small></h2><div class="tree" id="re-tree"></div></section>
       <section class="save"><button id="re-save" class="primary">Save room layout</button>
         <p id="re-status"></p><button id="re-close">Close editor</button></section>`;
     this.root.addEventListener('click', (e) => {
@@ -825,7 +829,7 @@ export class RoomEditor {
       this.root.querySelector('#re-piece')!.innerHTML = piece
         ? `<h2>Selected <span>${esc(piece.id)}</span> <small>${piece.section === 'lap' ? 'tray space' : 'room space'}${
             isPlaced(piece) ? ` · ${esc(piece.model)}` : ''
-          }</small></h2>
+          }</small></h2><div class="body">
           ${FIELDS.map(
             (f) =>
               `<div class="field"><label>${FIELD_LABEL[f]}</label>${[0, 1, 2]
@@ -844,9 +848,9 @@ export class RoomEditor {
                   <button data-act="remove" title="Delete">Remove</button></div>`
               : `<div class="row"><button data-act="export"
                   title="Write it as a .glb to src/assets/models/exported/, to place copies or edit it in Blender">Export .glb</button></div>`
-          }`
-        : `<h2>Selected <span>nothing</span></h2><p class="hint">Click a piece in the room, or pick one below.</p>
-          <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div>`;
+          }</div>`
+        : `<h2>Selected <span>nothing</span></h2><div class="body"><p class="hint">Click a piece in the room, or pick one below.</p>
+          <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div></div>`;
     }
     this.root.querySelector<HTMLButtonElement>('[data-act="undo"]')!.disabled = !this.history.canUndo;
     this.root.querySelector<HTMLButtonElement>('[data-act="redo"]')!.disabled = !this.history.canRedo;
@@ -870,23 +874,24 @@ export class RoomEditor {
     ];
     const order = [...this.deps.sources.map((s) => s.label), ADDED];
     const selected = this.selected ? keyOf(this.selected) : null;
+    this.root.querySelector('#re-count')!.textContent = `${entries.length} pieces`;
     this.root.querySelector('#re-tree')!.innerHTML = sceneTree(entries, order)
       .map(
         (section) =>
-          `<div class="sec">${section.label}</div>` +
+          `<div class="sec"><span>${section.label}</span><small>${section.section === 'lap' ? 'tray space' : 'room space'}</small></div>` +
           section.groups
             .map((g) => {
               const group = `${section.section}:${g.label}`;
               const open = !this.folded.has(group);
               const rows = open
-                ? g.entries
+                ? `<div class="kids">${g.entries
                     .map(
                       (e) =>
                         `<button class="node${e.key === selected ? ' on' : ''}" data-act="pick" data-key="${esc(e.key)}">${esc(e.id)}</button>`,
                     )
-                    .join('')
+                    .join('')}</div>`
                 : '';
-              return `<button class="grp" data-act="fold" data-group="${esc(group)}">${open ? '▾' : '▸'} ${esc(g.label)}
+              return `<button class="grp" data-act="fold" data-group="${esc(group)}"><span class="tw">${open ? '▾' : '▸'}</span>${esc(g.label)}
                 <small>${g.entries.length}</small></button>${rows}`;
             })
             .join(''),
@@ -951,12 +956,22 @@ const CSS = `
 .room-ed input { width: 100%; box-sizing: border-box; font: 12.5px ui-monospace, Consolas, monospace; color: var(--ink);
   background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 4px 5px; }
 .room-ed input:focus { outline: none; border-color: var(--accent); }
-.room-ed .tree { display: grid; gap: 1px; }
-.room-ed .tree .sec { margin: 6px 0 2px; font-size: 11px; font-weight: 650; color: var(--muted); }
-.room-ed .tree button { text-align: left; border: 1px solid transparent; background: none; padding: 3px 6px; border-radius: 4px; }
-.room-ed .tree button:hover { border-color: var(--line); }
-.room-ed .tree .grp { color: var(--muted); }
-.room-ed .tree .grp small { margin-left: 4px; opacity: .7; }
-.room-ed .tree .node { padding-left: 22px; }
-.room-ed .tree .node.on { color: var(--accent); border-color: var(--accent); }
+.room-ed .card { background: #181b22; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.room-ed .card > h2 { margin: 0; padding: 7px 10px; background: #1f232c; border-bottom: 1px solid var(--line); }
+.room-ed .card > .body { padding: 10px 10px 4px; }
+.room-ed .card.scene { display: flex; flex-direction: column; min-height: 160px; max-height: 46vh; }
+.room-ed .tree { flex: 1; overflow-y: auto; padding-bottom: 6px; }
+.room-ed .tree .sec { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between;
+  padding: 5px 10px; background: #262b36; border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .07em; }
+.room-ed .tree .sec:not(:first-child) { border-top: 1px solid var(--line); margin-top: 4px; }
+.room-ed .tree .sec small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+.room-ed .tree button { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: none;
+  padding: 3px 6px; border-radius: 4px; }
+.room-ed .tree button:hover { background: #1f232c; }
+.room-ed .tree .grp { margin: 2px 4px 0; width: calc(100% - 8px); color: var(--muted); font-weight: 600; }
+.room-ed .tree .grp .tw { display: inline-block; width: 14px; font-size: 10px; }
+.room-ed .tree .grp small { margin-left: 4px; opacity: .7; font-weight: 400; }
+.room-ed .tree .kids { margin: 0 6px 2px 16px; padding-left: 6px; border-left: 1px solid var(--line); }
+.room-ed .tree .node.on { color: var(--accent); border-color: var(--accent); background: #221f1a; }
 `;
