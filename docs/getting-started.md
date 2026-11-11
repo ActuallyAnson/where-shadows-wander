@@ -179,12 +179,13 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 | Esc | Deselect |
 | Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
 | Revert / Reset | Back to where the file has it / to the code's default |
-| Eye, Overview, Left, Right | View presets (drag empty space to orbit, scroll to zoom) |
+| Eye, Overview, Left, Right | View presets (drag empty space to orbit, scroll to zoom). Eye is at the player's eyes |
 | Room only | Hides the stage, the reading page and the story's views (on when the editor opens) |
 | Close editor | Hands the view back to the Hand Lab |
 
 - **Spaces.** Pieces in the room are in room space: x right, y up from the floor, -z toward the wall the shadows play on, with the player at the origin. Keep everything short of z -1.5, the nearest the wall ahead comes. The lap pieces (`tray`, `quilt`) are in the tray's own space.
-- **Things that follow.** Moving the tray moves the candle, which is the light the gameplay shadows are cast from. A wonder's glow moves with the piece it is on.
+- **Things that follow.** Moving the tray moves the candle, which is the light the gameplay shadows are cast from. A wonder's glow moves with the piece it is on. The candle's shadows are baked, and baked again as you drag (once a frame), so they follow the piece live.
+- **The player.** A light-blue wireframe shows where the player sits: the headset at their eyes, a line down to a cross on the floor, and roughly what a Quest 3 sees (110° across, 96° up and down) out to z -1.5. It is hidden in the Eye view.
 - **Not in the editor:** the window, the walls and the wall ahead (which follows the stage distance). To make another piece editable, give it an id in its view and list it in `BEDROOM_PIECE_IDS` (`src/engine/shadow/bedroom-layout.ts`).
 - A file the game can't read is reported in the console (`room layout: ...`), and the affected pieces stand at their defaults. The dev server refuses to save one.
 

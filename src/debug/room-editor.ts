@@ -8,7 +8,20 @@
 //
 //   W move · E rotate · R scale · Q local/world · hold Shift to snap (1 cm, 5°, 0.05) · Esc deselect
 //   Ctrl+Z undo · Ctrl+Y or Ctrl+Shift+Z redo · Ctrl+S save
-import { Object3D, Raycaster, Vector2, Vector3, type PerspectiveCamera } from '@iwsdk/core';
+//
+// The candle's shadows are baked: they are cast again while a piece is dragged (once a frame) and whenever it is placed. The
+// headset marker shows where the player's eyes are and roughly what the headset can see, in every view but Eye.
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  LineBasicMaterial,
+  LineSegments,
+  Object3D,
+  Raycaster,
+  Vector2,
+  Vector3,
+  type PerspectiveCamera,
+} from '@iwsdk/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { copyPlacement, placementOr, roundPlacement, serializeRoomLayout } from '../engine/stage/room-layout';
@@ -23,6 +36,11 @@ export interface RoomEditorDeps {
   scene: Object3D;
   /** The room's root (room space): the view presets are placed in it. */
   room: Object3D;
+  /**
+   * The height (m) of the player's eyes above the floor when the room was placed. The room stands round the player's head (room
+   * space has the player at x = 0, z = 0), so the headset marker and the Eye view stand at (0, this, 0).
+   */
+  eyeHeight(): number;
   /** What owns the pieces: each view of the room. */
   sources: readonly EditableSource[];
   /** The layout the game was built from; Save writes the pieces' placements into it and then to the file. */
@@ -42,11 +60,18 @@ const FIELDS = ['pos', 'rotDeg', 'scale'] as const;
 const FIELD_LABEL = { pos: 'Position (m)', rotDeg: 'Rotation (°)', scale: 'Scale' } as const;
 const PANEL_W = 300;
 
-/** View presets, in room space: where the camera stands and what it looks at. */
+/** The headset's field of view (a Quest 3's is about 110° across and 96° up and down). */
+const HEADSET_FOV_DEG = { across: 110, upDown: 96 };
+/** How far the marker draws the view (m): z -1.5, the nearest the wall ahead comes. */
+const VIEW_DEPTH_M = 1.5;
+/** The marker is hidden when the camera is this close to the eyes (m), as in the Eye view, where it would only be in the way. */
+const MARKER_HIDE_NEAR_M = 0.3;
+
+/** View presets, in room space: where the camera stands and what it looks at. Eye's heights are above the player's eyes. */
 const VIEWS: Readonly<Record<string, readonly [Vec3, Vec3]>> = {
   Eye: [
-    [0, 1.15, 0.05],
-    [0, 0.85, -1.6],
+    [0, 0, 0],
+    [0, -0.3, -1.6],
   ],
   Overview: [
     [0.2, 2.2, 1.7],
@@ -68,6 +93,12 @@ export class RoomEditor {
   private readonly orbit: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly helper: Object3D;
+  /** The player's headset and what it sees, in room space. */
+  private readonly marker: LineSegments;
+  private readonly markerEye = new Vector3();
+  /** A piece dragged since the last frame: its view is told it moved (and the shadows are baked again) once a frame. */
+  private draggedPiece: EditablePiece | null = null;
+  private draggedFrame = 0;
   private readonly raycaster = new Raycaster();
   private readonly pointer = new Vector2();
   private readonly downAt = new Vector2();
@@ -109,7 +140,10 @@ export class RoomEditor {
       if (this.selected) this.dragStart = readPlacement(this.selected.object);
     });
     this.gizmo.addEventListener('objectChange', () => {
-      if (this.selected) this.selected.object.updateMatrix();
+      if (this.selected) {
+        this.selected.object.updateMatrix();
+        this.movedWhileDragging(this.selected);
+      }
       this.renderFields();
     });
     this.gizmo.addEventListener('mouseUp', () => {
@@ -118,6 +152,13 @@ export class RoomEditor {
       this.commit(piece, this.dragStart, readPlacement(piece.object));
       this.dragStart = null;
     });
+    this.marker = new LineSegments(
+      new BufferGeometry(),
+      new LineBasicMaterial({ color: 0x6fd3ff, transparent: true, opacity: 0.8, depthTest: false }),
+    );
+    this.marker.renderOrder = 999;
+    this.marker.matrixAutoUpdate = false;
+    this.orbit.addEventListener('change', () => this.fadeMarker());
     this.mount();
   }
 
@@ -127,6 +168,7 @@ export class RoomEditor {
     this.open = true;
     this.deps.suspendDesk(true);
     this.deps.scene.add(this.helper);
+    this.placeMarker();
     this.orbit.enabled = true;
     this.gizmo.enabled = true;
     this.root.style.display = '';
@@ -149,6 +191,10 @@ export class RoomEditor {
     this.select(null);
     this.setRoomOnly(false);
     this.deps.scene.remove(this.helper);
+    this.deps.room.remove(this.marker);
+    cancelAnimationFrame(this.draggedFrame);
+    this.draggedFrame = 0;
+    this.draggedPiece = null;
     this.orbit.enabled = false;
     this.gizmo.enabled = false;
     this.root.style.display = 'none';
@@ -233,7 +279,73 @@ export class RoomEditor {
 
   private place(piece: EditablePiece, p: Readonly<Placement>): void {
     applyPlacement(piece.object, p);
+    this.moved(piece);
+  }
+
+  /** Tells the piece's view it moved: what follows it goes with it, and the candle's shadows are baked again. */
+  private moved(piece: EditablePiece): void {
     this.deps.sources.find((s) => s.editables().includes(piece))?.moved?.(piece);
+  }
+
+  /** The gizmo moves a piece many times a frame; its view is told once, just before the next frame. */
+  private movedWhileDragging(piece: EditablePiece): void {
+    this.draggedPiece = piece;
+    if (this.draggedFrame) return;
+    this.draggedFrame = requestAnimationFrame(() => {
+      this.draggedFrame = 0;
+      const dragged = this.draggedPiece;
+      this.draggedPiece = null;
+      if (dragged) this.moved(dragged);
+    });
+  }
+
+  /** Builds the headset marker at the player's eyes: the headset, a line down to the floor, and the view out to the wall. */
+  private placeMarker(): void {
+    const eyeY = this.deps.eyeHeight();
+    const v: number[] = [];
+    const line = (a: Vec3, b: Vec3) => v.push(...a, ...b);
+    // The headset: a box 18 x 10 x 10 cm round the eyes.
+    const [hx, hy, hz] = [0.09, 0.05, 0.05];
+    for (const sy of [-1, 1])
+      for (const sz of [-1, 1]) line([-hx, eyeY + sy * hy, sz * hz], [hx, eyeY + sy * hy, sz * hz]);
+    for (const sx of [-1, 1])
+      for (const sz of [-1, 1]) line([sx * hx, eyeY - hy, sz * hz], [sx * hx, eyeY + hy, sz * hz]);
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1]) line([sx * hx, eyeY + sy * hy, -hz], [sx * hx, eyeY + sy * hy, hz]);
+    // Where the player sits: straight down to the floor, and a small cross there.
+    line([0, eyeY - hy, 0], [0, 0, 0]);
+    line([-0.1, 0, 0], [0.1, 0, 0]);
+    line([0, 0, -0.1], [0, 0, 0.1]);
+    // The view: from the eyes out to a rectangle at the nearest the wall comes, and straight ahead.
+    const d = VIEW_DEPTH_M;
+    const w = d * Math.tan(((HEADSET_FOV_DEG.across / 2) * Math.PI) / 180);
+    const h = d * Math.tan(((HEADSET_FOV_DEG.upDown / 2) * Math.PI) / 180);
+    const far: Vec3[] = [
+      [-w, eyeY - h, -d],
+      [w, eyeY - h, -d],
+      [w, eyeY + h, -d],
+      [-w, eyeY + h, -d],
+    ];
+    for (let i = 0; i < 4; i++) {
+      line([0, eyeY, 0], far[i]);
+      line(far[i], far[(i + 1) % 4]);
+    }
+    line([0, eyeY, 0], [0, eyeY, -d]);
+    this.marker.geometry.dispose();
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new Float32BufferAttribute(v, 3));
+    this.marker.geometry = geo;
+    this.marker.updateMatrix();
+    this.deps.room.add(this.marker);
+    this.fadeMarker();
+  }
+
+  /** Hides the marker when the camera is at the player's eyes (it would fill the view), shows it otherwise. */
+  private fadeMarker(): void {
+    const room = this.deps.room;
+    room.updateMatrixWorld(true);
+    room.localToWorld(this.markerEye.set(0, this.deps.eyeHeight(), 0));
+    this.marker.visible = this.deps.camera.position.distanceTo(this.markerEye) > MARKER_HIDE_NEAR_M;
   }
 
   private step(undo: boolean): void {
@@ -321,8 +433,10 @@ export class RoomEditor {
     if (!v) return;
     const room = this.deps.room;
     room.updateMatrixWorld(true);
-    const eye = room.localToWorld(new Vector3(...v[0]));
-    const target = room.localToWorld(new Vector3(...v[1]));
+    // Eye stands at the player's eyes; the others stand where they say.
+    const up = name === 'Eye' ? this.deps.eyeHeight() : 0;
+    const eye = room.localToWorld(new Vector3(v[0][0], v[0][1] + up, v[0][2]));
+    const target = room.localToWorld(new Vector3(v[1][0], v[1][1] + up, v[1][2]));
     this.deps.camera.position.copy(eye);
     this.orbit.target.copy(target);
     this.orbit.update();

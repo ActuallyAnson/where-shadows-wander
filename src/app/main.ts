@@ -1136,6 +1136,7 @@ async function start(): Promise<void> {
       canvas: world.renderer.domElement,
       scene: world.scene,
       room: bedroomView.group,
+      eyeHeight: () => lastHead[1],
       sources: [roomModels, roomDressing, bedroomView, bedTray],
       layout: bedroomLayout.layout,
       fileName: BEDROOM_LAYOUT_FILE,
