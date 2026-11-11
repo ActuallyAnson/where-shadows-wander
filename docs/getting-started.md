@@ -168,8 +168,9 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). Arrange them in the running game:
 
 1. `npm run dev`, then open the Hand Lab with the editor: `https://localhost:8081/?mock=1&edit=room`.
-2. Click a piece, or pick it from the **Pieces** list. Drag the gizmo, or type exact numbers into Position (metres), Rotation (degrees) and Scale.
-3. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change. Saving doesn't reload the page; the next reload reads the saved file.
+2. Click a piece, or pick it from the **Scene** tree on the right (Room and Lap, grouped by Furniture, Dressing, Room, Tray and Added). Drag the gizmo, or type exact numbers into Position (metres), Rotation (degrees) and Scale.
+3. To add a model, use the **Assets** panel on the left (below).
+4. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change, with any model files you imported or exported. Saving doesn't reload the page; the next reload reads the saved file.
 
 | Key or button | Does |
 |---|---|
@@ -179,6 +180,8 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 | Esc | Deselect |
 | Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
 | Revert / Reset | Back to where the file has it / to the code's default |
+| Ctrl+D or Duplicate, Delete or Remove | Copy or take out an added model (built-in pieces can't be copied or removed). Undoable |
+| Export .glb | Writes the selected built-in piece to `src/assets/models/exported/<id>.glb` |
 | Eye, Overview, Left, Right | View presets (drag empty space to orbit, scroll to zoom). Eye is at the player's eyes |
 | Room only | Hides the stage, the reading page and the story's views (on when the editor opens) |
 | Close editor | Hands the view back to the Hand Lab |
@@ -188,6 +191,17 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 - **The player.** A light-blue wireframe shows where the player sits: the headset at their eyes, a line down to a cross on the floor, and roughly what a Quest 3 sees (110° across, 96° up and down) out to z -1.5. It is hidden in the Eye view.
 - **Not in the editor:** the window, the walls and the wall ahead (which follows the stage distance). To make another piece editable, give it an id in its view and list it in `BEDROOM_PIECE_IDS` (`src/engine/shadow/bedroom-layout.ts`).
 - A file the game can't read is reported in the console (`room layout: ...`), and the affected pieces stand at their defaults. The dev server refuses to save one.
+
+#### The asset browser
+
+The **Assets** panel on the left is `src/assets/models` as a tree of folders (it is hidden in windows narrower than 1000 px; ‹ folds it away).
+
+- **Import:** **Import…**, or drag `.glb` files from your computer onto a folder. A name with spaces or odd characters is tidied (`Chair (1).GLB` becomes `Chair-1.glb`). The dev server refuses a file over the 500 KB model budget, bytes that are not a self-contained `.glb`, and a name whose asset id another file under `src/assets` already has (the id is the file name in lower case with hyphens, in any folder: `Chair.glb` clashes with `chair.glb`).
+- **Organise:** **New folder**, **Rename**, **Delete**, and drag a file or folder onto another folder to move it. Moving keeps a model's id, so the layout still finds it; a model placed in the room (marked ●) can't be renamed or deleted until it's removed there and saved. Git doesn't keep empty folders.
+- **Place:** **Add to room** (or double-click) puts the model on the floor where the view is looking. Dragging it into the view stands it on the surface under the pointer (a table, the bed; on the tray it goes in the lap section), else on the floor. A placed model is saved in the layout file with a `"model"` field (its asset id), keeps its own size (times its scale), and turns about the middle of its base. In the game and the headset it loads like the other furniture.
+- **Export:** select a built-in piece and press **Export .glb**. The file appears under `exported/` (`chair-2.glb` if its id is taken) and can be placed or edited in Blender; the piece in the room is not changed. glTF can't hold additive (glowing) blending, a depth offset or a drawing order, and the status line says when a piece uses them. An exported copy's origin is the middle of its base, not where the code's piece has it.
+- Model files added, changed or deleted under `src/assets/models` don't reload the page (they would end the editor's session); the next reload reads them. Without a dev server (a tester build) the panel is read-only and export downloads the file.
+- `node scripts/room-editor-probe.mjs https://localhost:8097` (with `npx vite --port 8097 --strictPort` running) checks all of this in a browser and puts the layout file back afterwards.
 
 ### Puzzle layouts: IWSDK's scene editor
 

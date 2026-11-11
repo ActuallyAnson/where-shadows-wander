@@ -24,3 +24,4 @@ The game must show the lantern within 5 seconds of a cold start on a headset, an
 - The paper wall is procedural, so nothing is `critical` yet. The critical total stays 0 until a paper texture is added.
 - Textures are not compressed for the GPU automatically: if a texture is large in memory, use KTX2.
 - No limit on texture dimensions or GPU memory yet.
+- (11 Nov 2026) Models may sit in nested folders under `src/assets/models`; the id is still the file name alone, so it must be unique across all of `src/assets`. The room editor's asset browser imports, moves and renames files through the dev server and enforces this, the model budget and the single-file rule before writing ([ADR 0015](0015-room-layout-file-and-editor.md)). Adding or deleting a model while the dev server runs no longer reloads the page; reload by hand to see it in the game.
