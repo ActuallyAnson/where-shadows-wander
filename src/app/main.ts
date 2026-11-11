@@ -86,6 +86,7 @@ import { createUiSound } from './ui-sound';
 import { isDeskMode, loadLaunch, saveLaunch, switchLaunch } from './launch-mode';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
+import { hideEmulatorOfferBar } from './emulator-offer';
 import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -128,6 +129,8 @@ async function start(): Promise<void> {
   if (import.meta.env.DEV) {
     const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
     if (emulated) emulated.primaryInputMode = 'hand';
+    // Its "Enter XR" bar repeats the launcher's Enter VR (and the desk modes never enter XR): hide it.
+    if (emulated) hideEmulatorOfferBar(document);
   }
   // The critical assets have loaded; from here IWSDK gives up on any one request after 8 s, not 30 s.
   shortenAssetTimeout();
