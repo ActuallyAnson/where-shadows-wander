@@ -14,6 +14,7 @@
 import {
   AssetManager,
   BufferGeometry,
+  Euler,
   Float32BufferAttribute,
   LineBasicMaterial,
   LineSegments,
@@ -117,6 +118,21 @@ const keyOf = (p: EditablePiece): string => `${p.section}:${p.id}`;
 const isPlaced = (p: EditablePiece): p is PlacedPiece => typeof (p as Partial<PlacedPiece>).model === 'string';
 /** The scene tree's group for the models placed in the editor. */
 const ADDED = 'Added';
+/** Camera movement: [forward, right, up] for each key (`KeyboardEvent.code`). */
+const MOVE_KEYS: Readonly<Record<string, readonly [number, number, number]>> = {
+  KeyW: [1, 0, 0],
+  KeyS: [-1, 0, 0],
+  KeyA: [0, -1, 0],
+  KeyD: [0, 1, 0],
+  KeyQ: [0, 0, -1],
+  KeyE: [0, 0, 1],
+  ArrowUp: [1, 0, 0],
+  ArrowDown: [-1, 0, 0],
+  ArrowLeft: [0, -1, 0],
+  ArrowRight: [0, 1, 0],
+};
+const MOVE_M_PER_S = 1.5;
+const LOOK_RAD_PER_PX = 0.004;
 /** How far a copy stands from what it copies (m, along x). */
 const COPY_OFFSET_M = 0.1;
 /** Escapes text for HTML. */
@@ -162,8 +178,33 @@ export class RoomEditor {
   private shownKey: string | null | undefined = undefined;
   private readonly onKeyDown = (e: KeyboardEvent) => this.key(e, true);
   private readonly onKeyUp = (e: KeyboardEvent) => this.key(e, false);
-  private readonly onPointerDown = (e: PointerEvent) => this.downAt.set(e.clientX, e.clientY);
-  private readonly onPointerUp = (e: PointerEvent) => this.click(e);
+  private readonly onPointerDown = (e: PointerEvent) => {
+    this.downAt.set(e.clientX, e.clientY);
+    if (e.button === 2) this.setFlying(true);
+  };
+  private readonly onPointerUp = (e: PointerEvent) => {
+    if (e.button === 2) return this.setFlying(false);
+    this.click(e);
+  };
+  private readonly onPointerMove = (e: PointerEvent) => {
+    if (this.flying) this.look(e.movementX, e.movementY);
+  };
+  private readonly onContextMenu = (e: Event) => e.preventDefault();
+  /** Keys let go while the window had no focus never send keyup: stop moving. */
+  private readonly onBlur = () => {
+    this.held.clear();
+    this.setFlying(false);
+  };
+  /** Fly mode: the right mouse button held (mouse looks, WASD and Q/E move). */
+  private flying = false;
+  /** Movement keys held (`KeyboardEvent.code`), and whether Shift (faster) is down. */
+  private readonly held = new Set<string>();
+  private fast = false;
+  private moveFrame = 0;
+  private lastMoveT = 0;
+  private readonly euler = new Euler(0, 0, 0, 'YXZ');
+  private readonly moveDir = new Vector3();
+  private readonly moveStep = new Vector3();
   private readonly onResize = () => this.applyPanelWidth();
   /** The panel's width as last dragged (kept for the next time the editor opens), and the tab it shows. */
   private panelW = readStoredWidth();
@@ -201,6 +242,8 @@ export class RoomEditor {
     this.savedText = serializeRoomLayout(this.collect());
     this.orbit = new OrbitControls(deps.camera, deps.canvas);
     this.orbit.enabled = false;
+    // The right button flies (see setFlying); pan is Ctrl/Shift + left drag, or the movement keys.
+    this.orbit.mouseButtons.RIGHT = null;
     this.gizmo = new TransformControls(deps.camera, deps.canvas);
     this.gizmo.enabled = false;
     this.helper = this.gizmo.getHelper();
@@ -256,10 +299,13 @@ export class RoomEditor {
     this.root.style.display = '';
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
     window.addEventListener('resize', this.onResize);
     window.addEventListener('beforeunload', this.onBeforeUnload);
     this.deps.canvas.addEventListener('pointerdown', this.onPointerDown);
     this.deps.canvas.addEventListener('pointerup', this.onPointerUp);
+    this.deps.canvas.addEventListener('pointermove', this.onPointerMove);
+    this.deps.canvas.addEventListener('contextmenu', this.onContextMenu);
     this.deps.canvas.addEventListener('dragover', this.onCanvasDragOver);
     this.deps.canvas.addEventListener('drop', this.onCanvasDrop);
     window.addEventListener('dragover', this.onWindowDrag);
@@ -289,10 +335,17 @@ export class RoomEditor {
     this.root.style.display = 'none';
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('beforeunload', this.onBeforeUnload);
     this.deps.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.deps.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.deps.canvas.removeEventListener('pointermove', this.onPointerMove);
+    this.deps.canvas.removeEventListener('contextmenu', this.onContextMenu);
+    this.setFlying(false);
+    this.held.clear();
+    cancelAnimationFrame(this.moveFrame);
+    this.moveFrame = 0;
     this.deps.canvas.removeEventListener('dragover', this.onCanvasDragOver);
     this.deps.canvas.removeEventListener('drop', this.onCanvasDrop);
     window.removeEventListener('dragover', this.onWindowDrag);
@@ -746,6 +799,69 @@ export class RoomEditor {
     return { section: 'room', pos: [p.x, 0, p.z] };
   }
 
+  /** Starts or ends fly mode (the right mouse button). The WASD and Q/E keys held stop when it ends. */
+  private setFlying(on: boolean): void {
+    if (on === this.flying) return;
+    this.flying = on;
+    this.root.classList.toggle('flying', on);
+    this.deps.canvas.style.cursor = on ? 'crosshair' : '';
+    if (!on) for (const code of this.held) if (!code.startsWith('Arrow')) this.held.delete(code);
+  }
+
+  /** Turns the camera where it stands (fly mode's mouse look); the point the view orbits stays the same distance ahead. */
+  private look(dx: number, dy: number): void {
+    const camera = this.deps.camera;
+    const distance = Math.max(camera.position.distanceTo(this.orbit.target), 0.3);
+    this.euler.setFromQuaternion(camera.quaternion, 'YXZ');
+    this.euler.y -= dx * LOOK_RAD_PER_PX;
+    this.euler.x = Math.min(Math.max(this.euler.x - dy * LOOK_RAD_PER_PX, -1.5), 1.5);
+    this.euler.z = 0;
+    camera.quaternion.setFromEuler(this.euler);
+    this.orbit.target.copy(camera.position).add(this.moveDir.set(0, 0, -distance).applyQuaternion(camera.quaternion));
+    this.fadeMarker();
+  }
+
+  private startMoving(): void {
+    if (this.moveFrame) return;
+    this.lastMoveT = performance.now();
+    this.moveFrame = requestAnimationFrame((t) => this.moveTick(t));
+  }
+
+  /** Moves the camera and the point it orbits together, once a frame, while movement keys are held. */
+  private moveTick(t: number): void {
+    this.moveFrame = 0;
+    if (!this.open || this.held.size === 0) return;
+    const dt = Math.min((t - this.lastMoveT) / 1000, 0.1);
+    this.lastMoveT = t;
+    const camera = this.deps.camera;
+    let fwd = 0,
+      right = 0,
+      up = 0;
+    for (const code of this.held) {
+      const [f, r, u] = MOVE_KEYS[code];
+      fwd += f;
+      right += r;
+      up += u;
+    }
+    const step = this.moveStep.set(0, 0, 0);
+    // Forward: where the camera looks while flying; level with the floor for the arrow keys.
+    this.moveDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    if (!this.flying) this.moveDir.y = 0;
+    if (this.moveDir.lengthSq() > 1e-6) step.addScaledVector(this.moveDir.normalize(), fwd);
+    this.moveDir.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    this.moveDir.y = 0;
+    if (this.moveDir.lengthSq() > 1e-6) step.addScaledVector(this.moveDir.normalize(), right);
+    step.y += up;
+    if (step.lengthSq() > 0) {
+      step.normalize().multiplyScalar(MOVE_M_PER_S * (this.fast ? 3 : 1) * dt);
+      camera.position.add(step);
+      this.orbit.target.add(step);
+      if (!this.flying) this.orbit.update();
+      this.fadeMarker();
+    }
+    this.moveFrame = requestAnimationFrame((tt) => this.moveTick(tt));
+  }
+
   /** A click on the canvas (not a drag of the view or the gizmo) selects the piece under it, or nothing. */
   private click(e: PointerEvent): void {
     if (e.button !== 0 || this.gizmo.dragging || this.gizmo.axis !== null) return;
@@ -768,9 +884,23 @@ export class RoomEditor {
   }
 
   private key(e: KeyboardEvent, down: boolean): void {
-    if (e.key === 'Shift') return this.setSnap(down);
-    if (!down || e.altKey || e.metaKey) return;
+    if (e.key === 'Shift') {
+      this.fast = down;
+      return this.setSnap(down);
+    }
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    // Movement: the arrow keys any time; WASD and Q/E only while flying (otherwise they pick the gizmo's mode).
+    if (e.code in MOVE_KEYS && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (!down) this.held.delete(e.code);
+      else if (e.code.startsWith('Arrow') || this.flying) {
+        this.held.add(e.code);
+        this.startMoving();
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
+    if (!down || e.altKey || e.metaKey) return;
     const k = e.key.toLowerCase();
     if (e.ctrlKey) {
       if (k === 'z') this.step(!e.shiftKey);
@@ -805,7 +935,8 @@ export class RoomEditor {
       <div class="pane" data-tab="inspect">
         <p class="hint">Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
         Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
-        Drag empty space to look around.</p>
+        Drag empty space to orbit; hold the right button to fly (mouse looks, WASD moves, Q/E down/up, Shift faster);
+        arrow keys move any time.</p>
         <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
         <section class="card" id="re-piece"></section>
       </div>

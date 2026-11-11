@@ -183,6 +183,9 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 | Ctrl+D or Duplicate, Delete or Remove | Copy or take out an added model (built-in pieces can't be copied or removed). Undoable |
 | Export .glb | Writes the selected built-in piece to `src/assets/models/exported/<id>.glb` |
 | Eye, Overview, Left, Right | View presets (drag empty space to orbit, scroll to zoom). Eye is at the player's eyes |
+| Hold the right mouse button | Fly: the mouse turns the view, W/A/S/D move, Q/E go down/up, Shift is 3 times faster |
+| Arrow keys | Move the view level with the floor, any time (W/E/R/Q pick the gizmo's mode unless you are flying) |
+| Ctrl or Shift + drag | Pan |
 | Room only | Hides the stage, the reading page and the story's views (on when the editor opens) |
 | Close editor | Hands the view back to the Hand Lab |
 
