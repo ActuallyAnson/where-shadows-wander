@@ -262,7 +262,7 @@ The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are 
 
 Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the dev server and in a **tester build**; the judges' build (`npm run build`) does not contain them. `npm run build -- --mode tester` makes a tester build (for the Pico over GitHub Pages or a tunnel). The **🛠 Dev** overlay (section 6), with the Hand Lab and room editor buttons in it, is part of the same gate. `node scripts/check-debug-free.mjs` builds both ways and fails if the normal build has any debug code in it; run it before a release.
 
-**Keyboard** (Alt plus the key, so none of it clashes with the Hand Lab's keys; a small line at the bottom left of the page shows what is not normal):
+**Keyboard** (Alt plus the key, so none of it clashes with the Hand Lab's keys; a small line at the bottom center of the page shows what is not normal):
 
 | Keys | What it does |
 |---|---|

@@ -66,7 +66,7 @@ export class DebugTools {
     );
     this.hud = document.createElement('div');
     this.hud.style.cssText =
-      'position:fixed;left:12px;bottom:64px;z-index:9998;padding:4px 8px;border-radius:6px;pointer-events:none;' +
+      'position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:9998;padding:4px 8px;border-radius:6px;pointer-events:none;' +
       'font:12px ui-monospace,monospace;background:rgba(15,18,24,0.85);color:#e3b341;white-space:pre;';
     (ctx.hudParent ?? document.body).append(this.hud);
     this.controller.subscribe(() => this.drawHud());
