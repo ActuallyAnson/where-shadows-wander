@@ -79,7 +79,7 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
   (`check:debug-free`).
 - In a dev or tester build one **Developer** button (modes, testing switches, the launch log) sits at
   the bottom on top of the title screen, so a tester build is never mistaken for the release.
-- Every build shows BEGIN, SETTINGS and a dim "Trouble starting?" under the title.
+- Every build shows BEGIN and SETTINGS under the title, nothing else.
 
 ## Not doing
 

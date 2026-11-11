@@ -4,9 +4,6 @@ import { captureOptions, loadCaptureChoice, nextCapture, saveCaptureChoice } fro
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
 import type { UiSound } from './ui-sound';
 
-/** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
-const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
-
 /** Things the page's own screens ask of the app, filled in once the app has them (the settings exist after the title does). */
 export interface LauncherHooks {
   openSettings?: () => void;
@@ -107,18 +104,13 @@ export async function mountEnterArButtonIfNeeded(
     return btn;
   };
 
-  // An "other way in" button: its own colours in a dev or tester build, the dim title-screen ones in the judges' build.
-  const makeWayBtn = (text: string, debug: readonly [string, string, string], onClick: () => void) => {
-    const [bg, fg, border] = DEBUG_TOOLS ? debug : QUIET_BUTTON;
-    return makeBtn(text, bg, fg, border, onClick);
-  };
-
-  // Direct clean launch function
-  const launchDirect = async (mode: XRSessionMode, forceWebGLLayer: boolean) => {
+  // The one way in (the title's BEGIN). It falls back by itself: to fewer features if the runtime rejects some, and to
+  // the older XRWebGLLayer if three.js can't bind the session with a projection layer (the Pico's driver has none).
+  const launchDirect = async (mode: XRSessionMode) => {
     title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
-    appendLog(`Requesting ${mode} session (forceWebGLLayer: ${forceWebGLLayer})...`, '#e3b341');
+    appendLog(`Requesting ${mode} session...`, '#e3b341');
 
     // Stash original createProjectionLayer so we can restore it on failure or session end
     const origCreateProjLayer =
@@ -140,13 +132,6 @@ export async function mountEnterArButtonIfNeeded(
     try {
       const w = world as unknown as { sessionRequestPending?: boolean; session?: XRSession };
       w.sessionRequestPending = false;
-
-      if (forceWebGLLayer) {
-        if (typeof XRWebGLBinding !== 'undefined' && 'createProjectionLayer' in XRWebGLBinding.prototype) {
-          appendLog('Bypassing createProjectionLayer to force XRWebGLLayer', '#d2a8ff');
-          delete (XRWebGLBinding.prototype as unknown as { createProjectionLayer?: unknown }).createProjectionLayer;
-        }
-      }
 
       // Feature ladder: Wolvic on Pico can reject optional features (like bounded-floor or hand-tracking)
       // if controllers are connected, boundary is unconfigured/stationary, or after a session reset.
@@ -230,25 +215,13 @@ export async function mountEnterArButtonIfNeeded(
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
       title?.setBusy(false);
-      showNote(
-        "Couldn't start VR. The headset runtime rejected the session.\nTry 'Reload page' below, or restart Wolvic.",
-      );
-      openOtherWays();
+      showNote("Couldn't start VR. Reload the page and press BEGIN again.");
     }
   };
 
   const vrSupported = await xr.isSessionSupported('immersive-vr').catch(() => false);
 
   appendLog(`XR Support: immersive-vr=${vrSupported}`);
-
-  // The title screen's BEGIN is the way in. The other ways in (a Pico browser sometimes needs them) are behind
-  // "Trouble starting?", in every build; dev and tester builds give them their technical names.
-  const otherWays = document.createElement('div');
-  otherWays.style.cssText =
-    'display:none;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;pointer-events:auto;';
-  const openOtherWays = (): void => {
-    otherWays.style.display = 'flex';
-  };
 
   // Without VR support the title is not shown, so the no-XR notice (no-xr-notice.ts) stays readable.
   if (vrSupported) {
@@ -258,11 +231,10 @@ export async function mountEnterArButtonIfNeeded(
           label: 'BEGIN',
           begin: true,
           onPress: () => {
-            void launchDirect('immersive-vr', false);
+            void launchDirect('immersive-vr');
           },
         },
         { label: 'SETTINGS', onPress: () => hooks.openSettings?.() },
-        { label: 'Trouble starting?', quiet: true, onPress: openOtherWays },
       ],
       {
         onReach: () => sound?.hover(),
@@ -279,47 +251,6 @@ export async function mountEnterArButtonIfNeeded(
     world.scene.visible = false;
     const choice = loadCaptureChoice();
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
-
-    otherWays.append(
-      makeWayBtn(
-        DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
-        ['#1c2d42', '#58a6ff', '#388bfd'],
-        () => {
-          void launchDirect('immersive-vr', true);
-        },
-      ),
-    );
-  }
-
-  otherWays.append(
-    makeWayBtn(DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)', ['#2d1840', '#bc8cff', '#a371f7'], () => {
-      statusLine.textContent = '● Launching via IWSDK...';
-      statusLine.style.color = '#bc8cff';
-      appendLog('Calling world.launchXR({ sessionMode: "immersive-vr", features: { handTracking: true } })...');
-      try {
-        world.launchXR({
-          sessionMode: 'immersive-vr' as unknown as import('@iwsdk/core').SessionMode,
-          features: { handTracking: true },
-        });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        appendLog(`IWSDK launch threw: ${msg}`, '#ff7b72');
-      }
-    }),
-    makeWayBtn(DEBUG_TOOLS ? '🔄 Reload Page' : 'Reload page', ['#3d1f24', '#f85149', '#da3633'], () => {
-      location.reload();
-    }),
-  );
-
-  if (!title) {
-    const trouble = document.createElement('button');
-    trouble.type = 'button';
-    trouble.textContent = 'Trouble starting?';
-    trouble.style.cssText =
-      'background:none;border:0;color:#a8a294;font:13px system-ui,-apple-system,sans-serif;text-decoration:underline;' +
-      'cursor:pointer;pointer-events:auto;';
-    trouble.onclick = openOtherWays;
-    buttonRow.append(trouble);
   }
 
   // Developer: the other modes (Hand Lab, room editor), the testing switches and the launch log, in one panel. A debug
@@ -343,7 +274,7 @@ export async function mountEnterArButtonIfNeeded(
   }
 
   if (developerElement) uiContainer.append(developerElement);
-  uiContainer.append(note, buttonRow, otherWays);
+  uiContainer.append(note, buttonRow);
   document.body.append(uiContainer);
 
   world.renderer.xr.addEventListener('sessionstart', () => {

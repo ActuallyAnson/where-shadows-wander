@@ -52,7 +52,7 @@ We have a Pico now and no Quest yet. Develop on the Pico; confirm on a Quest bef
 Steps on the headset (Pico or Quest):
 
 1. Open the link in the headset browser. Make sure the headset's room or space setup is done.
-2. Press **BEGIN** and allow hand tracking (if it won't start, **Trouble starting?** has other ways in). Put the controllers down.
+2. Press **BEGIN** and allow hand tracking (if it won't start, reload the page and press it again). Put the controllers down.
 3. Look around the room for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle on the table, and your hands as dark gloves with their shadows on the wall. (To see a dot on every joint instead, press **Developer**, then **Joint dots**, before BEGIN; dev and tester builds only.)
 4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
 5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This checks that your settings are saved between sessions (the report's `saves` section).

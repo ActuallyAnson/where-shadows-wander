@@ -11,7 +11,7 @@ The game is a virtual room (ADR 0005); the passthrough mode was kept only for te
 ## Decision
 
 - **The page has one address and reads no query options.** What it starts as is in `src/app/launch-mode.ts`: `game` (the default), `lab` (the Hand Lab) or `room-editor` (the Hand Lab with the room editor; dev and tester builds only, else it opens as the lab). The choice, and the lab's hand source, are kept in the tab's `sessionStorage`: a reload stays in the mode, a new tab or the link sent to a headset opens the game. Choosing a mode saves it and reloads.
-- **The title screen is the same in every build:** BEGIN, SETTINGS and "Trouble starting?" (compatibility mode, IWSDK's own launch, reload).
+- **The title screen is the same in every build:** BEGIN and SETTINGS. (Update, 11 Nov 2026: "Trouble starting?" and its other ways in, compatibility mode and IWSDK's own launch, were removed. BEGIN already falls back to fewer features and to the older WebGL layer by itself, and IWSDK's launch was the path that failed silently on the Pico.)
 - **Dev and tester builds add one Developer button** (`src/app/developer-panel.ts`): the modes, the testing switches (now with the lantern's flicker, which replaces `?flicker=`), the launch log and Copy logs. It is behind `DEBUG_TOOLS`, so the judges' build does not contain it (`check:debug-free`).
 - **The judges' build reaches the Hand Lab only from the no-headset page** ("Try the Hand Lab"), for visitors without a headset. The lab's "Back to the game" returns.
 - **The AR mode is removed:** the Enter AR button, `?xr=ar`, the `HandOccluder` (it only mattered over passthrough), and the composite probe. Git history keeps them.

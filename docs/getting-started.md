@@ -46,7 +46,7 @@ The dev server adds IWER, an emulated Quest 3 with hands, sitting in a fake livi
 
 1. Open **https://localhost:8081/** in your own Chrome, not the managed window.
 2. Chrome warns "Your connection is not private". The dev server uses a self-signed certificate. Click **Advanced**, then **Proceed to localhost**.
-3. Click **Enter XR**. The fake room appears behind the app, standing in for passthrough.
+3. Press **BEGIN** on the title screen. (The emulator's own Enter XR bar is hidden: it repeats BEGIN, `src/app/emulator-offer.ts`.)
 4. In the emulator toolbar, open the input menu and choose **Hands**. Dots appear on each finger joint, orange for the right hand and blue for the left.
 5. Use the hand panels to try pose presets, the pinch slider, and the move/rotate handles.
 6. Exit XR, then press **Copy report** (bottom left) to see what the app measured: hands, planes, anchors, frame rate.
@@ -86,7 +86,7 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 2. In the headset browser, open the **Network** address from section 3, e.g. `https://192.168.1.95:8081/`.
 3. Accept the certificate warning (usually **Advanced**, then **Proceed**; the wording varies by browser).
 4. Make sure the headset's room or space setup is done.
-5. Press **Enter XR**, allow hand tracking and spatial data, and put the controllers down.
+5. Press **BEGIN**, allow hand tracking, and put the controllers down.
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
@@ -251,7 +251,8 @@ The settings and the day last played are saved in the browser ([ADR 0010](adr/00
 
 The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are one table in `src/engine/services/settings/settings.ts`: tolerance, hold time, shadow size, recognition glow, lantern flicker, the four volumes, high contrast, captions (a stub until the story exists) and the main hand. Each has a range, a default and a one-line explanation, and the panel, the saves and the tests all read that table.
 
-- **Open the panel:** on the desktop, press **Settings** in the Hand Lab (**Developer**, then **Hand Lab**). In a headset, press **Developer** under the title, turn on **Settings panel opens when VR starts**, then press BEGIN: it opens a second after the session starts, in front of you and a little toward your main hand. Nothing opens it in play yet: the lantern flow (Teammate B) should call `__wsw.openSettings()`.
+- **Open the panel (every build):** **SETTINGS** on the title screen opens them as a page, before the headset is on. In VR, cover the candle to pause, then press **Settings** on the pause screen.
+- **Open it while testing (dev and tester builds):** **Settings** in the Hand Lab, or **Developer** > **Settings panel opens when VR starts** in a headset. The debug pages after the settings pages are dev and tester only.
 - **Use it:** poke a button with a fingertip. There are two pages (**More settings >** and **< Back**), **Reset to defaults** and **Close**. A change applies at once and is saved with the next save event.
 - **Use a setting in game code:** read `settings.value` (on `__wsw.settings` in dev) and `settings.subscribe(fn)` to hear changes. `highContrast`, `captions` and `hand` are only read by listeners; the other settings are already pushed to the recognizer, shadow projector, sharpen, lantern and mixer by the store.
 - **Add a setting:** add its field to `Settings`, an entry to `SETTING_SPECS` (with the one-line help) and a page slot in `PAGES` (`src/ui/settings-panel/markup.ts`), and, if it steers an engine object, a case in `SettingsStore.apply`. A new field needs a save version bump (section 15).
@@ -291,8 +292,8 @@ Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the
 | No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. Press **Developer** in the launcher and turn on **Joint dots** to see a dot on every tracked joint. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
-| No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always shows its own title screen: **BEGIN** starts VR, and **Trouble starting?** has two other ways in. If you don't see them, update to the latest `main`. |
-| On the Pico, hands show as a pointer and a click but no hands drawn ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the launcher's **Enter VR** button), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
+| No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always shows its own title screen, and **BEGIN** starts VR. If it fails, reload the page and press BEGIN again; the launch log (**Developer**, dev and tester builds) says what the browser answered. |
+| On the Pico, hands show as a pointer and a click but no hands drawn ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the title's **BEGIN**), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
 | Hand Lab opens as the plain game | The mode is kept per tab: a new tab, or the link opened elsewhere, starts the game. Press **Developer**, then **Hand Lab**. |

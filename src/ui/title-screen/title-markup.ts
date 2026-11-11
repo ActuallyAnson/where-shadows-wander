@@ -6,8 +6,6 @@ import { SCENE_SVG } from './title-scene';
 
 export interface TitleItem {
   label: string;
-  /** Dimmer than the others, for the way-out items ("Trouble starting?"). */
-  quiet?: boolean;
 }
 
 const escapeHtml = (s: string): string =>
@@ -31,7 +29,7 @@ export function titleMarkup(items: readonly TitleItem[]): string {
   const buttons = items
     .map(
       (it) =>
-        `<button type="button" class="wsw-item${it.quiet ? ' wsw-quiet' : ''}"><span class="wsw-mark wsw-l"></span>${escapeHtml(
+        `<button type="button" class="wsw-item"><span class="wsw-mark wsw-l"></span>${escapeHtml(
           it.label,
         )}<span class="wsw-mark wsw-r"></span></button>`,
     )
@@ -63,7 +61,6 @@ export const TITLE_CSS = `
 .wsw-divider{margin-top:2vmin;width:min(420px,70vw);height:auto}
 .wsw-menu{display:flex;flex-direction:column;align-items:center;gap:1vmin;position:relative;z-index:1}
 .wsw-item{background:none;border:0;color:#a89c8a;font-family:inherit;font-weight:700;font-size:clamp(18px,3.8vmin,30px);letter-spacing:.22em;text-shadow:0 2px 6px rgba(0,0,0,.8);min-height:56px;padding:1.4vmin 9vmin;position:relative;cursor:pointer;outline:none;touch-action:manipulation;transition:color .45s ease,letter-spacing .45s ease,text-shadow .45s ease,transform .2s ease}
-.wsw-quiet{font-size:clamp(13px,2.5vmin,18px);font-weight:400;color:#8a7e6e}
 .wsw-mark{position:absolute;top:50%;width:9px;height:9px;background:#ffd89a;opacity:0;transform:translateY(-50%) rotate(45deg) scale(0);transition:transform .4s cubic-bezier(.2,1.7,.4,1),opacity .35s ease,left .4s ease,right .4s ease;box-shadow:0 0 12px rgba(255,200,120,.9)}
 .wsw-l{left:5vmin}
 .wsw-r{right:5vmin}
@@ -97,7 +94,6 @@ export const TITLE_CSS = `
 @keyframes wsw-snuff{0%{opacity:1}100%{opacity:.12}}
 .wsw-busy .wsw-flame{animation:wsw-snuff .9s ease-in forwards}
 .wsw-busy .wsw-item{pointer-events:none;color:#ffd89a;letter-spacing:.3em}
-.wsw-busy .wsw-quiet{opacity:.35}
 @keyframes wsw-flap{0%,100%{transform:rotate(0)}50%{transform:rotate(16deg)}}
 @keyframes wsw-glide{0%,100%{transform:translate(830px,372px)}50%{transform:translate(838px,362px)}}
 @keyframes wsw-steam{0%{stroke-dashoffset:40;opacity:0}30%{opacity:.7}100%{stroke-dashoffset:-40;opacity:0}}
