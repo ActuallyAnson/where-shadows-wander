@@ -185,5 +185,5 @@ function toggleRecording(): void {
   $<HTMLButtonElement>('guide').disabled = false;
 }
 
-// The Hand Lab link opens the game page in the lab with the webcam: the page's mode is kept in the tab, not the address.
-document.getElementById('lab-link')?.addEventListener('click', () => saveLaunch({ mode: 'lab', source: 'webcam' }));
+// The Hand Lab link opens the game with webcam hands: the page's choice is kept in the tab, not the address.
+document.getElementById('lab-link')?.addEventListener('click', () => saveLaunch({ mode: 'game', hands: 'webcam' }));

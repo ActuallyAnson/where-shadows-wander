@@ -36,11 +36,11 @@ describe('xrSessionSupported', () => {
 });
 
 describe('landingHtml', () => {
-  it('shows the game name, the link to open on a headset, and the Hand Lab way in', () => {
+  it('shows the game name and the link to open on a headset, and no Hand Lab', () => {
     const html = landingHtml('https://example.test/game/');
     expect(html).toContain('Where Shadows Wander');
     expect(html).toContain('https://example.test/game/');
-    expect(html).toContain('data-lab');
+    expect(html).not.toContain('data-lab');
     expect(html).not.toContain('?mock');
     expect(html).toContain('Meta Quest');
   });

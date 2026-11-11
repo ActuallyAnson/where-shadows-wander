@@ -1,9 +1,9 @@
 /* global window */
-// Checks the sound in a real browser, with no headset.
+// Checks the sound in a real browser, with no headset: the game in the emulator's session, with mock hands.
 // Usage: start a dev server (npx vite --port 8095 --strictPort) then
 //   node scripts/audio-probe.mjs https://localhost:8095
 // In headless Chromium it checks that:
-//   audio stays locked until a gesture, then runs;
+//   audio stays locked until a gesture (the press on BEGIN), then runs;
 //   the flame crackles from the moment audio unlocks (it was lit while locked);
 //   a sound placed left of the listener is louder in the left ear (and the same on the right);
 //   muting the effects bus silences effects, and the ambience bus still plays the flame's crackle;
@@ -11,7 +11,7 @@
 //   pausing suspends the context and resuming runs it again;
 //   the per-frame update costs well under 0.5 ms.
 import { chromium } from 'playwright';
-import { launchIn } from './lib/launch.mjs';
+import { enterVr, launchIn, lightCandle } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8081';
 const browser = await chromium.launch({
@@ -23,12 +23,13 @@ const check = (name, ok, detail = '') => {
   if (!ok) failed++;
 };
 
-const page = await (
-  await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1000, height: 700 } })
-).newPage();
+const page =
+  await // A small page: the emulator's session draws with the software renderer, and a large one stalls the main thread long enough
+  // for the meters below to miss a short sound. This probe listens; it does not look.
+  (await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 320, height: 240 } })).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await launchIn(page, { mode: 'lab', flicker: 0 });
+await launchIn(page, { flicker: 0 });
 await page.goto(`${base}/`);
 await page.waitForFunction(() => window.__wsw?.audio, null, { timeout: 90000 });
 
@@ -38,10 +39,11 @@ const before = await page.evaluate(() => ({
 }));
 check('locked before any gesture', before.context && before.state === 'locked', JSON.stringify(before));
 
-await page.mouse.click(300, 300);
+await enterVr(page);
 await page.waitForFunction(() => window.__wsw.audio.state === 'running', null, { timeout: 10000 }).catch(() => {});
 const after = await page.evaluate(() => window.__wsw.audio.state);
-check('running after a click', after === 'running', after);
+check('running after the press on BEGIN', after === 'running', after);
+await lightCandle(page);
 
 // Taps the master output into a left and a right meter. Returns helpers kept on window.
 await page.evaluate(() => {
@@ -74,8 +76,6 @@ await page.evaluate(() => {
       };
       tick();
     });
-  // The listener sits at head height looking down -Z (the frame loop also updates it each frame).
-  window.__wsw.world.camera.position.set(0, 1.2, 0);
 });
 
 const peak = (ms = 500) => page.evaluate((m) => window.__peak(m), ms);

@@ -35,7 +35,7 @@ ADR 0006 planned the room for IWSDK's scene editor (`public/scenes/main.iwsdk.sc
 - **Arranging the room needs no code.** It's done in the real room, with its lighting and the real wall distance, and the change is a reviewable diff of a data file.
 - **Moving the tray moves the candle**, and the candle is the light that casts the gameplay shadows. Keep the tray near its default unless that is wanted.
 - **Not in the editor yet:** the window, the walls, and the painted stand-ins (hidden once their models load). Adding a piece means giving it an id in its view (`editable(id, object)` or an `EditablePiece`) and listing it in `BEDROOM_PIECE_IDS`.
-- **The editor works on the desktop only**, in the Hand Lab, not in a headset session.
+- **The editor works on the desktop only**, in the Hand Lab, not in a headset session. (Since [ADR 0018](0018-hand-lab-in-session.md) it is its own desk mode, the only one: the Hand Lab runs in the game's session, and Close returns to the game.)
 - `public/scenes/main.iwsdk.scene.json` stays as IWSDK's start scene, empty.
 
 ## Update (11 Nov 2026): added models, an asset browser and export

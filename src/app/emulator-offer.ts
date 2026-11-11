@@ -1,6 +1,6 @@
 // Dev only. The IWER emulator (injected by IWSDK's dev plugin) draws its own "Enter XR" bar at the top of the page
 // whenever a session is offered (iwsdk.config.json offers one always, for the headset browser's enter prompt). The
-// launcher's own Enter VR buttons already do that job, and the Hand Lab and the room editor never enter XR, so the bar
+// launcher's own Enter VR buttons already do that job, and the room editor never enters XR, so the bar
 // is hidden. The emulator's in-session controls are a different element and are left alone.
 
 /** The parts of a DOM element `isEmulatorOfferHost` looks at, so it can be tested without a DOM. */

@@ -1,5 +1,5 @@
-// A hand source fills both HandFrames each frame in mock mode (the Hand Lab), in
-// place of the headset. Every source writes the same HandFrame format as
+// A hand source fills both HandFrames each frame with mock hands (the Hand Lab), in
+// place of the device's, in the game's session (ADR 0018). Every source writes the same HandFrame format as
 // XRHandReader, so the rest of the game can't tell the difference.
 import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
 import type { PresetName } from '../engine/hands/synthetic-hand';
@@ -19,8 +19,8 @@ export interface HandSource {
 }
 
 /**
- * Where mock hands rest, in scene space. The desktop camera (the player's eyes)
- * sits at (0, 1, 0.5) (iwsdk.config.json): this is 65 cm ahead and 20 cm below
+ * Where mock hands rest, in the desk rig's space (eyes at MOCK_HEAD, (0, 1, 0.5),
+ * looking down -Z; desk-frame.ts moves them into the wearer's rig): 65 cm ahead and 20 cm below
  * the eyes, level with the middle of the paper wall, and about 20 cm in front of
  * the candle on the bed tray (main.ts placeRig), so the hands are between the
  * flame and the wall as a player's would be. Their shadows land just above the

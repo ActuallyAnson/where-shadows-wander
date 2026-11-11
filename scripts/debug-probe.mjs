@@ -1,11 +1,11 @@
 /* global window, document */
-// Checks the debug tools in a real browser, with no headset.
+// Checks the debug tools in a real browser, with no headset: the game in the emulator's session, with mock hands.
 // Usage: start a dev server (npx vite --port 8097 --strictPort), with recordings/emulator-demo.handrec.json present, then
 //   node scripts/debug-probe.mjs https://localhost:8097 [screenshot-prefix]
 // It presses the keys (Alt+1 to 5, Alt+K, Alt+J, Alt+R), switches each system off and on, shows the overlays, replays
 // the demo recording, and drives the hands-only menu's buttons.
 import { chromium } from 'playwright';
-import { launchIn } from './lib/launch.mjs';
+import { enterVr, launchIn, lightCandle } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const shot = process.argv[3];
@@ -23,7 +23,7 @@ const page = await (
 ).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await launchIn(page, { mode: 'lab', flicker: 0.5 });
+await launchIn(page, { flicker: 0.5 });
 await page.goto(`${base}/`);
 await page.waitForFunction(() => window.__wsw?.debug, null, { timeout: 90000 });
 const w = (fn, arg) => page.evaluate(fn, arg);
@@ -31,8 +31,9 @@ const key = (code) => page.keyboard.press(`Alt+${code}`);
 const wait = (ms) => page.waitForTimeout(ms);
 
 check('the HUD is on the page', (await w(() => document.body.innerText)).includes('DEBUG'));
-// The candle lights itself in mock mode after 3 s; the shadow only shows once it is lit.
-await page.waitForFunction(() => window.__wsw.sessionState() === 'playing', null, { timeout: 20000 });
+// The shadow only shows once the candle is lit.
+await enterVr(page);
+await lightCandle(page);
 await wait(300);
 
 // --- systems ---

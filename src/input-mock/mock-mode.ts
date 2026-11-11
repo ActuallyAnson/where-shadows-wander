@@ -1,5 +1,5 @@
-// Mock mode (the Hand Lab, chosen on the page: src/app/launch-mode.ts): drives the
-// game's hands from a HandSource instead of a headset, so the game runs at a desk.
+// Mock hands (the Hand Lab, chosen on the page: src/app/launch-mode.ts, ADR 0018): drives the
+// game's hands from a HandSource instead of the device's, in the game's own session.
 // The sources:
 //   synthetic   hands you pose with buttons or keys (the default)
 //   script      every v1 shape on each hand, in a loop

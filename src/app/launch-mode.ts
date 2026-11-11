@@ -1,19 +1,24 @@
-// What the page starts as: the game (the default), the Hand Lab (mock hands at a desk) or the room editor (in the Hand Lab,
-// development and tester builds only). The address is always the plain page: the choice is kept in the tab's
-// sessionStorage, so a reload stays in the lab while a new tab, or the link sent to a headset, opens the game. Choosing a
-// mode saves it and reloads the page. Plain TypeScript, with the storage passed in for the tests.
+// What the page starts as, and whose hands play it (ADR 0018). The mode is the game (the default) or the room editor (a desk
+// tool, development and tester builds only). The hands are the device's (a headset, or the emulator's) or, for testing, a mock
+// source the Hand Lab panel drives inside the same session: synthetic, scripted, a replay or the webcam. The address is always
+// the plain page: the choice is kept in the tab's sessionStorage, so a reload keeps it while a new tab, or the link sent to a
+// headset, opens the plain game. Choosing saves it and reloads the page. Plain TypeScript, with the storage passed in for the
+// tests.
 import { MOCK_SOURCES, type MockSourceKind } from '../input-mock/mock-mode';
 
-export type LaunchMode = 'game' | 'lab' | 'room-editor';
-export const LAUNCH_MODES: readonly LaunchMode[] = ['game', 'lab', 'room-editor'];
+export type LaunchMode = 'game' | 'room-editor';
+export const LAUNCH_MODES: readonly LaunchMode[] = ['game', 'room-editor'];
+
+/** Whose hands play: the device's, or a mock source (the Hand Lab). */
+export type HandsChoice = 'device' | MockSourceKind;
+export const HANDS_CHOICES: readonly HandsChoice[] = ['device', ...MOCK_SOURCES];
 
 export interface LaunchChoice {
   mode: LaunchMode;
-  /** The Hand Lab's hand source (the lab remembers the last one picked). */
-  source: MockSourceKind;
+  hands: HandsChoice;
 }
 
-export const DEFAULT_LAUNCH: Readonly<LaunchChoice> = { mode: 'game', source: 'synthetic' };
+export const DEFAULT_LAUNCH: Readonly<LaunchChoice> = { mode: 'game', hands: 'device' };
 export const LAUNCH_KEY = 'wsw.launch';
 
 /** The part of sessionStorage this uses. */
@@ -30,20 +35,21 @@ function browserStorage(): LaunchStorage | null {
   }
 }
 
+const isHands = (v: unknown): v is HandsChoice => (HANDS_CHOICES as readonly unknown[]).includes(v);
+
 /**
- * The tab's choice (the game if there is none, or the storage is blocked or damaged). Without the debug tools the room
- * editor is not in the build, so it opens as the plain Hand Lab.
+ * The tab's choice (the plain game if there is none, or the storage is blocked or damaged). Both the room editor and mock
+ * hands are testing tools: without the debug tools they are not in the build, so the page opens as the plain game. A tab
+ * left in the old Hand Lab mode (`{ mode: 'lab', source }`) opens the game with that source's hands.
  */
 export function loadLaunch(debugTools: boolean, storage: LaunchStorage | null = browserStorage()): LaunchChoice {
+  if (!debugTools) return { ...DEFAULT_LAUNCH };
   try {
-    const raw = JSON.parse(storage?.getItem(LAUNCH_KEY) ?? 'null') as Partial<LaunchChoice> | null;
+    const raw = JSON.parse(storage?.getItem(LAUNCH_KEY) ?? 'null') as Record<string, unknown> | null;
     if (!raw || typeof raw !== 'object') return { ...DEFAULT_LAUNCH };
-    let mode = (LAUNCH_MODES as readonly unknown[]).includes(raw.mode) ? (raw.mode as LaunchMode) : 'game';
-    if (mode === 'room-editor' && !debugTools) mode = 'lab';
-    const source = (MOCK_SOURCES as readonly unknown[]).includes(raw.source)
-      ? (raw.source as MockSourceKind)
-      : DEFAULT_LAUNCH.source;
-    return { mode, source };
+    if (raw.mode === 'lab') return { mode: 'game', hands: isHands(raw.source) ? raw.source : 'synthetic' };
+    const mode = (LAUNCH_MODES as readonly unknown[]).includes(raw.mode) ? (raw.mode as LaunchMode) : 'game';
+    return { mode, hands: isHands(raw.hands) ? raw.hands : DEFAULT_LAUNCH.hands };
   } catch {
     return { ...DEFAULT_LAUNCH };
   }
@@ -53,20 +59,26 @@ export function loadLaunch(debugTools: boolean, storage: LaunchStorage | null = 
 export function saveLaunch(choice: Readonly<LaunchChoice>, storage: LaunchStorage | null = browserStorage()): boolean {
   try {
     if (!storage) return false;
-    storage.setItem(LAUNCH_KEY, JSON.stringify({ mode: choice.mode, source: choice.source }));
+    storage.setItem(LAUNCH_KEY, JSON.stringify({ mode: choice.mode, hands: choice.hands }));
     return true;
   } catch {
     return false;
   }
 }
 
-/** Saves `mode` (keeping the lab's source) and reloads the page into it. */
+/** Saves `mode` (keeping the hands) and reloads the page into it. */
 export function switchLaunch(mode: LaunchMode, debugTools: boolean): void {
   saveLaunch({ ...loadLaunch(debugTools), mode });
   location.reload();
 }
 
-/** Whether `mode` runs on mock hands (the Hand Lab, and the room editor inside it). */
+/** Saves whose hands play (keeping the mode) and reloads the page with them. */
+export function switchHands(hands: HandsChoice, debugTools: boolean): void {
+  saveLaunch({ ...loadLaunch(debugTools), hands });
+  location.reload();
+}
+
+/** Whether `mode` runs at a desk with no session (the room editor). The game always runs in one. */
 export function isDeskMode(mode: LaunchMode): boolean {
   return mode !== 'game';
 }

@@ -1,9 +1,8 @@
 // On a browser that can't start the session the game asks for (a laptop, a phone), the game
 // page is otherwise blank and IWSDK shows no Enter XR button. This explains what the page is
 // and where to go. It checks the session the page really requests, immersive-vr (ADR 0005). The emulator in
-// `npm run dev` supports it, so it never shows there.
-
-import { switchLaunch } from './launch-mode';
+// `npm run dev` supports it, so it never shows there. The Hand Lab is not offered: it is a testing tool in the game's own
+// session (ADR 0018), so without one there is nothing for it to run in.
 
 /** The part of `navigator.xr` this reads. */
 export interface XrSupport {
@@ -19,7 +18,7 @@ export async function xrSessionSupported(xr: XrSupport | undefined): Promise<boo
   }
 }
 
-/** The page a visitor without a headset sees: what the game is, how to get in on a headset, and the Hand Lab to try without one. */
+/** The page a visitor without a headset sees: what the game is and how to get in on a headset. */
 export function landingHtml(link: string): string {
   const safe = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   return `
@@ -62,13 +61,11 @@ export function landingHtml(link: string): string {
         <li>Press <b>BEGIN</b> and sit down with your hands in front of you.</li>
         <li>Light the candle with your hand, then shape rabbits, birds and foxes in its light.</li>
       </ol>
-      <p style="margin:0">No headset? <button type="button" data-lab>Try the Hand Lab</button></p>
-      <p class="small">The Hand Lab shows the hand shapes the game reads, with mock or webcam hands. It is a test bench, not the game.</p>
+      <p class="small">The game is played in the headset with your own hands; there is nothing to play in this browser.</p>
     </main>`;
 }
 
-/** `debugTools`: whether the build has the debug tools (the launch choice is read with it). */
-export async function showNoXrNoticeIfNeeded(debugTools: boolean): Promise<void> {
+export async function showNoXrNoticeIfNeeded(): Promise<void> {
   if (await xrSessionSupported(navigator.xr)) return;
 
   const box = document.createElement('section');
@@ -82,6 +79,5 @@ export async function showNoXrNoticeIfNeeded(debugTools: boolean): Promise<void>
       .then(() => (button.textContent = 'Copied'))
       .catch(() => (button.textContent = 'Select the link above and copy it'));
   });
-  box.querySelector('[data-lab]')?.addEventListener('click', () => switchLaunch('lab', debugTools));
   document.body.append(box);
 }

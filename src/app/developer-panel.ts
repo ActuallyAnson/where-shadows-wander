@@ -1,15 +1,16 @@
 // The launcher's Developer panel (dev and tester builds only): everything that used to be typed into the address, as big
 // buttons, for testing on a headset where typing an address is a chore (and nobody should have to).
 //
-// - Modes: the Hand Lab (mock hands at a desk) and the room editor. A press saves the mode for this tab and reloads the
-//   page into it (launch-mode.ts); the address stays the plain page.
+// - Hands and modes: whose hands play the game (the device's, or the Hand Lab's mock ones, in the same session: ADR 0018),
+//   and the room editor. A press saves the choice for this tab and reloads the page with it (launch-mode.ts); the address
+//   stays the plain page.
 // - Switches: a press takes effect at once (the page is told with a `wsw-testing` event), is remembered in the browser for
 //   next time (testing-options.ts), and nothing reloads. The overlays change live; the settings panel and the recording
 //   start when VR starts, so they are armed here and begin when you press BEGIN. Capture mode and the lantern's flicker
 //   are read when the page starts, so those two reload it.
 // - Logs: the launch log, and a button that copies it to the clipboard.
 import { loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
-import { switchLaunch, type LaunchMode } from './launch-mode';
+import { HANDS_CHOICES, loadLaunch, switchHands, switchLaunch, type HandsChoice } from './launch-mode';
 import {
   DEFAULT_TESTING,
   describeTesting,
@@ -31,10 +32,13 @@ const RECORD_TEXT: Record<RecordChoice, string> = {
   shapes: 'guided shapes (84 s)',
 };
 
-const MODES: readonly { mode: LaunchMode; label: string }[] = [
-  { mode: 'lab', label: 'Hand Lab: mock, replayed or webcam hands at a desk' },
-  { mode: 'room-editor', label: 'Room editor: arrange the bedroom and save it' },
-];
+const HANDS_TEXT: Record<HandsChoice, string> = {
+  device: "the device's (headset or emulator)",
+  synthetic: 'Hand Lab: synthetic (pose with keys)',
+  script: 'Hand Lab: every shape, in a loop',
+  replay: 'Hand Lab: a replayed recording',
+  webcam: 'Hand Lab: the webcam',
+};
 
 export interface DeveloperPanelHooks {
   /** The launcher's live log, shown in the panel. */
@@ -87,14 +91,21 @@ export function createDeveloperPanel(
     return b;
   };
 
-  const modeButtons = MODES.map(({ mode, label }) => {
-    const b = button(() => switchLaunch(mode, true));
+  const modeButton = (label: string, onClick: () => void) => {
+    const b = button(onClick);
     b.textContent = label;
     b.style.background = '#1c2d42';
     b.style.borderColor = '#388bfd';
     b.style.color = '#58a6ff';
     return b;
-  });
+  };
+  const hands = loadLaunch(true).hands;
+  const handsButton = modeButton(`Hands (press reloads): ${HANDS_TEXT[hands]}`, () =>
+    switchHands(HANDS_CHOICES[(HANDS_CHOICES.indexOf(hands) + 1) % HANDS_CHOICES.length], true),
+  );
+  const editorButton = modeButton('Room editor: arrange the bedroom and save it (at the desk, no VR)', () =>
+    switchLaunch('room-editor', true),
+  );
 
   const set = (next: TestingOptions) => {
     options = next;
@@ -147,9 +158,12 @@ export function createDeveloperPanel(
   copy.textContent = '📋 Copy logs';
 
   element.append(
-    heading('Modes'),
-    small('Opens in this tab, and stays there across reloads. The lab has a button back to the game.'),
-    ...modeButtons,
+    heading('Hands and modes'),
+    small(
+      "Kept in this tab across reloads. Mock hands play the game in its own session: press BEGIN (the emulator at a desk). The room editor's Close returns to the game.",
+    ),
+    handsButton,
+    editorButton,
     heading('Testing switches'),
     active,
     joints,

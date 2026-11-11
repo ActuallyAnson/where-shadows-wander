@@ -1,8 +1,6 @@
-// The Hand Lab: mock mode's control panel (src/app/launch-mode.ts). One page to try hand
-// sources (synthetic, scripted, replay, webcam), make shapes, read the
-// classifier's features, record, and look around the hands in 3D.
-import type { PerspectiveCamera, Scene } from '@iwsdk/core';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+// The Hand Lab: the panel for mock hands (ADR 0018, src/app/launch-mode.ts). The game runs in its normal session (the
+// emulator at a desk) and the lab only changes whose hands play: try hand sources (synthetic, scripted, replay, webcam), make
+// shapes, read the classifier's features and record. Everything in the room is the game's own, as on a headset.
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
@@ -13,12 +11,9 @@ import { SHAPE_HOW, SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-scr
 import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
-import { HandBones } from './hand-bones';
-import type { Quaternion } from '@iwsdk/core';
-import type { LanternLight } from '../engine/shadow/pure/lantern-light';
-import { LanternMarker } from './lantern-marker';
+import type { DeskFrame } from './desk-frame';
 import { downloadRecording, handCardHtml } from './hand-card';
-import { MOCK_WRIST, type HandSource } from './hand-source';
+import type { HandSource } from './hand-source';
 import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
 import { ScriptedSource } from './scripted-source';
@@ -32,26 +27,22 @@ const JITTER_M = 0.003;
 const SHAPE_KEYS: PresetName[] = ['relaxed', ...SHAPES];
 
 export interface LabView {
-  scene: Scene;
-  camera: PerspectiveCamera;
-  canvas: HTMLCanvasElement;
   /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
   settings?: { toggle(): void; isOpen(): boolean };
   /** The pause screen: the Menu button shows and hides it, and says whether it is showing. */
   menu?: { cycle(): void; label(): string };
   /** Told the kind of source in use whenever it changes, so the page can start with it again after a reload. */
   onSourceKind?(kind: MockSourceKind): void;
-  /** Leaves the lab for the game (the "Back to the game" button). */
+  /** Gives the hands back to the device (the "Device hands" button). */
   exit?(): void;
 }
 
 export class HandLab {
-  private readonly bones = new HandBones();
-  private readonly marker: LanternMarker;
   /** The latest gesture events, newest first (copied: the detector reuses its event objects). */
   private readonly gestureLog: string[] = [];
   private calibrationSaved = true;
-  private readonly orbit: OrbitControls;
+  /** Where the candle is, as the desk rig sees it (the G key aims a hand at it). */
+  private readonly deskLantern = [0, 0, 0];
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
   private recording: HandRecording | null = null;
@@ -63,50 +54,30 @@ export class HandLab {
   private recordStart = 0;
   private busy = false;
   private message = '';
-  /** Another desk tool (the room editor) has the view: the panel is hidden, and the orbit and keys are off. */
-  private suspended = false;
 
   constructor(
     private readonly mode: MockMode,
     private readonly hands: Record<Handedness, HandFrame>,
     private readonly shapes: ShapeRecognizer,
     private readonly gestures: GestureDetector,
-    /** The candle the game placed (read every frame: it moves when the rig is placed again or the candle is carried). */
+    /** The candle the game placed (read when used: it moves when the rig is placed again or the candle is carried). */
     private readonly lantern: Readonly<ArrayLike<number>>,
+    /** The sources pose hands for the desk rig; this maps the room back to it. */
+    private readonly desk: DeskFrame,
     private readonly view: LabView,
   ) {
-    view.scene.add(this.bones.mesh);
     loadCalibration(shapes);
-    this.marker = new LanternMarker([lantern[0], lantern[1], lantern[2]], gestures.config.coverRadiusM);
-    view.scene.add(this.marker.group);
-    this.orbit = new OrbitControls(view.camera, view.canvas);
-    const [lx, ly, lz] = MOCK_WRIST.left;
-    const [rx] = MOCK_WRIST.right;
-    // Between the hands and the candle, which sits nearer the player on the tray.
-    this.orbit.target.set((lx + rx) / 2, (ly + lantern[1]) / 2, (lz + lantern[2]) / 2);
-    // Above and to the side of the player, so curled fingers and the lantern are both in view.
-    view.camera.position.set(0.3, ly + 0.3, lantern[2] + 0.35);
-    this.orbit.update();
-    this.fitView();
-    window.addEventListener('resize', () => this.fitView());
-
     this.onSourceChanged();
     this.mount();
     setInterval(() => this.renderLive(), 100);
   }
 
-  /** The lantern marker's glow follows the flickering light. */
-  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
-    this.marker.setLight(light, cameraQuaternion);
-  }
-
-  /** Call once per frame, after the hands are filled. */
+  /**
+   * Call once per frame, right after the source has filled the hands and before they are moved into the room's rig, so a
+   * recording keeps the desk rig's space (the one every mock source replays in).
+   */
   frame(): void {
-    this.bones.update([this.hands.left, this.hands.right]);
-    const l = this.lantern;
-    this.marker.group.position.set(l[0], l[1], l[2]);
     const g = this.gestures;
-    this.marker.setProgress(Math.max(g.state.left.coverProgress, g.state.right.coverProgress));
     for (let i = 0; i < g.events.count; i++) {
       const e = g.events.at(i);
       const at = e.position.map((v) => v.toFixed(2)).join(', ');
@@ -118,29 +89,6 @@ export class HandLab {
     if (this.guided && !this.guided.frame(this.mode.time - this.guidedStart, this.hands.left, this.hands.right, null))
       this.finishGuided();
     else if (this.guided) this.lockToPrompt();
-  }
-
-  /**
-   * Hands the desk view to another tool (the room editor, src/debug/room-editor.ts) or takes it back: while suspended the
-   * panel is hidden, the orbit and the lab's keys are off, and the view is no longer shifted for the panel.
-   */
-  suspend(on: boolean): void {
-    this.suspended = on;
-    this.orbit.enabled = !on;
-    this.root.style.display = on ? 'none' : '';
-    this.fitView();
-  }
-
-  /** Keeps the hands centred in the part of the window the panel doesn't cover. */
-  private fitView(): void {
-    if (this.suspended) {
-      this.view.camera.clearViewOffset();
-      return;
-    }
-    const w = window.innerWidth,
-      h = window.innerHeight;
-    const narrow = w < 700;
-    this.view.camera.setViewOffset(w, h, narrow ? 0 : PANEL_W / 2, narrow ? h * 0.22 : 0, w, h);
   }
 
   /** Changes the hand source; the classifier starts fresh, since mock time restarts at 0. */
@@ -254,12 +202,10 @@ export class HandLab {
 
   private mount(): void {
     document.head.append(Object.assign(document.createElement('style'), { textContent: CSS }));
-    // The canvas is transparent (for passthrough); give the lab a dark backdrop so bones show up.
-    document.body.style.background = '#101217';
     this.root.className = 'lab';
     this.root.innerHTML = `
-      <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
-        </p><button type="button" data-act="exit" data-arg="">Back to the game</button></header>
+      <header><h1>Hand Lab</h1><p>Mock hands in the game's own session. Press BEGIN, and move the head with the
+        emulator's controls.</p><button type="button" data-act="exit" data-arg="">Device hands</button></header>
       <section id="lab-controls"></section>
       <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
@@ -459,7 +405,7 @@ export class HandLab {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (this.suspended || e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === 'Space') {
       if (this.guided) return e.preventDefault();
       this.mode.paused = !this.mode.paused;
@@ -476,8 +422,10 @@ export class HandLab {
     else if (k === 'l') this.selected = 'left';
     else if (k === 'j') s.jitter = s.jitter > 0 ? 0 : JITTER_M;
     else if (k === 'p') s.setPinch(sel, !s.pinching(sel));
-    else if (k === 'g') s.placeOver(sel, [this.lantern[0], this.lantern[1], this.lantern[2]]);
-    else if (k === 'b') s.home(sel);
+    else if (k === 'g') {
+      this.desk.toDesk(this.lantern, this.deskLantern);
+      s.placeOver(sel, [this.deskLantern[0], this.deskLantern[1], this.deskLantern[2]]);
+    } else if (k === 'b') s.home(sel);
     else if (k === 'q') s.turn(sel, -TURN_DEG, 0);
     else if (k === 'e') s.turn(sel, TURN_DEG, 0);
     else if (k === 'z') s.turn(sel, 0, TURN_DEG);
@@ -502,7 +450,7 @@ const CSS = `
 .lab {
   --ink: #ece6d8; --muted: #a8a294; --panel: #1b1e26; --line: #2e333f; --stage: #262a34;
   --accent: #f0a24a; --right: #f09a3e; --left: #5aa0d8;
-  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 10; overflow-y: auto;
+  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 10000; overflow-y: auto; /* over the title screen (9998) and launcher (9999) */
   box-sizing: border-box; padding: 14px; display: grid; gap: 12px; align-content: start;
   background: #14161c; color: var(--ink); border-left: 1px solid var(--line);
   font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;

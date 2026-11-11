@@ -253,7 +253,7 @@ export async function mountEnterArButtonIfNeeded(
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
 
-  // Developer: the other modes (Hand Lab, room editor), the testing switches and the launch log, in one panel. A debug
+  // Developer: whose hands play (the device's or the Hand Lab's), the room editor, the testing switches and the launch log, in one panel. A debug
   // tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
   let developerElement: HTMLElement | null = null;
   if (DEBUG_TOOLS) {

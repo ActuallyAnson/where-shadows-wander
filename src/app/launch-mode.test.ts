@@ -7,23 +7,34 @@ const memory = (initial: Record<string, string> = {}): LaunchStorage & { data: R
 };
 
 describe('launch mode', () => {
-  it('is the game when nothing is stored, the storage is missing or damaged', () => {
+  it('is the plain game when nothing is stored, the storage is missing or damaged', () => {
+    expect(DEFAULT_LAUNCH).toEqual({ mode: 'game', hands: 'device' });
     expect(loadLaunch(true, memory())).toEqual(DEFAULT_LAUNCH);
     expect(loadLaunch(true, null)).toEqual(DEFAULT_LAUNCH);
     expect(loadLaunch(true, memory({ [LAUNCH_KEY]: '{oops' }))).toEqual(DEFAULT_LAUNCH);
-    expect(loadLaunch(true, memory({ [LAUNCH_KEY]: '{"mode":"nope","source":"nope"}' }))).toEqual(DEFAULT_LAUNCH);
+    expect(loadLaunch(true, memory({ [LAUNCH_KEY]: '{"mode":"nope","hands":"nope"}' }))).toEqual(DEFAULT_LAUNCH);
   });
 
   it('round-trips a choice', () => {
     const s = memory();
-    expect(saveLaunch({ mode: 'room-editor', source: 'webcam' }, s)).toBe(true);
-    expect(loadLaunch(true, s)).toEqual({ mode: 'room-editor', source: 'webcam' });
+    expect(saveLaunch({ mode: 'game', hands: 'webcam' }, s)).toBe(true);
+    expect(loadLaunch(true, s)).toEqual({ mode: 'game', hands: 'webcam' });
+    saveLaunch({ mode: 'room-editor', hands: 'device' }, s);
+    expect(loadLaunch(true, s)).toEqual({ mode: 'room-editor', hands: 'device' });
   });
 
-  it('opens the room editor as the plain Hand Lab without the debug tools', () => {
+  it('opens a tab left in the old Hand Lab mode as the game with mock hands', () => {
+    expect(loadLaunch(true, memory({ [LAUNCH_KEY]: '{"mode":"lab","source":"script"}' }))).toEqual({
+      mode: 'game',
+      hands: 'script',
+    });
+    expect(loadLaunch(true, memory({ [LAUNCH_KEY]: '{"mode":"lab"}' }))).toEqual({ mode: 'game', hands: 'synthetic' });
+  });
+
+  it('is always the plain game without the debug tools', () => {
     const s = memory();
-    saveLaunch({ mode: 'room-editor', source: 'script' }, s);
-    expect(loadLaunch(false, s)).toEqual({ mode: 'lab', source: 'script' });
+    saveLaunch({ mode: 'room-editor', hands: 'script' }, s);
+    expect(loadLaunch(false, s)).toEqual(DEFAULT_LAUNCH);
   });
 
   it('reports a refused save', () => {
@@ -37,9 +48,8 @@ describe('launch mode', () => {
     expect(saveLaunch(DEFAULT_LAUNCH, null)).toBe(false);
   });
 
-  it('runs the lab and the room editor on mock hands', () => {
+  it('runs only the room editor at a desk', () => {
     expect(isDeskMode('game')).toBe(false);
-    expect(isDeskMode('lab')).toBe(true);
     expect(isDeskMode('room-editor')).toBe(true);
   });
 });

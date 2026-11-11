@@ -78,6 +78,7 @@ import { PromptPanel } from '../engine/xr/prompt-panel';
 import { clearFor } from '../engine/xr/session-mode';
 import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
+import { DeskFrame } from '../input-mock/desk-frame';
 import { HandLab } from '../input-mock/hand-lab';
 import { createMockSource, MockMode, mockOptionsFor } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
@@ -88,7 +89,7 @@ import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
 import { createUiSound } from './ui-sound';
-import { isDeskMode, loadLaunch, saveLaunch, switchLaunch } from './launch-mode';
+import { isDeskMode, loadLaunch, saveLaunch, switchHands, switchLaunch } from './launch-mode';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
@@ -96,10 +97,12 @@ import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 
-// What the page starts as (launch-mode.ts): the game, or the Hand Lab with mock hands (and in it the dev room editor).
+// What the page starts as (launch-mode.ts, ADR 0018): the game, always in a session (a headset, or the emulator at a desk),
+// played by the device's hands or by mock ones from the Hand Lab; or the dev room editor, the one desk mode, with no session.
 // The address is always the plain page; the choice is kept in the tab and changed from the page.
 const launch = loadLaunch(DEBUG_TOOLS);
-const mockOptions = isDeskMode(launch.mode) ? mockOptionsFor(launch.source) : null;
+const desk = isDeskMode(launch.mode);
+const mockHands = !desk && launch.hands !== 'device' ? launch.hands : null;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -117,8 +120,8 @@ const diagnostics = new Diagnostics();
 const failures = new FailureReporter((message) => diagnostics.error(message));
 // The "Copy report" panel is a debug tool: only in dev and tester builds (src/debug/debug-flag.ts).
 if (DEBUG_TOOLS) void import('../debug/report-panel').then((m) => m.mountReportPanel(diagnostics));
-// Mock mode runs on any browser, so it skips the "open this on a headset" notice.
-if (!mockOptions) void showNoXrNoticeIfNeeded(DEBUG_TOOLS);
+// The room editor runs on any browser, so it skips the "open this on a headset" notice.
+if (!desk) void showNoXrNoticeIfNeeded();
 
 // No top-level await here: IWSDK lazily imports a chunk that imports back from
 // this one, and a suspended top-level await deadlocks that in production builds.
@@ -131,11 +134,14 @@ async function start(): Promise<void> {
   // The game is a virtual room: iwsdk.config.json asks for immersive-vr (ADR 0005).
   const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
   // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
-  if (import.meta.env.DEV) {
-    const emulated = (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE;
-    if (emulated) emulated.primaryInputMode = 'hand';
-    // Its "Enter XR" bar repeats the launcher's Enter VR (and the desk modes never enter XR): hide it.
-    if (emulated) hideEmulatorOfferBar(document);
+  const emulatedDevice = import.meta.env.DEV
+    ? (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE
+    : undefined;
+  const emulated = !!emulatedDevice;
+  if (emulatedDevice) {
+    emulatedDevice.primaryInputMode = 'hand';
+    // Its "Enter XR" bar repeats the launcher's BEGIN (and the room editor never enters XR): hide it.
+    hideEmulatorOfferBar(document);
   }
   // The critical assets have loaded; from here IWSDK gives up on any one request after 8 s, not 30 s.
   shortenAssetTimeout();
@@ -145,7 +151,7 @@ async function start(): Promise<void> {
   let uiAudio: AudioEngine | null = null;
   const uiSound = createUiSound(() => uiAudio);
   const launcherHooks: LauncherHooks = {};
-  if (!mockOptions) void mountEnterArButtonIfNeeded(world, uiSound, launcherHooks);
+  if (!desk) void mountEnterArButtonIfNeeded(world, uiSound, launcherHooks);
   disableIwsdkRays(world);
 
   const hands = new XRHandReader();
@@ -156,10 +162,10 @@ async function start(): Promise<void> {
   // The session's visibility: the frame holds still on it and saves can listen to it.
   const visibility = new SessionVisibility();
   // The save (the settings), read once now and written only on events (headset off, page hidden), never per frame.
-  // The Hand Lab keeps its own save, so a development session never touches a real one.
+  // Mock hands and the room editor keep their own save, so a development session never touches a real one.
   const saves = new SaveManager({
     store: browserStore() ?? new MemoryStore(),
-    prefix: mockOptions ? 'wsw.save.mock' : 'wsw.save',
+    prefix: mockHands || desk ? 'wsw.save.mock' : 'wsw.save',
     onError: (message) => diagnostics.error(`save: ${message}`),
   });
   saves.load();
@@ -168,14 +174,14 @@ async function start(): Promise<void> {
 
   // Shape recognition on both hands every frame; the story will listen to its commits.
   const shapes = new ShapeRecognizer();
-  // Lantern gestures. In mock mode the cover-flame gesture aims at the candle on the tray (placeRig sets it); in XR it waits
-  // for the lantern flow.
+  // Lantern gestures. The cover-flame gesture waits for the lantern flow: the candle sits in the lap, where a resting fist
+  // would read as "pause" (covering the flame is read by CandleView instead).
   const gestures = new GestureDetector();
   gestures.setLantern(null);
   let clock = 0;
 
   // Hand shadows land on the stage: StageFrame, the virtual room's paper wall, 2 m ahead and 1.6 x 1.0 m (ADR 0005). The
-  // Hand Lab uses the same wall as a headset; only where the hands and the head come from differs.
+  // room editor uses the same wall as a headset; only where the head comes from differs.
   // Capture mode (five taps on the title's emblem, or the Testing panel): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
   // before the session starts, so it is set here; the foveation is set when the session starts.
   const capture = captureOptions(loadCaptureChoice());
@@ -454,6 +460,8 @@ async function start(): Promise<void> {
     world.camera.getWorldDirection(settingsLook);
     return menu.show(id, [settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z, line);
   };
+  /** Where mock hands go: the rig placeRig last placed (only with the Hand Lab's hands). */
+  let deskFrame: DeskFrame | null = null;
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
@@ -519,9 +527,7 @@ async function start(): Promise<void> {
       0, 0, 0, 1,
     );
     wallPauseView.group.matrixWorldNeedsUpdate = true;
-    // Cover-flame aims at the candle on the tray in mock mode only. In XR it waits for the lantern flow: the candle sits
-    // in the lap, where a resting fist would read as "pause".
-    if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
+    deskFrame?.set(head, yaw); // mock hands follow the rig
     rigPlaced = true;
     everPlaced = true;
     return true;
@@ -532,23 +538,24 @@ async function start(): Promise<void> {
   const headRot = new Quaternion();
   const headScale = new Vector3();
   let resetWatched: XRReferenceSpace | null = null;
-  // In mock mode the player's eyes are the desktop camera; in XR initialize with a default seated rig so the scene is immediately visible.
-  if (mockOptions) placeRig(MOCK_HEAD, 0);
+  // At the desk (the room editor) the player's eyes are the desktop camera; in XR initialize with a default seated rig so the
+  // scene is immediately visible, until the head pose places it.
+  if (desk) placeRig(MOCK_HEAD, 0);
   else placeRig([0, 1.2, 0], 0);
-  // Mock mode (the Hand Lab): a HandSource fills the same HandFrames instead of WebXR.
+  // Mock hands (the Hand Lab, debug builds only): a HandSource fills the same HandFrames in the session in
+  // place of the device's, posed for the desk rig and moved into the wearer's (desk-frame.ts).
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
-  if (mockOptions) {
-    const source = await createMockSource(mockOptions).catch((e) => {
-      diagnostics.error(`mock source "${mockOptions.source}" failed, using synthetic hands: ${String(e)}`);
+  if (DEBUG_TOOLS && mockHands) {
+    const source = await createMockSource(mockOptionsFor(mockHands)).catch((e) => {
+      diagnostics.error(`mock source "${mockHands}" failed, using synthetic hands: ${String(e)}`);
       return new SyntheticSource();
     });
     mock = new MockMode(source);
+    deskFrame = new DeskFrame();
+    deskFrame.set(lastHead, lastYaw);
     // The lab's lantern is the candle on the tray: `lantern` is where placeRig (and picking the candle up) put it.
-    lab = new HandLab(mock, hands.hands, shapes, gestures, lantern, {
-      scene: world.scene,
-      camera: world.camera,
-      canvas: world.renderer.domElement,
+    lab = new HandLab(mock, hands.hands, shapes, gestures, lantern, deskFrame, {
       settings: {
         toggle: () => (settingsPanel.isOpen ? settingsPanel.close() : void openSettings()),
         isOpen: () => settingsPanel.isOpen,
@@ -557,14 +564,14 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
-      // The lab remembers its source for the next reload, and leaves for the game's title screen.
-      onSourceKind: (kind) => saveLaunch({ ...loadLaunch(DEBUG_TOOLS), source: kind }),
-      exit: () => switchLaunch('game', DEBUG_TOOLS),
+      // The lab remembers its source for the next reload, and gives the hands back to the device.
+      onSourceKind: (kind) => saveLaunch({ ...loadLaunch(DEBUG_TOOLS), hands: kind }),
+      exit: () => switchHands('device', DEBUG_TOOLS),
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
-  // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
-  // mock mode; over passthrough the real hands are visible, so it hides itself.
+  // The hands as the player sees them in the room (swap this one line for another look). Shown in VR (whoever's hands they
+  // are); over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
   let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
   world.scene.add(handVisual.object);
@@ -594,9 +601,8 @@ async function start(): Promise<void> {
   // The room editor (src/debug/room-editor.ts), chosen in the Developer panel: arranges the bedroom's static pieces in the
   // Hand Lab and saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
   let roomEditor: import('../debug/room-editor').RoomEditor | null = null;
-  if (DEBUG_TOOLS && lab && launch.mode === 'room-editor') {
+  if (DEBUG_TOOLS && launch.mode === 'room-editor') {
     const { RoomEditor } = await import('../debug/room-editor');
-    const desk = lab;
     roomEditor = new RoomEditor({
       camera: world.camera,
       canvas: world.renderer.domElement,
@@ -615,11 +621,9 @@ async function start(): Promise<void> {
       fileName: BEDROOM_LAYOUT_FILE,
       assetFiles,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
+      // Closing the editor leaves for the game (its desk has nothing else on it).
       suspendDesk: (on) => {
-        desk.suspend(on);
-        if (mock) mock.paused = on;
-        // Closing the editor leaves the plain Hand Lab, and a reload keeps it there.
-        if (!on) saveLaunch({ ...loadLaunch(DEBUG_TOOLS), mode: 'lab' });
+        if (!on) switchLaunch('game', DEBUG_TOOLS);
       },
     });
     // The candle stands on the tray: when the tray moves, the rig is placed again so the candle (the light) follows it.
@@ -718,7 +722,9 @@ async function start(): Promise<void> {
     guard('sessionstart: quality', () => {
       governor.reset();
       governor.setRefreshRate((session as { frameRate?: number } | null)?.frameRate ?? 72);
-      governorOn = !mock && !!session;
+      // Not under the emulator: a desktop's display rate (60 Hz, under the headset's 72) would trip it for no reason, and the
+      // desk would then show less of the room than a headset does.
+      governorOn = !!session && !emulated;
       applyGovernor();
     });
     if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
@@ -734,8 +740,7 @@ async function start(): Promise<void> {
       });
       guard('sessionstart: diagnostics', () => diagnostics.sessionStarted(session, world.renderer));
     }
-    // Mock hands don't come from the session, so in mock mode capabilities stay at "no session".
-    if (session && !mock) {
+    if (session) {
       guard('sessionstart: capabilities', () => capabilities.sessionStarted(session));
       guard('sessionstart: hands status', () => handsStatus.start());
     }
@@ -752,12 +757,10 @@ async function start(): Promise<void> {
       world.renderer.setClearColor(0x000000, 0);
       passthrough = false;
     });
-    if (!mock) {
-      guard('sessionend: wall', () => {
-        rigCalibratedFromHead = false;
-        placeRig([0, 1.2, 0], 0);
-      });
-    }
+    guard('sessionend: wall', () => {
+      rigCalibratedFromHead = false;
+      placeRig([0, 1.2, 0], 0);
+    });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
@@ -774,13 +777,12 @@ async function start(): Promise<void> {
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
     guard('sessionend: hands status', () => handsStatus.stop());
     // Hands are only read inside a session, so without this they would keep their last pose on the 2D page.
-    if (!mock)
-      guard('sessionend: hands', () => {
-        for (const h of handList) {
-          h.tracked = false;
-          h.validJoints = 0;
-        }
-      });
+    guard('sessionend: hands', () => {
+      for (const h of handList) {
+        h.tracked = false;
+        h.validJoints = 0;
+      }
+    });
     guard('sessionend: visibility', () => visibility.detach());
     guard('sessionend: saves', () => saves.flush()); // leaving VR does not hide the page, so no page event would save it
     guard('sessionend: hands panel', () => handsPanel?.hide());
@@ -834,7 +836,7 @@ async function start(): Promise<void> {
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
   // Capture mode keeps this message out of a recording: it would show whenever tracking drops mid-take.
-  const handsPanel = mock || capture.enabled ? null : new PromptPanel();
+  const handsPanel = capture.enabled ? null : new PromptPanel();
   if (handsPanel) world.player.add(handsPanel.mesh);
   let handsPanelVersion = handsStatus.version;
 
@@ -882,7 +884,8 @@ async function start(): Promise<void> {
       diagnostics.mark('firstFrame');
       const frame = this.world.xrFrame;
       const refSpace = this.world.xrReferenceSpace;
-      if (!frame && !mock) {
+      // Only the room editor draws with no session.
+      if (!frame && !desk) {
         timings.end(SLOT.total);
         timings.endFrame();
         return;
@@ -901,15 +904,28 @@ async function start(): Promise<void> {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
         debug.replay.fill(step, hands.hands.left, hands.hands.right);
         handsStatus.update(step, true, 1);
-      } else if (mock) mock.update(delta, hands.hands.left, hands.hands.right);
-      else if (frame && refSpace && !paused) {
+      } else if (mock && frame) {
+        // The Hand Lab's hands, in the session in place of the device's: the lab records them as posed (the desk rig's space),
+        // then they move into the wearer's rig. The hands cue sees them like any tracked hands.
+        if (!paused) {
+          mock.update(delta, hands.hands.left, hands.hands.right);
+          try {
+            lab?.frame();
+          } catch (e) {
+            failures.report('hand lab', e);
+          }
+          deskFrame?.toRig(hands.hands.left);
+          deskFrame?.toRig(hands.hands.right);
+          handsStatus.update(step, hands.hands.left.tracked || hands.hands.right.tracked, 1);
+        }
+      } else if (frame && refSpace && !paused) {
         hands.update(frame, refSpace, this.world.player.matrixWorld);
         capabilities.update(frame, refSpace, hands.hands, this.world.player.matrixWorld.elements, performance.now());
         handsStatus.update(step, hands.hands.left.tracked || hands.hands.right.tracked, hands.handSources);
       }
       if (frame && refSpace) hideIwsdkHandMeshes(this.world);
       timings.end(SLOT.read);
-      // Mock time in mock mode, so pausing the Hand Lab freezes holds too.
+      // Mock time with mock hands, so pausing the Hand Lab freezes holds too.
       if (!paused) clock += step;
       const handsT = mock ? mock.time : clock;
       if (!paused) {
@@ -940,12 +956,12 @@ async function start(): Promise<void> {
           }
         }
       }
-      if (!mock && frame && refSpace && refSpace !== resetWatched) {
+      if (frame && refSpace && refSpace !== resetWatched) {
         // Recentring moves the player's frame: recalibrate the rig from the new head pose.
         refSpace.addEventListener('reset', () => (rigCalibratedFromHead = false));
         resetWatched = refSpace;
       }
-      if (!rigCalibratedFromHead && !mock && frame && refSpace) {
+      if (!rigCalibratedFromHead && frame && refSpace) {
         const pose = frame.getViewerPose(refSpace);
         if (pose) {
           headMatrix.fromArray(pose.transform.matrix).premultiply(this.world.player.matrixWorld);
@@ -992,9 +1008,8 @@ async function start(): Promise<void> {
             handTouchingWick = true;
           }
           if (!handTouchingWick && frame && controllerPressed(frame)) handTouchingWick = true;
-          if (!handTouchingWick && mock) {
-            handTouchingWick = true;
-          }
+          // The room editor has no hands: its room is lit, as the editor needs to see it.
+          if (!handTouchingWick && desk) handTouchingWick = true;
 
           if (handTouchingWick) {
             ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
@@ -1052,6 +1067,8 @@ async function start(): Promise<void> {
           }
           shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
+          // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
+          if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;
           handTrail.update(
             paused ? 0 : step,
             stage,
@@ -1152,7 +1169,6 @@ async function start(): Promise<void> {
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
         candleView.update(lanternLight.light, cameraQuat);
-        lab?.applyLight(lanternLight.light, cameraQuat);
       } catch (e) {
         failures.report('lighting', e);
       }
@@ -1194,13 +1210,6 @@ async function start(): Promise<void> {
       } catch (e) {
         failures.report('hands drawing', e);
       }
-      timings.begin(SLOT.lab);
-      try {
-        lab?.frame();
-      } catch (e) {
-        failures.report('hand lab', e);
-      }
-      timings.end(SLOT.lab);
       timings.end(SLOT.total);
       timings.endFrame();
       diagnostics.frame(frame, refSpace, hands.hands, performance.now() - t0);

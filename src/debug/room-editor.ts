@@ -1,6 +1,6 @@
 // The room editor: arrange the bedroom's static pieces in the running game and save them to the room layout file
-// (content/rooms/bedroom.json, src/engine/stage/room-layout.ts). Development and tester builds only; it opens in the Hand Lab
-// from the launcher's Developer panel (src/app/launch-mode.ts), and main.ts loads it with a dynamic import behind DEBUG_TOOLS.
+// (content/rooms/bedroom.json, src/engine/stage/room-layout.ts). Development and tester builds only; it is the one desk mode
+// (no VR session, ADR 0018), opened from the launcher's Developer panel (src/app/launch-mode.ts), and main.ts loads it with a dynamic import behind DEBUG_TOOLS.
 //
 // Click a piece to select it (or pick it from the list), then drag the gizmo or type exact numbers. The numbers are the
 // piece's placement as the file stores it: position in metres, rotation in degrees and scale, in the piece's own space
@@ -73,7 +73,7 @@ export interface RoomEditorDeps {
   fileName: string;
   /** Scene roots that are part of the room, still shown with "Room only" on (everything else at the top of the scene is hidden). */
   roomRoots: readonly Object3D[];
-  /** Takes the desk view from the Hand Lab (true) or gives it back (false). */
+  /** Told when the editor takes the desk view (true) and when it closes (false: main.ts returns to the game). */
   suspendDesk(on: boolean): void;
 }
 
@@ -287,7 +287,7 @@ export class RoomEditor {
     this.mount();
   }
 
-  /** Opens the editor: it takes the desk view, and the Hand Lab's panel, orbit and keys stand aside. */
+  /** Opens the editor: it takes the desk view. */
   show(): void {
     if (this.open) return;
     this.open = true;
@@ -319,7 +319,7 @@ export class RoomEditor {
     this.render();
   }
 
-  /** Closes the editor and gives the desk view back to the Hand Lab. Unsaved changes stay in the room until reload. */
+  /** Closes the editor (main.ts then leaves for the game). Unsaved changes stay in the room until reload. */
   hide(): void {
     if (!this.open) return;
     this.open = false;

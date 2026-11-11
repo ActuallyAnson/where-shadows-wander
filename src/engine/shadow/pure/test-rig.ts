@@ -1,10 +1,11 @@
-// The player's rig helpers: the Hand Lab's head, a first lantern placement, and the yaw of a head pose. The stage itself is
-// StageFrame (src/engine/stage), in a headset and in the Hand Lab alike. Plain TypeScript.
+// The player's rig helpers: the desk rig's head (the room editor, and the space mock hands are posed in), a first lantern
+// placement, and the yaw of a head pose. The stage itself is StageFrame (src/engine/stage), in a headset and at the desk alike.
+// Plain TypeScript.
 import type { Vec3 } from '../../hands/hand';
 
 type V3 = Readonly<ArrayLike<number>>;
 
-/** The desktop camera in mock mode (iwsdk.config.json). */
+/** The desk rig's eyes: the room editor's head, and the space every mock hand source poses its hands in (desk-frame.ts). */
 export const MOCK_HEAD: Readonly<Vec3> = [0, 1, 0.5];
 /** How far the table top is below a seated player's eyes. */
 const TABLE_BELOW_EYES_M = 0.45;

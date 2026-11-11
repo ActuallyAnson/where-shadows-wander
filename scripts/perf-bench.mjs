@@ -1,4 +1,4 @@
-// A repeatable performance benchmark of the running game, for before-and-after numbers. It opens the Hand Lab in headless Chromium
+// A repeatable performance benchmark of the running game, for before-and-after numbers. It plays the game in the emulator's session in headless Chromium
 // (a software renderer, so the milliseconds are a proxy that rises and falls with the real cost, not a headset's numbers), puts the
 // game in its states (the lit room, then with the decoration shed) and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
 // triangles and textures, the texture memory, and the JavaScript the frame allocates. It also records the start-up time and the heap.
@@ -6,9 +6,10 @@
 //   npm run dev                                   (in another terminal, then:)
 //   node scripts/perf-bench.mjs [url] [--label name] [--out file.json] [--runs 3]
 //
-// The default address is https://localhost:5173/ (the Vite dev server); it opens in the Hand Lab. Compare two runs with `--out`.
+// The default address is https://localhost:5173/ (the Vite dev server). Compare two runs with `--out`. Runs from before ADR 0018
+// (11 Nov 2026) drew the desk view of the old Hand Lab, not a session's, so compare only runs made since.
 import { chromium } from 'playwright';
-import { launchIn } from './lib/launch.mjs';
+import { enterVr, launchIn, lightCandle } from './lib/launch.mjs';
 import { writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -36,23 +37,16 @@ async function once() {
       for (const e of list.getEntries()) window.__longTasks.push(e.duration);
     }).observe({ entryTypes: ['longtask'] });
   });
-  await launchIn(page, { mode: 'lab' });
+  await launchIn(page);
   const t0 = Date.now();
   await page.goto(url);
   await page.waitForFunction(() => window.__wsw);
   const startupMs = Date.now() - t0;
-  // The same 26 s as earlier runs, so the stall counts compare: the candle lights itself after 3 s in the Hand Lab.
-  await page.waitForTimeout(26000);
-  await page.evaluate(() => {
-    const c = window.__wsw.world.camera;
-    c.fov = 85;
-    c.updateProjectionMatrix();
-    window.__pin = () => {
-      c.position.set(0, 1.3, 0.3);
-      c.lookAt(0, 1.2, -2);
-    };
-    window.__pin();
-  });
+  // Into the session, the candle lit (as a player would after 3 s), then 26 s in all, so the stall counts compare between runs.
+  await enterVr(page);
+  await page.waitForTimeout(3000);
+  await lightCandle(page);
+  await page.waitForTimeout(23000);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
   const heapMb = await page.evaluate(() => performance.memory.usedJSHeapSize / 1048576);

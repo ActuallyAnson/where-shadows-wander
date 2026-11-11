@@ -156,7 +156,7 @@ We don't have a Quest yet; we have a Pico. Details are in [ADR 0003](adr/0003-pi
 - **Build to the WebXR standard, not to one headset.** Every XR feature is optional and feature-detected.
 - **Testing order:** IWER emulator for logic, the webcam hand bench for hand shapes, Pico for real-device behaviour, Quest for final confirmation.
 - **Hand data on the Pico:** works in Wolvic Chromium 1.4 (a sideloaded build, not the Pico Store's Wolvic), in a VR session that asks only for `local-floor`, `bounded-floor` and `hand-tracking`. PicoBrowser 3.3 (Chrome 105) and the Pico Store's Wolvic (Gecko) give no joints. Meta documents WebXR hand input as supported in Quest Browser; still to confirm on a Quest.
-- **Hand data without a headset:** the Hand Lab (opened from the game page) and the webcam hand bench (`webcam.html`) track hands from a laptop camera and convert them to the same 25-joint data the game reads. Headset sessions and the bench can both save hand recordings for replay in tests. See [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
+- **Hand data without a headset:** the Hand Lab (mock hands for the game's own session, in development builds) and the webcam hand bench (`webcam.html`) track hands from a laptop camera and convert them to the same 25-joint data the game reads. Headset sessions and the bench can both save hand recordings for replay in tests. See [ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md).
 
 ### Stack
 

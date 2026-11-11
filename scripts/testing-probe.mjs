@@ -4,9 +4,10 @@
 //   node scripts/testing-probe.mjs https://localhost:8097 [screenshot.png]
 // It opens the plain game (the dev server's emulator gives the page navigator.xr, so the launcher shows), presses the
 // testing switches and checks that each takes effect at once (nothing reloads, the address stays plain), is remembered
-// across a reload, and that the settings panel and the recording begin when a VR session starts. Then it opens the Hand
-// Lab and the room editor from the panel and comes back to the game, the address plain all the while.
+// across a reload, and that the settings panel and the recording begin when a VR session starts. Then it gives the game the
+// Hand Lab's mock hands (in a session), gives them back, and opens the room editor, the address plain all the while.
 import { chromium } from 'playwright';
+import { enterVr } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const shot = process.argv[3];
@@ -115,20 +116,34 @@ check(
   JSON.stringify(cleared),
 );
 
-// The modes: the Hand Lab and the room editor open from the panel, and the lab leads back to the game; the address stays plain.
+// Hands and modes (ADR 0018): the Hands button gives the game the Hand Lab's mock hands, in the game itself (its launcher and
+// BEGIN are there) and in a real session; Device hands gives them back. The room editor opens from the panel too. The address
+// stays plain throughout.
 const plain = () => new URL(page.url()).search === '' && new URL(page.url()).hash === '';
 if (await panel.isHidden()) await page.getByRole('button', { name: /Developer/ }).click();
-await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Hand Lab/ }).click()]);
+await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Hands/ }).click()]);
 await page.waitForFunction(() => window.__wsw?.lab, null, { timeout: 90000 });
-check('Hand Lab opens in the lab, with a plain address', plain(), page.url());
-check('the lab has no launcher', (await page.locator('#xr-launcher-ui').count()) === 0);
+check('Hands gives the game mock hands, with a plain address', plain(), page.url());
+check('the game keeps its launcher with mock hands', (await page.locator('#xr-launcher-ui').count()) === 1);
 await page.reload();
 await page.waitForFunction(() => window.__wsw?.lab, null, { timeout: 90000 });
-check('a reload stays in the lab', true);
-await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Back to the game' }).click()]);
+check('a reload keeps the mock hands', true);
+await enterVr(page);
+await page.waitForFunction(() => window.__wsw.hands.hands.right.tracked, null, { timeout: 30000 });
+const inSession = await page.evaluate(() => ({
+  bg: window.__wsw.world.scene.background?.getHexString() ?? null,
+  alpha: window.__wsw.world.renderer.getClearAlpha(),
+}));
+check(
+  'mock hands play in a real session, with the room backdrop a headset has',
+  inSession.bg === '14161c' && inSession.alpha === 1,
+  JSON.stringify(inSession),
+);
+await page.evaluate(() => window.__wsw.world.renderer.xr.getSession()?.end());
+await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Device hands' }).click()]);
 await page.waitForSelector('#xr-launcher-ui', { timeout: 90000 });
 await page.waitForFunction(() => window.__wsw, null, { timeout: 90000 });
-check('Back to the game opens the game', (await page.evaluate(() => window.__wsw.lab)) === null && plain());
+check('Device hands gives the hands back', (await page.evaluate(() => window.__wsw.lab)) === null && plain());
 await page.getByRole('button', { name: /Developer/ }).click();
 await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Room editor/ }).click()]);
 await page.waitForFunction(() => window.__wsw?.roomEditor, null, { timeout: 90000 });
