@@ -3,8 +3,8 @@
 // Usage: start a dev server (npx vite --port 8097 --strictPort) then
 //   node scripts/saves-probe.mjs https://localhost:8097
 // In headless Chromium it checks that:
-//   a save made in one page load is there in the next (a creature, a solution, progress);
-//   it is written when the page is hidden, and when a puzzle ends, but not while nothing changed;
+//   a save made in one page load is there in the next (a setting);
+//   it is written when the page is hidden or flushed, but not while nothing changed;
 //   a damaged slot is recovered from the other and kept under wsw.save.mock.corrupt.* (the Hand Lab, ?mock=1, keeps its own save under wsw.save.mock.*);
 //   with localStorage blocked (as in some private modes) the game still starts and the save works in memory;
 //   with writes failing (a full disk) the game carries on and saves again when they work.
@@ -48,9 +48,7 @@ const keys = (page) =>
   );
   await page.evaluate(() => {
     const s = window.__wsw.saves;
-    s.discoverCreature('rabbit');
-    s.recordSolution('c1-p2', 'cup');
-    s.setProgress(1, 3);
+    s.setSettings({ ...s.data.settings, volumeMaster: 0.4, captions: true });
   });
   const none = await page.evaluate(() => Object.keys(localStorage).filter((k) => k === 'wsw.save.mock.b').length);
   check('changes alone do not write (no per-change writes)', none === 0, `slot b present: ${none}`);
@@ -63,14 +61,14 @@ const keys = (page) =>
   const second = await open(context);
   const loaded = await second.page.evaluate(() => {
     const s = window.__wsw.saves;
-    return { rabbit: s.hasCreature('rabbit'), solutions: s.solutionsFound('c1-p2'), puzzle: s.data.progress.puzzle };
+    return { volume: s.data.settings.volumeMaster, captions: s.data.settings.captions, day: s.data.lastPlayedDay };
   });
   check(
     'the next load has it all',
-    loaded.rabbit && loaded.solutions.join() === 'cup' && loaded.puzzle === 3,
+    loaded.volume === 0.4 && loaded.captions === true && /^\d{4}-\d\d-\d\d$/.test(loaded.day),
     JSON.stringify(loaded),
   );
-  // 2. puzzleEnded writes at once, and an idle flush writes nothing.
+  // 2. An idle flush writes nothing; a change then a flush writes once.
   const sets = await second.page.evaluate(() => {
     const s = window.__wsw.saves;
     const spy = { n: 0 };
@@ -81,13 +79,14 @@ const keys = (page) =>
     };
     s.flush();
     const idle = spy.n;
-    s.puzzleEnded('c1-p3', { solved: true, solutionId: 'wall', next: { chapter: 1, puzzle: 4 } });
+    s.setSettings({ ...s.data.settings, volumeMaster: 0.5 });
+    s.flush();
     const ended = spy.n;
     Storage.prototype.setItem = real;
     return { idle, ended };
   });
   check(
-    'an idle flush writes nothing; a puzzle ending writes at once',
+    'an idle flush writes nothing; a change writes once when flushed',
     sets.idle === 0 && sets.ended === 1,
     JSON.stringify(sets),
   );
@@ -102,12 +101,12 @@ const keys = (page) =>
   const third = await open(context);
   const rec = await third.page.evaluate(() => ({
     status: { ...window.__wsw.saves.status },
-    rabbit: window.__wsw.saves.hasCreature('rabbit'),
+    volume: window.__wsw.saves.data.settings.volumeMaster,
     kept: Object.keys(localStorage).filter((k) => k.startsWith('wsw.save.mock.corrupt')),
   }));
   check(
     'a damaged newest slot loads from the other and is kept',
-    rec.status.recovered === 'other-slot' && rec.rabbit && rec.kept.length === 1,
+    rec.status.recovered === 'other-slot' && rec.volume === 0.4 && rec.kept.length === 1,
     JSON.stringify(rec),
   );
   check('no page errors', errors.length === 0 && third.errors.length === 0, [...errors, ...third.errors].join(' | '));
@@ -126,13 +125,13 @@ const keys = (page) =>
   });
   const r = await page.evaluate(() => {
     const s = window.__wsw.saves;
-    s.discoverCreature('fox');
+    s.setSettings({ ...s.data.settings, volumeMaster: 0.3 });
     const wrote = s.flush();
-    return { wrote, status: { ...s.status }, fox: s.hasCreature('fox') };
+    return { wrote, status: { ...s.status }, kept: s.data.settings.volumeMaster === 0.3 };
   });
   check(
     'with storage blocked the game starts and the save works in memory',
-    r.fox && r.wrote === true && r.status.persistent === false,
+    r.kept && r.wrote === true && r.status.persistent === false,
     JSON.stringify(r),
   );
   check('no page errors with storage blocked', errors.length === 0, errors.join(' | '));
@@ -151,12 +150,12 @@ const keys = (page) =>
         throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
       return real.apply(this, arguments);
     };
-    s.discoverCreature('fox');
+    s.setSettings({ ...s.data.settings, volumeMaster: 0.3 });
     const failedWrite = s.flush();
     const whileFailing = { ...s.status };
     Storage.prototype.setItem = real;
     const recovered = s.flush();
-    return { failedWrite, whileFailing, recovered, now: { ...s.status }, fox: s.hasCreature('fox') };
+    return { failedWrite, whileFailing, recovered, now: { ...s.status }, kept: s.data.settings.volumeMaster === 0.3 };
   });
   check(
     'a full disk does not stop the game, and the next flush saves',
@@ -164,7 +163,7 @@ const keys = (page) =>
       r.whileFailing.persistent === false &&
       r.recovered === true &&
       r.now.persistent === true &&
-      r.fox,
+      r.kept,
     JSON.stringify(r),
   );
   check('no page errors with a full disk', errors.length === 0, errors.join(' | '));

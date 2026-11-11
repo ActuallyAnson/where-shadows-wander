@@ -7,7 +7,7 @@
 //   the flame crackles from the moment audio unlocks (it was lit while locked);
 //   a sound placed left of the listener is louder in the left ear (and the same on the right);
 //   muting the effects bus silences effects, and the ambience bus still plays the flame's crackle;
-//   a shape event (candidate, commit) makes a sound, and the chime plays on puzzleSolved;
+//   a shape event (candidate, commit) makes a sound, and lighting the candle a whoosh;
 //   pausing suspends the context and resuming runs it again;
 //   the per-frame update costs well under 0.5 ms.
 import { chromium } from 'playwright';
@@ -161,10 +161,14 @@ const played = await page.evaluate(() => {
   w.shapes.events.push('commit', 'right', 'flat', 1, 0, 0.4);
   w.gameAudio.onShapeEvents(w.shapes.events, w.projector.shadows, w.stage);
   const afterCommit = a.stats.played - n;
-  w.gameAudio.puzzleSolved(w.stage);
+  w.gameAudio.candleIgnited(w.candleView.flamePosition);
   return [afterCandidate, afterCommit, a.stats.played - n];
 });
-check('candidate makes a rustle, commit a thump, a solved puzzle a chime', played.join() === '1,2,3', played.join());
+check(
+  'candidate makes a rustle, commit a thump, lighting the candle a whoosh',
+  played.join() === '1,2,3',
+  played.join(),
+);
 
 // Pause: setPaused suspends the context, and clearing it resumes it. (The game calls it from the session's
 // visibility and the page's, not from the frame loop.)

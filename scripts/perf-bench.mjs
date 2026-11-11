@@ -1,6 +1,6 @@
 // A repeatable performance benchmark of the running game, for before-and-after numbers. It opens the Hand Lab in headless Chromium
 // (a software renderer, so the milliseconds are a proxy that rises and falls with the real cost, not a headset's numbers), puts the
-// game in four states and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
+// game in its states (the lit room, then with the decoration shed) and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
 // triangles and textures, the texture memory, and the JavaScript the frame allocates. It also records the start-up time and the heap.
 //
 //   npm run dev                                   (in another terminal, then:)
@@ -39,9 +39,9 @@ async function once() {
   await page.goto(url);
   await page.waitForFunction(() => window.__wsw);
   const startupMs = Date.now() - t0;
-  await page.waitForTimeout(26000); // the opening is over and the night has started
+  // The same 26 s as earlier runs, so the stall counts compare: the candle lights itself after 3 s in the Hand Lab.
+  await page.waitForTimeout(26000);
   await page.evaluate(() => {
-    window.__wsw.storyLine.clear();
     const c = window.__wsw.world.camera;
     c.fov = 85;
     c.updateProjectionMatrix();
@@ -148,22 +148,6 @@ async function once() {
     await page.evaluate(() => (window.__wsw.governor.level = 0));
     await page.waitForTimeout(500);
   }
-  await page.evaluate(() => {
-    window.__wsw.roomDressing.setAwake(3);
-    window.__wsw.wakeSleeper(1);
-    window.__wsw.rewards.play('light', 0, 0);
-  });
-  await page.waitForTimeout(600);
-  states.push(await measure('room + spark + reward'));
-  await page.getByText('Prologue').click();
-  await page.waitForTimeout(5500);
-  await page.evaluate(() => window.__pin());
-  states.push(await measure('opening reel'));
-  await page.evaluate(() => window.__wsw.prologue.skip());
-  await page.waitForTimeout(3000);
-  await page.getByText('Ending').click();
-  await page.waitForTimeout(5000);
-  states.push(await measure('finale hall'));
   await browser.close();
   return { startupMs, heapMb, calibMs, stalls, states };
 }
