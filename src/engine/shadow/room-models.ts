@@ -9,9 +9,10 @@
 //
 // Where each piece stands comes from the room layout file (content/rooms/bedroom.json, src/engine/stage/room-layout.ts) under
 // the piece's `id`; `at` and `yaw` below are the defaults when the file has no entry. The layout's scale multiplies the fitted size.
-import { AssetManager, Box3, DoubleSide, Group, Mesh, MeshBasicMaterial, Vector3 } from '@iwsdk/core';
-import type { Material, Object3D, Texture } from '@iwsdk/core';
+import { AssetManager, Box3, Group, Vector3 } from '@iwsdk/core';
+import type { Material, Object3D } from '@iwsdk/core';
 import type { CandleLight } from './candle-light';
+import { toRoomLook } from './room-look';
 import { placement, placementOr, type Placement, type RoomLayout } from '../stage/room-layout';
 import { applyPlacement, type EditablePiece, type EditableSource } from './room-placement';
 
@@ -140,27 +141,7 @@ export class RoomModels implements EditableSource {
 
   private add(model: Object3D, piece: RoomPiece, candle: CandleLight): void {
     // The room's look: each surface its own colour and texture, lit by the room's one light.
-    model.traverse((o) => {
-      if (!(o instanceof Mesh)) return;
-      const source = (Array.isArray(o.material) ? o.material : [o.material]) as (Material & {
-        color?: { getHex(): number };
-        map?: Texture | null;
-      })[];
-      const made = source.map((m) => {
-        const basic = new MeshBasicMaterial({
-          color: m.color ? m.color.getHex() : 0xffffff,
-          map: m.map ?? null,
-          vertexColors: o.geometry.hasAttribute('color'),
-          side: DoubleSide,
-          toneMapped: false,
-        });
-        candle.light(basic);
-        this.materials.push(basic);
-        return basic;
-      });
-      o.material = made.length === 1 ? made[0] : made;
-      candle.cast(o);
-    });
+    toRoomLook(model, candle, this.materials);
 
     // Fit it to its footprint (in its own axes), scaled evenly to fill it, its base on the floor. The holder then takes the
     // layout's placement (by default at `at`, turned by `yaw`).
