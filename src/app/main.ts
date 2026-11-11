@@ -267,7 +267,7 @@ async function start(): Promise<void> {
    * and the candle can be made out. Once the candle catches it eases back to the night level over MOON_SETTLE_S, under the
    * candle's own light spreading out.
    */
-  const START_MOON_LIFT = 4;
+  const START_MOON_LIFT = 2;
   const MOON_SETTLE_S = 3;
   let moonLift = START_MOON_LIFT;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
@@ -1158,6 +1158,8 @@ async function start(): Promise<void> {
         world.camera.getWorldPosition(settingsHead);
         stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
+        // Waiting to be lit, the candle holds a small, bright pool of light round itself, to draw the eye to it.
+        roomDressing.waiting = sessionState === 'title_vr';
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).

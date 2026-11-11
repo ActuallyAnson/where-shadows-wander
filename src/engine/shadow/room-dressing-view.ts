@@ -98,7 +98,7 @@ const SLIDE_LIMIT = 0.9;
  * instead, so the room is lit as the candle catches, not after. When the candle goes out (covered, paused) the light draws back
  * to the flame in DARKEN_S.
  */
-const SPREAD_FROM_M = 0.12;
+const SPREAD_FROM_M = 0.2;
 export const SPREAD_S = 1.5;
 export const DARKEN_S = 2;
 /** The room art's own colour, as a share of its painted colour (the light multiplies it). */
@@ -107,6 +107,11 @@ const LIT_PEAK = 1.0;
 const MOON_PATCH = 0.07;
 /** How bright the candle's glow is at the end of the hold that lights it, as it catches (its full brightness is about 1). */
 const IGNITION_GLOW = 0.9;
+/**
+ * How bright the candle's small pool of light is while it waits to be lit (`waiting`), before the hold on the wick: bright, but
+ * only about SPREAD_FROM_M across, so the eye goes to the candle first. The hold then spreads it out to the room.
+ */
+const WAITING_GLOW = 1.2;
 /** Seconds the glow from the hold takes to hand over to the burning flame's light (which fades in), so there is no dip. */
 const HANDOVER_S = 0.6;
 
@@ -615,6 +620,8 @@ export class RoomDressingView implements EditableSource {
 
   /** How far the lighting of the candle has got (0..1, the title's hold on the wick): the room starts to glow before it catches. */
   ignition = 0;
+  /** Whether the candle is waiting to be lit for the first time: then it holds a small, bright pool of light (WAITING_GLOW). */
+  waiting = false;
   /** The glow the hold had reached, held while the newly lit flame's own light fades in (see HANDOVER_S). */
   private glowCarry = 0;
 
@@ -631,8 +638,8 @@ export class RoomDressingView implements EditableSource {
     if (light.lit) {
       brightness = Math.max(occlusion * (0.2 + 0.8 * light.intensity), this.glowCarry * occlusion);
     } else {
-      brightness = glow;
-      this.glowCarry = glow;
+      brightness = this.waiting ? Math.max(glow, WAITING_GLOW) : glow;
+      this.glowCarry = brightness;
     }
     this.warmNow = Math.min(1, Math.max(0, brightness / 0.5));
     this.flameOn = brightness > 0 && flame !== undefined;
