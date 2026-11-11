@@ -24,11 +24,20 @@ import {
 } from '@iwsdk/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { copyPlacement, placementOr, roundPlacement, serializeRoomLayout } from '../engine/stage/room-layout';
-import type { Placement, RoomLayout, Vec3 } from '../engine/stage/room-layout';
+import {
+  copyPlacement,
+  mergeLayout,
+  nextPieceId,
+  placementOr,
+  roundPlacement,
+  serializeRoomLayout,
+} from '../engine/stage/room-layout';
+import type { LayoutSection, Placement, RoomLayout, Vec3 } from '../engine/stage/room-layout';
+import type { PlacedModels, PlacedPiece } from '../engine/shadow/placed-models';
 import { applyPlacement, readPlacement } from '../engine/shadow/room-placement';
 import type { EditablePiece, EditableSource } from '../engine/shadow/room-placement';
 import { RoomEditHistory } from './room-edit-history';
+import { sceneTree } from './room-scene-tree';
 
 export interface RoomEditorDeps {
   camera: PerspectiveCamera;
@@ -41,8 +50,12 @@ export interface RoomEditorDeps {
    * space has the player at x = 0, z = 0), so the headset marker and the Eye view stand at (0, this, 0).
    */
   eyeHeight(): number;
-  /** What owns the pieces: each view of the room. */
-  sources: readonly EditableSource[];
+  /** What owns the built-in pieces: each view of the room, with the name the scene tree groups its pieces under. */
+  sources: readonly { label: string; source: EditableSource }[];
+  /** The models placed in the room (layout entries with a `model`): the editor adds, copies and removes these. */
+  placed: PlacedModels;
+  /** The ids of the built-in pieces, per section, which a new piece may not take. */
+  knownIds: Readonly<Record<LayoutSection, readonly string[]>>;
   /** The layout the game was built from; Save writes the pieces' placements into it and then to the file. */
   layout: RoomLayout;
   /** The file's name under content/rooms/. */
@@ -88,6 +101,14 @@ const VIEWS: Readonly<Record<string, readonly [Vec3, Vec3]>> = {
 };
 
 const keyOf = (p: EditablePiece): string => `${p.section}:${p.id}`;
+const isPlaced = (p: EditablePiece): p is PlacedPiece => typeof (p as Partial<PlacedPiece>).model === 'string';
+/** The scene tree's group for the models placed in the editor. */
+const ADDED = 'Added';
+/** How far a copy stands from what it copies (m, along x). */
+const COPY_OFFSET_M = 0.1;
+/** Escapes text for HTML. */
+const esc = (s: string): string =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
 
 export class RoomEditor {
   private readonly orbit: OrbitControls;
@@ -102,7 +123,11 @@ export class RoomEditor {
   private readonly raycaster = new Raycaster();
   private readonly pointer = new Vector2();
   private readonly downAt = new Vector2();
-  private readonly history = new RoomEditHistory();
+  private readonly history = new RoomEditHistory<PlacedPiece>();
+  /** Keys (`section:id`) of placed models taken out of the room: Save drops their entries from the file. */
+  private readonly removed = new Set<string>();
+  /** Scene tree groups folded shut (`section:label`). */
+  private readonly folded = new Set<string>();
   private readonly root = document.createElement('aside');
   /** What "Room only" hid, to show again when it is turned off. */
   private readonly hiddenByRoomOnly = new Set<Object3D>();
@@ -217,9 +242,70 @@ export class RoomEditor {
     return serializeRoomLayout(this.collect()) !== this.savedText;
   }
 
-  /** Every piece there is now (models that load late are added as they arrive). */
+  /** Every piece there is now (models that load late are added as they arrive), the placed models last. */
   pieces(): EditablePiece[] {
-    return this.deps.sources.flatMap((s) => [...s.editables()]);
+    return [...this.deps.sources.flatMap((s) => [...s.source.editables()]), ...this.deps.placed.editables()];
+  }
+
+  /**
+   * Places a copy of the model `model` (an asset id) in `section` at `at`, as one undoable step, and selects it. Its id is the
+   * model's, or the model's with the next free number. Resolves with the piece, or null if the model would not load.
+   */
+  async addModel(model: string, at: Readonly<Placement>, section: LayoutSection = 'room'): Promise<PlacedPiece | null> {
+    const id = nextPieceId(model, (candidate) => this.taken(candidate));
+    const piece = await this.deps.placed.add(section, id, model, at);
+    if (!piece) {
+      this.status = `"${model}" did not load (see the console)`;
+      this.render();
+      return null;
+    }
+    this.removed.delete(keyOf(piece));
+    this.history.pushAdd(keyOf(piece), piece);
+    this.status = '';
+    this.select(piece);
+    return piece;
+  }
+
+  /** Places a copy of the selected model next to it (built-in pieces cannot be copied). */
+  async duplicate(): Promise<PlacedPiece | null> {
+    const piece = this.selected;
+    if (!piece || !isPlaced(piece)) return null;
+    const at = readPlacement(piece.object);
+    at.pos[0] += COPY_OFFSET_M;
+    return this.addModel(piece.model, at, piece.section);
+  }
+
+  /** Takes the selected model out of the room, as one undoable step (built-in pieces cannot be removed). */
+  remove(): boolean {
+    const piece = this.selected;
+    if (!piece || !isPlaced(piece)) return false;
+    this.select(null);
+    this.takeOut(piece);
+    this.history.pushRemove(keyOf(piece), piece);
+    this.status = '';
+    this.render();
+    return true;
+  }
+
+  /** Whether a new piece may not take `id`: a piece there is now, an entry in the file, a built-in id, or one undo could bring back. */
+  private taken(id: string): boolean {
+    const { layout, knownIds } = this.deps;
+    if (this.pieces().some((p) => p.id === id)) return true;
+    if (this.history.items().some((p) => p.id === id)) return true;
+    for (const section of ['room', 'lap'] as const)
+      if (Object.prototype.hasOwnProperty.call(layout[section], id) || knownIds[section].includes(id)) return true;
+    return false;
+  }
+
+  private takeOut(piece: PlacedPiece): void {
+    if (this.selected === piece) this.select(null);
+    this.deps.placed.detach(piece);
+    this.removed.add(keyOf(piece));
+  }
+
+  private putBack(piece: PlacedPiece): void {
+    this.deps.placed.reattach(piece);
+    this.removed.delete(keyOf(piece));
   }
 
   /** Selects a piece by id (`bed`, or `lap:quilt` for another section), for scripts and tests. */
@@ -235,15 +321,21 @@ export class RoomEditor {
     this.commit(piece, readPlacement(piece.object), to);
   }
 
-  /** The layout as Save would write it: the file's own entries, with every piece there now at its current placement. */
+  /**
+   * The layout as Save would write it: the file's own entries, less the models taken out, with every piece there now at its
+   * current placement (and a placed model's asset).
+   */
   collect(): RoomLayout {
-    const out: RoomLayout = {
-      version: this.deps.layout.version,
-      room: { ...this.deps.layout.room },
-      lap: { ...this.deps.layout.lap },
-    };
-    for (const p of this.pieces()) out[p.section][p.id] = roundPlacement(readPlacement(p.object));
-    return out;
+    return mergeLayout(
+      this.deps.layout,
+      this.pieces().map((p) => ({
+        section: p.section,
+        id: p.id,
+        placement: readPlacement(p.object),
+        model: isPlaced(p) ? p.model : undefined,
+      })),
+      this.removed,
+    );
   }
 
   /** Writes the layout file through the dev server; on a built page (no dev server) it downloads it instead. */
@@ -284,7 +376,8 @@ export class RoomEditor {
 
   /** Tells the piece's view it moved: what follows it goes with it, and the candle's shadows are baked again. */
   private moved(piece: EditablePiece): void {
-    this.deps.sources.find((s) => s.editables().includes(piece))?.moved?.(piece);
+    if (isPlaced(piece)) return this.deps.placed.moved();
+    this.deps.sources.find((s) => s.source.editables().includes(piece))?.source.moved?.(piece);
   }
 
   /** The gizmo moves a piece many times a frame; its view is told once, just before the next frame. */
@@ -350,12 +443,21 @@ export class RoomEditor {
 
   private step(undo: boolean): void {
     const e = undo ? this.history.undo() : this.history.redo();
-    if (!e || e.kind !== 'move') return;
-    const piece = this.pieces().find((p) => keyOf(p) === e.key);
-    if (piece) {
-      this.place(piece, undo ? e.before : e.after);
-      this.select(piece);
+    if (!e) return;
+    if (e.kind === 'move') {
+      const piece = this.pieces().find((p) => keyOf(p) === e.key);
+      if (piece) {
+        this.place(piece, undo ? e.before : e.after);
+        this.select(piece);
+      }
+    } else if ((e.kind === 'add') === undo) {
+      // Undoing an add, or redoing a remove.
+      this.takeOut(e.item);
+    } else {
+      this.putBack(e.item);
+      this.select(e.item);
     }
+    this.status = '';
     this.render();
   }
 
@@ -480,8 +582,10 @@ export class RoomEditor {
       if (k === 'z') this.step(!e.shiftKey);
       else if (k === 'y') this.step(false);
       else if (k === 's') void this.save();
+      else if (k === 'd') void this.duplicate();
       else return;
-    } else if (k === 'w') this.setMode('translate');
+    } else if (e.key === 'Delete') this.remove();
+    else if (k === 'w') this.setMode('translate');
     else if (k === 'e') this.setMode('rotate');
     else if (k === 'r') this.setMode('scale');
     else if (k === 'q') {
@@ -502,10 +606,11 @@ export class RoomEditor {
     this.root.innerHTML = `
       <header><h1>Room editor</h1>
         <p>Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
-        Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+S saves. Drag empty space to look around.</p></header>
+        Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
+        Drag empty space to look around.</p></header>
       <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
       <section id="re-piece"></section>
-      <section><h2>Pieces</h2><div class="list" id="re-list"></div></section>
+      <section><h2>Scene</h2><div class="tree" id="re-tree"></div></section>
       <section class="save"><button id="re-save" class="primary">Save room layout</button>
         <p id="re-status"></p><button id="re-close">Close editor</button></section>`;
     this.root.addEventListener('click', (e) => {
@@ -523,6 +628,13 @@ export class RoomEditor {
       else if (act === 'redo') this.step(false);
       else if (act === 'reset') this.reset();
       else if (act === 'revert') this.revert();
+      else if (act === 'copy') void this.duplicate();
+      else if (act === 'remove') this.remove();
+      else if (act === 'fold') {
+        const group = b.dataset.group ?? '';
+        if (!this.folded.delete(group)) this.folded.add(group);
+        this.render();
+      }
     });
     this.root.addEventListener('change', (e) => {
       const input = e.target as HTMLInputElement;
@@ -565,7 +677,9 @@ export class RoomEditor {
     if (shown !== this.shownKey) {
       this.shownKey = shown;
       this.root.querySelector('#re-piece')!.innerHTML = piece
-        ? `<h2>Selected <span>${piece.id}</span> <small>${piece.section === 'lap' ? 'tray space' : 'room space'}</small></h2>
+        ? `<h2>Selected <span>${esc(piece.id)}</span> <small>${piece.section === 'lap' ? 'tray space' : 'room space'}${
+            isPlaced(piece) ? ` · ${esc(piece.model)}` : ''
+          }</small></h2>
           ${FIELDS.map(
             (f) =>
               `<div class="field"><label>${FIELD_LABEL[f]}</label>${[0, 1, 2]
@@ -577,7 +691,13 @@ export class RoomEditor {
           ).join('')}
           <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button>
             <button data-act="revert" title="Back to where the file has it">Revert</button>
-            <button data-act="reset" title="Back to the code's default">Reset</button></div>`
+            <button data-act="reset" title="Back to the code's default">Reset</button></div>
+          ${
+            isPlaced(piece)
+              ? `<div class="row"><button data-act="copy" title="Ctrl+D">Duplicate</button>
+                  <button data-act="remove" title="Delete">Remove</button></div>`
+              : ''
+          }`
         : `<h2>Selected <span>nothing</span></h2><p class="hint">Click a piece in the room, or pick one below.</p>
           <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div>`;
     }
@@ -585,21 +705,46 @@ export class RoomEditor {
     this.root.querySelector<HTMLButtonElement>('[data-act="redo"]')!.disabled = !this.history.canRedo;
     this.renderFields();
 
-    const list = this.pieces()
-      .slice()
-      .sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
-    this.root.querySelector('#re-list')!.innerHTML = list
-      .map((p) => {
-        const key = keyOf(p);
-        const on = piece && keyOf(piece) === key ? 'on' : '';
-        return `<button data-act="pick" data-key="${key}" class="${on}">${p.section === 'lap' ? 'lap · ' : ''}${p.id}</button>`;
-      })
-      .join('');
+    this.renderTree();
 
     const dirty = this.dirty;
     this.root.querySelector('#re-save')!.textContent = dirty ? 'Save room layout ●' : 'Save room layout';
     this.root.querySelector('#re-status')!.textContent =
       this.status || (dirty ? 'Unsaved changes' : 'Everything saved');
+  }
+
+  /** The scene tree: Room and Lap, each grouped by what owns the pieces (the models placed here are "Added"). */
+  private renderTree(): void {
+    const entries = [
+      ...this.deps.sources.flatMap(({ label, source }) =>
+        source.editables().map((p) => ({ key: keyOf(p), id: p.id, section: p.section, group: label })),
+      ),
+      ...this.deps.placed.editables().map((p) => ({ key: keyOf(p), id: p.id, section: p.section, group: ADDED })),
+    ];
+    const order = [...this.deps.sources.map((s) => s.label), ADDED];
+    const selected = this.selected ? keyOf(this.selected) : null;
+    this.root.querySelector('#re-tree')!.innerHTML = sceneTree(entries, order)
+      .map(
+        (section) =>
+          `<div class="sec">${section.label}</div>` +
+          section.groups
+            .map((g) => {
+              const group = `${section.section}:${g.label}`;
+              const open = !this.folded.has(group);
+              const rows = open
+                ? g.entries
+                    .map(
+                      (e) =>
+                        `<button class="node${e.key === selected ? ' on' : ''}" data-act="pick" data-key="${esc(e.key)}">${esc(e.id)}</button>`,
+                    )
+                    .join('')
+                : '';
+              return `<button class="grp" data-act="fold" data-group="${esc(group)}">${open ? '▾' : '▸'} ${esc(g.label)}
+                <small>${g.entries.length}</small></button>${rows}`;
+            })
+            .join(''),
+      )
+      .join('');
   }
 
   /** Fills the number boxes from the selected piece (skipping the one being typed in). */
@@ -659,4 +804,12 @@ const CSS = `
 .room-ed input { width: 100%; box-sizing: border-box; font: 12.5px ui-monospace, Consolas, monospace; color: var(--ink);
   background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 4px 5px; }
 .room-ed input:focus { outline: none; border-color: var(--accent); }
+.room-ed .tree { display: grid; gap: 1px; }
+.room-ed .tree .sec { margin: 6px 0 2px; font-size: 11px; font-weight: 650; color: var(--muted); }
+.room-ed .tree button { text-align: left; border: 1px solid transparent; background: none; padding: 3px 6px; border-radius: 4px; }
+.room-ed .tree button:hover { border-color: var(--line); }
+.room-ed .tree .grp { color: var(--muted); }
+.room-ed .tree .grp small { margin-left: 4px; opacity: .7; }
+.room-ed .tree .node { padding-left: 22px; }
+.room-ed .tree .node.on { color: var(--accent); border-color: var(--accent); }
 `;

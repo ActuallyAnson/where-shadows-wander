@@ -99,7 +99,7 @@ import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
 import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
-import { BEDROOM_LAYOUT_FILE, readBedroomLayout } from '../engine/shadow/bedroom-layout';
+import { BEDROOM_LAYOUT_FILE, BEDROOM_PIECE_IDS, readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
@@ -1134,7 +1134,14 @@ async function start(): Promise<void> {
       scene: world.scene,
       room: bedroomView.group,
       eyeHeight: () => lastHead[1],
-      sources: [roomModels, roomDressing, bedroomView, bedTray],
+      sources: [
+        { label: 'Furniture', source: roomModels },
+        { label: 'Dressing', source: roomDressing },
+        { label: 'Room', source: bedroomView },
+        { label: 'Tray', source: bedTray },
+      ],
+      placed: placedModels,
+      knownIds: BEDROOM_PIECE_IDS,
       layout: bedroomLayout.layout,
       fileName: BEDROOM_LAYOUT_FILE,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
