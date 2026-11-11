@@ -36,7 +36,9 @@ import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
 import type { StagePlane } from '../engine/shadow/pure/stage-plane';
-import { JOINT } from '../engine/hands/hand';
+import { createHandFrame, JOINT } from '../engine/hands/hand';
+import { FADE_IN_S } from '../engine/xr/hand-fade';
+import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
@@ -577,6 +579,17 @@ async function start(): Promise<void> {
     window.addEventListener(HAND_LAB_EVENT, (e) => showLab((e as CustomEvent<boolean>).detail));
   }
   const handList = [hands.hands.left, hands.hands.right];
+  // The right hand as drawn while it holds the matchstick (posed-hand.ts), and the lists of hands the glove draws then.
+  const heldHand = new PosedHand('right', MATCH_GRIP);
+  /** Seconds the held grip takes to blend to the live fingers once the candle is lit. */
+  const HELD_TO_LIVE_S = 0.35;
+  let heldLive = 0; // 0 the grip .. 1 the live hand
+  /** Seconds the left hand takes to fade in when the candle is first lit (its fade-in after that is the usual quick one). */
+  const LEFT_REVEAL_S = 1.2;
+  let sinceLit = 0; // seconds since the candle was lit (0 before)
+  // Before then the left is an untracked stand-in, so a left hand left drawn from an earlier session fades out.
+  const titleHands = [createHandFrame('left'), heldHand.frame];
+  const blendHands = [hands.hands.left, heldHand.frame];
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR (whoever's hands they
   // are); over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -933,6 +946,11 @@ async function start(): Promise<void> {
       timings.end(SLOT.read);
       // Mock time with mock hands, so pausing the Hand Lab freezes holds too.
       if (!paused) clock += step;
+      // The right hand holds the matchstick in a set grip until the candle is lit, then its fingers blend to the live ones.
+      heldLive = sessionState === 'title_vr' ? 0 : Math.min(1, heldLive + step / HELD_TO_LIVE_S);
+      heldHand.update(hands.hands.right, heldLive);
+      sinceLit = sessionState === 'title_vr' ? 0 : sinceLit + step;
+      handVisual.fadeInS[0] = sinceLit < LEFT_REVEAL_S ? LEFT_REVEAL_S : FADE_IN_S;
       const handsT = mock && lab?.mockActive ? mock.time : clock;
       if (!paused) {
         timings.begin(SLOT.classify);
@@ -992,7 +1010,7 @@ async function start(): Promise<void> {
         world.camera.getWorldQuaternion(cameraQuat);
         if (sessionState === 'title_vr') {
           titleLighter.visible = true;
-          titleLighter.update(hands.hands.right, cameraQuat, clock);
+          titleLighter.update(heldHand.frame, cameraQuat, clock);
 
           // Only the matchstick's flame lights the candle: a bare hand near the wick does not.
           let handTouchingWick = false;
@@ -1200,12 +1218,14 @@ async function start(): Promise<void> {
         handEye[0] = settingsHead.x;
         handEye[1] = settingsHead.y;
         handEye[2] = settingsHead.z;
-        const activeHands = sessionState === 'title_vr' ? [] : handList;
+        // Before the candle is lit only the right hand is drawn, holding the matchstick (lit by its flame); once it is
+        // lit the left fades in and the right's fingers blend to the live ones.
+        const titleNow = sessionState === 'title_vr';
         handVisual.update(
-          activeHands,
+          titleNow ? titleHands : heldLive < 1 ? blendHands : handList,
           step,
-          rigPlaced && candleView.lit ? candleView.flamePosition : null,
-          !paused && sessionState !== 'title_vr',
+          titleNow ? titleLighter.flamePosition : rigPlaced && candleView.lit ? candleView.flamePosition : null,
+          !paused,
           handEye,
         );
         timings.end(SLOT.handVisual);

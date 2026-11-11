@@ -87,8 +87,8 @@ export class TitleLighterView {
   }
 
   /**
-   * Updates position to follow right hand index fingertip (or wrist/controller) and flickers the flame.
-   * Zero per-frame allocations.
+   * Updates position to sit in the right hand's pinch (between the thumb and index tips; the wrist when only a few joints
+   * are known) and flickers the flame. Zero per-frame allocations.
    */
   update(hand: HandFrame | null, cameraQuaternion: Quaternion, timeSeconds: number): void {
     if (!this._visible) return;
@@ -96,11 +96,19 @@ export class TitleLighterView {
     if (hand && hand.tracked && hand.validJoints >= 5) {
       this.group.visible = true;
       const p = hand.positions;
-      // Prefer index fingertip, fallback to wrist
-      const idx = hand.validJoints >= 20 ? JOINT['index-finger-tip'] * 3 : JOINT['wrist'] * 3;
-      const x = p[idx];
-      const y = p[idx + 1];
-      const z = p[idx + 2];
+      let x: number, y: number, z: number;
+      if (hand.validJoints >= 20) {
+        const i = JOINT['index-finger-tip'] * 3;
+        const t = JOINT['thumb-tip'] * 3;
+        x = (p[i] + p[t]) / 2;
+        y = (p[i + 1] + p[t + 1]) / 2;
+        z = (p[i + 2] + p[t + 2]) / 2;
+      } else {
+        const w = JOINT.wrist * 3;
+        x = p[w];
+        y = p[w + 1];
+        z = p[w + 2];
+      }
 
       this.group.position.set(x, y, z);
       this.flamePosition[0] = x;
