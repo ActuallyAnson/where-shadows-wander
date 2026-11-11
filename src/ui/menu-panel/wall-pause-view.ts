@@ -19,7 +19,7 @@ import { JOINT, type HandFrame } from '../../engine/hands/hand';
 import { distanceToPlane, type StagePlane } from '../../engine/shadow/pure/stage-plane';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
 
-export type PauseMenuAction = 'resume' | 'restart' | 'settings';
+export type PauseMenuAction = 'resume' | 'settings';
 export type WallMenuMode = 'pause' | 'settings';
 
 export interface WallButtonDef {
@@ -47,24 +47,13 @@ export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
     canvasW: 560,
   },
   {
-    id: 'restart',
-    label: 'Begin this part again',
-    yMin: -0.2,
-    yMax: -0.1,
-    xMin: -0.45,
-    xMax: 0.45,
-    canvasY: 375,
-    canvasH: 70,
-    canvasW: 660,
-  },
-  {
     id: 'settings',
     label: 'Settings',
-    yMin: -0.33,
-    yMax: -0.23,
+    yMin: -0.2,
+    yMax: -0.1,
     xMin: -0.38,
     xMax: 0.38,
-    canvasY: 475,
+    canvasY: 375,
     canvasH: 70,
     canvasW: 560,
   },

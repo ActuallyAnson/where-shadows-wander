@@ -28,7 +28,7 @@ export interface Settings {
   captions: boolean;
   /** The short walks between puzzles: the traveller turns and walks into the next land. Off goes straight to the puzzle. */
   travelScenes: boolean;
-  /** Press the pause, solved and end screens' buttons by looking at them for a moment, for players who cannot poke. */
+  /** Press the pause screen's buttons by looking at them for a moment, for players who cannot poke. */
   gazeMenus: boolean;
   /** The hand the panel listens to and opens beside; the game may read it as the player's main hand. */
   hand: Hand;

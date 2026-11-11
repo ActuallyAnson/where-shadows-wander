@@ -10,7 +10,6 @@ import {
   loadTesting,
   MENU_CHOICES,
   nextChoice,
-  STORY_CHOICES,
   RECORD_CHOICES,
   saveTesting,
   TESTING_EVENT,
@@ -71,23 +70,15 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
     joints.textContent = `Joint dots: ${options.joints ? 'ON' : 'off'}`;
     shadow.textContent = `Shadow capsules: ${options.shadow ? 'ON' : 'off'}`;
     settings.textContent = `Settings panel opens when VR starts: ${options.settings ? 'ON' : 'off'}`;
-    kindred.textContent = `Kindred (the shadow bird): ${options.kindred ? 'ON' : 'off'}`;
-    cutscene.textContent = `Test cutscene plays when VR starts: ${options.cutscene ? 'ON' : 'off'}`;
     capture.textContent = `Capture mode (demo video; press reloads): ${loadCaptureChoice()}`;
     record.textContent = `Recording hands when VR starts: ${RECORD_TEXT[options.record]}`;
     menu.textContent = `Menu screen showing: ${options.menu}`;
-    rewind.textContent = `Rewind on a fall (turn the night back 3 s): ${options.rewindOnFall ? 'ON' : 'off'}`;
-    story.textContent = `Story scene when VR starts: ${options.story} (the prologue, the finale, or a travel scene)`;
     for (const [b, isOn] of [
       [joints, options.joints],
       [shadow, options.shadow],
       [settings, options.settings],
-      [cutscene, options.cutscene],
-      [kindred, options.kindred],
       [record, options.record !== 'off'],
       [menu, options.menu !== 'off'],
-      [story, options.story !== 'off'],
-      [rewind, options.rewindOnFall],
     ] as const) {
       b.style.background = isOn ? '#163824' : '#21262d';
       b.style.borderColor = isOn ? '#2ea043' : '#30363d';
@@ -98,12 +89,8 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   const joints = button(() => set({ ...options, joints: !options.joints }));
   const shadow = button(() => set({ ...options, shadow: !options.shadow }));
   const settings = button(() => set({ ...options, settings: !options.settings }));
-  const kindred = button(() => set({ ...options, kindred: !options.kindred }));
-  const cutscene = button(() => set({ ...options, cutscene: !options.cutscene }));
   const record = button(() => set({ ...options, record: nextChoice(RECORD_CHOICES, options.record) }));
   const menu = button(() => set({ ...options, menu: nextChoice(MENU_CHOICES, options.menu) }));
-  const rewind = button(() => set({ ...options, rewindOnFall: !options.rewindOnFall }));
-  const story = button(() => set({ ...options, story: nextChoice(STORY_CHOICES, options.story) }));
   const capture = button(() => {
     saveCaptureChoice(nextCapture(loadCaptureChoice()));
     location.reload(); // the eye buffers' size is set when the page starts
@@ -112,22 +99,7 @@ export function createTestingPanel(target: EventTarget = window): { element: HTM
   clear.textContent = 'Clear all switches';
   clear.style.cssText += 'background:#2d1b1b;color:#ff7b72;border-color:#6e2f2f;';
 
-  element.append(
-    title,
-    active,
-    joints,
-    shadow,
-    settings,
-    cutscene,
-    kindred,
-    record,
-    menu,
-    story,
-    rewind,
-    capture,
-    hint,
-    clear,
-  );
+  element.append(title, active, joints, shadow, settings, record, menu, capture, hint, clear);
   refresh();
   return {
     element,

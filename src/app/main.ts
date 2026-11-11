@@ -1,13 +1,15 @@
 // Composition root. IWSDK owns the XR session, renderer and display loop; one
 // driver system hands each frame to our code. Pure code (src/engine/hands,
-// src/engine/sim, src/engine/stage, src/game) never imports IWSDK or three.js;
-// this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
+// src/engine/stage) never imports IWSDK or three.js; this is enforced by
+// ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
+//
+// What runs (docs/adr/0016-story-shadow-theatre.md): the bedroom, the VR title and lighting the candle, the hands' shadows on the
+// wall, and covering the flame to pause. The story told in shadow puppets on the wall comes next.
 import {
   AmbientLight,
   AssetManager,
   AssetType,
   Color,
-  Group,
   Matrix4,
   Quaternion,
   SessionMode,
@@ -15,7 +17,6 @@ import {
   World,
   createSystem,
 } from '@iwsdk/core';
-import type { Object3D } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
@@ -26,18 +27,12 @@ import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
 import { VrTitleView } from '../ui/title-screen/vr-title-view';
 import { RoomDressingView } from '../engine/shadow/room-dressing-view';
-import { FixturesView } from '../engine/render/fixtures-view';
-import { GhostTargetView } from '../engine/render/ghost-target-view';
-import { StageRenderer } from '../engine/render/stage-renderer';
 import { GestureDetector } from '../engine/hands/gesture-detector';
 import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
-import { createSilhouette, projectProp, type Prop } from '../engine/shadow/pure/prop-shadow';
-import { SIM_HZ } from '../game/game';
-import { NightDriver } from './night-driver';
 import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
@@ -45,45 +40,14 @@ import type { MenuScreenId } from '../ui/menu-panel/screens';
 import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { JOINT } from '../engine/hands/hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
-import { CutsceneHost } from './cutscene-host';
-import type { CutsceneData } from '../engine/sim/cutscene';
-import { ENDING_MOOD } from './ending';
-import { OPENING, OPENING_S, openingFoxAlpha } from './opening';
-import { SkipTouch } from '../engine/shadow/pure/skip-touch';
-import { stagePoint } from '../engine/services/audio/stage-point';
-import { FINALE_PAGES, hasSeenPrologue, markPrologueSeen, Prologue, PrologueReel, type PrologueHost } from './prologue';
-import { Kindred, SCARE_RADIUS_M, shadowSpot } from '../engine/shadow/pure/kindred';
-import { KindredView } from '../engine/shadow/kindred-view';
-import { nearestJointGap, STICKER_COUNT, TravellerMood, type StickerId } from '../engine/shadow/pure/traveller-mood';
-import { StickerView } from '../engine/shadow/sticker-view';
-import { CRYSTAL } from '../engine/shadow/cinematic-art';
-import { CinematicScene } from '../engine/shadow/cinematic-scene';
-import { WalkSceneView } from '../engine/shadow/walk-scene-view';
-import { LAND_OF_PUZZLE } from '../engine/shadow/walk-lands';
 import { FrameInspector } from './frame-inspector';
-import { CALM_WIND, FAN_WIND } from '../engine/shadow/bunting-view';
-import { FadeView } from '../engine/shadow/fade-view';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
-import { ReadingPageView } from '../engine/shadow/reading-page-view';
-import { PropSketchView } from '../engine/shadow/prop-sketch-view';
-import { REWARDS, RewardBurstView } from '../engine/shadow/reward-burst-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
-import { SparkFlightView } from '../engine/shadow/spark-flight-view';
 import { StoryLineView } from '../engine/shadow/story-line-view';
-import { GlowView } from '../engine/shadow/glow-view';
-import { AirView } from '../engine/shadow/air-view';
-import { RabbitView } from '../engine/shadow/rabbit-view';
-import { PropTouch } from '../engine/shadow/pure/prop-touch';
-import { SparkleLayer } from '../engine/shadow/sparkle-layer';
-import { Follower, nearMissLevel, SolveBloom } from '../engine/shadow/pure/glow';
-import { SHAPES } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
-import { CutsceneView } from '../engine/shadow/cutscene-view';
-import { PropShadowView } from '../engine/shadow/prop-shadow-view';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
-import { LevelEditor } from '../debug/level-editor';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
 import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
 import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
@@ -121,8 +85,6 @@ import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
-import { endLine } from './journal';
-import { MENU_SCREENS } from '../ui/menu-panel/screens';
 import { createUiSound } from './ui-sound';
 import { mountLabLink } from './lab-link';
 import { reportSource } from './report-source';
@@ -190,10 +152,9 @@ async function start(): Promise<void> {
   const capabilities = new CapabilityDetector();
   // Whether hand data is arriving (tracking, lost, or unavailable), for the in-scene "Show me your hands" message.
   const handsStatus = new HandsStatus();
-  // The session's visibility: the simulation pauses on it (Teammate A) and saves can listen to it (Teammate B).
+  // The session's visibility: the frame holds still on it and saves can listen to it.
   const visibility = new SessionVisibility();
-  // The save (progress, the creature gallery, solutions found): read once now, written only on events (headset
-  // off, page hidden, a puzzle ending), never per frame. Teammate A's puzzle code calls saves.puzzleEnded.
+  // The save (the settings), read once now and written only on events (headset off, page hidden), never per frame.
   // The Hand Lab (?mock=1) keeps its own save, so a development session never touches a real one.
   const saves = new SaveManager({
     store: browserStore() ?? new MemoryStore(),
@@ -201,10 +162,10 @@ async function start(): Promise<void> {
     onError: (message) => diagnostics.error(`save: ${message}`),
   });
   saves.load();
-  saves.touchDay(); // saves.previousDay is the night before, to tell a new night from a return the same evening
+  saves.touchDay();
   attachSaveHooks(saves, visibility, { window, document });
 
-  // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
+  // Shape recognition on both hands every frame; the story will listen to its commits.
   const shapes = new ShapeRecognizer();
   // Lantern gestures. In mock mode the cover-flame gesture aims at the candle on the tray (placeRig sets it); in XR it waits
   // for the lantern flow.
@@ -231,8 +192,6 @@ async function start(): Promise<void> {
   const shadowRenderer = new ShadowRenderer();
   // On the room's wall the stage is the middle of the candle's round pool of light, drawn over most of the wall (stage-edge-glsl.ts).
   const lightPoolArea = new Float64Array(4);
-  // The shadows of the invisible props (the game's level calls propShadows.setProps when a puzzle loads).
-  const propShadows = new PropShadowView();
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
@@ -252,6 +211,7 @@ async function start(): Promise<void> {
   const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
+  stageView.mood = 0.4; // the wall's warmth: a still evening (the story may set it later)
   const candleView = new CandleView();
   candleView.lit = false;
   const titleLighter = new TitleLighterView();
@@ -299,7 +259,7 @@ async function start(): Promise<void> {
   /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;
   const TITLE_HINT_PLAIN_AFTER_S = 16;
-  type SessionState = 'title_vr' | 'opening' | 'playing' | 'paused';
+  type SessionState = 'title_vr' | 'playing' | 'paused';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
   let titleStallT = 0; // seconds on the title with the candle not being lit; a hint shows after a while
@@ -307,23 +267,8 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x101422, 0.008);
   // ?debug=shadow,joints (or repeat ?debug=...): each named view on.
   const debugViews = new Set(params.getAll('debug').flatMap((v) => v.split(',').map((x) => x.trim())));
-  // Cutscenes (captions and shadow puppets on the stage); the game's flow calls cutscenes.play(data, onDone).
-  const cutsceneView = new CutsceneView();
-  const cutscenes = new CutsceneHost(cutsceneView);
-  // The kindred (a shadow bird that flies about the wall): the Hand Lab's Kindred button, or the Testing panel's switch.
-  const kindred = new Kindred();
-  const kindredStartX = 0.4;
-  const spot = new Float64Array(2);
-  const kindredView = new KindredView();
-  // The traveller's moods: a sticker over their head (sad after a fall, happy at the goal, surprised by a near hand, puzzled when kept waiting).
-  const travellerMood = new TravellerMood();
-  const stickerView = new StickerView();
-  // The Hand Lab's level editor, for the puzzle being played.
-  const levelEditors = new WeakMap<object, LevelEditor>(); // one per puzzle, so a revert always goes back to how it was written
-  const storyLine = new StoryLineView();
-  // The captions (a setting): a smaller line of ink low on the wall that names the story's sounds.
+  // The captions (a setting): a small line of ink low on the wall that names the sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
-  const spark = new SparkFlightView();
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
   // time (and comes back slowly), and the inspector gives the debug bar a line of what a frame costs. It watches only in a headset
   // session: on the desktop the software renderer would trip it for no reason.
@@ -332,291 +277,20 @@ async function start(): Promise<void> {
   let governorOn = false;
   let appliedLevel = 0;
   const handTrail = new HandTrailView();
-  /** What the quality level means: the paper's scenery and the rings are switched by it here; the rest are checked where they are used. */
+  /** What the quality level means: the paper's scenery and the rings are switched by it here; the trail is checked where it is used. */
   const applyGovernor = () => {
     appliedLevel = governor.level;
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
     handTrail.ringsOn = governor.isOn('ring');
   };
-  const propSketch = new PropSketchView();
-  const readingPage = new ReadingPageView();
-  const rewards = new RewardBurstView();
-  const sparkFrom = new Vector3();
-  const sparkTo = new Vector3();
-  const sparkStart = { x: 0, y: 0, z: 0 };
-  // The prologue: a black void with the story drawn in white calligraphy. While it plays, everything else in the scene is
-  // hidden (and put back after), and the pages float where the player was facing.
-  const cinematic = new CinematicScene();
-  const hiddenForPrologue: { object: Object3D; visible: boolean }[] = [];
-  let backgroundBeforePrologue: typeof world.scene.background = null;
-  /**
-   * What a full-view scene does to the app: the screen fades to black, the room is hidden and the background made black while the
-   * scene plays, and the room is put back through another fade after (so neither way is a hard cut).
-   */
-  const fade = new FadeView();
-  let inVoid = false;
-  const voidHost = (scene: {
-    enter(head: { x: number; y: number; z: number }, dirX: number, dirZ: number): void;
-    leave(): void;
-  }): PrologueHost => ({
-    enter: () => {
-      fade.fadeTo(1, 0.6, () => {
-        hiddenForPrologue.length = 0;
-        for (const child of world.scene.children) {
-          if (child === cinematic.group || child === hall.group || child === walkScene.group || child === fade.group)
-            continue;
-          hiddenForPrologue.push({ object: child, visible: child.visible });
-          child.visible = false;
-        }
-        backgroundBeforePrologue = world.scene.background;
-        world.scene.background = new Color(0x000000);
-        inVoid = true;
-        // The scene is built around the head, facing the way it faces now.
-        world.camera.getWorldPosition(prologueHead);
-        world.camera.getWorldDirection(prologueAhead);
-        scene.enter(prologueHead, prologueAhead.x, prologueAhead.z);
-        fade.fadeTo(0, 0.9);
-      });
-    },
-    leave: () => {
-      fade.fadeTo(1, 0.5, () => {
-        if (inVoid) {
-          for (const h of hiddenForPrologue) h.object.visible = h.visible;
-          hiddenForPrologue.length = 0;
-          world.scene.background = backgroundBeforePrologue;
-          inVoid = false;
-        }
-        scene.leave();
-        fade.fadeTo(0, 0.9);
-      });
-    },
-  });
-  // The travel scenes between puzzles: the traveller walks into the next land (and the land it has just left wakes), in the same void.
-  const walkScene = new WalkSceneView();
-  let travelDemo = 0;
-  const walkHost = voidHost(walkScene);
-  // The walk's sounds: footsteps in time with the traveller (from ahead of where the head faced), and the sleeper's note as its land wakes.
-  const walkPoint = new Vector3();
-  const walkAt = () => {
-    walkPoint.set(prologueHead.x + prologueAhead.x * 3.6, prologueHead.y - 1.2, prologueHead.z + prologueAhead.z * 3.6);
-    return walkPoint;
-  };
-  walkScene.onStep = (alternate) => {
-    const p = walkAt();
-    gameAudio.stepAtPoint(p.x, p.y, p.z, alternate);
-  };
-  walkScene.onWake = () => {
-    const p = walkAt();
-    const index = Math.max(0, travelRun ? LAND_OF_PUZZLE.indexOf(travelRun.segments[travelRun.at].land) : 0);
-    gameAudio.lullabyNote(index, p.x, p.y + 1.2, p.z);
-  };
-  interface TravelRun {
-    segments: { land: (typeof LAND_OF_PUZZLE)[number]; mode: 'arrive' | 'wake' }[];
-    at: number;
-    dipping: boolean;
-    leaving: boolean;
-    /** Skip was poked: whatever is left of the walk is dropped. */
-    skipRest: boolean;
-    resume: SessionState;
-  }
-  let travelRun: TravelRun | null = null;
-
-  const reducedMotion = () =>
-    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  /** Plays the walk from puzzle `from` (its land wakes) to puzzle `to` (the traveller walks into its land), if travel scenes are on. */
-  const travelTo = (from: number, to: number): 'started' | 'busy' | 'off' => {
-    if (travelRun || inVoid || prologue.playing || finale.playing) return 'busy';
-    if (!settings.value.travelScenes || reducedMotion()) return 'off';
-    const segments: TravelRun['segments'] = [];
-    if (from >= 0 && LAND_OF_PUZZLE[from]) segments.push({ land: LAND_OF_PUZZLE[from], mode: 'wake' });
-    if (LAND_OF_PUZZLE[to]) segments.push({ land: LAND_OF_PUZZLE[to], mode: 'arrive' });
-    if (segments.length === 0) return 'off';
-    travelRun = { segments, at: 0, dipping: false, leaving: false, skipRest: false, resume: sessionState };
-    sessionState = 'opening'; // the game holds still while the traveller walks
-    walkScene.prepare(segments[0].land, segments[0].mode);
-    walkHost.enter();
-    return 'started';
-  };
-  /** For the Testing switch: waits while another full-view scene (the first-time opening) is playing, and says in the report why it did not play. */
-  const travelWhenFree = (from: number, to: number, triesLeft = 60) => {
-    const result = travelTo(from, to);
-    if (result === 'busy' && triesLeft > 0) later(() => travelWhenFree(from, to, triesLeft - 1), 500);
-    else if (result === 'off')
-      diagnostics.error(
-        `travel scene did not play: ${settings.value.travelScenes ? 'the device asks for less motion' : 'Travel scenes is off in Settings'}`,
-      );
-  };
-  // The finale plays in the hall of the great crystal, the last thing the night shows.
-  const hall = new CinematicScene(CRYSTAL, 'hall');
-  /** One lullaby note, from ahead of where the head faced as a scene began (the sun, or the crystal). */
-  // Delayed story steps (the last notes, the end screen, a fade back up) are kept so a session that ends cancels them.
-  const laterTimers = new Set<ReturnType<typeof setTimeout>>();
-  const later = (fn: () => void, ms: number) => {
-    const handle = setTimeout(() => {
-      laterTimers.delete(handle);
-      fn();
-    }, ms);
-    laterTimers.add(handle);
-  };
-  const cancelLater = () => {
-    for (const handle of laterTimers) clearTimeout(handle);
-    laterTimers.clear();
-  };
-  const storyNote = (index: number) =>
-    gameAudio.lullabyNote(
-      index,
-      prologueHead.x + prologueAhead.x * 4.5,
-      prologueHead.y + 0.3,
-      prologueHead.z + prologueAhead.z * 4.5,
-    );
-  // The opening: a wordless reel in the dusk scene. The lullaby notes fall as the five lights go out, then the first one sounds alone.
-  const prologue = new PrologueReel(cinematic, voidHost(cinematic), storyNote);
-  const finale = new Prologue(hall, voidHost(hall), FINALE_PAGES, (page) => {
-    if (page < FINALE_PAGES.length - 1) storyNote(page);
-    else for (let k = 0; k < 5; k++) later(() => storyNote(k), k * 240);
-  });
-  /** The Skip poke for each (a fingertip held on the ring for a moment). */
-  const prologueSkip = new SkipTouch();
-  const finaleSkip = new SkipTouch();
-  const walkSkip = new SkipTouch();
-  const prologueHead = new Vector3();
-  const prologueAhead = new Vector3();
-  /** Where the traveller is on the stage, read from the game by readTraveller (false before the night starts). */
-  const travellerAt = { x: 0, y: 0 };
-  const readTraveller = (): boolean => {
-    const game = night.game;
-    if (!game) return false;
-    const slot = game.traveller.slot(game);
-    travellerAt.x = game.store.x[slot];
-    travellerAt.y = game.store.y[slot];
-    return true;
-  };
-  let stickerNext = 0;
-  // The solve moment (the wall's light swells, the kindred bursts) and the near-miss glow round a hand that is almost right.
-  const glow = new GlowView();
-  const air = new AirView();
-  // The shadow animals come alive: a committed rabbit shape hops out of the hand, a committed fox shape calls the kindred.
-  const rabbits = new RabbitView();
-  // Dust that a hand's shadow shakes off a prop's shadow when it reaches into it.
-  const propTouch = new PropTouch();
-  const dust = new SparkleLayer(9);
-  let summonT = 0; // seconds the kindred stays after a fox shape called it (it is switched on for the visit)
-  let perchT = 0;
-  const solveBloom = new SolveBloom();
-  const nearGlow = [new Follower(), new Follower()];
-  let moodNow = 0.4;
-  let moodGoal = 0.4;
-  // The ending: the room cools and dims as the cutscene plays (the night calls this after the return).
-  const playEnding = (onDone?: () => void) => {
-    storyLine.clear(); // the finale speaks for itself
-    captionLine.clear();
-    moodGoal = ENDING_MOOD;
-    // When the hall fades away the room stands there, every sleeper awake: a moment on that picture (with one last line) before the
-    // end screen comes.
-    finale.start(() => {
-      storyLine.say('The room dreams on.', 1.6, 3.2);
-      later(() => onDone?.(), 6500);
-    });
-  };
-  const playSolve = () => {
-    moodGoal = 1;
-    solveBloom.trigger();
-    if (kindredOn) kindredView.burst(kindred);
-    if (rigPlaced) gameAudio.twinkleAt(stage, kindred.x, kindred.y);
-  };
-  let openingT = -1; // seconds into the opening (title, then the fox drifts in and leaves); -1 when it is not running
-  let kindredOn = false;
-  let kindredWanted = false; // the Testing panel's switch, which the opening must not leave switched off
-  const setKindred = (on: boolean) => {
-    if (openingT < 0) kindredWanted = on;
-    kindredOn = on;
-    if (!on) kindredView.hide();
-  };
-  // The interludes between the night's scenes (src/game/story.ts): a short cutscene on the wall while the game holds. One that
-  // comes while the view is elsewhere (the travel scene's walk) waits until the wall is back.
-  let pendingInterlude: { data: CutsceneData; onDone: () => void } | null = null;
-  /** The playing interlude's end (not the opening's, which starts the night), so a session that ends can end it too. */
-  let interludeDone: (() => void) | null = null;
-  const playInterlude = (data: CutsceneData, onDone: () => void) => {
-    if (travelRun || inVoid) {
-      pendingInterlude = { data, onDone };
-      return;
-    }
-    const done = () => {
-      if (interludeDone === done) interludeDone = null;
-      onDone();
-    };
-    const problems = cutscenes.play(data, done);
-    if (problems.length > 0) {
-      failures.report('interlude', new Error(`${data.id}: ${problems.join('; ')}`));
-      onDone();
-      return;
-    }
-    interludeDone = done;
-  };
-  const playOpening = () => {
-    const problems = cutscenes.play(OPENING, () => {
-      readingPage.clear();
-      openingT = -1;
-      setKindred(kindredWanted);
-      sessionState = 'playing';
-      candleView.setLocked(true);
-      night.start();
-    });
-    if (problems.length > 0) {
-      failures.report('opening', new Error(problems.join('; ')));
-      sessionState = 'playing';
-      candleView.setLocked(true);
-      night.start();
-      return;
-    }
-    openingT = 0;
-    // The first page of the book, low in front of the player while the night begins: the flat hand that makes the first bridge.
-    world.camera.getWorldPosition(prologueHead);
-    world.camera.getWorldDirection(prologueAhead);
-    readingPage.show(prologueHead, prologueAhead.x, prologueAhead.z, OPENING_S);
-    kindred.x = -kindredStartX; // enters from the left edge
-    setKindred(true);
-  };
-  const stageGroup = new Group();
-  stageGroup.matrixAutoUpdate = false;
-  const stageRenderer = new StageRenderer(stageGroup);
-  // The ghost outline of the wanted shape: the first rung of the hint ladder (the night's hint-show events).
-  const ghostTarget = new GhostTargetView(stageGroup, {
-    targetId: 'hint',
-    x: 0.0,
-    y: -0.15,
-    requiredShape: 'flat',
-    active: false,
-  });
-  // The puzzles' gate, counterweight plate, wind and window (the drops are entities the stage renderer draws).
-  const fixturesView = new FixturesView(stageGroup);
   const wallPauseView = new WallPauseView();
-  stageGroup.add(wallPauseView.group);
   world.scene.add(
     stageView.group,
-    stageGroup,
+    wallPauseView.group,
     bedroomView.group,
     shadowRenderer.mesh,
-    propShadows.mesh,
-    cutsceneView.group,
-    storyLine.group,
     captionLine.group,
-    spark.group,
     handTrail.group,
-    propSketch.group,
-    rewards.group,
-    readingPage.group,
-    cinematic.group,
-    fade.group,
-    hall.group,
-    walkScene.group,
-    glow.group,
-    rabbits.group,
-    dust.mesh,
-    air.group,
-    kindredView.group,
-    stickerView.group,
     candleView.group,
     titleLighter.group,
     bedTray.group,
@@ -632,10 +306,9 @@ async function start(): Promise<void> {
   const audio = new AudioEngine();
   audio.attachGestureUnlock(document);
   uiAudio = audio;
-  // The music is made while the title screen sits idle, so starting it with the session costs no frame.
+  // The sounds are made in code; rendering them takes real time on a headset's CPU, so a worker does it ahead while the title
+  // screen sits idle, and the engine finds each ready. Without workers the pool does the same on the main thread.
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
-  // The sounds are made in code; rendering them takes real time on a headset's CPU (the music alone about a second), so a worker does it
-  // ahead (every sound, the room's loops first) and the engine finds each ready. Without workers the pool does the same on the main thread.
   const soundPool = new TaskPool<RenderJob, RenderedSound>({
     create: () =>
       typeof Worker === 'undefined'
@@ -654,141 +327,13 @@ async function start(): Promise<void> {
       audio,
       () => settings.value.captions,
       (text) => {
-        // Not while the room is out of sight (the prologue, the finale): the wall is not shown, and the caption would be lost.
-        if (inVoid || sessionState !== 'playing') return false;
+        if (sessionState !== 'playing') return false;
         captionLine.say(text, 0, 1.6);
         return true;
       },
       () => performance.now() / 1000,
     ),
   );
-  // The kindred's visits for the night (a hint's perch, the return): it flies in if it is not about, and stays
-  // perched until released. `kindredAway` keeps it hidden from the dimming until the return.
-  let kindredAway = false;
-  let kindredVisiting = false;
-  const visitKindred = (x: number, y: number) => {
-    if (kindredAway) return;
-    if (!kindredOn) {
-      kindred.x = x + (x >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
-      kindred.y = y + 0.1;
-      kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
-      kindredVisiting = true;
-    }
-    kindred.perchAt(x, y);
-    perchT = Infinity;
-    gameAudio.twinkleAt(stage, x, y);
-  };
-  const endKindredVisit = () => {
-    if (perchT === Infinity) {
-      perchT = 0;
-      kindred.release();
-    }
-    if (kindredVisiting) {
-      kindredVisiting = false;
-      kindredOn = kindredWanted;
-      if (!kindredOn) kindredView.hide();
-    }
-  };
-  // The night (src/game) and what it shows: night-driver.ts turns the game's events into these calls.
-  const propOutline = createSilhouette();
-  const wakeSleeper = (index: number): void => {
-    // The spark leaves the traveller (where it stands on the paper), flies across the room to the sleeper, and the room lights it
-    // and plays its note when it lands.
-    if (!readTraveller()) {
-      travellerAt.x = 0;
-      travellerAt.y = 0;
-    }
-    stagePoint(stage, travellerAt.x, travellerAt.y + 0.05, 0.06, sparkStart);
-    sparkFrom.set(sparkStart.x, sparkStart.y, sparkStart.z);
-    roomDressing.wakePoint(index, sparkTo);
-    spark.launch(sparkFrom, sparkTo, () => {
-      roomDressing.setAwake(index + 1);
-      if (index === 1) roomDressing.rippleBunting(); // the second sleeper hangs under the bunting
-      gameAudio.lullabyNote(index, sparkTo.x, sparkTo.y, sparkTo.z);
-    });
-  };
-  const night = new NightDriver({
-    stage,
-    flame: candleView.flamePosition,
-    blend: () => projector.settings.blend,
-    saves,
-    setProps: (list, light, onStage, blend) => {
-      propShadows.setProps(list, light, onStage, blend);
-      propSketch.setProps(list, light, onStage, blend); // and a faint painting of each prop, toward the light
-      // The dust a hand shakes off a prop's shadow needs the outlines too (on puzzle load only, so it may allocate).
-      propTouch.setPolygons(
-        list.map((p) => {
-          const n = projectProp(p, light, onStage, blend, propOutline);
-          return { vertices: propOutline.points.slice(0, n * 2), vertexCount: n };
-        }),
-      );
-    },
-    showHint: (shape, x, y) => {
-      ghostTarget.setTarget('hint', x, y, shape);
-      ghostTarget.active = true;
-    },
-    hideHint: () => {
-      ghostTarget.active = false;
-    },
-    perchKindred: visitKindred,
-    releaseKindred: endKindredVisit,
-    dim: () => {
-      // The room cools with the mood the night sets; the kindred darts off the wall and stays away. The candle gutters: the whole
-      // view dims for a moment (a slow fade to half dark, held, then back up) and a beam creaks overhead.
-      if (kindredOn) kindred.scare(kindred.x, kindred.y - 0.05);
-      fade.fadeTo(0.55, 1.0, () => later(() => fade.fadeTo(0, 1.8), 1600));
-      roomDressing.group.localToWorld(creakPoint.set(0, 2.4, -0.4));
-      gameAudio.creak(creakPoint.x, creakPoint.z);
-    },
-    setKindredAway: (away) => {
-      kindredAway = away;
-      if (away) {
-        endKindredVisit();
-        kindredOn = false; // not setKindred: the Testing switch's own choice stays
-        kindredView.hide();
-      }
-    },
-    setMood: (goal) => {
-      moodGoal = goal;
-    },
-    say: (text, delay, hold, after) => storyLine.say(text, delay, hold, after),
-    scenery: (index) => {
-      stageView.setTheme(index);
-      roomDressing.setWind(index === 3 ? FAN_WIND : CALM_WIND); // the fan puzzle blows the bunting about
-    },
-    rewound: () => {
-      // The night turns back: a quick dip of the view and a soft chime, so the jump is felt as a rewind, not a glitch.
-      fade.fadeTo(0.45, 0.12, () => fade.fadeTo(0, 0.7));
-      gameAudio.twinkleAt(stage, 0, 0);
-    },
-    reward: (index) => {
-      // The puzzle's own reward, on the paper where the traveller stands.
-      if (governor.isOn('reward') && readTraveller())
-        rewards.play(REWARDS[index] ?? 'sparks', travellerAt.x, travellerAt.y);
-    },
-    wake: (index) => wakeSleeper(index),
-    travel: (from, to) => void travelTo(from, to),
-    interlude: playInterlude,
-    note: (text) => captionLine.say(text, 3.2, 2.6),
-    setAwake: (count) => {
-      sleepersAwake = count;
-      if (count === 0) {
-        spark.clear(); // a restart: nothing in flight
-        rewards.clear();
-      }
-      roomDressing.setAwake(count);
-    },
-    solved: () => {
-      // The bloom and the burst, but the wall warms by the night's colour script, not all the way.
-      const mood = moodGoal;
-      playSolve();
-      moodGoal = mood;
-      gameAudio.puzzleSolved(stage);
-    },
-    twinkle: (x, y) => gameAudio.twinkleAt(stage, x, y),
-    playEnding: (onDone) => playEnding(onDone),
-    nightOver: () => void showMenu('end', endLine(night.waysFound(), MENU_SCREENS.end.line)),
-  });
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
@@ -808,15 +353,14 @@ async function start(): Promise<void> {
   // The title screen's SETTINGS item opens the same settings as a page, before the headset is on.
   const settingsPage = createSettingsPage(settings);
   launcherHooks.openSettings = () => settingsPage.open();
-  // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyTextSize = () => {
-    storyLine.scale = settings.value.textSize;
     captionLine.scale = settings.value.textSize;
   };
   settings.subscribe((key) => {
     if (key === null || key === 'textSize') applyTextSize();
   });
   applyTextSize();
+  // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
     shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
@@ -825,8 +369,7 @@ async function start(): Promise<void> {
     if (key === null || key === 'highContrast') applyContrast();
   });
   applyContrast();
-  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it
-  // (the lantern flow will).
+  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it.
   // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
@@ -846,10 +389,9 @@ async function start(): Promise<void> {
     world.camera.getWorldDirection(settingsLook);
     return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
-  // The pause, solved and end screens. The game flow calls menu.show('pause' | 'solved' | 'end') and reads the
-  // presses from menu.onPress; here a press on Settings opens the settings panel and Resume closes the screen.
+  // The pause screen in the room, shown from the Hand Lab's Menu button or the launcher's Testing panel; a press on Settings opens
+  // the settings panel, Resume closes the screen and Leave ends the session.
   const menuTips = new Float32Array(6);
-  // The menu screen being looked at from the Hand Lab's Menu button or the launcher's Testing panel (never by the game).
   let menuChoice: MenuChoice = 'off';
   const showMenuChoice = (choice: MenuChoice) => {
     menuChoice = choice;
@@ -873,17 +415,6 @@ async function start(): Promise<void> {
       menu.hide();
       menuChoice = 'off';
       void world.renderer.xr.getSession()?.end();
-    } else if (screen === 'pause' && button === 'restart') {
-      menu.hide();
-      menuChoice = 'off';
-      sessionState = 'playing';
-      candleView.setLocked(true);
-      night.restart();
-    } else if (screen === 'end' && button === 'again') {
-      menu.hide();
-      menuChoice = 'off';
-      moodGoal = 0.4;
-      night.again();
     }
   };
   const showMenu = (id: MenuScreenId, line?: string) => {
@@ -894,54 +425,6 @@ async function start(): Promise<void> {
   let badPoseReported = false;
   let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
-  // The room's ambient sounds: the clock at the back and the wind at the window follow the room when it is placed round the player;
-  // a few flakes tick on the glass and a beam creaks now and then, less as the sleepers wake, and never over a story scene.
-  const clockPoint = new Vector3();
-  const windPoint = new Vector3();
-  const creakPoint = new Vector3();
-  const placeAmbientSounds = () => {
-    roomDressing.group.updateWorldMatrix(true, false);
-    roomDressing.group.localToWorld(clockPoint.set(-1.4, 1.9, 0.8));
-    roomDressing.group.localToWorld(windPoint.set(-1.95, 1.4, -0.8));
-    gameAudio.placeAmbient(clockPoint, windPoint);
-  };
-  let ambientOn = false;
-  let ambientTimer: ReturnType<typeof setTimeout> | undefined;
-  let sleepersAwake = 0;
-  const ambientTick = () => {
-    ambientTimer = setTimeout(ambientTick, 3500 + Math.random() * 7000);
-    if (!ambientOn || inVoid || visibility.paused || sessionState !== 'playing' || !governor.isOn('ambient')) return;
-    if (Math.random() < 0.15) {
-      roomDressing.group.localToWorld(creakPoint.set((Math.random() - 0.5) * 3, 2.4, -1.6 + Math.random() * 2));
-      gameAudio.creak(creakPoint.x, creakPoint.z);
-    } else if (Math.random() < 1 - 0.16 * sleepersAwake) gameAudio.snowTick();
-  };
-  // The traveller's footsteps: one soft step for every stride of ground it walks (not while it waits, and not across a jump).
-  /** How close (metres on the paper) a hand's shadow must come to the traveller for it to glance at it. */
-  const GLANCE_M = 0.13;
-  const STEP_M = 0.045;
-  let stepLastX = 0;
-  let stepWalked = 0;
-  let stepSeen = false;
-  let stepAlternate = false;
-  const footsteps = () => {
-    if (!readTraveller()) {
-      stepSeen = false;
-      return;
-    }
-    const dx = Math.abs(travellerAt.x - stepLastX);
-    if (stepSeen && night.game!.traveller.state === 'walk' && dx < 0.1) {
-      stepWalked += dx;
-      if (stepWalked >= STEP_M) {
-        stepWalked -= STEP_M;
-        stepAlternate = !stepAlternate;
-        gameAudio.stepAt(stage, travellerAt.x, travellerAt.y, stepAlternate);
-        if (governor.isOn('reward')) rewards.play('puff', travellerAt.x, travellerAt.y - 0.035); // a little dust at its feet
-      }
-    } else stepWalked = 0;
-    stepLastX = travellerAt.x;
-    stepSeen = true;
-  };
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
     if (!(Number.isFinite(yaw) && Number.isFinite(head[0]) && Number.isFinite(head[1]) && Number.isFinite(head[2]))) {
@@ -966,7 +449,6 @@ async function start(): Promise<void> {
     const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
     roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
-    placeAmbientSounds();
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -992,20 +474,19 @@ async function start(): Promise<void> {
     const titleY = head[1] - 0.15;
     const titleZ = head[2] - Math.cos(yaw) * titleDist;
     vrTitle.place(titleX, titleY, titleZ, yaw);
+    // The pause menu is drawn on the wall: it lives in the stage's frame.
     const r = stage.right,
       u = stage.up,
       n = stage.normal,
       o = stage.origin;
     // prettier-ignore
-    stageGroup.matrix.set(
+    wallPauseView.group.matrix.set(
       r[0], u[0], n[0], o[0],
       r[1], u[1], n[1], o[1],
       r[2], u[2], n[2], o[2],
       0, 0, 0, 1,
     );
-    stageGroup.matrixWorldNeedsUpdate = true;
-    // The wall or the flame moved: the props' shadows (and the ground they make) are cast again.
-    night.relight();
+    wallPauseView.group.matrixWorldNeedsUpdate = true;
     // Cover-flame aims at the candle on the tray in mock mode only. In XR it waits for the lantern flow: the candle sits
     // in the lap, where a resting fist would read as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
@@ -1013,6 +494,7 @@ async function start(): Promise<void> {
     everPlaced = true;
     return true;
   };
+  wallPauseView.group.matrixAutoUpdate = false;
   const headMatrix = new Matrix4();
   const headPos = new Vector3();
   const headRot = new Quaternion();
@@ -1043,50 +525,9 @@ async function start(): Promise<void> {
         cycle: () => showMenuChoice(nextChoice(MENU_CHOICES, menuChoice)),
         label: () => menuChoice,
       },
-      cutscene: { play: () => playOpening() },
-      prologue: { play: () => prologue.start() },
-      travel: {
-        play: () => {
-          const from = travelDemo++ % 4;
-          void travelTo(from, from + 1);
-        },
-      },
-      rewind: { go: () => night.rewind(3) },
-      editor: {
-        open: () => {
-          // In the lab there is no opening to start the night: opening the editor does it.
-          if (night.started) return;
-          sessionState = 'playing';
-          candleView.setLocked(true);
-          night.start();
-        },
-        current: () => {
-          const puzzle = night.game?.puzzle;
-          if (!puzzle) return null;
-          let editor = levelEditors.get(puzzle);
-          if (!editor) levelEditors.set(puzzle, (editor = new LevelEditor(puzzle)));
-          return editor;
-        },
-        changed: () => night.restart(),
-      },
-      kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
-      solve: { play: () => playSolve() },
-      ending: { play: () => playEnding() },
-      sticker: {
-        // Shows the next sticker over the traveller, to see them all.
-        next: () => {
-          if (readTraveller()) travellerMood.show(stickerNext as StickerId, travellerAt.x, travellerAt.y);
-          stickerNext = (stickerNext + 1) % STICKER_COUNT;
-        },
-      },
     });
   }
   const handList = [hands.hands.left, hands.hands.right];
-  // ?debug=props shows a few demo props' shadows (src/debug/demo-props.ts): dev and tester builds only.
-  let demoProps: ((stage: StagePlane) => Prop[]) | null = null;
-  const demoKey = new Float64Array(6).fill(NaN);
-  if (DEBUG_TOOLS && debugViews.has('props')) demoProps = (await import('../debug/demo-props')).demoProps;
-  let simWasPaused = false;
   // The hands as the player sees them in the room (swap this one line for another look). Shown in VR and
   // mock mode; over passthrough the real hands are visible, so it hides itself.
   const handVisual: HandVisual = new CapsuleHandVisual();
@@ -1094,7 +535,7 @@ async function start(): Promise<void> {
   world.scene.add(handVisual.object);
   // Debug tools (src/debug, ADR 0012, getting-started section 17): only when DEBUG_TOOLS is on (the dev server, or a build made with
   // `vite build --mode tester`), and loaded on demand, so a normal build does not contain them. `debug` is null otherwise.
-  // ?debug=shadow,joints,colliders still turns the overlays on at start.
+  // ?debug=shadow,joints still turns the overlays on at start.
   const handFlags = { handVisual: true };
   let debug: DebugTools | null = null;
   if (DEBUG_TOOLS) {
@@ -1117,7 +558,6 @@ async function start(): Promise<void> {
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
     for (const [view, overlay] of [
       ['shadow', 'capsules'],
-      ['colliders', 'colliders'],
       ['joints', 'joints'],
     ] as const)
       if (debugViews.has(view)) debug.showOverlay(overlay);
@@ -1167,8 +607,6 @@ async function start(): Promise<void> {
   // addSource keeps only one source, so everything we report goes through it.
   diagnostics.addSource(() => ({
     ...reportSource({
-      simHz: SIM_HZ,
-      simSteps: night.steps,
       handReadMethod: hands.method,
       mockSource: mock ? mock.source.name : null,
       capabilities,
@@ -1190,22 +628,6 @@ async function start(): Promise<void> {
     gestures: { ...gestures.counts, droppedEvents: gestures.events.dropped },
     perf: timings.toJSON(),
     render: renderReport(),
-    stageRenderer: {
-      liveCount: stageRenderer.liveCount,
-      drawCalls: 1,
-      ghostTargetActive: ghostTarget.active,
-    },
-    night: night.game
-      ? {
-          puzzle: night.game.puzzle.id,
-          complete: night.game.complete,
-          traveller: night.game.traveller.state,
-          terrainCapsules: night.game.solver.terrain.count,
-          layoutProblems: night.game.layout.problems.length,
-          hint: night.game.runner.hintRung,
-          waitingForHands: night.game.waitingForHands,
-        }
-      : null,
     shadow: {
       stage: 'real',
       placed: rigPlaced,
@@ -1270,17 +692,11 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: audio', () => audio.unlock());
-    guard('sessionstart: room sound', () => gameAudio.setRoom(true));
     guard('sessionstart: quality', () => {
       governor.reset();
       governor.setRefreshRate((session as { frameRate?: number } | null)?.frameRate ?? 72);
       governorOn = !mock && !!session;
       applyGovernor();
-    });
-    guard('sessionstart: ambient', () => {
-      placeAmbientSounds();
-      ambientOn = true;
-      if (ambientTimer === undefined) ambientTimer = setTimeout(ambientTick, 6000);
     });
     if (capture.enabled) guard('sessionstart: capture', () => world.renderer.xr.setFoveation?.(capture.foveation));
     // A session started from the browser's own enter prompt gives the page no click; a pinch in it still unlocks.
@@ -1302,22 +718,9 @@ async function start(): Promise<void> {
       guard('sessionstart: hands status', () => handsStatus.start());
     }
     if (session) guard('sessionstart: visibility', () => visibility.attach(session));
-    // The first time a headset starts the game, the prologue plays before the candle (once; the Testing switch plays it again).
-    if (session && !mock && !hasSeenPrologue()) {
-      guard('sessionstart: prologue', () => {
-        later(() => {
-          markPrologueSeen(); // only once it plays: leaving at once should not use up the first showing
-          prologue.start();
-        }, 800);
-      });
-    }
   });
   world.renderer.xr.addEventListener('sessionend', () => {
-    guard('sessionend: room sound', () => gameAudio.setRoom(false));
-    guard('sessionend: ambient', () => {
-      ambientOn = false;
-      clearTimeout(ambientTimer); // the chain starts again with the next session
-      ambientTimer = undefined;
+    guard('sessionend: quality', () => {
       governorOn = false;
       governor.reset();
       applyGovernor();
@@ -1334,19 +737,6 @@ async function start(): Promise<void> {
         placeRig([0, 1.2, 0], 0);
       });
     }
-    guard('sessionend: story', () => {
-      prologue.skip();
-      finale.skip();
-      pendingInterlude = null;
-      // An interlude ends with the session, and the night stops holding for it.
-      const done = interludeDone;
-      if (done) {
-        cutscenes.stop(false);
-        done();
-      }
-      cancelLater(); // skipping runs the end-of-finale step, which must not show the end screen now
-      fade.setBlack(false); // and a dim that was waiting to lift must not stay
-    });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
       ignitionHoldTimer = 0;
@@ -1356,9 +746,6 @@ async function start(): Promise<void> {
       candleView.setLocked(false);
       titleLighter.visible = false;
       wallPauseView.hide();
-      stageRenderer.mesh.visible = false;
-      kindredView.group.visible = false;
-      ghostTarget.mesh.visible = false;
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -1413,25 +800,15 @@ async function start(): Promise<void> {
       tools.showOverlay('joints', t.joints || debugViews.has('joints'));
     };
     applyOverlays(loadTesting());
-    night.rewindOnFall = loadTesting().rewindOnFall;
     showMenuChoice(loadTesting().menu);
-    setKindred(loadTesting().kindred);
     window.addEventListener(TESTING_EVENT, (e) => {
       const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
       applyOverlays(t);
-      night.rewindOnFall = t.rewindOnFall;
       showMenuChoice(t.menu);
-      setKindred(t.kindred);
     });
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
-      if (t.cutscene) setTimeout(() => playOpening(), 1000);
-      // A story scene, to see it straight away on a headset: the prologue, or the finale (the same one the night ends with).
-      if (t.story === 'prologue') later(() => prologue.start(), 1000);
-      if (t.story === 'travel') later(() => travelWhenFree(2, 3), 1000);
-      if (t.story === 'finale') later(() => finale.start(), 1000);
-      setKindred(t.kindred);
       armRecording(t.record);
     });
   }
@@ -1441,8 +818,6 @@ async function start(): Promise<void> {
   if (handsPanel) world.player.add(handsPanel.mesh);
   let handsPanelVersion = handsStatus.version;
 
-  // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
-  // and scene understanding (-1) systems and before render.
   /** True while any controller button is down. Indexed loops, so no iterator or closure is made in the frame. */
   const controllerPressed = (frame: XRFrame): boolean => {
     const sources = frame.session.inputSources;
@@ -1453,7 +828,21 @@ async function start(): Promise<void> {
     }
     return false;
   };
+  /** Lights the candle: the title dissolves, the room warms and the hands' shadows come onto the wall. */
+  const igniteCandle = () => {
+    sessionState = 'playing';
+    ignitionHoldTimer = 0;
+    candleView.ignitionProgress = 0;
+    roomDressing.ignition = 0;
+    candleView.lit = true;
+    candleView.setLocked(true);
+    titleLighter.visible = false;
+    gameAudio.candleIgnited(candleView.flamePosition);
+    vrTitle.ignite();
+  };
 
+  // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
+  // and scene understanding (-1) systems and before render.
   class FrameDriverSystem extends createSystem({}) {
     update(delta: number) {
       // Nothing in the frame may throw out of here: the browser and IWSDK do not catch it, and the next frame
@@ -1483,17 +872,9 @@ async function start(): Promise<void> {
       if (governor.level !== appliedLevel) applyGovernor();
       // The headset's system menu (visible-blurred) or a hidden page: no hand data arrives and the game holds still.
       const paused = visibility.paused;
-      // The first frame after the headset was off carries the whole gap; the sim loop clamps its own, these do not.
+      // The first frame after the headset was off carries the whole gap; these do not clamp their own.
       const step = Math.min(delta, MAX_STEP_S);
-      const shadowsVisible =
-        candleView.lit &&
-        sessionState !== 'paused' &&
-        sessionState !== 'title_vr' &&
-        !prologue.playing &&
-        !finale.playing &&
-        !inVoid;
-      // The ledges' shadows wait until the opening is over, or they sit over its captions.
-      const propsVisible = shadowsVisible && openingT < 0;
+      const shadowsVisible = candleView.lit && sessionState === 'playing';
       timings.begin(SLOT.read);
       if (debug?.replay.active) {
         // A recorded session stands in for the hands (the debug menu, Alt+R); the hands cue sees them as tracked.
@@ -1561,7 +942,6 @@ async function start(): Promise<void> {
             lantern[0] = candleView.group.position.x;
             lantern[1] = candleView.group.position.y;
             lantern[2] = candleView.group.position.z;
-            if (candleAction.justPlaced) night.relight();
           }
         } catch (e) {
           failures.report('candle pickup', e);
@@ -1594,8 +974,6 @@ async function start(): Promise<void> {
           if (!handTouchingWick && mock) {
             handTouchingWick = true;
           }
-          // Not while a story scene is playing: the room is hidden and the hands are somewhere else.
-          if (prologue.playing || finale.playing) handTouchingWick = false;
 
           if (handTouchingWick) {
             ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
@@ -1612,24 +990,14 @@ async function start(): Promise<void> {
           candleView.ignitionProgress = ignitionProgress;
           roomDressing.ignition = ignitionProgress; // the room starts to glow as the wick is held
 
-          if (ignitionHoldTimer >= 3.0) {
-            sessionState = 'opening';
-            candleView.ignitionProgress = 0;
-            roomDressing.ignition = 0;
-            candleView.lit = true;
-            titleLighter.visible = false;
-            gameAudio.candleIgnited(candleView.flamePosition);
-            vrTitle.ignite();
-            playOpening();
-          }
+          if (ignitionHoldTimer >= 3.0) igniteCandle();
         } else {
           titleLighter.visible = false;
-          if (sessionState === 'opening') {
-            vrTitle.update(step);
-          } else if (sessionState === 'playing') {
+          // The title dissolves once the candle is lit.
+          if (!vrTitle.isDissolved) vrTitle.update(step);
+          if (sessionState === 'playing') {
             if (candleView.isCovered) {
               sessionState = 'paused';
-              simWasPaused = true;
               candleView.lit = false;
               candleView.resetCover();
               audio.mixer.setLift(Bus.Ambience, 0.15);
@@ -1648,18 +1016,6 @@ async function start(): Promise<void> {
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);
-              simWasPaused = true;
-            } else if (action === 'restart') {
-              wallPauseView.hide();
-              sessionState = 'playing';
-              candleView.resetCover();
-              candleView.lit = true;
-              candleView.setLocked(true);
-              audio.mixer.setLift(Bus.Ambience, 1.0);
-              audio.mixer.setLift(Bus.Music, 1.0);
-              gameAudio.candleIgnited(candleView.flamePosition);
-              night.restart();
-              simWasPaused = true;
             } else if (action === 'settings') {
               wallPauseView.showSettings();
             }
@@ -1668,12 +1024,6 @@ async function start(): Promise<void> {
         timings.begin(SLOT.shadow);
         try {
           shadowRenderer.mesh.visible = shadowsVisible;
-          propShadows.mesh.visible = propsVisible;
-          fixturesView.group.visible = propsVisible && night.started;
-          stageRenderer.mesh.visible = shadowsVisible;
-          kindredView.group.visible = shadowsVisible;
-          ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
-
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
@@ -1681,211 +1031,18 @@ async function start(): Promise<void> {
           }
           shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
-          if (demoProps) {
-            // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.
-            const o = stage.origin,
-              f = candleView.flamePosition;
-            if (
-              o[0] !== demoKey[0] ||
-              o[1] !== demoKey[1] ||
-              o[2] !== demoKey[2] ||
-              f[0] !== demoKey[3] ||
-              f[1] !== demoKey[4] ||
-              f[2] !== demoKey[5]
-            ) {
-              propShadows.setProps(demoProps(stage), f, stage, projector.settings.blend);
-              demoKey.set([o[0], o[1], o[2], f[0], f[1], f[2]]);
-            }
-          }
-          propShadows.update(stage, propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0);
-          if (night.game)
-            fixturesView.update(
-              night.game.fixtures,
-              propsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
-              paused ? 0 : step,
-            );
-          if (kindredOn && rigPlaced) {
-            // It circles where the flame's light falls on the wall: the flame's position in stage coordinates.
-            const f = candleView.flamePosition,
-              o = stage.origin,
-              r = stage.right,
-              up = stage.up;
-            const dx = f[0] - o[0],
-              dy = f[1] - o[1],
-              dz = f[2] - o[2];
-            const hw = stage.width / 2,
-              hh = stage.height / 2;
-            const fx = Math.max(-hw * 0.7, Math.min(hw * 0.7, dx * r[0] + dy * r[1] + dz * r[2]));
-            const fy = Math.max(-hh * 0.7, Math.min(hh * 0.7, dx * up[0] + dy * up[1] + dz * up[2]));
-            // A hand's shadow coming close startles it (the palm's shadow, from the light through the hand).
-            if (kindred.startled <= 0 && openingT < 0 && perchT <= 0) {
-              const fl = candleView.flamePosition;
-              for (const h of handList) {
-                if (!h.tracked) continue;
-                const o3 = JOINT['middle-finger-metacarpal'] * 3;
-                if (
-                  !shadowSpot(
-                    stage,
-                    fl[0],
-                    fl[1],
-                    fl[2],
-                    h.positions[o3],
-                    h.positions[o3 + 1],
-                    h.positions[o3 + 2],
-                    spot,
-                  )
-                )
-                  continue;
-                const ex = spot[0] - kindred.x,
-                  ey = spot[1] - kindred.y;
-                if (ex * ex + ey * ey < SCARE_RADIUS_M * SCARE_RADIUS_M) {
-                  kindred.scare(spot[0], spot[1]);
-                  break;
-                }
-              }
-            }
-            kindred.update(step, hw, hh, fx, fy, true);
-            let foxAlpha = 1;
-            if (summonT > 0) foxAlpha = Math.min(1, summonT, (7 - summonT) / 0.6);
-            if (openingT >= 0) {
-              openingT += step;
-              foxAlpha = openingFoxAlpha(openingT);
-            }
-            kindredView.update(
-              kindred,
-              stage,
-              shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion * foxAlpha : 0,
-              step,
-            );
-            if (!shadowsVisible) kindredView.group.visible = false;
-          }
-          // Dust: a hand's shadow reaching into a prop's shadow shakes a little off it, with a soft rustle.
-          for (let i = 0; i < 2; i++) {
-            const sh = projector.shadows[i === 0 ? 'left' : 'right'];
-            if (
-              propTouch.update(i, step, sh.active && sh.onStage, sh.bounds[0], sh.bounds[1], sh.bounds[2], sh.bounds[3])
-            ) {
-              dust.sparkles.burst(propTouch.touchX, propTouch.touchY, 9, 0.05);
-              gameAudio.bridgeActivated(stage, propTouch.touchX, propTouch.touchY);
-            }
-          }
-          dust.sparkles.update(step, 0, 0, 0);
-          dust.draw(stage, shadowRenderer.baseOpacity * candleView.occlusion * 0.8);
-          // The shadow animals: what a hand just committed comes alive on the wall (visual only, no gameplay).
-          for (let i = 0; i < shapes.events.count; i++) {
-            const e = shapes.events.at(i);
-            if (e.type !== 'commit' || (e.shape !== 'rabbit' && e.shape !== 'fox')) continue;
-            const sh = projector.shadows[e.hand];
-            if (!sh.active || !sh.onStage) continue;
-            const cx = (sh.bounds[0] + sh.bounds[2]) * 0.5;
-            const cy = (sh.bounds[1] + sh.bounds[3]) * 0.5;
-            if (e.shape === 'rabbit') {
-              rabbits.spawn(e.hand === 'left' ? 0 : 1, cx, cy - 0.05, cx >= 0 ? 1 : -1);
-              gameAudio.hopAt(stage, cx, cy);
-            } else {
-              if (!kindredOn) {
-                kindred.x = cx + (cx >= 0 ? 0.6 : -0.6) * stage.width * 0.5; // it flies in from the nearer edge
-                kindred.y = cy + 0.1;
-                summonT = 7;
-                kindredOn = true; // for the visit only: the switch's own choice (kindredWanted) is untouched
-              }
-              kindred.perchAt(cx, cy + 0.09);
-              perchT = 3.2;
-              gameAudio.twinkleAt(stage, cx, cy + 0.09);
-            }
-          }
-          rabbits.update(step, stage, shadowRenderer.baseOpacity * candleView.occlusion);
-          if (perchT > 0 && (perchT -= step) <= 0) kindred.release();
-          if (summonT > 0 && (summonT -= step) <= 0) {
-            kindredOn = kindredWanted;
-            if (!kindredOn) kindredView.hide();
-          }
-          // Glows on the wall: the solve bloom, and a soft light round a hand that is nearly making the wanted shape.
-          {
-            const occ = candleView.occlusion;
-            solveBloom.update(step);
-            stickerView.update(travellerMood, stage, shadowRenderer.baseOpacity * occ);
-            audio.mixer.setLift(Bus.Music, 1 + 0.4 * solveBloom.value); // the music swells with the light
-            glow.set(0, stage, 0, stage.height * 0.05, stage.width * 0.55, solveBloom.value * 0.7 * occ);
-            const wanted = ghostTarget.active ? SHAPES.indexOf(ghostTarget.requiredShape) : -1;
-            for (let i = 0; i < 2; i++) {
-              const h = i === 0 ? 'left' : 'right';
-              const sh = projector.shadows[h];
-              let level = 0;
-              if (wanted >= 0 && sh.active && sh.onStage && shapes[h].state.committed !== ghostTarget.requiredShape)
-                level = nearMissLevel(shapes[h].margins[wanted]);
-              const f = nearGlow[i].update(level, step);
-              glow.set(
-                1 + i,
-                stage,
-                (sh.bounds[0] + sh.bounds[2]) * 0.5,
-                (sh.bounds[1] + sh.bounds[3]) * 0.5,
-                0.1,
-                f * 0.55 * occ,
-              );
-            }
-          }
-          spark.update(paused ? 0 : step);
-          readingPage.update(step);
-          rewards.update(
-            paused ? 0 : step,
-            stage,
-            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
-          );
-          propSketch.update(
-            propsVisible && governor.isOn('propSketch') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
-          );
           handTrail.update(
             paused ? 0 : step,
             stage,
             projector.shadows,
             shadowsVisible && governor.isOn('trail') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
           );
-          world.camera.getWorldPosition(settingsHead);
-          fade.update(step, settingsHead);
-          prologue.update(step);
-          finale.update(step);
-          if (travelRun && inVoid) {
-            const run = travelRun;
-            walkScene.update(step);
-            if (walkScene.finished && !run.dipping && !run.leaving) {
-              if (run.at + 1 < run.segments.length && !run.skipRest) {
-                // The next scene (the walk into the new land) follows the waking: a quick dip to black, so the repaint is not seen.
-                run.dipping = true;
-                const next = run.segments[run.at + 1];
-                fade.fadeTo(1, 0.35, () => {
-                  run.at++;
-                  world.camera.getWorldPosition(prologueHead);
-                  world.camera.getWorldDirection(prologueAhead);
-                  walkScene.start(prologueHead, prologueAhead.x, prologueAhead.z, next.land, next.mode);
-                  fade.fadeTo(0, 0.5, () => (run.dipping = false));
-                });
-              } else {
-                run.leaving = true;
-                walkHost.leave();
-                later(() => {
-                  sessionState = run.resume;
-                  travelRun = null;
-                }, 1300);
-              }
-            }
-          }
-          // The story's quiet line on the wall: it waits while paused and is not shown under a menu or a cutscene.
+          // The captions' line on the wall: it waits while paused and is not shown under a menu.
           const lineOpacity =
-            shadowsVisible && !menu.group.visible && !cutscenes.playing
-              ? shadowRenderer.baseOpacity * candleView.occlusion
-              : 0;
-          // A line said as a scene begins waits out its interlude, so it is not lost under the cutscene.
-          const linesWait = paused || sessionState !== 'playing' || cutscenes.playing;
-          storyLine.update(linesWait ? 0 : step, stage, lineOpacity);
-          captionLine.update(linesWait ? 0 : step, stage, lineOpacity);
-          if (pendingInterlude && !travelRun && !inVoid) {
-            const waiting = pendingInterlude;
-            pendingInterlude = null;
-            playInterlude(waiting.data, waiting.onDone);
-          }
-          if (menu.group.visible || cutscenes.playing || prologue.playing || finale.playing || (travelRun && inVoid)) {
-            // The fingertips that can reach the menu or poke Skip: each tracked hand's index tip.
+            shadowsVisible && !menu.group.visible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
+          captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          if (menu.group.visible) {
+            // The fingertips that can reach the menu: each tracked hand's index tip.
             let tips = 0;
             for (const h of handList) {
               if (!h.tracked) continue;
@@ -1895,32 +1052,13 @@ async function start(): Promise<void> {
               menuTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            if (menu.group.visible) {
-              menu.gazeOn = settings.value.gazeMenus;
-              if (menu.gazeOn) {
-                world.camera.getWorldPosition(gazeAt);
-                world.camera.getWorldDirection(gazeDir);
-                menu.setGaze(gazeAt.x, gazeAt.y, gazeAt.z, gazeDir.x, gazeDir.y, gazeDir.z);
-              }
-              menu.update(step, menuTips, tips);
+            menu.gazeOn = settings.value.gazeMenus;
+            if (menu.gazeOn) {
+              world.camera.getWorldPosition(gazeAt);
+              world.camera.getWorldDirection(gazeDir);
+              menu.setGaze(gazeAt.x, gazeAt.y, gazeAt.z, gazeDir.x, gazeDir.y, gazeDir.z);
             }
-            if (travelRun && inVoid && !travelRun.leaving) {
-              if (walkSkip.update(step, menuTips, tips, walkScene.skipPlane)) {
-                travelRun.skipRest = true;
-                walkScene.skip();
-              }
-              walkScene.setSkipProgress(walkSkip.progress);
-            }
-            if (prologue.playing) {
-              if (prologueSkip.update(step, menuTips, tips, cinematic.skipPlane)) prologue.skip();
-              cinematic.setSkipProgress(prologueSkip.progress);
-            }
-            if (finale.playing) {
-              if (finaleSkip.update(step, menuTips, tips, hall.skipPlane)) finale.skip();
-              hall.setSkipProgress(finaleSkip.progress);
-            }
-            if (cutscenes.playing)
-              cutscenes.update(step, stage, menuTips, tips, shadowRenderer.baseOpacity * candleView.occlusion);
+            menu.update(step, menuTips, tips);
           }
           debug?.frame(rigPlaced);
         } catch (e) {
@@ -1953,66 +1091,6 @@ async function start(): Promise<void> {
           else panel.show(recorder.script.waitText, 0);
         }
       }
-      const isSimPaused =
-        paused || sessionState === 'paused' || sessionState === 'title_vr' || sessionState === 'opening';
-      if (isSimPaused) simWasPaused = true;
-      else {
-        try {
-          if (rigPlaced) {
-            // The outline only animates here; the game decides when the puzzle is solved.
-            ghostTarget.update(delta, projector.shadows, shapes);
-            ghostTarget.mesh.visible = shadowsVisible && ghostTarget.active;
-            // The traveller's mood: how near is the nearer hand's shadow?
-            if (!readTraveller()) stageRenderer.glance = false;
-            else {
-              let gap = 1e9;
-              for (let i = 0; i < 2; i++) {
-                const hs = projector.shadows[i === 0 ? 'left' : 'right'];
-                if (hs.active && hs.onStage)
-                  gap = Math.min(gap, nearestJointGap(hs.joints, hs.joints.length / 2, travellerAt.x, travellerAt.y));
-              }
-              stageRenderer.glance = gap < GLANCE_M; // it glances back at a hand that reaches close to it
-              const state = night.game!.traveller.state;
-              travellerMood.update(
-                delta,
-                travellerAt.x,
-                travellerAt.y,
-                state === 'blocked' || state === 'look-back' || state === 'held',
-                state === 'goal',
-                gap,
-              );
-            }
-          }
-          // Back from a pause (the flame covered, the headset off, the system menu): one held frame lets the game
-          // drop the time that passed, so nothing jumps (docs/SIMULATION.md).
-          const held = simWasPaused;
-          simWasPaused = false;
-          const shadows = projector.shadows;
-          night.frame(
-            delta,
-            held,
-            shadows.left.active ? shadows.left : null,
-            shadows.right.active ? shadows.right : null,
-            shapes.events,
-            hands.hands.left.tracked,
-            hands.hands.right.tracked,
-          );
-          footsteps();
-        } catch (e) {
-          failures.report('simulation', e);
-        }
-      }
-      try {
-        if (shadowsVisible && night.game) {
-          stageRenderer.mesh.visible = true;
-          stageRenderer.update(night.game.store, night.alpha);
-        } else {
-          stageRenderer.mesh.visible = false;
-        }
-      } catch (e) {
-        failures.report('stage renderer', e);
-      }
-      // The stand-in lantern burns once the rig is placed; Teammate B's lantern flow will set `lit` and the position.
       try {
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
@@ -2025,19 +1103,8 @@ async function start(): Promise<void> {
         // back when the flame is covered (the pause).
         roomDressing.spread(candleView.lit, step);
         candleLight.bakeIfDirty(world.renderer, world.scene);
-        world.camera.getWorldPosition(settingsHead);
         // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
-        // Mood: the room starts cold and warms as the puzzles are solved (a placeholder curve until the puzzles set it).
-        moodNow += (moodGoal - moodNow) * Math.min(1, step / 2.5);
-        stageView.mood = moodNow;
-        air.update(
-          stage,
-          candleView.flamePosition,
-          rigPlaced && lanternLight.light.lit ? candleView.occlusion : 0,
-          step,
-          !passthrough && sessionState !== 'paused',
-        );
         candleView.update(lanternLight.light, cameraQuat);
         lab?.applyLight(lanternLight.light, cameraQuat);
       } catch (e) {
@@ -2116,21 +1183,11 @@ async function start(): Promise<void> {
         showMenu,
         stageView,
         shadowRenderer,
-        cutscenes,
-        kindred,
-        kindredView,
-        stickerView,
-        storyLine,
         captionLine,
-        wakeSleeper,
         soundPool,
         governor,
         inspector,
-        fade,
-        rewards,
         handTrail,
-        prologue,
-        finale,
         openSettings,
         shapes,
         gestures,
@@ -2142,11 +1199,6 @@ async function start(): Promise<void> {
         lanternLight,
         candleView,
         candleLight,
-        stageGroup,
-        stageRenderer,
-        ghostTarget,
-        fixturesView,
-        night,
         audio,
         gameAudio,
         debug,
@@ -2162,13 +1214,7 @@ async function start(): Promise<void> {
         wallPauseView,
         sessionState: () => sessionState,
         igniteCandle: () => {
-          if (sessionState === 'title_vr') {
-            sessionState = 'opening';
-            candleView.lit = true;
-            gameAudio.candleIgnited(candleView.flamePosition);
-            vrTitle.ignite();
-            playOpening();
-          }
+          if (sessionState === 'title_vr') igniteCandle();
         },
         probe: (points: readonly (readonly number[])[]) =>
           probePixels(world.renderer, world.scene, world.camera, points),

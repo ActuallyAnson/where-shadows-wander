@@ -1,4 +1,4 @@
-// The pause, solved and end screens in the room. No panel: the text and a misty backdrop are drawn as artwork (menu-art.ts)
+// The pause screen in the room. No panel: the text and a misty backdrop are drawn as artwork (menu-art.ts)
 // on quads in front of the player, and a fingertip reaches and presses the items by position (menu-layout.ts), not through
 // UIKit. A press is reported through `onPress(screen, buttonId)`; which button does what is the game flow's business.
 // A texture is redrawn only when the reached item changes. Nothing is built per frame.
