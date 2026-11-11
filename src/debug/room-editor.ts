@@ -40,6 +40,8 @@ import type { ModelLoader, PlacedModels, PlacedPiece } from '../engine/shadow/pl
 import type { AssetFileInfo } from '../engine/services/assets/asset-tree';
 import { AssetClient } from './asset-client';
 import { AssetPanel, assetDragOf, ASSET_DRAG_TYPE } from './room-editor-assets';
+import { exportGlb, prepareForExport } from './piece-export';
+import { MODEL_MAX_BYTES } from '../engine/services/assets/asset-tree';
 import { applyPlacement, readPlacement } from '../engine/shadow/room-placement';
 import type { EditablePiece, EditableSource } from '../engine/shadow/room-placement';
 import { RoomEditHistory } from './room-edit-history';
@@ -343,6 +345,48 @@ export class RoomEditor {
     this.status = '';
     this.render();
     return true;
+  }
+
+  /**
+   * Exports the selected built-in piece as a .glb into src/assets/models/exported/ (a file of the same name is replaced), where
+   * the asset browser shows it and copies can be placed. Its textures are scaled down if it would be over the model budget. If
+   * its id is another asset's (the bed is "bed", which no file is, but the chair is "chair"), the file takes the next free
+   * number. Without a dev server the file is downloaded. Resolves with what happened.
+   */
+  async exportSelected(): Promise<string> {
+    const piece = this.selected;
+    if (!piece || isPlaced(piece)) return this.say('Pick a built-in piece to export');
+    const { root, warnings } = prepareForExport(piece.object, piece.id);
+    let bytes: Uint8Array | null = null;
+    for (const size of [Infinity, 512, 256]) {
+      bytes = await exportGlb(root, size);
+      if (bytes.length <= MODEL_MAX_BYTES) break;
+    }
+    if (!bytes || bytes.length > MODEL_MAX_BYTES)
+      return this.say(
+        `${piece.id} is over the ${Math.round(MODEL_MAX_BYTES / 1024)} KB model budget even with small textures`,
+      );
+    const kb = `${Math.max(1, Math.round(bytes.length / 1024))} KB`;
+    const notes = warnings.length ? ` Note: ${warnings.join('; ')}.` : '';
+    if (!this.client.current?.live) {
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'model/gltf-binary' }));
+      Object.assign(document.createElement('a'), { href: url, download: `${piece.id}.glb` }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      return this.say(`No dev server: downloaded ${piece.id}.glb (${kb}).${notes}`);
+    }
+    for (let n = 1; n < 20; n++) {
+      const path = `exported/${n === 1 ? piece.id : `${piece.id}-${n}`}.glb`;
+      const result = await this.assets.write(path, bytes, true);
+      if (result.ok) return this.say(`Exported ${path} (${kb}).${notes}`);
+      if (!/is taken by/.test(result.error)) return this.say(`Not exported: ${result.error}`);
+    }
+    return this.say(`Not exported: no free name for ${piece.id}`);
+  }
+
+  private say(status: string): string {
+    this.status = status;
+    this.render();
+    return status;
   }
 
   /** Whether a new piece may not take `id`: a piece there is now, an entry in the file, a built-in id, or one undo could bring back. */
@@ -730,6 +774,7 @@ export class RoomEditor {
       else if (act === 'reset') this.reset();
       else if (act === 'revert') this.revert();
       else if (act === 'copy') void this.duplicate();
+      else if (act === 'export') void this.exportSelected();
       else if (act === 'remove') this.remove();
       else if (act === 'fold') {
         const group = b.dataset.group ?? '';
@@ -797,7 +842,8 @@ export class RoomEditor {
             isPlaced(piece)
               ? `<div class="row"><button data-act="copy" title="Ctrl+D">Duplicate</button>
                   <button data-act="remove" title="Delete">Remove</button></div>`
-              : ''
+              : `<div class="row"><button data-act="export"
+                  title="Write it as a .glb to src/assets/models/exported/, to place copies or edit it in Blender">Export .glb</button></div>`
           }`
         : `<h2>Selected <span>nothing</span></h2><p class="hint">Click a piece in the room, or pick one below.</p>
           <div class="row"><button data-act="undo">Undo</button><button data-act="redo">Redo</button></div>`;
