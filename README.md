@@ -1,8 +1,8 @@
 # Where Shadows Wander
 
-A seated, hands-only virtual reality puzzle game: light a lantern in a small cosy room, and your hands' shadows help a little traveller cross the wall.
+A seated, hands-only virtual reality story: light a candle in a child's bedroom at night, and watch a story played in shadow puppets on the wall, moving it on with the shapes of your hands.
 
-**Status:** hands, shadows, the virtual-room wall, sound, saves and the asset pipeline are built; puzzles, art and headset tuning are next. Built for the Meta VR Start Developer Competition 2026.
+**Status:** the bedroom, lighting the candle, your hands' shadows on the wall, the shape recogniser, pausing by covering the flame, sound, saves and settings are built. The puzzle game was removed on 11 Nov 2026 ([ADR 0016](docs/adr/0016-story-shadow-theatre.md)); the shadow-puppet story system is next. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, emulator, webcam, headset testing, troubleshooting.
 - [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
@@ -55,6 +55,6 @@ Steps on the headset (Pico or Quest):
 2. Press **Enter VR** (on the Pico: **Enter VR (Direct Hands)**) and allow hand tracking. Put the controllers down.
 3. Look around the room for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle on the table, and your hands as dark gloves with their shadows on the wall. (To see a dot on every joint instead, add `?debug=joints` to the link.)
 4. Leave XR, then press **Copy report** at the bottom left of the page and paste the text to us. If copy doesn't work, press **Show**, then select and copy the text.
-5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This checks that your progress is saved between sessions (the report's `saves` section).
+5. Close the browser completely, reopen the page, enter XR again for about 10 seconds, then send a second report. This checks that your settings are saved between sessions (the report's `saves` section).
 
 To record hand data, add `?record=20` to the link (`?record=20&note=fist then flat hand` to label it). After leaving XR, press **Download recording**, then open the file in the Hand Recording Player.

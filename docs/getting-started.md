@@ -68,7 +68,7 @@ The Hand Lab is mock mode (`?mock=1`): the game runs in a normal browser with ha
 5. **Calibration:** with real hands, press **Calibrate right** (or left) and hold that hand flat, fingers straight and together, for 2 seconds. Curl is then measured from your own straight, which removes the webcam's offset (it reads straight fingers as somewhat bent). It's remembered in this browser; **Clear** removes it. The **Shape guide** shows a picture of each shape and how to make it.
 6. **Guided recording** prompts you through every shape, right hand then left (84 s: each shape held 4.5 s with 2 s rests, with a picture of each), and saves a recording with **shape labels**: which shape each hand was asked to make, and when. Those are what the classifier is scored against (#12). Use it with the **Webcam** source. With **Script** it gives a labelled synthetic recording. Press **Stop guided** to end early; you keep the labels for the prompts you finished.
 
-The Hand Lab is the same game as in a headset: the same room, the same paper wall (`StageFrame`: 2 m ahead, 1.6 × 1.0 m, 0.2 m below the eyes; a puppet hand's shadow is about 15 × 35 cm on it) and the same candle on the bed tray. Only the hands and the head differ: the head is the desktop camera at (0, 1, 0.5), and the mock hands rest 20 cm in front of the candle. Shadow puppets are made with the hand turned toward the wall: tilt a synthetic hand with T/Y. **G** puts the selected hand over the candle (for the cover-flame pause). Add `&debug=shadow` to draw the collision capsules (red), outline (green) and each joint projected separately (blue dots, which sit on the red lines' ends at the normal shadow size). In a headset the wall is placed in front of you when the session starts. Add `&debug=props` (dev and tester builds only) to draw the shadows of three demo props, a bed-sized box, a ball and a lamp-sized cylinder, with the same lantern and softness as the hands; a level draws its own with `PropShadowView.setProps` (`src/engine/shadow/prop-shadow-view.ts`) and turns the same props into ground with `addPropTerrain` (`src/engine/shadow/pure/prop-terrain.ts`).
+The Hand Lab is the same game as in a headset: the same room, the same paper wall (`StageFrame`: 2 m ahead, 1.6 × 1.0 m, 0.2 m below the eyes; a puppet hand's shadow is about 15 × 35 cm on it) and the same candle on the bed tray. Only the hands and the head differ: the head is the desktop camera at (0, 1, 0.5), and the mock hands rest 20 cm in front of the candle. Shadow puppets are made with the hand turned toward the wall: tilt a synthetic hand with T/Y. **G** puts the selected hand over the candle (for the cover-flame pause). Add `&debug=shadow` to draw the shadow capsules (red), outline (green) and each joint projected separately (blue dots, which sit on the red lines' ends at the normal shadow size). In a headset the wall is placed in front of you when the session starts.
 
 You can also choose the source in the address: `?mock=1&src=script`, `?mock=1&src=webcam`, or `?mock=1&src=replay&file=recordings/emulator-demo.handrec.json`. Adding `&record=10` records ten seconds the same way a headset does.
 
@@ -90,7 +90,7 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
-**The Testing button (no address to type; dev server and tester builds only, section 17).** The launcher at the bottom of the page has a **Testing** button next to Enter VR. It opens big on/off buttons: joint dots, shadow capsules, open the settings panel when VR starts, and record your hands (20 s of free hands, or the guided shapes). Each press applies at once and is remembered in the browser, so there is nothing to apply and nothing to reload; the settings panel and the recording begin when you press Enter VR. **Clear all switches** turns everything off. The lantern flicker is a setting in the settings panel. `?mock`, `?src`, `?file` and `?stage` are only for the desktop Hand Lab, and `?xr=ar` is the launcher's Enter AR button. `node scripts/testing-probe.mjs <url>` checks it in a browser.
+**The Testing button (no address to type; dev server and tester builds only, section 17).** The launcher at the bottom of the page has a **Testing** button next to Enter VR. It opens big on/off buttons: joint dots, shadow capsules, open the settings panel when VR starts, record your hands (20 s of free hands, or the guided shapes), and a menu screen to look at (off or pause). Each press applies at once and is remembered in the browser, so there is nothing to apply and nothing to reload; the settings panel and the recording begin when you press Enter VR. **Clear all switches** turns everything off. The lantern flicker is a setting in the settings panel. `?mock`, `?src`, `?file` and `?stage` are only for the desktop Hand Lab, and `?xr=ar` is the launcher's Enter AR button. `node scripts/testing-probe.mjs <url>` checks it in a browser.
 
 **Capture mode, for recording the demo video (works in the judges' build too).** On the title screen, tap the emblem (the little flame above the title) five times quickly: the page steps capture mode through off, clean and sharp and reloads, and a note under the menu says which is on. In the tester build the Testing panel has the same switch. Capture mode keeps the "Show me your hands" panel out of the picture (it would appear whenever tracking drops mid-take) and turns the headset's foveated rendering off (a recording shows its blurry edges). Sharp also renders the eyes at 1.5 times the resolution; that costs frame time, so check it holds the headset's rate before a take. The settings are in the session report (`capture`). Record with the headset's own recorder; this has not been tried on a Pico or a Quest yet, so do a short test take and look at the file before the real one. It is for taking video, not for playing.
 
@@ -148,7 +148,7 @@ npm run build   # production build into dist/
 ```
 
 `npm run check` fails if:
-- ESLint finds a problem, including code in `src/engine/hands`, `src/engine/sim`, `src/engine/stage` or `src/game` importing IWSDK, three.js or an engine-facing folder, or using browser globals (pure code stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
+- ESLint finds a problem, including code in `src/engine/hands`, `src/engine/stage` or `src/engine/shadow/pure` importing IWSDK, three.js or an engine-facing folder, or using browser globals (pure code stays engine-free, see [ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md));
 - a file isn't formatted with Prettier (`npm run format` fixes it);
 - a second copy of three.js gets installed;
 - a test fails.
@@ -161,7 +161,7 @@ To check a production build the way GitHub Pages serves it: `node scripts/serve-
 
 Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/pages.yml`), after `npm run check` passes. One-time setup by the repo owner: **Settings → Pages → Source: GitHub Actions**. The site is at https://actuallyanson.github.io/where-shadows-wander/ (and the webcam bench at `.../webcam.html`). The published site is public even though the repo is private.
 
-## 12. Edit the room and puzzle layouts
+## 12. Edit the room layout
 
 ### The bedroom: the room editor
 
@@ -186,11 +186,11 @@ Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR
 | Hold the right mouse button | Fly: the mouse turns the view, W/A/S/D move, Q/E go down/up, Shift is 3 times faster |
 | Arrow keys | Move the view level with the floor, any time (W/E/R/Q pick the gizmo's mode unless you are flying) |
 | Ctrl or Shift + drag | Pan |
-| Room only | Hides the stage, the reading page and the story's views (on when the editor opens) |
+| Room only | Hides the stage and everything else that is not the room (on when the editor opens) |
 | Close editor | Hands the view back to the Hand Lab |
 
 - **Spaces.** Pieces in the room are in room space: x right, y up from the floor, -z toward the wall the shadows play on, with the player at the origin. Keep everything short of z -1.5, the nearest the wall ahead comes. The lap pieces (`tray`, `quilt`) are in the tray's own space.
-- **Things that follow.** Moving the tray moves the candle, which is the light the gameplay shadows are cast from. A wonder's glow moves with the piece it is on. The candle's shadows are baked, and baked again as you drag (once a frame), so they follow the piece live.
+- **Things that follow.** Moving the tray moves the candle, which is the light the hand shadows are cast from. A wonder's glow moves with the piece it is on. The candle's shadows are baked, and baked again as you drag (once a frame), so they follow the piece live.
 - **The player.** A light-blue wireframe shows where the player sits: the headset at their eyes, a line down to a cross on the floor, and roughly what a Quest 3 sees (110° across, 96° up and down) out to z -1.5. It is hidden in the Eye view.
 - **Not in the editor:** the window, the walls and the wall ahead (which follows the stage distance). To make another piece editable, give it an id in its view and list it in `BEDROOM_PIECE_IDS` (`src/engine/shadow/bedroom-layout.ts`).
 - A file the game can't read is reported in the console (`room layout: ...`), and the affected pieces stand at their defaults. The dev server refuses to save one.
@@ -206,40 +206,6 @@ The **Assets** panel along the bottom shows `src/assets/models`: the folder tree
 - Model files added, changed or deleted under `src/assets/models` don't reload the page (they would end the editor's session); the next reload reads them. Without a dev server (a tester build) the panel is read-only and export downloads the file.
 - `node scripts/room-editor-probe.mjs https://localhost:8097` (with `npx vite --port 8097 --strictPort` running) checks all of this in a browser and puts the layout file back afterwards.
 
-### Puzzle layouts: IWSDK's scene editor
-
-The puzzle layouts (`public/scenes/chapter-1.iwsdk.scene.json`) are IWSDK scene files, edited in IWSDK's scene editor ([ADR 0006](adr/0006-editor-authored-layouts.md)). `public/scenes/main.iwsdk.scene.json` is IWSDK's start scene and stays empty. With `npm run dev` running, the editor is in the browser window IWSDK manages (it opens the scene from the editor's own file list). From a terminal: `npx iwsdk scene open --input-json '{"path":"public/scenes/chapter-1.iwsdk.scene.json"}'`, and `npx iwsdk scene state` shows the open file and any problems.
-
-Everything the game needs is set with the inspector's own fields, so you never edit the file by hand:
-
-| In the editor | What it means to the game |
-|---|---|
-| **Asset** `piece-rock`, `piece-crow`, `piece-fox`, `piece-traveller`, `piece-rabbit`, `piece-raindrop`, `piece-firefly` | An entity of that kind. Change the kind by choosing another asset |
-| **Asset** `marker-gap`, `marker-goal`, `marker-plate` | A named spot for the puzzle code |
-| **Position** x, y (metres) | Where it is on the stage; z is ignored (the stage is the x and y plane, like a wall, so dragging on the floor of the 3D view moves z, which does nothing) |
-| **Scale** | A piece's radius (scale 0.08 is a radius of 0.08 m; the ball you see is the size the game uses). A marker's width and height are its scale x and y |
-| **Add Component, `Piece`** (optional) | Starting speed `vx`, `vy` and the flags `isStatic`, `isSensor`, `hidden` |
-| **Visible** off | The node, and everything under it, is left out |
-
-#### What IWSDK's editor offers, and what it does not
-
-Checked on 11 Oct 2026 by driving a running editor (reading its panels, opening files, selecting nodes, `scene render-stats` and a screenshot), not from memory. The editor is IWSDK 1.0.0's.
-
-| Part | What is there |
-|---|---|
-| Toolbar | Move, Rotate and Scale, Snap, Local and World space, Undo and Redo, a Runtime and Editor switch |
-| Panels | Scene Graph (with Add Entity), Inspector, and at the bottom Assets, Console and Validation |
-| Inspector | Node name, Asset (a dropdown of the manifest), Visible, Position, Rotation and Scale with a reset for each, and Components |
-| Built-in nodes | Player Space, Camera, Head, the two target rays and the two grips, and Level Root, which a scene node can be placed under |
-| Add Component (37 built in) | AmbientLight, DirectionalLight, HemisphereLight, PointLight, RectAreaLight, SpotLight, IBLGradient, IBLTexture, DomeGradient, DomeTexture, AudioSource, CameraSource, PhysicsBody, PhysicsShape, PhysicsManipulation, OneHandGrabbable, TwoHandsGrabbable, DistanceGrabbable, PokeInteractable, RayInteractable, ScreenSpace, Follower, LocomotionEnvironment, EnvironmentRaycastTarget, DepthOccludable, LevelRoot, LevelTag, XRAnchor, XRMesh, XRPlane, XRCylinderLayer, XRQuadLayer, and runtime-state tags (Grabbed, Handle, Hovered, Pressed, XRLayerState); **plus our own `Piece`** |
-| Prefabs, instances, patterns | The scene file format has them (`resources.prefabs`, an `instance` node, and a `pattern` node that repeats a prefab in a line, grid, circle, along a path, scattered, or at listed transforms), and the editor **draws them**: a file with one instance and a linear pattern of four showed five rocks, with no validation problems. **The editor has no controls for making them**: a pattern or instance node shows the same Inspector as any other node, with no count, step or prefab field. They can only be written into the file by hand |
-| Not found | Animation clips or a timeline, particles, materials or shaders, scripts, a mixer, a profiler, play controls, terrain, light baking |
-| Scene settings | The file format has fog, tone mapping, exposure and shadow type (`environment`); no control for them was seen in the editor |
-
-Not checked by hand: dragging nodes in the Scene Graph, how Snap behaves, copy and paste or duplicate, selecting several nodes, editing a built-in node, saving a prefab, and how the Runtime tab looks with hands. **Our loader (`parseLayout`) reads only plain `asset` nodes. It does not expand an `instance` or `pattern` node; it lists it in `problems` (and the scene-file test fails on it)**, so place pieces and markers as plain nodes.
-
-Put each puzzle in its own group (`puzzle-1`) so the puzzle code can load one with `parseLayout(doc, 'puzzle-1')` and `spawnLayout` (nothing calls them yet; Teammate A's puzzle code will). The editor's scene-graph hide is preview-only and is not saved; use the inspector's **Visible** toggle to leave a node out. Groups can nest and their positions add up; rotation and scale on a parent are ignored and reported. `npm test` checks every scene file against IWSDK's validator and our loader.
-
 ## 13. Add models, textures and sounds
 
 Put the file in `src/assets` and it is in the game ([ADR 0009](adr/0009-asset-pipeline.md)); there is no list to edit. The first folder under `src/assets` sets how it loads:
@@ -250,7 +216,7 @@ Put the file in `src/assets` and it is in the game ([ADR 0009](adr/0009-asset-pi
 | `src/assets/audio/` (`sfx/`, `music/`) | In the background after the critical files | Sounds. Music goes in a folder named `music` |
 | anywhere else, for example `src/assets/models/` | When first used | Models and textures |
 
-The id is the file name in lower case with hyphens (`Paper Crow.glb` is `paper-crow`). Models must be single-file `.glb`; extensions must be lower case (`npm run check` says so if not). A `.glb` dropped in while `npm run dev` is running appears in the scene editor's **Assets** panel within seconds, ready to add to a scene. In code, `new AssetLoader({ load: iwsdkLoad, fallback })` (`src/engine/services/assets`) gets a lazy or background one by id: it times out after 8 s, tries twice, shares a load between callers, and gives a stand-in rather than failing (it tries again after 10 s, or call `retry(id)`). It is not for critical files, and a loaded model is one shared object, so take copies with `AssetManager.getGLTF(id)`.
+The id is the file name in lower case with hyphens (`Paper Crow.glb` is `paper-crow`). Models must be single-file `.glb`; extensions must be lower case (`npm run check` says so if not). In code, `new AssetLoader({ load: iwsdkLoad, fallback })` (`src/engine/services/assets`) gets a lazy or background one by id: it times out after 8 s, tries twice, shares a load between callers, and gives a stand-in rather than failing (it tries again after 10 s, or call `retry(id)`). It is not for critical files, and a loaded model is one shared object, so take copies with `AssetManager.getGLTF(id)`.
 
 **Size limits** (`src/engine/services/assets/budgets.mjs`): a texture 512 KB, a model 500 KB, a sound effect 300 KB, a music file 1.5 MB, the critical files together 1 MB, and the first-load JavaScript 800 KB gzipped. `npm run check` checks the files in the repository and `npm run build` checks the first-load bundle, so an over-budget file turns CI red (it blocks merging only if the repository requires the check), and on `main` it stops the Pages deploy. Use WebP or KTX2 for textures, Ogg or MP3 for sound, and keep textures to 2048 pixels or less: the limits are file sizes, not memory.
 
@@ -258,18 +224,18 @@ The id is the file name in lower case with hyphens (`Paper Crow.glb` is `paper-c
 
 ## 14. Sound
 
-Sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)), in `src/engine/services/audio`. Browsers keep audio locked until the first click, key press or tap, so the first sound after loading waits for that. Starting a VR session and pinching inside one also try to unlock it, but **whether the Pico or Quest browser allows that is not confirmed**: after entering VR, check `__wsw.audio.state` is `running`. The four sounds (paper rustle, thump, chime, flame crackle) are placeholders made in code ([CREDITS.md](../CREDITS.md)).
+Sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)), in `src/engine/services/audio`. Browsers keep audio locked until the first click, key press or tap, so the first sound after loading waits for that. Starting a VR session and pinching inside one also try to unlock it, but **whether the Pico or Quest browser allows that is not confirmed**: after entering VR, check `__wsw.audio.state` is `running`. The sounds are placeholders made in code ([CREDITS.md](../CREDITS.md)).
 
-- **Events.** A recognised shape rustles, a committed shape thumps, a let-go shape makes a soft breath (a low falling pair if tracking was lost), all from where that hand's shadow is on the wall; the lit flame crackles from the flame, the candle makes a small sound when lifted and set down, and a headset session plays a low room tone and slow music under everything. The title screen ticks as a fingertip reaches an item and strikes a match for BEGIN (after the first tap: browsers keep audio locked until then). For a solved puzzle call `gameAudio.puzzleSolved(stage)` (`gameAudio` is on `__wsw` in dev).
+- **Events.** A recognised shape rustles, a committed shape thumps, a let-go shape makes a soft breath (a low falling pair if tracking was lost), all from where that hand's shadow is on the wall; the candle whooshes when it is lit and then crackles from the flame, and makes a small sound when lifted and set down. The title screen ticks as a fingertip reaches an item and strikes a match for BEGIN (after the first tap: browsers keep audio locked until then). `gameAudio` is on `__wsw` in dev. The other sound definitions (chime, notes, music, ambience) are kept for the story but nothing plays them yet.
 - **Volumes.** `audio.mixer.setMaster(0..1)`, `setVolume(Bus.Music | Bus.Effects | Bus.Ambience, 0..1)`, `setMuted(bus, true)` and `setAllMuted(true)`. In the dev console: `__wsw.audio.mixer.setVolume(1, 0.5)`.
 - **A real sound.** Put the file in `src/assets/audio/sfx/` named after the sound (`rustle`, `thump`, `chime`, `crackle`): the asset pipeline (section 13) loads it in the background under that id. Handing it to the engine is not automatic yet: once it has loaded, call `audio.setBuffer(Sound.Rustle, AssetManager.getAudio('rustle'))`. Add its licence to `CREDITS.md`.
 - **Check it in a browser.** `npx vite --port 8095 --strictPort`, then `node scripts/audio-probe.mjs https://localhost:8095` checks the unlock, the left and right panning, the buses, the events and the cost with no headset.
 
 ## 15. Saves
 
-Progress, the creature gallery and the solutions found per puzzle are saved in the browser ([ADR 0010](adr/0010-saves.md), `src/engine/services/saves`). The save is read once at start and written only on events: the headset coming off or the system menu opening, the VR session ending, the page being hidden or closed, and a puzzle ending. Nothing runs per frame.
+The settings and the day last played are saved in the browser ([ADR 0010](adr/0010-saves.md), `src/engine/services/saves`). The save is version 3 (`schema.ts`); an older save that held puzzle progress and creatures migrates to it, keeping its settings and day. The save is read once at start and written only on events: the headset coming off or the system menu opening, the VR session ending, and the page being hidden or closed. Nothing runs per frame.
 
-- **Use it:** `saves.puzzleEnded('c1-p2', { solved: true, solutionId: 'cup', next: { chapter: 1, puzzle: 3 } })` when a puzzle ends, `saves.discoverCreature('rabbit')` for the gallery, `saves.data.progress` to resume. Read `saves.data` each time rather than keeping a piece of it. `saves.touchDay()` ran at start; `saves.previousDay` is the last night played (compare with today for a new night). In the dev console it is `__wsw.saves`.
+- **Use it:** `saves.setSettings(next)` stores the settings (`main.ts` already calls it whenever a setting changes). Read `saves.data` each time rather than keeping a piece of it. `saves.touchDay()` ran at start; `saves.previousDay` is the last night played (compare with today for a new night). In the dev console it is `__wsw.saves`.
 - **Look at it:** `localStorage` keys `wsw.save.a` and `wsw.save.b` (the higher `seq` is the newest), `wsw.save.corrupt.<a|b>.<0-2>` if a slot was damaged, `wsw.save.newer.<a|b>` if a save from a newer version was moved aside. The Hand Lab (`?mock=1`) uses `wsw.save.mock.*` instead. `__wsw.saves.status` says whether it is being stored, whether it recovered from damage, and the last problem; the diagnostics report has the same under `saves`.
 - **Change the format:** raise `CURRENT_VERSION` in `schema.ts`, add the step to `migrations.ts` (it must never throw), a reader in `SANITIZERS`, a frozen `fixtures/save-v<new>.json`, and update the `save-v<N>.expected.json` files. A test fails if you forget any of them.
 - **Start over** in the browser: `__wsw.saves.reset()` (it overwrites both slots; a save from a newer version is moved aside first), or delete the `wsw.save.*` keys.
@@ -277,7 +243,7 @@ Progress, the creature gallery and the solutions found per puzzle are saved in t
 
 ## 16. Settings
 
-The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are one table in `src/engine/services/settings/settings.ts`: tolerance, hold time, shadow size, recognition glow, lantern flicker, the four volumes, high contrast, captions (a stub until story beats exist) and the main hand. Each has a range, a default and a one-line explanation, and the panel, the saves and the tests all read that table.
+The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are one table in `src/engine/services/settings/settings.ts`: tolerance, hold time, shadow size, recognition glow, lantern flicker, the four volumes, high contrast, captions (a stub until the story exists) and the main hand. Each has a range, a default and a one-line explanation, and the panel, the saves and the tests all read that table.
 
 - **Open the panel:** on the desktop, press **Settings** in the Hand Lab (`?mock=1`, or **Open Hand Lab** on the game page). In a headset, press **Testing** in the launcher, turn on **Settings panel opens when VR starts**, then press Enter VR: it opens a second after the session starts, in front of you and a little toward your main hand. Nothing opens it in play yet: the lantern flow (Teammate B) should call `__wsw.openSettings()`.
 - **Use it:** poke a button with a fingertip. There are two pages (**More settings >** and **< Back**), **Reset to defaults** and **Close**. A change applies at once and is saved with the next save event.
@@ -293,27 +259,18 @@ Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the
 
 | Keys | What it does |
 |---|---|
-| Alt+P | Pause or resume the simulation (hands and shadows stay live) |
-| Alt+. | Run exactly one fixed step (pauses first); press again for the next |
-| Alt+[ and Alt+] | Slower and faster: 1x, 1/2x, 1/4x, 1/10x |
-| Alt+0 | Normal speed, running |
-| Alt+K | Show the shadow capsules, outline and projected joints (what the solver gets from your hands) |
-| Alt+C | Show a circle for each entity collider (needs an `EntityStore`; see below) |
+| Alt+K | Show the shadow capsules, outline and projected joints |
 | Alt+J | Show the joint dots |
 | Alt+R | Start or stop replaying the demo recording into the game, in place of your hands |
 | Alt+1 to Alt+5 | Switch off or on: shadow, sharpen, flicker, candle light, hand visual |
 
-**Hands-only menu.** The settings panel (section 16) has more pages after the two settings pages when the debug tools are on: **Debug: time and views** (pause, step, speed, capsules, colliders, joint dots) and **Debug: systems and replay** (the five systems, replay), then one page per group of registered actions. Poke a button; its text shows the state, and a key press updates it too. In a headset: Testing (launcher) > Settings panel opens when VR starts, press Enter VR, then the **Next page >** button.
-
-**Slow motion and stepping** wrap the call to `FixedStepLoop.advance` from outside (`TimeControl`); the simulation still only sees whole fixed steps, so a paused or slowed run stays deterministic. Hands, shadows, audio and the lantern keep running in real time: it is the simulation (Teammate A's) that slows.
+**Hands-only menu.** The settings panel (section 16) has more pages after the two settings pages when the debug tools are on: **Debug: views** (capsules, joint dots) and **Debug: systems and replay** (the five systems, replay), then one page per group of registered actions. Poke a button; its text shows the state, and a key press updates it too. In a headset: Testing (launcher) > Settings panel opens when VR starts, press Enter VR, then the **Next page >** button.
 
 **Switching a system off** is an override that sits on top of the settings: changing a setting while a system is off does not turn it back on, and a page reload clears it. Sharpen restores to the setting's value; flicker to what the flame was doing before (the device's default or the player's choice).
 
 **Replay.** Alt+R plays `recordings/emulator-demo.handrec.json` (served by the dev server; `recordings/` is not in the repository or in a build) in a loop, and the hands cue and everything downstream see tracked hands. To replay another file from the console: `__wsw.debug.replay.load(json, 'name')`, then it is active until stopped (`__wsw.debug.replay.stop()`). The Hand Lab's own **Replay...** button still works at a desk.
 
-**Entity colliders.** Nothing makes an `EntityStore` in `main.ts` yet (the simulation step is empty). When Teammate A adds one, call `debug?.setEntityStore(store)` right after it, and Alt+C draws a circle per live entity (radius and position from the store, coloured by kind, up to 192).
-
-**Skip to a puzzle (not built).** It plugs in through `debug.controller.actions.register({ id, group: 'Puzzles', label, run })` (`src/debug/debug-actions.ts`): when the puzzle code and framework exist, register one action per puzzle at start and the menu lists them, six to a page. Register before the settings panel is first opened (it builds its pages once).
+**Menu actions.** Code can add buttons to the menu with `debug.controller.actions.register({ id, group, label, run })` (`src/debug/debug-actions.ts`), for example one per story scene to skip to it. The menu lists each group on its own pages, six to a page. Register before the settings panel is first opened (it builds its pages once).
 
 **Adding a debug tool:** put it under `src/debug`, reach it only with `if (DEBUG_TOOLS) { const { ... } = await import(...) }` (never a static import from code that ships), add a marker string to `scripts/check-debug-free.mjs`, an item to `DebugController.pages()` and a key to `debug-keys.ts`. **Check it in a browser:** `npx vite --port 8097 --strictPort`, then `node scripts/debug-probe.mjs https://localhost:8097`.
 

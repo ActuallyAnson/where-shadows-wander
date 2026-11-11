@@ -1,6 +1,6 @@
 # ADR 0006: Puzzle layouts and the room are authored in IWSDK's scene editor and read by a small loader
 
-Status: accepted 7 Oct 2026 (Anson; Damon agreed to the loader approach in chat). Trial results below; some items are still open.
+Status: superseded by [ADR 0016](0016-story-shadow-theatre.md) on 11 Nov 2026 (the puzzle gameplay was removed). Was: accepted 7 Oct 2026 (Anson; Damon agreed to the loader approach in chat). Trial results below; some items are still open.
 
 ## Context
 

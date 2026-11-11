@@ -1,6 +1,6 @@
 # ADR 0014: The bedroom puzzles' props and layouts are written in TypeScript, in stage space
 
-Status: proposed 25 Oct 2026 (Teammate A). Needs Anson to agree (his projector and converter are what the app's caster calls).
+Status: superseded by [ADR 0016](0016-story-shadow-theatre.md) on 11 Nov 2026 (the puzzle gameplay was removed). Was: proposed 25 Oct 2026 (Teammate A). Needs Anson to agree (his projector and converter are what the app's caster calls).
 
 ## Context
 
