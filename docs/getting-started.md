@@ -42,7 +42,7 @@ You'll see something like:
 
 ## 4. Try it in the emulator (no headset)
 
-The dev server adds IWER, an emulated Quest 3 with hands, sitting in a fake living room.
+The dev server adds IWER, an emulated Quest 3 with hands. (Its synthetic environment is off: the game is VR only and draws its own bedroom.)
 
 1. Open **https://localhost:8081/** in your own Chrome, not the managed window.
 2. Chrome warns "Your connection is not private". The dev server uses a self-signed certificate. Click **Advanced**, then **Proceed to localhost**.

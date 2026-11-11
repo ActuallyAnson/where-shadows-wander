@@ -160,6 +160,6 @@ The diagnostics report has a `render` section (`clearAlpha`, `toneMapping`, `out
 
 ## Builds and deploys
 
-- `npm run dev`: IWSDK's dev server with HTTPS and the IWER emulator (Quest 3, synthetic living room).
+- `npm run dev`: IWSDK's dev server with HTTPS and the IWER emulator (Quest 3, no synthetic room: the game draws its own).
 - `npm run build`: production build in `dist/`, with two pages: `index.html` (the game; the Hand Lab and the room editor are in dev and tester builds only) and `webcam.html` (the webcam bench). MediaPipe loads only on the bench and in the Hand Lab's webcam worker, never in the game's first load. Relative URLs, so it works under a GitHub Pages subpath.
 - CI (`.github/workflows/ci.yml`) runs `npm run check` and a build on every PR. Merging to `main` deploys to GitHub Pages (`.github/workflows/pages.yml`).
