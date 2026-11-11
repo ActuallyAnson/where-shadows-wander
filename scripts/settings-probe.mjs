@@ -25,7 +25,7 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto(`${base}/?mock=1&stage=real&flicker=0`);
+await page.goto(`${base}/?mock=1&flicker=0`);
 await page.waitForFunction(() => window.__wsw?.settingsPanel, null, { timeout: 90000 });
 await page.getByRole('button', { name: 'Settings', exact: true }).click(); // the Hand Lab's button
 await page.waitForFunction(() => window.__wsw.settingsPanel.isOpen || window.__wsw.settingsPanel.lastError, null, {

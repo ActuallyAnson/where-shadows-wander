@@ -98,4 +98,4 @@ Exceptions: the tutorial shows its outline after 0.5 s; the castle waits 30 s fo
 2. **The dimming (Anson):** the candle guttering for 2–3 s. Today only the mood and the kindred change.
 3. **The outline pulse** at the last rung, and the ledge's drifting outline that shows the lift.
 4. **Sounds (B):** the ledge's lift and the gate opening (today a soft twinkle).
-5. **Headset check:** the night has only been played in the Hand Lab (`?mock=1&stage=real`) and headless tests.
+5. **Headset check:** the night has only been played in the Hand Lab (`?mock=1`) and headless tests.

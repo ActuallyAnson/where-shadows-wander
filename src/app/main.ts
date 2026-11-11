@@ -40,9 +40,9 @@ import { MENU_CHOICES, nextChoice, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
-import { createStagePlane, type StagePlane } from '../engine/shadow/pure/stage-plane';
+import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { JOINT } from '../engine/hands/hand';
-import { MOCK_HEAD, placeLantern, placeTestRig, yawOf, type StageMode } from '../engine/shadow/pure/test-rig';
+import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { CutsceneHost } from './cutscene-host';
 import type { CutsceneData } from '../engine/sim/cutscene';
 import { ENDING_MOOD } from './ending';
@@ -109,7 +109,6 @@ import { clearFor, occluderDefault, sessionModeOf, xrModeFromUrl } from '../engi
 import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { HandLab } from '../input-mock/hand-lab';
-import { MOCK_LANTERN } from '../input-mock/hand-source';
 import { createMockSource, MockMode, mockOptionsFromUrl } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
@@ -204,34 +203,28 @@ async function start(): Promise<void> {
 
   // Shape recognition on both hands every frame. Its events go to the simulation (Teammate A) once it exists.
   const shapes = new ShapeRecognizer();
-  // Lantern gestures for Teammate B's lantern flow. Mock mode has a stand-in lantern; in XR it waits for B's.
+  // Lantern gestures. In mock mode the cover-flame gesture aims at the candle on the tray (placeRig sets it); in XR it waits
+  // for the lantern flow.
   const gestures = new GestureDetector();
-  gestures.setLantern(mockOptions ? MOCK_LANTERN : null);
+  gestures.setLantern(null);
   let clock = 0;
 
-  // Hand shadows land on the stage. In a headset it is Teammate A's StageFrame: the virtual room's paper wall,
-  // 2 m ahead and 1.6 x 1.0 m (ADR 0005). The Hand Lab (?mock=1) keeps the stand-in tabletop theatre by default;
-  // ?stage=wall is a bigger stand-in and ?stage=real the real wall, to look at it on a desktop.
-  // ?debug=shadow shows the capsules. The lantern is placed by the same stand-in rule in both until the lantern flow exists.
+  // Hand shadows land on the stage: StageFrame, the virtual room's paper wall, 2 m ahead and 1.6 x 1.0 m (ADR 0005). The
+  // Hand Lab (?mock=1) uses the same wall as a headset; only where the hands and the head come from differs.
+  // ?debug=shadow shows the capsules.
   const params = new URLSearchParams(location.search);
   // Capture mode (five taps on the title's emblem, or the Testing panel): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
   // before the session starts, so it is set here; the foveation is set when the session starts.
   const capture = captureOptions(loadCaptureChoice());
   if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
-  const stageChoice: 'real' | StageMode =
-    !mockOptions || params.get('stage') === 'real' ? 'real' : params.get('stage') === 'wall' ? 'wall' : 'table';
-  // The Hand Lab's stand-in stage can be switched between the tabletop theatre and a wall-sized one (the Stage button).
-  let mockStage: StageMode = stageChoice === 'real' ? 'table' : stageChoice;
   const lastHead = new Float64Array(3);
   const saucerPos = new Float64Array(3);
   let lastYaw = 0;
   const stageFrame = new StageFrame();
-  const standInStage = createStagePlane();
-  const stage: StagePlane = stageChoice === 'real' ? stageFrame : standInStage;
+  const stage: StagePlane = stageFrame;
   const lantern = new Float64Array(3);
-  // On the real wall the shadow settings are in real-wall.ts (blend 0.65, a low edge blur); the near, small
-  // tabletop theatre was tuned with full perspective (blend 0).
-  const projector = new ShadowProjector(stageChoice === 'real' ? REAL_WALL_SHADOW_SETTINGS : { blend: 0.0 });
+  // The wall's shadow settings are in real-wall.ts (blend 0.65, a low edge blur).
+  const projector = new ShadowProjector(REAL_WALL_SHADOW_SETTINGS);
   const shadowRenderer = new ShadowRenderer();
   // On the room's wall the stage is the middle of the candle's round pool of light, drawn over most of the wall (stage-edge-glsl.ts).
   const lightPoolArea = new Float64Array(4);
@@ -948,10 +941,8 @@ async function start(): Promise<void> {
     lastHead[1] = head[1];
     lastHead[2] = head[2];
     lastYaw = yaw;
-    if (stageChoice === 'real') {
-      stageFrame.placeInFront(head, yaw);
-      placeLantern(head, yaw, lantern);
-    } else placeTestRig(mockStage, head, yaw, standInStage, lantern);
+    stageFrame.placeInFront(head, yaw);
+    placeLantern(head, yaw, lantern);
 
     const sdx = stage.origin[0] - head[0],
       sdz = stage.origin[2] - head[2];
@@ -974,9 +965,7 @@ async function start(): Promise<void> {
     lantern[1] = saucerPos[1];
     lantern[2] = saucerPos[2];
 
-    stageView.setPool(
-      stageChoice === 'real' ? lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea) : null,
-    );
+    stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
     stageView.place(stage, lantern);
     candleView.place(lantern);
 
@@ -1000,8 +989,8 @@ async function start(): Promise<void> {
     stageGroup.matrixWorldNeedsUpdate = true;
     // The wall or the flame moved: the props' shadows (and the ground they make) are cast again.
     night.relight();
-    // Cover-flame only aims at the stand-in lantern in mock mode. In XR it waits for Teammate B's
-    // lantern: a guessed spot near the chest would read a resting fist as "pause".
+    // Cover-flame aims at the candle on the tray in mock mode only. In XR it waits for the lantern flow: the candle sits
+    // in the lap, where a resting fist would read as "pause".
     if (mockOptions) gestures.setLantern([lantern[0], lantern[1], lantern[2]]);
     rigPlaced = true;
     everPlaced = true;
@@ -1024,7 +1013,8 @@ async function start(): Promise<void> {
       return new SyntheticSource();
     });
     mock = new MockMode(source);
-    lab = new HandLab(mock, hands.hands, shapes, gestures, MOCK_LANTERN, {
+    // The lab's lantern is the candle on the tray: `lantern` is where placeRig (and picking the candle up) put it.
+    lab = new HandLab(mock, hands.hands, shapes, gestures, lantern, {
       scene: world.scene,
       camera: world.camera,
       canvas: world.renderer.domElement,
@@ -1065,16 +1055,6 @@ async function start(): Promise<void> {
       kindred: { toggle: () => setKindred(!kindredOn), isOn: () => kindredOn },
       solve: { play: () => playSolve() },
       ending: { play: () => playEnding() },
-      stage:
-        stageChoice === 'real'
-          ? undefined
-          : {
-              toggle: () => {
-                mockStage = mockStage === 'table' ? 'wall' : 'table';
-                if (rigPlaced) placeRig(lastHead, lastYaw);
-              },
-              label: () => mockStage,
-            },
       sticker: {
         // Shows the next sticker over the traveller, to see them all.
         next: () => {
@@ -1202,13 +1182,13 @@ async function start(): Promise<void> {
         }
       : null,
     shadow: {
-      stage: stageChoice,
+      stage: 'real',
       placed: rigPlaced,
       everPlaced,
       // Where the real wall landed, to read from a headset report.
       wall: {
         origin: [stage.origin[0], stage.origin[1], stage.origin[2]],
-        version: stageChoice === 'real' ? stageFrame.version : null,
+        version: stageFrame.version,
       },
       onStage: [projector.shadows.left.onStage, projector.shadows.right.onStage],
     },
@@ -1674,11 +1654,7 @@ async function start(): Promise<void> {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
             handTrail.onShapeEvents(shapes.events, projector.shadows);
           }
-          shadowRenderer.setPool(
-            stageChoice === 'real' ? lightPoolArea : null,
-            stageView.flameOnWall.x,
-            stageView.flameOnWall.y,
-          );
+          shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
           if (demoProps) {
             // ?debug=props: rebuild the demo props' shadows when the stage or the flame moves.

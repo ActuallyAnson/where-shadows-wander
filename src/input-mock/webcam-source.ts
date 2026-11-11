@@ -22,7 +22,7 @@ import { clearHand, type HandSource } from './hand-source';
 const CAMERA = [0, 1, 0.5];
 /** mediapipeToHandFrame places hands this far in front of the webcam; we turn them about that point. */
 const HAND_DEPTH = 0.5;
-/** Lowers webcam hands to where mock hands rest (MOCK_WRIST), over the table, in front of the paper stage. */
+/** Lowers webcam hands to about where mock hands rest (MOCK_WRIST), in front of the candle and the paper wall. */
 const HAND_DROP = 0.2;
 
 export class WebcamSource implements HandSource {

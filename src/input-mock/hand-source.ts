@@ -20,22 +20,16 @@ export interface HandSource {
 
 /**
  * Where mock hands rest, in scene space. The desktop camera (the player's eyes)
- * sits at (0, 1, 0.5) (iwsdk.config.json): this is about 45 cm ahead and 20 cm
- * below the eyes, 25 cm over the table, between the lantern and the paper stage
- * (src/engine/shadow/pure/test-rig.ts).
+ * sits at (0, 1, 0.5) (iwsdk.config.json): this is 65 cm ahead and 20 cm below
+ * the eyes, level with the middle of the paper wall, and about 20 cm in front of
+ * the candle on the bed tray (main.ts placeRig), so the hands are between the
+ * flame and the wall as a player's would be. Their shadows land just above the
+ * middle of the wall.
  */
 export const MOCK_WRIST: Readonly<Record<Handedness, Readonly<Vec3>>> = {
-  left: [-0.08, 0.8, 0.05],
-  right: [0.08, 0.8, 0.05],
+  left: [-0.08, 0.8, -0.15],
+  right: [0.08, 0.8, -0.15],
 };
-
-/**
- * A stand-in lantern for mock mode, until Teammate B's lantern exists: on the
- * near edge of the table, below and in front of the desktop camera, with the
- * mock hands between it and the stage (GDD "The lantern"). The same place as the
- * test rig's lantern for MOCK_HEAD (src/engine/shadow/pure/test-rig.ts).
- */
-export const MOCK_LANTERN: Readonly<Vec3> = [0, 0.65, 0.35];
 
 export function clearHand(hand: HandFrame): void {
   hand.tracked = false;

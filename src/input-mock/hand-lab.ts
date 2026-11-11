@@ -3,7 +3,7 @@
 // classifier's features, record, and look around the hands in 3D.
 import type { PerspectiveCamera, Scene } from '@iwsdk/core';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
+import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import type { GestureDetector } from '../engine/hands/gesture-detector';
@@ -58,8 +58,6 @@ export interface LabView {
   rewind?: { go(): void };
   /** The level editor for the puzzle being played: `current()` is its editor (null before a puzzle loads); `changed()` loads the puzzle again with the edit. */
   editor?: { open(): void; current(): LevelEditor | null; changed(): void };
-  /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
-  stage?: { toggle(): void; label(): string };
 }
 
 export class HandLab {
@@ -92,17 +90,18 @@ export class HandLab {
     private readonly hands: Record<Handedness, HandFrame>,
     private readonly shapes: ShapeRecognizer,
     private readonly gestures: GestureDetector,
-    private readonly lantern: Readonly<Vec3>,
+    /** The candle the game placed (read every frame: it moves when the rig is placed again or the candle is carried). */
+    private readonly lantern: Readonly<ArrayLike<number>>,
     private readonly view: LabView,
   ) {
     view.scene.add(this.bones.mesh);
     loadCalibration(shapes);
-    this.marker = new LanternMarker(lantern, gestures.config.coverRadiusM);
+    this.marker = new LanternMarker([lantern[0], lantern[1], lantern[2]], gestures.config.coverRadiusM);
     view.scene.add(this.marker.group);
     this.orbit = new OrbitControls(view.camera, view.canvas);
     const [lx, ly, lz] = MOCK_WRIST.left;
     const [rx] = MOCK_WRIST.right;
-    // Between the hands and the lantern, which sits nearer the player on the table edge.
+    // Between the hands and the candle, which sits nearer the player on the tray.
     this.orbit.target.set((lx + rx) / 2, (ly + lantern[1]) / 2, (lz + lantern[2]) / 2);
     // Above and to the side of the player, so curled fingers and the lantern are both in view.
     view.camera.position.set(0.3, ly + 0.3, lantern[2] + 0.35);
@@ -123,6 +122,8 @@ export class HandLab {
   /** Call once per frame, after the hands are filled. */
   frame(): void {
     this.bones.update([this.hands.left, this.hands.right]);
+    const l = this.lantern;
+    this.marker.group.position.set(l[0], l[1], l[2]);
     const g = this.gestures;
     this.marker.setProgress(Math.max(g.state.left.coverProgress, g.state.right.coverProgress));
     for (let i = 0; i < g.events.count; i++) {
@@ -340,7 +341,6 @@ export class HandLab {
         this.editing = !this.editing;
         if (this.editing) this.view.editor?.open();
       } else if (act === 'edit-do') this.editStep(arg as EditAction | 'copy');
-      else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -401,7 +401,6 @@ export class HandLab {
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
         ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show the pause, solved and end screens, one after the other') : ''}
         ${this.view.kindred ? btn('kindred', '', 'Kindred', this.view.kindred.isOn(), 'A shadow bird that flies about the wall and circles the light') : ''}
-        ${this.view.stage ? btn('stage', '', `Stage: ${this.view.stage.label()}`, false, 'Switch the stand-in stage between the tabletop theatre and a wall-sized one (the tutorial needs the wall)') : ''}
         ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
         ${this.view.prologue ? btn('prologue', '', 'Prologue', false, 'Play the prologue: the story drawn in calligraphy in the dark') : ''}
         ${this.view.travel ? btn('travel', '', 'Travel', false, 'Play a travel scene: a land wakes, and the traveller walks into the next one') : ''}
@@ -556,7 +555,7 @@ export class HandLab {
     else if (k === 'l') this.selected = 'left';
     else if (k === 'j') s.jitter = s.jitter > 0 ? 0 : JITTER_M;
     else if (k === 'p') s.setPinch(sel, !s.pinching(sel));
-    else if (k === 'g') s.placeOver(sel, this.lantern);
+    else if (k === 'g') s.placeOver(sel, [this.lantern[0], this.lantern[1], this.lantern[2]]);
     else if (k === 'b') s.home(sel);
     else if (k === 'q') s.turn(sel, -TURN_DEG, 0);
     else if (k === 'e') s.turn(sel, TURN_DEG, 0);

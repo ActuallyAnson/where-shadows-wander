@@ -22,7 +22,7 @@ const page = await (
 ).newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(`${base}/?mock=1&stage=real&flicker=0.5`);
+await page.goto(`${base}/?mock=1&flicker=0.5`);
 await page.waitForFunction(() => window.__wsw?.debug, null, { timeout: 90000 });
 const w = (fn, arg) => page.evaluate(fn, arg);
 const key = (code) => page.keyboard.press(`Alt+${code}`);
