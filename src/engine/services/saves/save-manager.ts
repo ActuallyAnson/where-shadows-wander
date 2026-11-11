@@ -21,11 +21,9 @@ import { mergeData } from './merge';
 import { MIGRATIONS, migrate, type Migration } from './migrations';
 import {
   CURRENT_VERSION,
-  LIMITS,
   SANITIZERS,
   SAVE_FORMAT,
   defaultData,
-  isValidId,
   type DeepReadonly,
   type Sanitized,
   type SaveData,
@@ -81,14 +79,6 @@ type SlotRead =
   | { kind: 'valid'; seq: number; data: SaveData; repairs: number }
   | { kind: 'newer'; seq: number; version: number; raw: string; slot: number }
   | { kind: 'corrupt'; reason: string; raw: string };
-
-export interface PuzzleOutcome {
-  solved: boolean;
-  /** Which solution the player found, if solved. */
-  solutionId?: string;
-  /** Where to resume after this puzzle. Ignored if the puzzle was not solved. */
-  next?: { chapter: number; puzzle: number };
-}
 
 /** What a look at both slots found. */
 interface Scan {
@@ -180,26 +170,6 @@ export class SaveManager {
 
   // ---- changes (each only marks the save dirty; `flush` writes it) ----
 
-  /** Sets where to resume. Returns false (and changes nothing) for a value that is not a whole number in range. The latest setting wins, even a step back. */
-  setProgress(chapter: number, puzzle: number): boolean {
-    if (!Number.isInteger(chapter) || chapter < 1 || !Number.isInteger(puzzle) || puzzle < 0) return false;
-    const p = this.current.progress;
-    if (p.chapter === chapter && p.puzzle === puzzle) return true;
-    p.chapter = chapter;
-    p.puzzle = puzzle;
-    p.at = this.now();
-    return this.touch();
-  }
-
-  completeChapter(chapter: number): boolean {
-    const done = this.current.progress.chaptersCompleted;
-    if (!Number.isInteger(chapter) || chapter < 1 || chapter > LIMITS.chapters) return false;
-    if (done.includes(chapter)) return true;
-    done.push(chapter);
-    done.sort((a, b) => a - b);
-    return this.touch();
-  }
-
   /** Stores the player's settings (each value repaired into range). Returns false if nothing changed. */
   setSettings(next: Readonly<Settings>): boolean {
     const fixed = repairSettings(next).settings;
@@ -215,81 +185,22 @@ export class SaveManager {
    */
   touchDay(): string {
     const day = this.today();
-    const before = this.current.progress.lastPlayedDay;
+    const before = this.current.lastPlayedDay;
     if (!this.touchedDay) {
       this.touchedDay = true;
       this.previousDay = before;
     }
     if (before !== day) {
-      this.current.progress.lastPlayedDay = day;
+      this.current.lastPlayedDay = day;
       this.touch();
     }
     return before;
   }
 
-  /** Adds a creature to the gallery. Returns true if it is new (false for a known one, a bad id, or a full gallery). */
-  discoverCreature(id: string): boolean {
-    const c = this.current.creatures;
-    if (!isValidId(id) || id in c) return false;
-    if (Object.keys(c).length >= LIMITS.creatures) {
-      this.warn(`the gallery is full (${LIMITS.creatures}); "${id}" was not added`);
-      return false;
-    }
-    c[id] = { discoveredAt: this.now() };
-    return this.touch();
-  }
-
-  /** Records that a puzzle was solved in a particular way. Returns true if it is a solution not found before. */
-  recordSolution(puzzleId: string, solutionId: string): boolean {
-    if (!isValidId(puzzleId) || !isValidId(solutionId)) return false;
-    const rec = this.puzzleRecord(puzzleId);
-    if (!rec) return false;
-    const wasSolved = rec.solved;
-    rec.solved = true;
-    const isNew = !rec.solutions.includes(solutionId) && rec.solutions.length < LIMITS.solutionsPerPuzzle;
-    if (isNew) rec.solutions.push(solutionId);
-    if (isNew || !wasSolved) this.touch();
-    return isNew;
-  }
-
-  /**
-   * A puzzle ended: record how, move the resume point on, and write the save now. A solved puzzle is always
-   * marked solved, even if its solution id is not usable (that is reported, not lost). Returns whether it was written.
-   */
-  puzzleEnded(puzzleId: string, outcome: PuzzleOutcome): boolean {
-    if (outcome.solved) {
-      if (outcome.solutionId !== undefined && !isValidId(outcome.solutionId))
-        this.warn(`"${outcome.solutionId}" is not a usable solution id; "${puzzleId}" is marked solved without it`);
-      if (outcome.solutionId !== undefined && isValidId(outcome.solutionId) && isValidId(puzzleId)) {
-        this.recordSolution(puzzleId, outcome.solutionId);
-      } else if (isValidId(puzzleId)) {
-        const rec = this.puzzleRecord(puzzleId);
-        if (rec && !rec.solved) {
-          rec.solved = true;
-          this.touch();
-        }
-      }
-      if (outcome.next) this.setProgress(outcome.next.chapter, outcome.next.puzzle);
-    }
-    return this.flush();
-  }
-
-  hasCreature(id: string): boolean {
-    return id in this.current.creatures;
-  }
-
-  isSolved(puzzleId: string): boolean {
-    return this.current.puzzles[puzzleId]?.solved === true;
-  }
-
-  solutionsFound(puzzleId: string): readonly string[] {
-    return this.current.puzzles[puzzleId]?.solutions ?? [];
-  }
-
   // ---- writing ----
 
   /**
-   * Writes the save if it changed. Call when the headset comes off, the page is hidden or a puzzle ends: not per
+   * Writes the save if it changed. Call when the headset comes off or the page is hidden: not per
    * frame. Picks up anything another tab wrote first, so the two merge. Never throws.
    * @returns true if there was nothing to write or the write reached storage and was read back correctly;
    *   false if it did not (a failing store, an unreadable slot, or a read-only session).
@@ -327,7 +238,7 @@ export class SaveManager {
       }
     }
     const resetCount = Math.max(this.current.resetCount, scan.maxReset) + 1;
-    // Starting over is about progress; the player's accessibility settings are theirs and stay.
+    // Starting over keeps the player's accessibility settings: they are theirs.
     const { settings, settingsAt } = this.current;
     this.current = { ...defaultData(this.now()), resetCount, settings, settingsAt };
     this.readOnly = false;
@@ -349,15 +260,6 @@ export class SaveManager {
     this.status.newerVersion = true;
     this.status.persistent = false;
     this.status.lastError = `a save from a newer version (${version}) was found; this session is not saved`;
-  }
-
-  private puzzleRecord(id: string) {
-    const puzzles = this.current.puzzles;
-    if (!(id in puzzles)) {
-      if (Object.keys(puzzles).length >= LIMITS.puzzles) return null;
-      puzzles[id] = { solved: false, solutions: [] };
-    }
-    return puzzles[id];
   }
 
   private touch(): boolean {

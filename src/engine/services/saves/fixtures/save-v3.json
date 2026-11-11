@@ -1,0 +1,7 @@
+{
+  "format": "wsw-save",
+  "v": 3,
+  "seq": 1,
+  "sum": "a89c4f4b",
+  "data": "{\"createdAt\":1762000000000,\"updatedAt\":1762000065000,\"lastPlayedDay\":\"2026-11-11\",\"resetCount\":0,\"settings\":{\"tolerance\":2,\"holdTime\":0.4,\"shadowSize\":1,\"sharpen\":1,\"flicker\":1,\"volumeMaster\":1,\"volumeMusic\":0.3,\"volumeEffects\":1,\"volumeAmbience\":0.6,\"textSize\":1,\"highContrast\":true,\"captions\":true,\"gazeMenus\":false,\"hand\":\"left\"},\"settingsAt\":1762000060000}"
+}
