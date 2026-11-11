@@ -21,7 +21,7 @@ export async function mountEnterArButtonIfNeeded(
   }
 
   // The launch log: kept from the start, shown on the page only when BEGIN fails in a debug build (in a session, the
-  // room's Developer page shows the errors instead).
+  // developer overlay shows the errors instead).
   const logs: string[] = [];
 
   // Create UI overlay container

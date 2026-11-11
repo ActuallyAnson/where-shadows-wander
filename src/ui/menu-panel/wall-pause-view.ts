@@ -19,7 +19,7 @@ import { JOINT, type HandFrame } from '../../engine/hands/hand';
 import { distanceToPlane, type StagePlane } from '../../engine/shadow/pure/stage-plane';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
 
-export type PauseMenuAction = 'resume' | 'settings' | 'developer';
+export type PauseMenuAction = 'resume' | 'settings';
 export type WallMenuMode = 'pause' | 'settings';
 
 export interface WallButtonDef {
@@ -58,24 +58,6 @@ export const PAUSE_BUTTONS: readonly WallButtonDef[] = [
     canvasW: 560,
   },
 ];
-
-/** The pause screen's third button in debug builds: opens the Developer page (src/app/developer-page.ts) in the room. */
-export const DEVELOPER_BUTTON: WallButtonDef = {
-  id: 'developer',
-  label: 'Developer',
-  yMin: -0.33,
-  yMax: -0.23,
-  xMin: -0.38,
-  xMax: 0.38,
-  canvasY: 475,
-  canvasH: 70,
-  canvasW: 560,
-};
-
-export interface WallPauseOptions {
-  /** Adds the Developer button under Settings (debug builds only). */
-  developer?: boolean;
-}
 
 export const SETTINGS_BUTTONS: readonly WallButtonDef[] = [
   {
@@ -176,7 +158,6 @@ export class WallPauseView {
   private prevControllerTrigger = false;
 
   private settingsStore: SettingsStore | null = null;
-  private readonly pauseButtons: readonly WallButtonDef[];
 
   // Scratch vectors for zero allocation beam orientation
   private readonly beamStart = new Vector3();
@@ -186,8 +167,7 @@ export class WallPauseView {
   private readonly beamQuat = new Quaternion();
   private readonly upVec = new Vector3(0, 1, 0);
 
-  constructor(customCanvas?: HTMLCanvasElement, options: WallPauseOptions = {}) {
-    this.pauseButtons = options.developer ? [...PAUSE_BUTTONS, DEVELOPER_BUTTON] : PAUSE_BUTTONS;
+  constructor(customCanvas?: HTMLCanvasElement) {
     let cvs = customCanvas;
     if (!cvs && typeof document !== 'undefined') {
       cvs = document.createElement('canvas');
@@ -428,7 +408,7 @@ export class WallPauseView {
       }
     }
 
-    const currentButtons = this._mode === 'settings' ? SETTINGS_BUTTONS : this.pauseButtons;
+    const currentButtons = this._mode === 'settings' ? SETTINGS_BUTTONS : PAUSE_BUTTONS;
 
     if (hasPointer) {
       this.cursorX = hitX;
@@ -587,7 +567,7 @@ export class WallPauseView {
     g.stroke();
 
     // 3. Buttons: High-Contrast Black & White with 3-second golden hover progress
-    const buttons = isSettings ? SETTINGS_BUTTONS : this.pauseButtons;
+    const buttons = isSettings ? SETTINGS_BUTTONS : PAUSE_BUTTONS;
 
     for (let b = 0; b < buttons.length; b++) {
       const btn = buttons[b];

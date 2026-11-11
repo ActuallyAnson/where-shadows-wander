@@ -77,9 +77,9 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 - Debug is a separate small panel, never part of a title or pause screen, and exists only when
   `DEBUG_TOOLS` is true (dev and `--mode tester` builds). The release build has none of it
   (`check:debug-free`).
-- In a dev or tester build the developer controls are in the room: a **Developer** button on the pause
-  screen opens the Developer page of the settings screen. The title screen shows the launch log only
-  when BEGIN fails.
+- In a dev or tester build a **🛠 Dev** button at the top left opens the developer overlay, page UI in
+  the emulator's style, never part of the room. The title screen shows the launch log only when BEGIN
+  fails.
 - Every build shows BEGIN and SETTINGS under the title, nothing else.
 
 ## Not doing

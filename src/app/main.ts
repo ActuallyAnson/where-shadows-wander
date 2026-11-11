@@ -88,6 +88,7 @@ import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
 import { SettingsScreen } from '../ui/settings-panel/settings-screen';
 import type { ExtraPageItems } from '../ui/settings-panel/screen-model';
+import type { DeveloperOverlay } from './developer-overlay';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
@@ -204,7 +205,7 @@ async function start(): Promise<void> {
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
   const handStates = { left: shapes.left.state, right: shapes.right.state };
-  // The lantern's flicker: the Developer page's test flicker (0..1, 0 is steady) overrides it for testing; the default is
+  // The lantern's flicker: the developer overlay's test flicker (0..1, 0 is steady) overrides it for testing; the default is
   // gentler under reduced motion.
   let flickerTest = DEBUG_TOOLS ? loadTesting().flicker : null;
   const flickerParam = flickerTest ?? NaN;
@@ -325,7 +326,7 @@ async function start(): Promise<void> {
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
     handTrail.ringsOn = governor.isOn('ring');
   };
-  const wallPauseView = new WallPauseView(undefined, { developer: DEBUG_TOOLS });
+  const wallPauseView = new WallPauseView();
   world.scene.add(
     stageView.group,
     wallPauseView.group,
@@ -386,7 +387,7 @@ async function start(): Promise<void> {
   document.addEventListener('visibilitychange', syncAudioPause);
   // The accessibility settings (docs/adr/0010-saves.md): loaded from the save, applied live to the recognizer,
   // shadows, lantern and mixer, and saved on change. The lantern flicker follows the device's reduced-motion
-  // default until the player moves its slider, and the Developer page's test flicker overrides the setting for testing.
+  // default until the player moves its slider, and the developer overlay's test flicker overrides the setting for testing.
   const settings = new SettingsStore(
     { recognizer: shapes, projector, sharpen, lantern: lanternLight, mixer: audio.mixer },
     { applyOnlyWhenChosen: ['flicker'], neverApply: Number.isFinite(flickerParam) ? ['flicker'] : [] },
@@ -413,16 +414,11 @@ async function start(): Promise<void> {
     if (key === null || key === 'highContrast') applyContrast();
   });
   applyContrast();
-  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button. When the debug tools are on, the
-  // Developer page and the debug menu are extra pages after the settings, built the first time it opens; the pause
-  // screen's Developer button opens it at the Developer page.
+  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button.
+  // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
-  let developer: ExtraPageItems | null = null;
-  const settingsPanel = new SettingsScreen(menu, settings, () => [
-    ...(developer ? [developer] : []),
-    ...(debug?.controller.pages() ?? []),
-  ]);
+  const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
       wallPauseView.show();
@@ -433,15 +429,10 @@ async function start(): Promise<void> {
   const gazeAt = new Vector3();
   const handEye = new Float32Array(3); // where the eyes are, for fading the drawn hands near them
   const gazeDir = new Vector3();
-  const openSettings = (startAt?: string) => {
+  const openSettings = () => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
-    return settingsPanel.open(
-      [settingsHead.x, settingsHead.y, settingsHead.z],
-      settingsLook.x,
-      settingsLook.z,
-      startAt,
-    );
+    return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
   };
   // The pause screen in the room, shown from the Hand Lab's Menu button or the `menu` testing switch; a press on Settings opens
   // the settings panel, Resume closes the screen and Leave ends the session.
@@ -554,7 +545,7 @@ async function start(): Promise<void> {
   else placeRig([0, 1.2, 0], 0);
   // The Hand Lab (debug builds only, in the game): its panel picks whose hands play, live. With a mock source, a HandSource fills
   // the same HandFrames in the session in place of the device's, posed for the desk rig and moved into the wearer's
-  // (desk-frame.ts). Made the first time the panel is asked for (the Developer page, or a reload that had it).
+  // (desk-frame.ts). Made the first time the panel is asked for (the developer overlay, or a reload that had it).
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
   const openLab = (): HandLab => {
@@ -642,7 +633,7 @@ async function start(): Promise<void> {
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
   }
-  // The room editor (src/debug/room-editor.ts), chosen on the Developer page: arranges the bedroom's static pieces in the
+  // The room editor (src/debug/room-editor.ts), chosen in the developer overlay: arranges the bedroom's static pieces in the
   // Hand Lab and saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
   let roomEditor: import('../debug/room-editor').RoomEditor | null = null;
   if (DEBUG_TOOLS && launch.mode === 'room-editor') {
@@ -846,7 +837,7 @@ async function start(): Promise<void> {
   // The head pose is in reference space, which is the XR origin's space.
   let panel: PromptPanel | null = null;
   let panelAtStart = false;
-  /** Starts a hand recording (from the Developer page, or a `record` testing switch preset when the session starts). */
+  /** Starts a hand recording (from the developer overlay, or a `record` testing switch preset when the session starts). */
   const armRecording = (choice: 'off' | 'free' | 'shapes') => {
     if ((recorder && !recorder.finished) || choice === 'off') return;
     if (panel) world.player.remove(panel.mesh);
@@ -859,6 +850,8 @@ async function start(): Promise<void> {
       panelAtStart = false;
     }
   };
+  let developer: ExtraPageItems | null = null;
+  let developerOverlay: DeveloperOverlay | null = null;
   // The testing switches (debug tools only), preset in the browser's storage by the probe scripts (testing-options.ts): the
   // overlays and menu screen at once, the settings panel and the recording when VR starts.
   if (DEBUG_TOOLS && debug) {
@@ -871,14 +864,13 @@ async function start(): Promise<void> {
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       armRecording(t.record);
     });
-    // Alt+D at a desk: the Developer page without covering the candle first.
-    debug.onDeveloperKey = () => {
-      if (!world.renderer.xr.isPresenting) return;
-      if (settingsPanel.isOpen) settingsPanel.close();
-      else void openSettings(developer?.title);
-    };
-    const { developerPage } = await import('./developer-page'); // debug builds only, like the debug tools
-    developer = developerPage({
+    // The developer overlay: a panel on the page beside the emulator's own, not in the room. Debug builds only, loaded on
+    // demand like the debug tools.
+    const [{ developerPage }, { mountDeveloperOverlay }] = await Promise.all([
+      import('./developer-page'),
+      import('./developer-overlay'),
+    ]);
+    const page = developerPage({
       labShown: () => lab?.shown ?? false,
       showLab,
       recorder: () =>
@@ -905,6 +897,11 @@ async function start(): Promise<void> {
         else switchLaunch('room-editor', DEBUG_TOOLS);
       },
     });
+    developer = page;
+    const tools = debug;
+    const overlay = mountDeveloperOverlay(() => [page, ...tools.controller.pages()]);
+    developerOverlay = overlay;
+    tools.controller.subscribe(() => overlay.refresh()); // a key press changes the buttons' text too
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
   // Capture mode keeps this message out of a recording: it would show whenever tracking drops mid-take.
@@ -1119,10 +1116,6 @@ async function start(): Promise<void> {
               gameAudio.candleIgnited(candleView.flamePosition);
             } else if (action === 'settings') {
               wallPauseView.showSettings();
-            } else if (action === 'developer') {
-              // The room's settings screen at its Developer page; closing it brings the pause screen back.
-              wallPauseView.hide();
-              void openSettings(developer?.title);
             }
           }
         }
@@ -1309,9 +1302,12 @@ async function start(): Promise<void> {
         get lab() {
           return lab;
         },
-        /** The room's Developer page (debug builds), for the probes to press its buttons. */
+        /** The developer overlay's buttons (debug builds), for the probes. */
         get developer() {
           return developer;
+        },
+        get developerOverlay() {
+          return developerOverlay;
         },
         capabilities,
         handsStatus,

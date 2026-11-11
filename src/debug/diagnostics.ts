@@ -87,7 +87,7 @@ export class Diagnostics {
     performance.mark(`wsw-${name}`);
   }
 
-  /** How many errors are kept, and the newest (for the room's Developer page). */
+  /** How many errors are kept, and the newest (for the developer overlay). */
   get errorCount(): number {
     return this.errors.length;
   }

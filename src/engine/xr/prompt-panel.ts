@@ -1,5 +1,5 @@
 // A small text panel in the scene for guided recordings on a headset
-// (the Developer page's guided shapes recording). Page text isn't visible inside XR, so the prompt is
+// (the developer overlay's guided shapes recording). Page text isn't visible inside XR, so the prompt is
 // drawn on a canvas texture on a plane in front of the wearer. It's placed
 // once, not head-locked, so it stays put while the wearer looks at their hands.
 import type { PresetName } from '../hands/synthetic-hand';

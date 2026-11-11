@@ -1,5 +1,5 @@
 // Records hand joints during an XR session for offline replay. Armed with the
-// Developer page's Record buttons (or the `record` testing switch, when the session starts). Recording starts when the first hand is
+// developer overlay's Record buttons (or the `record` testing switch, when the session starts). Recording starts when the first hand is
 // tracked and stops after 20 s or when the session ends. The page then shows a
 // "Download recording" button (DOM isn't visible inside XR).
 //

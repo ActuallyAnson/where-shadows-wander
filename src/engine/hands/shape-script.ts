@@ -1,5 +1,5 @@
 // A timed sequence of shapes to make, one hand at a time. It drives the guided
-// recordings that label hand data (on a headset with the Developer page's guided shapes recording, in
+// recordings that label hand data (on a headset with the developer overlay's guided shapes recording, in
 // the Hand Lab and on the webcam bench) and the Hand Lab's scripted mock hands.
 // Plain TypeScript: no IWSDK, no three.js.
 import type { Handedness } from './hand';

@@ -57,14 +57,14 @@ The emulator's hands are perfect and synthetic. It's for checking that code work
 
 The Hand Lab changes only whose hands play. The game itself runs exactly as on a headset: you press **BEGIN**, the emulator starts a real VR session, and the room, wall, candle, lighting and quality settings are the ones a headset gets ([ADR 0018](adr/0018-hand-lab-in-session.md)). The hands come from a mock source instead of the device. There is no address for it: the page is always `https://localhost:8081/`, and the choice is kept in the browser tab (`src/app/launch-mode.ts`), so a reload keeps the mock hands and a new tab opens the game with the device's hands. It is in dev and tester builds only.
 
-1. With `npm run dev` running, open **https://localhost:8081/** in a normal Chrome tab and press **BEGIN** to enter the emulator's session. Press **Alt+D** to open the room's Developer page, then poke **Hand Lab panel** (or click it in the emulator). The panel appears on the right at once (no reload); a reload keeps it. Move the head with the emulator's controls. **Hide panel** at the top hides it again; the hands stay with the source you picked. Avoid the window `npm run dev` opens by itself: its downloads don't reach your Downloads folder (recordings don't need them: see below).
+1. With `npm run dev` running, open **https://localhost:8081/** in a normal Chrome tab and press **BEGIN** to enter the emulator's session. Press **🛠 Dev** at the top left, then **Hand Lab panel**. The panel appears on the right at once (no reload); a reload keeps it. Move the head with the emulator's controls. **Hide panel** at the top hides it again; the hands stay with the source you picked. Avoid the window `npm run dev` opens by itself: its downloads don't reach your Downloads folder (recordings don't need them: see below).
 2. Pick a **Source** in the panel. It switches live, in the session or out, with no reload, and a reload of the tab keeps it:
    - **Device:** the emulator's (or headset's) own hands, as the game reads them without the lab. The cards still show their features. It is where the lab starts.
    - **Synthetic:** choose **Left** or **Right**, then click a shape (or press 0–6). **Hide** takes a hand away (as if tracking were lost) and **Jitter** adds a few millimetres of tracking noise. Keys: R/L pick a hand, arrows move it (Shift for depth), Q/E roll, Z/X turn, T/Y tilt the fingers up or down, Space pauses. P pinches (press again to let go: the log shows a pinch-release where the fingertips met). G moves the hand to the candle: held there, a fingertip at the wick lights it on the title (3 s), and later a fist (2) over it covers the flame and pauses. B brings it back. The **Lantern gestures** box logs each gesture.
    - **Script:** every shape on the right hand, then the left, in a loop.
    - **Replay…:** pick a `.handrec.json`, or drag one onto the page.
    - **Webcam:** your own hands. Allow camera access; the first start downloads the hand model (about 8 MB). The status line shows the tracking rate and MediaPipe's time per frame, which runs in the background and doesn't slow the page.
-3. The cards show each hand's palm direction, thumb–index gap, finger spread and finger curl. The big label is the shape the hand is posed as (Synthetic and Script); the rough guess under it only knows flat, fist and open until the classifier lands. To see the joints or the shadow capsules, use the Debug: views page after the Developer page (or Alt+J, Alt+K), as on a headset.
+3. The cards show each hand's palm direction, thumb–index gap, finger spread and finger curl. The big label is the shape the hand is posed as (Synthetic and Script); the rough guess under it only knows flat, fist and open until the classifier lands. To see the joints or the shadow capsules, use the **🛠 Dev** overlay's Views switches (or Alt+J, Alt+K).
 4. **● Record**, then **Stop and download**, saves a `.handrec.json` into the repo's `recordings/` folder through the dev server (the message under Source says where). On a built page without the dev server it downloads to your Downloads folder instead.
 5. **Calibration:** with real hands, press **Calibrate right** (or left) and hold that hand flat, fingers straight and together, for 2 seconds. Curl is then measured from your own straight, which removes the webcam's offset (it reads straight fingers as somewhat bent). It's remembered in this browser; **Clear** removes it. The **Shape guide** shows a picture of each shape and how to make it.
 6. **Guided recording** prompts you through every shape, right hand then left (84 s: each shape held 4.5 s with 2 s rests, with a picture of each), and saves a recording with **shape labels**: which shape each hand was asked to make, and when. Those are what the classifier is scored against (#12). Use it with the **Webcam** source. With **Script** it gives a labelled synthetic recording. Press **Stop guided** to end early; you keep the labels for the prompts you finished.
@@ -91,23 +91,20 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
 7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
 
-**The Developer page (in the room; dev server and tester builds only, section 17).** In VR, cover the candle to pause, then point at **Developer** on the pause screen (at a desk, **Alt+D** opens and closes it). It is a page of the room's settings screen (`src/app/developer-page.ts`), with:
+**The developer overlay (no address to type; dev server and tester builds only, section 17).** A **🛠 Dev** button sits at the top left of the page, in the style of the emulator's own panels. It is page UI, not part of the room: at a desk it stays over the emulator's view during the session; on a headset use it on the title page before BEGIN (a page cannot be seen inside VR). It opens one panel (`src/app/developer-overlay.ts`) with:
 
-- **Hand Lab panel:** shows or hides the panel that picks whose hands play (section 5), at once.
-- **Record 20 s of hands** and **Record guided shapes:** start a hand recording now (it begins when a hand is first tracked). One at a time; when it is saved, press again for another.
-- **Lantern flicker (test):** the setting, steady, 0.5 or 1, applied live and remembered in the browser.
-- **Errors:** how many errors the page has caught; reach it to read the newest.
-- **Room editor:** leaves VR and reloads into the editor (below).
+- **Developer** (`src/app/developer-page.ts`): **Hand Lab panel** (shows or hides the panel that picks whose hands play, section 5, at once), **Record 20 s of hands** and **Record guided shapes** (start a recording now, or before BEGIN for the next session; it begins when a hand is first tracked, one at a time), **Lantern flicker (test)** (the setting, steady, 0.5 or 1, applied live and remembered in the browser), **Errors** (how many the page has caught, with the newest under it) and **Room editor** (leaves VR and reloads into the editor, below).
+- **Views** and **Systems and replay:** the debug menu's switches (section 17), each with its state.
 
-**Next page >** goes on to the debug pages (section 17). The launcher page has no developer controls: if BEGIN fails in a dev or tester build, the launch log appears under the title with **Copy logs**. The other testing switches (joint dots, shadow capsules, the settings panel or a recording when VR starts, a menu screen) are kept in the browser's `localStorage` (`wsw.testing`, `src/app/testing-options.ts`) and set there by the probe scripts. The game takes no address options at all. `node scripts/testing-probe.mjs <url>` checks the Developer page in a browser; the other probe scripts set the hands and mode before the page loads, and press BEGIN to enter the emulator's session, with `scripts/lib/launch.mjs`.
+If BEGIN fails in a dev or tester build, the launch log appears under the title with **Copy logs**. The other testing switches (joint dots, shadow capsules, the settings panel or a recording when VR starts, a menu screen) are kept in the browser's `localStorage` (`wsw.testing`, `src/app/testing-options.ts`) and set there by the probe scripts. The game takes no address options at all. `node scripts/testing-probe.mjs <url>` clicks through the overlay in a browser; the other probe scripts set the hands and mode before the page loads, and press BEGIN to enter the emulator's session, with `scripts/lib/launch.mjs`.
 
 **Capture mode, for recording the demo video (works in the judges' build too).** On the title screen, tap the emblem (the little flame above the title) five times quickly: the page steps capture mode through off, clean and sharp and reloads, and a note under the menu says which is on. Capture mode keeps the "Show me your hands" panel out of the picture (it would appear whenever tracking drops mid-take) and turns the headset's foveated rendering off (a recording shows its blurry edges). Sharp also renders the eyes at 1.5 times the resolution; that costs frame time, so check it holds the headset's rate before a take. The settings are in the session report (`capture`). Record with the headset's own recorder; this has not been tried on a Pico or a Quest yet, so do a short test take and look at the file before the real one. It is for taking video, not for playing.
 
 **From the hosted build:** once GitHub Pages is set up (section 11), use that HTTPS link instead. There's no certificate warning, and it works away from your Wi-Fi.
 
-**To record hand data on a headset,** press BEGIN, cover the candle, point at **Developer**, then press **Record 20 s of hands**. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR the page sends the file to the dev server, which saves it into `recordings/` on the computer running `npm run dev` (the button at the bottom right says where). If the page was not served by a dev server (a built page), press **Download recording** instead.
+**To record hand data on a headset,** press **🛠 Dev** on the title page, then **Record 20 s of hands**, then BEGIN. Recording starts when a hand is first tracked and lasts 20 seconds. After you exit XR the page sends the file to the dev server, which saves it into `recordings/` on the computer running `npm run dev` (the button at the bottom right says where). If the page was not served by a dev server (a built page), press **Download recording** instead.
 
-**To record labelled hand shapes on a headset,** press **Record guided shapes** on the Developer page instead. A panel in front of you says "Raise your hands to start", then prompts each shape with a countdown, right hand then left. It takes 84 seconds and the file carries shape labels. Follow the prompts as closely as you can: the labels say what you were asked to do, not what your hand did.
+**To record labelled hand shapes on a headset,** press **Record guided shapes** instead. A panel in front of you says "Raise your hands to start", then prompts each shape with a countdown, right hand then left. It takes 84 seconds and the file carries shape labels. Follow the prompts as closely as you can: the labels say what you were asked to do, not what your hand did.
 
 ## 7. View a recording
 
@@ -139,7 +136,7 @@ The report's `capabilities` section says what the session provides: hand trackin
 
 ## 9. Score the classifier on recordings
 
-Labelled recordings (section 5's **Guided recording**, or the Developer page's guided shapes recording on a headset) can be scored against the shape classifier:
+Labelled recordings (section 5's **Guided recording**, or the developer overlay's guided shapes recording on a headset) can be scored against the shape classifier:
 
 1. Put the `.handrec.json` files in `recordings/` (any subfolder). They stay on your machine; the folder is gitignored.
 2. Run `npm run eval`. It prints, per source (webcam, Pico, Quest, emulator, synthetic): frame accuracy, hits (prompted shapes that committed), false triggers per minute, flicker and time to commit, then a table per shape, a confusion matrix and the worst labels. A JSON report goes to `eval-reports/`.
@@ -176,7 +173,7 @@ Every push to `main` builds and deploys to GitHub Pages (`.github/workflows/page
 
 Where the bedroom's static pieces stand is in `content/rooms/bedroom.json` ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). Arrange them in the running game:
 
-1. `npm run dev`, open `https://localhost:8081/`, press **BEGIN**, then **Alt+D** and **Room editor** (Leave VR). It is the one mode that runs at the desk with no VR session. Closing the editor returns to the game.
+1. `npm run dev`, open `https://localhost:8081/`, press **🛠 Dev**, then **Room editor**. It is the one mode that runs at the desk with no VR session. Closing the editor returns to the game.
 2. Click a piece, or pick it in the right panel's **Scene** tab (Room and Lap, grouped by Furniture, Dressing, Room, Tray and Added). In the **Inspector** tab, drag the gizmo or type exact numbers into Position (metres), Rotation (degrees) and Scale. Drag the panel's left edge to widen it (double-click the edge for the default width; the width is remembered).
 3. To add a model, use the **Assets** panel along the bottom (below).
 4. **Save room layout** (or Ctrl+S) writes the file. Commit it like any other change, with any model files you imported or exported. Saving doesn't reload the page; the next reload reads the saved file.
@@ -255,7 +252,7 @@ The settings and the day last played are saved in the browser ([ADR 0010](adr/00
 The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are one table in `src/engine/services/settings/settings.ts`: tolerance, hold time, shadow size, recognition glow, lantern flicker, the four volumes, high contrast, captions (a stub until the story exists) and the main hand. Each has a range, a default and a one-line explanation, and the panel, the saves and the tests all read that table.
 
 - **Open the panel (every build):** **SETTINGS** on the title screen opens them as a page, before the headset is on. In VR, cover the candle to pause, then press **Settings** on the pause screen.
-- **Open it while testing (dev and tester builds):** **Settings** in the Hand Lab panel; the Developer page (pause screen > **Developer**, or Alt+D) is the same screen, so **Next page >** from it reaches the debug pages too. The Developer and debug pages after the settings pages are dev and tester only.
+- **Open it while testing (dev and tester builds):** **Settings** in the Hand Lab panel. The debug pages after the settings pages are dev and tester only.
 - **Use it:** poke a button with a fingertip. There are two pages (**More settings >** and **< Back**), **Reset to defaults** and **Close**. A change applies at once and is saved with the next save event.
 - **Use a setting in game code:** read `settings.value` (on `__wsw.settings` in dev) and `settings.subscribe(fn)` to hear changes. `highContrast`, `captions` and `hand` are only read by listeners; the other settings are already pushed to the recognizer, shadow projector, sharpen, lantern and mixer by the store.
 - **Add a setting:** add its field to `Settings`, an entry to `SETTING_SPECS` (with the one-line help) and a page slot in `PAGES` (`src/ui/settings-panel/markup.ts`), and, if it steers an engine object, a case in `SettingsStore.apply`. A new field needs a save version bump (section 15).
@@ -263,7 +260,7 @@ The accessibility settings ([ADR 0011](adr/0011-accessibility-settings.md)) are 
 
 ## 17. Debug tools
 
-Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the dev server and in a **tester build**; the judges' build (`npm run build`) does not contain them. `npm run build -- --mode tester` makes a tester build (for the Pico over GitHub Pages or a tunnel). The room's Developer page (section 6), with the Hand Lab and room editor buttons on it, and the pause screen's **Developer** button are part of the same gate. `node scripts/check-debug-free.mjs` builds both ways and fails if the normal build has any debug code in it; run it before a release.
+Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the dev server and in a **tester build**; the judges' build (`npm run build`) does not contain them. `npm run build -- --mode tester` makes a tester build (for the Pico over GitHub Pages or a tunnel). The **🛠 Dev** overlay (section 6), with the Hand Lab and room editor buttons in it, is part of the same gate. `node scripts/check-debug-free.mjs` builds both ways and fails if the normal build has any debug code in it; run it before a release.
 
 **Keyboard** (Alt plus the key, so none of it clashes with the Hand Lab's keys; a small line at the bottom left of the page shows what is not normal):
 
@@ -272,10 +269,9 @@ Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the
 | Alt+K | Show the shadow capsules, outline and projected joints |
 | Alt+J | Show the joint dots |
 | Alt+R | Start or stop replaying the demo recording into the game, in place of your hands |
-| Alt+D | Open or close the Developer page in the room (in a session) |
 | Alt+1 to Alt+5 | Switch off or on: shadow, sharpen, flicker, candle light, hand visual |
 
-**Hands-only menu.** The settings panel (section 16) has more pages after the two settings pages when the debug tools are on: **Developer** (section 6), **Debug: views** (capsules, joint dots) and **Debug: systems and replay** (the five systems, replay), then one page per group of registered actions. Poke a button; its text shows the state, and a key press updates it too. In a headset: cover the candle, point at **Developer**, then **Next page >**.
+**Hands-only menu.** The settings panel (section 16) has more pages after the two settings pages when the debug tools are on: **Debug: views** (capsules, joint dots) and **Debug: systems and replay** (the five systems, replay), then one page per group of registered actions. Poke a button; its text shows the state, and a key press updates it too. At a desk the **🛠 Dev** overlay has the same switches.
 
 **Switching a system off** is an override that sits on top of the settings: changing a setting while a system is off does not turn it back on, and a page reload clears it. Sharpen restores to the setting's value; flicker to what the flame was doing before (the device's default or the player's choice).
 
@@ -293,14 +289,14 @@ Debug tools ([ADR 0012](adr/0012-debug-tools.md), `src/debug`) exist only in the
 | Port 8081 already in use | `npm run dev:down`, then `npm run dev` again. |
 | No **Enter XR** button in desktop Chrome | Use the dev server (`npm run dev`), which adds the emulator. The hosted build only offers XR on a headset. |
 | No hands in the emulator | Switch the emulator's input to **Hands**. |
-| No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. In a dev or tester build, open the Developer page (pause screen > **Developer**), then **Next page >** and **Joint dots** to see a dot on every tracked joint. |
+| No hands on a headset | Turn on hand tracking in the headset settings, and put the controllers down. In a dev or tester build, press **🛠 Dev** on the title page and turn on **Joint dots** to see a dot on every tracked joint. |
 | Headset can't open the Network address | Same Wi-Fi? Some networks block devices from reaching each other. Use the hosted build instead. |
 | Webcam (Hand Lab or bench) says "Couldn't start" | Allow camera access for localhost in Chrome, and close other apps that use the camera. |
 | No way into VR on the Pico (a blank page, no Enter button) | The Pico browser (Chrome 105) can't show the browser's own enter prompt, which is all IWSDK relies on. The page always shows its own title screen, and **BEGIN** starts VR. If it fails, reload the page and press BEGIN again; in dev and tester builds the launch log appears under the title when it fails, and says what the browser answered. |
 | On the Pico, hands show as a pointer and a click but no hands drawn ("hands as controllers"), or **Enter** does nothing | The Pico's own browser and the Pico Store's Wolvic do not give a page the 25 hand joints. What works (ADR 0003, update 2): the sideloaded **Wolvic Chromium 1.4** build (`Wolvic-picoxr-arm64-chromium-generic-release.apk`), a **VR** session (the title's **BEGIN**), controllers off. Wolvic Chromium shows a blank page for a self-signed `https://192.168...` address (no certificate warning screen), so open the game through a trusted address: the GitHub Pages link, or a tunnel to the dev server (a public address: do not leave it running). The launcher's log box and buttons show what the browser said. |
 | Webcam stuck on "Loading hand model" or "Starting the camera" | The model downloads from Google on first start. Check your internet connection. |
 | Page stays white; the console says "WebGL context could not be created" | Chrome has turned WebGL off, usually after its graphics process crashed. Quit Chrome fully (Cmd+Q) and reopen it. If that doesn't help, turn on **Use graphics acceleration when available** in `chrome://settings/system`; `chrome://gpu` should show WebGL as hardware accelerated. |
-| The Hand Lab panel is gone | The panel and its source are kept per tab: a new tab, or the link opened elsewhere, starts the game with the device's hands. Press BEGIN, **Alt+D**, then **Hand Lab panel**. |
+| The Hand Lab panel is gone | The panel and its source are kept per tab: a new tab, or the link opened elsewhere, starts the game with the device's hands. Press **🛠 Dev**, then **Hand Lab panel**. |
 | Hand Lab recording isn't in `recordings/` | The dev server must be running (`npm run dev`) with the new vite.config.ts: restart it once after pulling. Without it the page falls back to a browser download. |
 | `npm run check` fails on "single three" | Something added another three.js. Run `npm ls three` to find it; never install a second copy. |
 | Copy report doesn't copy | Press **Show**, then select all the text and copy it by hand. |

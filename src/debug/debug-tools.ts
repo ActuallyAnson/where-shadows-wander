@@ -36,8 +36,6 @@ export interface DebugContext {
 
 export class DebugTools {
   readonly controller: DebugController;
-  /** Alt+D: opens or closes the room's Developer page (main.ts sets it). */
-  onDeveloperKey: (() => void) | null = null;
   readonly replay = new HandReplay();
   private readonly shadowDebug = new ShadowDebug();
   readonly dots = new JointDots();
@@ -79,8 +77,7 @@ export class DebugTools {
       const action = debugKeyAction(e);
       if (!action) return;
       e.preventDefault();
-      if (action === 'developer') this.onDeveloperKey?.();
-      else this.controller.handleKey(action);
+      this.controller.handleKey(action);
     };
     window.addEventListener('keydown', onKey);
     this.removers.push(() => window.removeEventListener('keydown', onKey));
@@ -156,7 +153,7 @@ export class DebugTools {
     const frames = this.ctx.readout?.();
     const text = this.controller.status();
     this.hud.textContent =
-      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+K capsules  Alt+J joints  Alt+R replay  Alt+D developer') +
+      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+K capsules  Alt+J joints  Alt+R replay') +
       (frames ? `  |  ${frames}` : '');
   }
 }

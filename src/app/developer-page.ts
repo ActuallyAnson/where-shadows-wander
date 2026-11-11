@@ -1,7 +1,6 @@
-// The Developer page in the room (dev and tester builds only): what the launcher's Developer panel used to hold, now
-// inside the session, where a headset can show it. It is one more page of the room's settings screen, opened from the
-// pause screen's Developer button (cover the candle, then point at Developer). The overlays and systems are on the debug
-// pages that follow it. Plain data and callbacks: main.ts supplies what each button does.
+// The developer buttons (dev and tester builds only): the Hand Lab, recordings, the test flicker, errors and the room
+// editor, as one section of the developer overlay (developer-overlay.ts), with the debug menu's pages after it. Plain data
+// and callbacks: main.ts supplies what each button does.
 import type { ExtraPageItems } from '../ui/settings-panel/screen-model';
 import { FLICKER_CHOICES, FREE_RECORD_SECONDS, nextChoice, type FlickerChoice } from './testing-options';
 

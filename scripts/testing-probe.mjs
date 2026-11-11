@@ -2,10 +2,10 @@
 // Checks the developer tools in a real browser, with no headset and with no address typed.
 // Usage: start a dev server (npx vite --port 8097 --strictPort) then
 //   node scripts/testing-probe.mjs https://localhost:8097 [screenshot.png]
-// The launcher page has no Developer button; its launch log is hidden until BEGIN fails. The testing switches preset in the
-// browser's storage take effect when the page starts and when VR starts. In the session, the pause screen's Developer
-// button opens the room's settings screen at the Developer page (developer-page.ts), whose buttons show the Hand Lab
-// (which switches whose hands play, live), start a recording, set the test flicker live, and open the room editor.
+// The launcher's launch log is hidden until BEGIN fails. The testing switches preset in the browser's storage take effect
+// when the page starts and when VR starts. In the session, the page's 🛠 Dev button opens the developer overlay
+// (developer-overlay.ts), whose rows are clicked here as a person would: show the Hand Lab (which switches whose hands
+// play, live), start a recording, set the test flicker live, switch a debug overlay, and open the room editor.
 import { chromium } from 'playwright';
 import { enterVr } from './lib/launch.mjs';
 
@@ -32,7 +32,7 @@ let navigations = 0;
 page.on('framenavigated', (f) => f === page.mainFrame() && navigations++);
 const plain = () => new URL(page.url()).search === '' && new URL(page.url()).hash === '';
 
-check('the launcher has no Developer button', (await page.getByRole('button', { name: /Developer/ }).count()) === 0);
+check('the 🛠 Dev button is on the page', await page.locator('#wsw-dev-toggle').isVisible());
 check('nor a Copy logs button until BEGIN fails', await page.getByRole('button', { name: /Copy logs/ }).isHidden());
 
 // Switches preset in storage (as the probe scripts do) apply when the page starts.
@@ -63,12 +63,27 @@ await page.evaluate(() => {
   localStorage.removeItem('wsw.testing');
 });
 
-// The Developer page, opened the way the pause screen's Developer button opens it.
-await page.evaluate(() => window.__wsw.openSettings(window.__wsw.developer.title));
-check('the Developer page opens in the room', await page.evaluate(() => window.__wsw.settingsPanel.isOpen));
+// The developer overlay, opened with the page's 🛠 Dev button during the session.
+const overlay = page.locator('#wsw-dev-overlay');
+check('the overlay starts closed', await overlay.isHidden());
+await page.locator('#wsw-dev-toggle').click();
+check('the 🛠 Dev button opens it, in the session', await overlay.isVisible());
+check('and nothing opens in the room', await page.evaluate(() => !window.__wsw.settingsPanel.isOpen));
 if (shot) await page.screenshot({ path: shot });
-const press = (id) => page.evaluate((id) => window.__wsw.developer.items.find((i) => i.id === id).press(), id);
-const text = (id) => page.evaluate((id) => window.__wsw.developer.items.find((i) => i.id === id).text(), id);
+const LABELS = {
+  'hand-lab': 'Hand Lab panel',
+  'record-free': 'Record 20 s of hands',
+  'record-shapes': 'Record guided shapes',
+  flicker: 'Lantern flicker (test)',
+  'room-editor': 'Room editor',
+  joints: 'Joint dots',
+};
+const valueButton = (id) => overlay.locator(':scope > div').filter({ hasText: LABELS[id] }).first().getByRole('button');
+const press = (id) => valueButton(id).click();
+const text = (id) => valueButton(id).innerText();
+
+await press('joints');
+check('a debug switch works from the overlay', await page.evaluate(() => !window.__wsw.debug.dots.mesh.visible));
 
 check('the free recording is already running', (await text('record-free')) !== 'Start', await text('record-free'));
 await press('record-shapes'); // ignored while the free one runs

@@ -11,7 +11,7 @@ import { join } from 'node:path';
 const MARKERS = [
   'Alt+K capsules', // the HUD line (debug-tools.ts)
   'Joint dots', // the debug menu (debug-controller.ts)
-  'Lantern flicker (test)', // the room's Developer page (developer-page.ts)
+  'Lantern flicker (test)', // the developer overlay's buttons (developer-page.ts)
   'Copy report', // the report panel (report-panel.ts)
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
   'Copy logs', // the launch log's copy button, shown when BEGIN fails (enter-ar-button.ts)

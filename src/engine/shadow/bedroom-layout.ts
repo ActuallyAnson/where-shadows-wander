@@ -1,5 +1,5 @@
 // The bedroom's layout file (content/rooms/bedroom.json), read once when the game starts. Every view that places static
-// pieces takes its placements from here; the dev room editor (the Developer page) edits this same object and saves it back.
+// pieces takes its placements from here; the dev room editor (the developer overlay) edits this same object and saves it back.
 import doc from '../../../content/rooms/bedroom.json';
 import { parseRoomLayout, type ParsedRoomLayout } from '../stage/room-layout';
 import { LAP_PIECE_IDS } from '../render/room/bed-tray-view';

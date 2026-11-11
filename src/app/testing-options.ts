@@ -1,6 +1,6 @@
 // The testing switches (joint dots, shadow capsules, open the settings panel when VR starts, record hands, the lantern's
 // flicker) as a plain object, remembered in the browser (`wsw.testing`) and read when the page starts. The probe scripts
-// write the key before the page loads; the room's Developer page (developer-page.ts) changes the flicker. Plain TypeScript.
+// write the key before the page loads; the developer overlay (developer-overlay.ts) changes the flicker. Plain TypeScript.
 
 export type RecordChoice = 'off' | 'free' | 'shapes';
 /** Which menu screen to show in the room (menu-panel), or none. */
