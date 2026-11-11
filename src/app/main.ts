@@ -92,6 +92,7 @@ import { HAND_LAB_EVENT, isDeskMode, loadLaunch, switchLaunch, updateLaunch } fr
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
+import { hideEmulatorInputSwitch, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
 import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -131,13 +132,12 @@ start().catch((e) => {
 async function start(): Promise<void> {
   // The game is a virtual room: iwsdk.config.json asks for immersive-vr (ADR 0005).
   const world = await World.create(document.getElementById('scene-container') as HTMLDivElement, projectOptions);
-  // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it with hands.
-  const emulatedDevice = import.meta.env.DEV
-    ? (window as { IWER_DEVICE?: { primaryInputMode: string } }).IWER_DEVICE
-    : undefined;
+  // Dev only: the IWER emulator starts with controllers; this game is hands-only, so start it, and its panel, with hands.
+  const emulatedDevice = import.meta.env.DEV ? (window as { IWER_DEVICE?: EmulatedDeviceLike }).IWER_DEVICE : undefined;
   const emulated = !!emulatedDevice;
   if (emulatedDevice) {
-    emulatedDevice.primaryInputMode = 'hand';
+    useEmulatorHands(emulatedDevice);
+    hideEmulatorInputSwitch(document); // and no switching it to controllers
     // Its "Enter XR" bar repeats the launcher's BEGIN (and the room editor never enters XR): hide it.
     hideEmulatorOfferBar(document);
   }
