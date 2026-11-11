@@ -4,6 +4,8 @@
 // this is enforced by ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 import {
   AmbientLight,
+  AssetManager,
+  AssetType,
   Color,
   Group,
   Matrix4,
@@ -96,6 +98,7 @@ import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
+import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
 import { BEDROOM_LAYOUT_FILE, readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
@@ -278,6 +281,20 @@ async function start(): Promise<void> {
   void roomModels.load(candleLight).then(() => {
     for (const piece of roomModels.editables()) roomDressing.follow(piece);
   });
+  // Models placed with the room editor (layout entries that name a `model`), loaded through the asset manifest, in the
+  // room or on the lap.
+  const manifestModels: ModelLoader = async (id) => {
+    const entry = (assetManifest as Record<string, { type?: unknown } | undefined>)[id];
+    if (!entry || entry.type !== AssetType.GLTF) return null;
+    await AssetManager.loadGLTFById(id);
+    return AssetManager.getGLTF(id)?.scene ?? null;
+  };
+  const placedModels = new PlacedModels(
+    { room: roomDressing.group, lap: bedTray.group },
+    manifestModels,
+    bedroomLayout.layout,
+  );
+  void placedModels.load(candleLight);
   const vrTitle = new VrTitleView();
   /** Seconds on the VR title, with no sign of lighting the candle, before the riddle appears, and before the plainer line replaces it. */
   const TITLE_HINT_AFTER_S = 6;
@@ -2131,6 +2148,7 @@ async function start(): Promise<void> {
         bedroomView,
         roomDressing,
         roomModels,
+        placedModels,
         roomEditor,
         vrTitle,
         wallPauseView,
