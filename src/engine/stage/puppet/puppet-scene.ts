@@ -1,0 +1,145 @@
+// A puppet scene: a short piece of shadow theatre on the wall (docs/adr/0016-story-shadow-theatre.md). Cut-out parts hang from
+// each other at pivots (a leg from a hip, a lantern from a staff), keyframed tracks move them, wobbles keep them alive, and cues
+// at marked moments play a note or write a line on the wall. Plain data: a scene is written as a constant (prologue-scene.ts)
+// and played by ScenePlayer. Coordinates are stage metres from the wall's centre (x right, y up); angles are radians,
+// counter-clockwise as the player sees the wall.
+
+/** What a track can move. */
+export type PuppetProp = 'x' | 'y' | 'angle' | 'scale' | 'opacity';
+export const PROPS: readonly PuppetProp[] = ['x', 'y', 'angle', 'scale', 'opacity'];
+/** Floats per part in ScenePlayer's pose arrays: x, y, angle, scale, opacity. */
+export const POSE_STRIDE = 5;
+
+/** How a track arrives at a key: `step` jumps there at the key's time; `smooth` eases in and out. */
+export type Ease = 'linear' | 'smooth' | 'in' | 'out' | 'step';
+/** A key: at `t` seconds the value is `value`, reached from the key before with `ease` (default linear). */
+export type Key = readonly [t: number, value: number, ease?: Ease];
+
+export interface PuppetPart {
+  readonly id: string;
+  /**
+   * What it looks like: a painted art id (puppet-art.ts), or the path of an image (.png, .webp) whose alpha is the cut-out.
+   * Empty: an invisible joint that only carries children.
+   */
+  readonly art: string;
+  /** A shadow (black, cast on the wall: the default) or a glow (light, added onto the wall). */
+  readonly look?: 'shadow' | 'glow';
+  /** A glow's colour, 0..1 each. */
+  readonly tint?: readonly [number, number, number];
+  /** The part it hangs from (listed before it). Its rest pose is then relative to the parent's pivot, in the parent's frame. */
+  readonly parent?: string;
+  /** Size, metres. */
+  readonly w: number;
+  readonly h: number;
+  /** The point it turns about and is placed by, as a fraction of its size from its bottom-left corner. Default the centre. */
+  readonly pivot?: readonly [number, number];
+  /** Rest pose; a track on a prop replaces it. */
+  readonly x?: number;
+  readonly y?: number;
+  readonly angle?: number;
+  readonly scale?: number;
+  readonly opacity?: number;
+  /** Drawn mirrored left to right (it faces the other way). */
+  readonly mirror?: boolean;
+}
+
+export interface Track {
+  readonly part: string;
+  readonly prop: PuppetProp;
+  /** In time order. Before the first key the value is the first key's; after the last, the last key's. */
+  readonly keys: readonly Key[];
+}
+
+/** A steady sway added on top of the pose: amp * sin(2π t / period + phase). */
+export interface Wobble {
+  readonly part: string;
+  readonly prop: PuppetProp;
+  readonly amp: number;
+  readonly period: number;
+  readonly phase?: number;
+}
+
+/** Something that happens at a moment: a note of the lullaby, or a line written on the wall. */
+export type Cue =
+  | { readonly t: number; readonly kind: 'note'; readonly note: number }
+  | {
+      readonly t: number;
+      readonly kind: 'line';
+      readonly text: string;
+      /** Which of the wall's lines: the big title or the small line under it. */
+      readonly slot: 'title' | 'line';
+      /** Seconds it stays once written. */
+      readonly hold: number;
+    };
+
+export interface PuppetScene {
+  readonly id: string;
+  /** Seconds it runs. */
+  readonly length: number;
+  /** Parents before their children; later parts draw over earlier ones. */
+  readonly parts: readonly PuppetPart[];
+  readonly tracks: readonly Track[];
+  readonly wobbles?: readonly Wobble[];
+  /** In time order. */
+  readonly cues?: readonly Cue[];
+}
+
+/** Problems with a scene, as sentences (none when it is sound). Run on load and in tests, never per frame. */
+export function validateScene(scene: PuppetScene): string[] {
+  const problems: string[] = [];
+  const seen = new Set<string>();
+  if (!(scene.length > 0)) problems.push(`${scene.id}: its length must be positive`);
+  for (const p of scene.parts) {
+    if (seen.has(p.id)) problems.push(`two parts are called ${p.id}`);
+    if (p.parent !== undefined && !seen.has(p.parent))
+      problems.push(`${p.id} hangs from ${p.parent}, which is not listed before it`);
+    if (!(p.w > 0 && p.h > 0)) problems.push(`${p.id} has no size`);
+    seen.add(p.id);
+  }
+  for (const tr of scene.tracks) {
+    if (!seen.has(tr.part)) problems.push(`a track moves ${tr.part}, which is not a part`);
+    if (tr.keys.length === 0) problems.push(`the ${tr.prop} track of ${tr.part} has no keys`);
+    for (let i = 1; i < tr.keys.length; i++)
+      if (tr.keys[i][0] < tr.keys[i - 1][0])
+        problems.push(`the ${tr.prop} track of ${tr.part} goes back in time at ${tr.keys[i][0]} s`);
+  }
+  for (const w of scene.wobbles ?? []) {
+    if (!seen.has(w.part)) problems.push(`a wobble moves ${w.part}, which is not a part`);
+    if (!(w.period > 0)) problems.push(`the wobble on ${w.part} needs a positive period`);
+  }
+  const cues = scene.cues ?? [];
+  for (let i = 1; i < cues.length; i++)
+    if (cues[i].t < cues[i - 1].t) problems.push(`the cues go back in time at ${cues[i].t} s`);
+  return problems;
+}
+
+/** Keys that swing a value between `from ± amp` every `period` seconds from `t0` to `t1`, then settle on `rest`. */
+export function swingKeys(
+  t0: number,
+  t1: number,
+  period: number,
+  amp: number,
+  centre = 0,
+  rest = centre,
+  phase = 1,
+): Key[] {
+  const keys: Key[] = [[t0, centre]];
+  let side = phase;
+  for (let t = t0 + period / 4; t < t1 - period / 8; t += period / 2) {
+    keys.push([t, centre + side * amp, 'smooth']);
+    side = -side;
+  }
+  keys.push([t1, rest, 'smooth']);
+  return keys;
+}
+
+/** Keys for a bob: a small lift at every footfall (`period` is a full stride, two steps) from `t0` to `t1`. */
+export function bobKeys(t0: number, t1: number, period: number, base: number, lift: number): Key[] {
+  const keys: Key[] = [[t0, base]];
+  for (let t = t0 + period / 4; t < t1 - period / 8; t += period / 2) {
+    keys.push([t, base + lift, 'out']);
+    keys.push([Math.min(t + period / 4, t1), base, 'in']);
+  }
+  keys.push([t1, base]);
+  return keys;
+}

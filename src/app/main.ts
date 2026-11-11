@@ -43,6 +43,11 @@ import { FrameInspector } from './frame-inspector';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
+import { PuppetView } from '../engine/shadow/puppet-view';
+import { SkipTouch } from '../engine/shadow/pure/skip-touch';
+import { ScenePlayer } from '../engine/stage/puppet/scene-player';
+import { PROLOGUE_SCENE } from '../engine/stage/puppet/prologue-scene';
+import type { Cue } from '../engine/stage/puppet/puppet-scene';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
@@ -262,6 +267,37 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x101422, 0.008);
   // The captions (a setting): a small line of ink low on the wall that names the sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
+  // The puppet story (ADR 0016): for now its first scene, the prologue, played on the wall a moment after the candle is lit, once
+  // a session (and again from `__wsw.playPrologue()` in dev). Its title and line are written in ink by two lines of their own.
+  const prologue = new ScenePlayer(PROLOGUE_SCENE);
+  const puppets = new PuppetView();
+  puppets.load(PROLOGUE_SCENE);
+  const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
+  const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
+  const storySkip = new SkipTouch();
+  /** Seconds left before the prologue starts (it waits for the candle's light to spread), or -1: not waiting. */
+  const PROLOGUE_AFTER_LIGHT_S = 1.8;
+  let prologueWait = -1;
+  let prologuePlayed = false;
+  const onStoryCue = (cue: Cue) => {
+    if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
+    else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
+  };
+  const startPrologue = () => {
+    prologueWait = -1;
+    prologuePlayed = true;
+    storyTitle.clear();
+    storyLine.clear();
+    prologue.start(onStoryCue);
+  };
+  const stopPrologue = () => {
+    prologueWait = -1;
+    prologue.skip();
+    storyTitle.clear();
+    storyLine.clear();
+    puppets.hide();
+  };
+  const skipTips = new Float32Array(6);
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
   // time (and comes back slowly), and the inspector gives the debug bar a line of what a frame costs. It watches only in a headset
   // session: on the desktop the software renderer would trip it for no reason.
@@ -282,6 +318,9 @@ async function start(): Promise<void> {
     wallPauseView.group,
     bedroomView.group,
     shadowRenderer.mesh,
+    puppets.group,
+    storyTitle.group,
+    storyLine.group,
     captionLine.group,
     handTrail.group,
     candleView.group,
@@ -728,6 +767,8 @@ async function start(): Promise<void> {
       candleView.setLocked(false);
       titleLighter.visible = false;
       wallPauseView.hide();
+      stopPrologue();
+      prologuePlayed = false;
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -818,6 +859,7 @@ async function start(): Promise<void> {
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
     vrTitle.ignite();
+    if (!prologuePlayed) prologueWait = PROLOGUE_AFTER_LIGHT_S;
   };
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
@@ -1020,6 +1062,31 @@ async function start(): Promise<void> {
           const lineOpacity =
             shadowsVisible && !menu.group.visible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
+          // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
+          const storyStep = paused || sessionState !== 'playing' ? 0 : step;
+          if (prologueWait >= 0 && storyStep > 0) {
+            prologueWait -= storyStep;
+            if (prologueWait < 0) startPrologue();
+          }
+          if (prologue.playing) {
+            // A fingertip held on the wall's lower right corner skips it.
+            let tips = 0;
+            for (const h of handList) {
+              if (!h.tracked) continue;
+              const o = JOINT['index-finger-tip'] * 3;
+              skipTips[tips * 3] = h.positions[o];
+              skipTips[tips * 3 + 1] = h.positions[o + 1];
+              skipTips[tips * 3 + 2] = h.positions[o + 2];
+              tips++;
+            }
+            if (storyStep > 0 && storySkip.update(storyStep, skipTips, tips, stage)) stopPrologue();
+            else {
+              prologue.update(storyStep);
+              puppets.update(prologue, stage, lineOpacity);
+            }
+          } else puppets.hide();
+          storyTitle.update(storyStep, stage, lineOpacity);
+          storyLine.update(storyStep, stage, lineOpacity);
           if (menu.group.visible) {
             // The fingertips that can reach the menu: each tracked hand's index tip.
             let tips = 0;
@@ -1193,6 +1260,10 @@ async function start(): Promise<void> {
         igniteCandle: () => {
           if (sessionState === 'title_vr') igniteCandle();
         },
+        prologue,
+        puppets,
+        /** Plays the prologue now (the candle must be lit to see it). */
+        playPrologue: () => startPrologue(),
       },
     });
 }

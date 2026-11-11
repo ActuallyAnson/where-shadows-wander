@@ -17,6 +17,8 @@ export interface SoundPlayer {
 
 /** Sounds from the wall come from this far in front of it, metres, so they are not inside the paper. */
 const WALL_LIFT_M = 0.05;
+/** The lullaby's notes, lowest first. */
+const NOTES: readonly SoundId[] = [Sound.Note0, Sound.Note1, Sound.Note2, Sound.Note3, Sound.Note4];
 
 export class GameAudio {
   private readonly at = { x: 0, y: 0, z: 0 };
@@ -45,6 +47,14 @@ export class GameAudio {
     } else {
       this.player.playAt(Sound.Ignite, 0, 0.75, -0.45);
     }
+  }
+
+  /** One of the lullaby's five notes (0 lowest .. 4), from the stage point (`sx`, `sy`) on `stage`: a story scene's cue. */
+  storyNote(index: number, stage: StagePlane, sx = 0, sy = 0): void {
+    const id = NOTES[index];
+    if (id === undefined) return;
+    stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
+    this.player.playAt(id, this.at.x, this.at.y, this.at.z);
   }
 
   /** The candle lifted or set down, from the flame (`flame` is its scene position). Call with the frame's two flags. */
