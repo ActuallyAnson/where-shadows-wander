@@ -111,7 +111,7 @@ const IGNITION_GLOW = 0.9;
  * How bright the candle's small pool of light is while it waits to be lit (`waiting`), before the hold on the wick: bright, but
  * only about SPREAD_FROM_M across, so the eye goes to the candle first. The hold then spreads it out to the room.
  */
-const WAITING_GLOW = 1.2;
+const WAITING_GLOW = 2.0;
 /** Seconds the glow from the hold takes to hand over to the burning flame's light (which fades in), so there is no dip. */
 const HANDOVER_S = 0.6;
 

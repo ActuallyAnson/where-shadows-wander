@@ -267,7 +267,7 @@ async function start(): Promise<void> {
    * and the candle can be made out. Once the candle catches it eases back to the night level over MOON_SETTLE_S, under the
    * candle's own light spreading out.
    */
-  const START_MOON_LIFT = 2;
+  const START_MOON_LIFT = 1;
   const MOON_SETTLE_S = 3;
   let moonLift = START_MOON_LIFT;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
