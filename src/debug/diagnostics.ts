@@ -87,6 +87,14 @@ export class Diagnostics {
     performance.mark(`wsw-${name}`);
   }
 
+  /** How many errors are kept, and the newest (for the room's Developer page). */
+  get errorCount(): number {
+    return this.errors.length;
+  }
+  get lastError(): string | null {
+    return this.errors.length ? this.errors[this.errors.length - 1] : null;
+  }
+
   error(message: string): void {
     this.errors.push(`${Math.round(performance.now())}ms ${message.slice(0, MAX_MESSAGE_CHARS)}`);
     if (this.errors.length > MAX_ERRORS) this.errors.shift();

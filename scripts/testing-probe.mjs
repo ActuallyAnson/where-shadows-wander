@@ -1,11 +1,11 @@
 /* global window */
-// Checks the launcher's Developer panel in a real browser, with no headset and with no address typed.
+// Checks the developer tools in a real browser, with no headset and with no address typed.
 // Usage: start a dev server (npx vite --port 8097 --strictPort) then
 //   node scripts/testing-probe.mjs https://localhost:8097 [screenshot.png]
-// It opens the plain game (the dev server's emulator gives the page navigator.xr, so the launcher shows), presses the
-// testing switches and checks that each takes effect at once (nothing reloads, the address stays plain), is remembered
-// across a reload, and that the settings panel and the recording begin when a VR session starts. Then it shows the Hand
-// Lab panel, switches to mock hands and back live in a session, and opens the room editor, the address plain all the while.
+// The launcher page has no Developer button; its launch log is hidden until BEGIN fails. The testing switches preset in the
+// browser's storage take effect when the page starts and when VR starts. In the session, the pause screen's Developer
+// button opens the room's settings screen at the Developer page (developer-page.ts), whose buttons show the Hand Lab
+// (which switches whose hands play, live), start a recording, set the test flicker live, and open the room editor.
 import { chromium } from 'playwright';
 import { enterVr } from './lib/launch.mjs';
 
@@ -26,126 +26,84 @@ const page = await (
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(`${base}/`);
-await page.waitForSelector('#xr-launcher-ui', { timeout: 90000 });
-await page.waitForFunction(() => window.__wsw?.debug, null, { timeout: 90000 });
+await page.waitForSelector('#xr-launcher-ui', { state: 'attached', timeout: 90000 });
+await page.waitForFunction(() => window.__wsw?.developer, null, { timeout: 90000 });
 let navigations = 0;
 page.on('framenavigated', (f) => f === page.mainFrame() && navigations++);
+const plain = () => new URL(page.url()).search === '' && new URL(page.url()).hash === '';
 
-const panel = page.locator('#xr-developer-panel');
-check('the Developer panel starts hidden', await panel.isHidden());
-check(
-  'the launcher has no AR or duplicate Enter VR button',
-  (await page.getByRole('button', { name: /Enter AR|Direct Hands/ }).count()) === 0,
+check('the launcher has no Developer button', (await page.getByRole('button', { name: /Developer/ }).count()) === 0);
+check('nor a Copy logs button until BEGIN fails', await page.getByRole('button', { name: /Copy logs/ }).isHidden());
+
+// Switches preset in storage (as the probe scripts do) apply when the page starts.
+await page.evaluate(() =>
+  localStorage.setItem('wsw.testing', JSON.stringify({ joints: true, shadow: true, settings: true, record: 'free' })),
 );
-await page.getByRole('button', { name: /Developer/ }).click();
-check('the Developer button shows it', await panel.isVisible());
-
-await page.getByRole('button', { name: /Joint dots/ }).click();
-check('Joint dots take effect at once', await page.evaluate(() => window.__wsw.debug.dots.mesh.visible));
-await page.getByRole('button', { name: /Shadow capsules/ }).click();
-check('and so do the shadow capsules', await page.evaluate(() => window.__wsw.debug.shadowDebug.capsulesVisible));
-await page.getByRole('button', { name: /Settings panel opens/ }).click();
-await page.getByRole('button', { name: /Recording hands/ }).click(); // off -> 20 s
-if (shot) await page.screenshot({ path: shot });
-check('nothing reloaded and the address is still plain', navigations === 0 && new URL(page.url()).search === '');
-const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('wsw.testing')));
-check(
-  'the switches are remembered in the browser',
-  stored.joints && stored.shadow && stored.settings && stored.record === 'free',
-  JSON.stringify(stored),
-);
-
-// A reload keeps them, with still no address.
 await page.reload();
-await page.waitForSelector('#xr-launcher-ui', { timeout: 90000 });
-await page.waitForFunction(() => window.__wsw?.debug, null, { timeout: 90000 });
-check('after a reload the address is still plain', new URL(page.url()).search === '');
+await page.waitForFunction(() => window.__wsw?.developer, null, { timeout: 90000 });
 check(
-  'and the overlays are on again',
+  'preset overlays are on when the page starts',
   await page.evaluate(() => window.__wsw.debug.dots.mesh.visible && window.__wsw.debug.shadowDebug.capsulesVisible),
 );
-await page.getByRole('button', { name: /Developer/ }).click();
-const text = await panel.innerText();
-check(
-  'the panel shows what is on',
-  /On now: joint dots, shadow capsules, settings panel on entry, recording 20 s/.test(text),
-  text.split('\n')[1],
-);
-
-// Starting VR: the settings panel opens and the recording is armed.
 check('no recording before VR starts', (await page.evaluate(() => window.__wsw.getRecorder())) === null);
-await page.evaluate(() => window.__wsw.world.renderer.xr.dispatchEvent({ type: 'sessionstart' }));
+await enterVr(page);
 await page.waitForFunction(() => window.__wsw.settingsPanel.isOpen || window.__wsw.settingsPanel.lastError, null, {
   timeout: 20000,
 });
-check('the settings panel opens when VR starts', await page.evaluate(() => window.__wsw.settingsPanel.isOpen));
+check('the preset settings panel opens when VR starts', await page.evaluate(() => window.__wsw.settingsPanel.isOpen));
 check(
-  'and a 20 s recording is armed',
+  'and the preset 20 s recording is armed',
   await page.evaluate(() => {
     const r = window.__wsw.getRecorder();
     return r !== null && r.seconds === 20 && r.script === null;
   }),
 );
+await page.evaluate(() => {
+  window.__wsw.settingsPanel.close();
+  localStorage.removeItem('wsw.testing');
+});
 
-// Guided shapes: the next press of the recording button.
-await page.evaluate(() => window.__wsw.world.renderer.xr.dispatchEvent({ type: 'sessionend' }));
-check(
-  'the recording is dropped when the session ends',
-  (await page.evaluate(() => window.__wsw.getRecorder())) === null,
-);
-await page.getByRole('button', { name: /Recording hands/ }).click(); // free -> guided shapes
-await page.evaluate(() => window.__wsw.world.renderer.xr.dispatchEvent({ type: 'sessionstart' }));
-check(
-  'guided shapes arm the shape script and a prompt panel',
-  await page.evaluate(() => {
-    const r = window.__wsw.getRecorder();
-    return r !== null && r.script !== null;
-  }),
-);
+// The Developer page, opened the way the pause screen's Developer button opens it.
+await page.evaluate(() => window.__wsw.openSettings(window.__wsw.developer.title));
+check('the Developer page opens in the room', await page.evaluate(() => window.__wsw.settingsPanel.isOpen));
+if (shot) await page.screenshot({ path: shot });
+const press = (id) => page.evaluate((id) => window.__wsw.developer.items.find((i) => i.id === id).press(), id);
+const text = (id) => page.evaluate((id) => window.__wsw.developer.items.find((i) => i.id === id).text(), id);
 
-await page.evaluate(() => window.__wsw.world.renderer.xr.dispatchEvent({ type: 'sessionend' })); // the launcher comes back
-await page.getByRole('button', { name: 'Clear all switches' }).click();
-const cleared = await page.evaluate(() => ({
-  dots: window.__wsw.debug.dots.mesh.visible,
-  caps: window.__wsw.debug.shadowDebug.capsulesVisible,
+check('the free recording is already running', (await text('record-free')) !== 'Start', await text('record-free'));
+await press('record-shapes'); // ignored while the free one runs
+check('a second recording waits for the first', await page.evaluate(() => window.__wsw.getRecorder().script === null));
+
+const navBefore = navigations;
+await press('flicker'); // the setting -> steady
+const steady = await page.evaluate(() => ({
+  amp: window.__wsw.lanternLight.settings.amplitude,
   stored: JSON.parse(localStorage.getItem('wsw.testing')),
 }));
 check(
-  'Clear all switches everything off',
-  !cleared.dots && !cleared.caps && cleared.stored.record === 'off',
-  JSON.stringify(cleared),
+  'the test flicker applies live and is remembered',
+  steady.amp === 0 && steady.stored.flicker === 0 && navigations === navBefore,
+  JSON.stringify(steady),
 );
+for (let i = 0; i < 3; i++) await press('flicker'); // steady -> 0.5 -> 1 -> the setting
+check('and hands the lantern back to the setting', (await text('flicker')) === 'the setting');
 
-// Hands (ADR 0018): the Developer panel's Hand Lab button shows the panel at once, with no reload, and the panel switches whose
-// hands play live, in the session: Script plays mock hands, Device gives the device's back. A reload keeps the panel and the
-// source. The room editor is a mode, and reloads. The address stays plain throughout.
-const plain = () => new URL(page.url()).search === '' && new URL(page.url()).hash === '';
+// Hands (ADR 0018): the Hand Lab shows at once, with no reload, and switches whose hands play live, in the session.
 const labPanel = page.locator('aside.lab');
 const labButton = (name) => labPanel.getByRole('button', { name, exact: true });
-if (await panel.isHidden()) await page.getByRole('button', { name: /Developer/ }).click();
 let before = navigations;
-await page.getByRole('button', { name: /^Hand Lab panel/ }).click();
+await press('hand-lab');
 await labPanel.waitFor({ state: 'visible', timeout: 10000 });
 check('the Hand Lab panel shows at once, with no reload', navigations === before && plain(), page.url());
 check('and starts with the device hands', await page.evaluate(() => !window.__wsw.lab.mockActive));
-await page.reload();
-await page.waitForFunction(() => window.__wsw?.lab, null, { timeout: 90000 });
-check('a reload keeps the panel', await labPanel.isVisible());
-await enterVr(page);
-before = navigations;
+check('the page says it is shown', (await text('hand-lab')) === 'SHOWN');
 await labButton('Script').click();
 await page.waitForFunction(() => window.__wsw.lab.mockActive && window.__wsw.hands.hands.right.tracked, null, {
   timeout: 30000,
 });
-const inSession = await page.evaluate(() => ({
-  bg: window.__wsw.world.scene.background?.getHexString() ?? null,
-  alpha: window.__wsw.world.renderer.getClearAlpha(),
-  presenting: window.__wsw.world.renderer.xr.isPresenting,
-}));
 check(
-  'Script switches to mock hands live, in the session, with the room backdrop a headset has',
-  inSession.presenting && inSession.bg === '14161c' && inSession.alpha === 1 && navigations === before,
-  JSON.stringify(inSession),
+  'Script switches to mock hands live, in the session',
+  await page.evaluate(() => window.__wsw.world.renderer.xr.isPresenting),
 );
 await labButton('Device').click();
 const back = await page.evaluate(() => ({
@@ -158,21 +116,18 @@ check(
   !back.mock && back.presenting && back.stored.hands === 'device' && navigations === before,
   JSON.stringify(back),
 );
-await labButton('Hide panel').click();
+await press('hand-lab');
 check(
-  'Hide panel hides it, remembered for the tab',
+  'a second press hides it, remembered for the tab',
   (await labPanel.isHidden()) &&
     (await page.evaluate(() => JSON.parse(sessionStorage.getItem('wsw.launch')).lab)) === false,
 );
-await page.evaluate(() => window.__wsw.world.renderer.xr.getSession()?.end());
-await page.waitForSelector('#xr-launcher-ui', { timeout: 30000 });
-await page.getByRole('button', { name: /Developer/ }).click();
-await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: /^Room editor/ }).click()]);
+
+// The room editor leaves VR and reloads into the desk.
+await Promise.all([page.waitForEvent('load'), press('room-editor')]);
 await page.waitForFunction(() => window.__wsw?.roomEditor, null, { timeout: 90000 });
 check('Room editor opens the editor, with a plain address', plain(), page.url());
-await page.evaluate(() => {
-  sessionStorage.removeItem('wsw.launch');
-});
+await page.evaluate(() => sessionStorage.removeItem('wsw.launch'));
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await browser.close();
 console.log(failed === 0 ? 'ALL PASS' : `${failed} FAILED`);

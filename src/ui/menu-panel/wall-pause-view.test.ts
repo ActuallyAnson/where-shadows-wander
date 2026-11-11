@@ -140,6 +140,37 @@ describe('WallPauseView', () => {
     view.dispose();
   });
 
+  describe('the Developer button (debug builds)', () => {
+    function aimedAt(view: WallPauseView, y: number) {
+      view.show();
+      const stage = createStagePlane();
+      stage.origin.set([0, 1.0, -1.5]);
+      stage.normal.set([0, 0, 1]);
+      stage.right.set([1, 0, 0]);
+      stage.up.set([0, 1, 0]);
+      const hand = createHandFrame('right');
+      hand.tracked = true;
+      hand.validJoints = 25;
+      const idx = JOINT['index-finger-tip'] * 3;
+      const mcp = JOINT['index-finger-metacarpal'] * 3;
+      hand.positions.set([0, 1.0 + y, -1.0], idx);
+      hand.positions.set([0, 1.0 + y, -0.9], mcp);
+      return view.update([hand], stage, true);
+    }
+
+    it('reports a press when the view has it', () => {
+      const view = new WallPauseView(undefined, { developer: true });
+      expect(aimedAt(view, -0.28)).toBe('developer');
+      view.dispose();
+    });
+
+    it('is not there otherwise', () => {
+      const view = new WallPauseView();
+      expect(aimedAt(view, -0.28)).toBeNull();
+      view.dispose();
+    });
+  });
+
   it('switches to settings mode and toggles high contrast setting on the wall', () => {
     const view = new WallPauseView();
     const fakeStore = {

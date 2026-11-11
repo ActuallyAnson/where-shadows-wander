@@ -1,8 +1,7 @@
 // What the page starts as, and whose hands play it (ADR 0018). The mode is the game (the default) or the room editor (a desk
 // tool, development and tester builds only). The hands are the device's (a headset, or the emulator's) or, for testing, a mock
 // source the Hand Lab panel drives inside the same session: synthetic, scripted, a replay or the webcam. The hands and the
-// panel change live (the Developer panel's Hand Lab button sends HAND_LAB_EVENT; the panel picks the source); only a mode
-// change reloads. The address is always the plain page: the choice is kept in the tab's sessionStorage, so a reload keeps it
+// panel change live (the room's Developer page shows the panel; the panel picks the source); only a mode change reloads. The address is always the plain page: the choice is kept in the tab's sessionStorage, so a reload keeps it
 // while a new tab, or the link sent to a headset, opens the plain game. Plain TypeScript, with the storage passed in for the
 // tests.
 import { MOCK_SOURCES, type MockSourceKind } from '../input-mock/mock-mode';
@@ -23,8 +22,6 @@ export interface LaunchChoice {
 
 export const DEFAULT_LAUNCH: Readonly<LaunchChoice> = { mode: 'game', hands: 'device', lab: false };
 export const LAUNCH_KEY = 'wsw.launch';
-/** Sent on the window to show (detail true) or hide (false) the Hand Lab panel, live. */
-export const HAND_LAB_EVENT = 'wsw-hand-lab';
 
 /** The part of sessionStorage this uses. */
 export interface LaunchStorage {

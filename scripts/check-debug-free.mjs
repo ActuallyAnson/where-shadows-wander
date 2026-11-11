@@ -11,10 +11,10 @@ import { join } from 'node:path';
 const MARKERS = [
   'Alt+K capsules', // the HUD line (debug-tools.ts)
   'Joint dots', // the debug menu (debug-controller.ts)
-  'Lantern flicker (press reloads)', // the launcher's Developer panel (developer-panel.ts)
+  'Lantern flicker (test)', // the room's Developer page (developer-page.ts)
   'Copy report', // the report panel (report-panel.ts)
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
-  'Copy logs', // the Developer panel's log button (developer-panel.ts)
+  'Copy logs', // the launch log's copy button, shown when BEGIN fails (enter-ar-button.ts)
   'Save room layout', // the room editor (room-editor.ts)
   'Add to room', // the room editor's asset browser (room-editor-assets.ts)
 ];

@@ -20,7 +20,8 @@ export async function mountEnterArButtonIfNeeded(
     return;
   }
 
-  // Live log buffer for on-screen inspection
+  // The launch log: kept from the start, shown on the page only when BEGIN fails in a debug build (in a session, the
+  // room's Developer page shows the errors instead).
   const logs: string[] = [];
 
   // Create UI overlay container
@@ -106,6 +107,8 @@ export async function mountEnterArButtonIfNeeded(
 
   // The one way in (the title's BEGIN). It falls back by itself: to fewer features if the runtime rejects some, and to
   // the older XRWebGLLayer if three.js can't bind the session with a projection layer (the Pico's driver has none).
+  /** Shows the launch log on the page (set below in debug builds). */
+  let showLaunchLog: (() => void) | null = null;
   const launchDirect = async (mode: XRSessionMode) => {
     title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
@@ -216,6 +219,7 @@ export async function mountEnterArButtonIfNeeded(
       console.error('[XR Direct Launch Error]', err);
       title?.setBusy(false);
       showNote("Couldn't start VR. Reload the page and press BEGIN again.");
+      showLaunchLog?.();
     }
   };
 
@@ -253,27 +257,27 @@ export async function mountEnterArButtonIfNeeded(
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
 
-  // Developer: whose hands play (the device's or the Hand Lab's), the room editor, the testing switches and the launch log, in one panel. A debug
-  // tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
-  let developerElement: HTMLElement | null = null;
+  // The launch log and its copy button, shown when BEGIN fails. A debug tool: only when DEBUG_TOOLS is on (the dev server or
+  // a `--mode tester` build), never in the judges' build. The developer switches are in the room (developer-page.ts).
   if (DEBUG_TOOLS) {
-    const { createDeveloperPanel } = await import('./developer-panel');
-    const developer = createDeveloperPanel({
-      log: logBox,
-      copyLogs: async () => {
+    logBox.style.display = 'none';
+    buttonRow.style.display = 'none';
+    uiContainer.append(logBox);
+    buttonRow.append(
+      makeBtn('📋 Copy logs', '#2b2410', '#e3b341', '#9e6a03', async () => {
         try {
           await navigator.clipboard.writeText(logs.join('\n'));
           appendLog('Logs copied to clipboard!', '#7ee787');
         } catch {
           appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
         }
-      },
-    });
-    developerElement = developer.element;
-    buttonRow.append(makeBtn('🛠 Developer', '#2b2410', '#e3b341', '#9e6a03', developer.toggle));
+      }),
+    );
+    showLaunchLog = () => {
+      logBox.style.display = 'block';
+      buttonRow.style.display = 'flex';
+    };
   }
-
-  if (developerElement) uiContainer.append(developerElement);
   uiContainer.append(note, buttonRow);
   document.body.append(uiContainer);
 

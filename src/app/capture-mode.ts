@@ -4,8 +4,8 @@
 // costs frame time, so it is for taking video, not for playing.
 //
 // It is switched without an address option, and works in the judges' build too: five quick taps on the title screen's
-// emblem step through off, clean and sharp (it is remembered in the browser, and the page reloads to apply it); the
-// tester build's Testing panel has the same switch. Plain TypeScript.
+// emblem step through off, clean and sharp (it is remembered in the browser, and the page reloads to apply it). Plain
+// TypeScript.
 
 export interface CaptureOptions {
   enabled: boolean;

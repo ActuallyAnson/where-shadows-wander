@@ -98,6 +98,8 @@ export class DebugController {
       case 'replay':
         void this.setReplay(!this.replaying);
         return;
+      case 'developer':
+        return; // the page owns no debug state: DebugTools hands this key to onDeveloperKey
       case 'capsules':
       case 'joints':
         this.setOverlay(action, !this.overlays[action]);

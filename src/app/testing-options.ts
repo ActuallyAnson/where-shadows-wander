@@ -1,7 +1,6 @@
 // The testing switches (joint dots, shadow capsules, open the settings panel when VR starts, record hands, the lantern's
-// flicker) as a plain object. The launcher's Developer panel changes them and they are remembered in the browser
-// (`wsw.testing`), so nobody types an address; the probe scripts write the same key before the page loads. Plain
-// TypeScript.
+// flicker) as a plain object, remembered in the browser (`wsw.testing`) and read when the page starts. The probe scripts
+// write the key before the page loads; the room's Developer page (developer-page.ts) changes the flicker. Plain TypeScript.
 
 export type RecordChoice = 'off' | 'free' | 'shapes';
 /** Which menu screen to show in the room (menu-panel), or none. */
@@ -39,27 +38,13 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
 export const FREE_RECORD_SECONDS = 20;
 
-/** What each button says about its current value. */
-export function describeTesting(o: Readonly<TestingOptions>): string[] {
-  const on: string[] = [];
-  if (o.joints) on.push('joint dots');
-  if (o.shadow) on.push('shadow capsules');
-  if (o.settings) on.push('settings panel on entry');
-  if (o.record === 'free') on.push(`recording ${FREE_RECORD_SECONDS} s`);
-  if (o.record === 'shapes') on.push('guided shape recording (84 s)');
-  if (o.menu !== 'off') on.push(`${o.menu} screen`);
-  if (o.flicker !== null) on.push(`lantern flicker ${o.flicker}`);
-  return on;
-}
-
 /** The next choice in a list, wrapping round: what pressing a cycling button does. */
 export function nextChoice<T>(list: readonly T[], current: T): T {
   return list[(list.indexOf(current) + 1) % list.length];
 }
 
-/** Where the switches are remembered, and the event the Developer panel raises when one changes. */
+/** Where the switches are remembered. */
 export const TESTING_KEY = 'wsw.testing';
-export const TESTING_EVENT = 'wsw-testing';
 
 /** The part of localStorage this uses. */
 export interface TestingStorage {

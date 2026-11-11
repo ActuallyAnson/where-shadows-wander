@@ -36,6 +36,8 @@ export interface DebugContext {
 
 export class DebugTools {
   readonly controller: DebugController;
+  /** Alt+D: opens or closes the room's Developer page (main.ts sets it). */
+  onDeveloperKey: (() => void) | null = null;
   readonly replay = new HandReplay();
   private readonly shadowDebug = new ShadowDebug();
   readonly dots = new JointDots();
@@ -77,7 +79,8 @@ export class DebugTools {
       const action = debugKeyAction(e);
       if (!action) return;
       e.preventDefault();
-      this.controller.handleKey(action);
+      if (action === 'developer') this.onDeveloperKey?.();
+      else this.controller.handleKey(action);
     };
     window.addEventListener('keydown', onKey);
     this.removers.push(() => window.removeEventListener('keydown', onKey));
@@ -101,7 +104,7 @@ export class DebugTools {
     if (o.joints) this.dots.update(this.ctx.handList, rigPlaced ? this.ctx.flame() : null);
   }
 
-  /** Switches an overlay from outside (the Developer panel's switches). */
+  /** Switches an overlay from outside (the testing switches preset in storage). */
   showOverlay(key: OverlayKey, on = true): void {
     this.controller.setOverlay(key, on);
   }
@@ -153,7 +156,7 @@ export class DebugTools {
     const frames = this.ctx.readout?.();
     const text = this.controller.status();
     this.hud.textContent =
-      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+K capsules  Alt+J joints  Alt+R replay') +
+      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+K capsules  Alt+J joints  Alt+R replay  Alt+D developer') +
       (frames ? `  |  ${frames}` : '');
   }
 }

@@ -32,7 +32,7 @@ import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
-import { loadTesting, MENU_CHOICES, nextChoice, TESTING_EVENT, type MenuChoice } from './testing-options';
+import { loadTesting, MENU_CHOICES, nextChoice, saveTesting, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
 import type { MenuScreenId } from '../ui/menu-panel/screens';
@@ -87,12 +87,13 @@ import { MockMode } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
 import { SettingsScreen } from '../ui/settings-panel/settings-screen';
+import type { ExtraPageItems } from '../ui/settings-panel/screen-model';
 import { FailureReporter } from './failure-reporter';
 import { FrameTimings, SLOT } from './frame-timings';
 import { mountEnterArButtonIfNeeded, type LauncherHooks } from './enter-ar-button';
 import { captureOptions, loadCaptureChoice } from './capture-mode';
 import { createUiSound } from './ui-sound';
-import { HAND_LAB_EVENT, isDeskMode, loadLaunch, switchLaunch, updateLaunch } from './launch-mode';
+import { isDeskMode, loadLaunch, switchLaunch, updateLaunch } from './launch-mode';
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
@@ -184,7 +185,7 @@ async function start(): Promise<void> {
 
   // Hand shadows land on the stage: StageFrame, the virtual room's paper wall, 2 m ahead and 1.6 x 1.0 m (ADR 0005). The
   // room editor uses the same wall as a headset; only where the head comes from differs.
-  // Capture mode (five taps on the title's emblem, or the Testing panel): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
+  // Capture mode (five taps on the title's emblem): a clean session for recording the demo video (capture-mode.ts). The eye buffers' scale has to be set
   // before the session starts, so it is set here; the foveation is set when the session starts.
   const capture = captureOptions(loadCaptureChoice());
   if (capture.enabled && capture.scale !== null) world.renderer.xr.setFramebufferScaleFactor(capture.scale);
@@ -203,18 +204,18 @@ async function start(): Promise<void> {
   const sharpen = new ShadowSharpen();
   // Each hand's classifier state, made once: a new object here every frame is garbage in a headset.
   const handStates = { left: shapes.left.state, right: shapes.right.state };
-  // The lantern's flicker: the Developer panel's flicker switch (0..1, 0 is steady) overrides it for testing; the default is
+  // The lantern's flicker: the Developer page's test flicker (0..1, 0 is steady) overrides it for testing; the default is
   // gentler under reduced motion.
-  const flickerTest = DEBUG_TOOLS ? loadTesting().flicker : null;
+  let flickerTest = DEBUG_TOOLS ? loadTesting().flicker : null;
   const flickerParam = flickerTest ?? NaN;
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lanternLight = new LanternLightModel({
     amplitude: Number.isFinite(flickerParam) ? Math.min(Math.max(flickerParam, 0), 1) : reduceMotion ? 0.3 : 1,
   });
-  // Follow the OS reduced-motion setting while the page is open, unless the flicker switch is set.
-  if (!Number.isFinite(flickerParam) && typeof matchMedia === 'function')
+  // Follow the OS reduced-motion setting while the page is open, unless the test flicker is set.
+  if (typeof matchMedia === 'function')
     matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-      lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
+      if (flickerTest === null) lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
     });
   const cameraQuat = new Quaternion();
   const stageView = new TestStageView();
@@ -324,7 +325,7 @@ async function start(): Promise<void> {
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
     handTrail.ringsOn = governor.isOn('ring');
   };
-  const wallPauseView = new WallPauseView();
+  const wallPauseView = new WallPauseView(undefined, { developer: DEBUG_TOOLS });
   world.scene.add(
     stageView.group,
     wallPauseView.group,
@@ -385,7 +386,7 @@ async function start(): Promise<void> {
   document.addEventListener('visibilitychange', syncAudioPause);
   // The accessibility settings (docs/adr/0010-saves.md): loaded from the save, applied live to the recognizer,
   // shadows, lantern and mixer, and saved on change. The lantern flicker follows the device's reduced-motion
-  // default until the player moves its slider, and the Developer panel's flicker switch overrides the setting for testing.
+  // default until the player moves its slider, and the Developer page's test flicker overrides the setting for testing.
   const settings = new SettingsStore(
     { recognizer: shapes, projector, sharpen, lantern: lanternLight, mixer: audio.mixer },
     { applyOnlyWhenChosen: ['flicker'], neverApply: Number.isFinite(flickerParam) ? ['flicker'] : [] },
@@ -412,11 +413,16 @@ async function start(): Promise<void> {
     if (key === null || key === 'highContrast') applyContrast();
   });
   applyContrast();
-  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button; in a headset the Testing switch opens it.
-  // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
+  // The settings screen: pressed with a fingertip. The Hand Lab has a Settings button. When the debug tools are on, the
+  // Developer page and the debug menu are extra pages after the settings, built the first time it opens; the pause
+  // screen's Developer button opens it at the Developer page.
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
-  const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
+  let developer: ExtraPageItems | null = null;
+  const settingsPanel = new SettingsScreen(menu, settings, () => [
+    ...(developer ? [developer] : []),
+    ...(debug?.controller.pages() ?? []),
+  ]);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
       wallPauseView.show();
@@ -427,12 +433,17 @@ async function start(): Promise<void> {
   const gazeAt = new Vector3();
   const handEye = new Float32Array(3); // where the eyes are, for fading the drawn hands near them
   const gazeDir = new Vector3();
-  const openSettings = () => {
+  const openSettings = (startAt?: string) => {
     world.camera.getWorldPosition(settingsHead);
     world.camera.getWorldDirection(settingsLook);
-    return settingsPanel.open([settingsHead.x, settingsHead.y, settingsHead.z], settingsLook.x, settingsLook.z);
+    return settingsPanel.open(
+      [settingsHead.x, settingsHead.y, settingsHead.z],
+      settingsLook.x,
+      settingsLook.z,
+      startAt,
+    );
   };
-  // The pause screen in the room, shown from the Hand Lab's Menu button or the launcher's Testing panel; a press on Settings opens
+  // The pause screen in the room, shown from the Hand Lab's Menu button or the `menu` testing switch; a press on Settings opens
   // the settings panel, Resume closes the screen and Leave ends the session.
   const menuTips = new Float32Array(6);
   let menuChoice: MenuChoice = 'off';
@@ -543,7 +554,7 @@ async function start(): Promise<void> {
   else placeRig([0, 1.2, 0], 0);
   // The Hand Lab (debug builds only, in the game): its panel picks whose hands play, live. With a mock source, a HandSource fills
   // the same HandFrames in the session in place of the device's, posed for the desk rig and moved into the wearer's
-  // (desk-frame.ts). Made the first time the panel is asked for (the Developer panel, or a reload that had it).
+  // (desk-frame.ts). Made the first time the panel is asked for (the Developer page, or a reload that had it).
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
   const openLab = (): HandLab => {
@@ -578,7 +589,6 @@ async function start(): Promise<void> {
       l.show(launch.lab);
       void l.start(launch.hands);
     }
-    window.addEventListener(HAND_LAB_EVENT, (e) => showLab((e as CustomEvent<boolean>).detail));
   }
   const handList = [hands.hands.left, hands.hands.right];
   // The right hand as drawn while it holds the matchstick (posed-hand.ts), and the lists of hands the glove draws then.
@@ -632,7 +642,7 @@ async function start(): Promise<void> {
     });
     debug.controller.subscribe(() => settingsPanel.refreshExtra()); // a key press changes the menu's text too
   }
-  // The room editor (src/debug/room-editor.ts), chosen in the Developer panel: arranges the bedroom's static pieces in the
+  // The room editor (src/debug/room-editor.ts), chosen on the Developer page: arranges the bedroom's static pieces in the
   // Hand Lab and saves them to content/rooms/bedroom.json. Debug builds only, loaded on demand like the other debug tools.
   let roomEditor: import('../debug/room-editor').RoomEditor | null = null;
   if (DEBUG_TOOLS && launch.mode === 'room-editor') {
@@ -836,9 +846,11 @@ async function start(): Promise<void> {
   // The head pose is in reference space, which is the XR origin's space.
   let panel: PromptPanel | null = null;
   let panelAtStart = false;
-  /** Starts a hand recording for the session that is starting (armed by the launcher's Testing panel, no address needed). */
+  /** Starts a hand recording (from the Developer page, or a `record` testing switch preset when the session starts). */
   const armRecording = (choice: 'off' | 'free' | 'shapes') => {
-    if (recorder || choice === 'off') return;
+    if ((recorder && !recorder.finished) || choice === 'off') return;
+    if (panel) world.player.remove(panel.mesh);
+    panel = null;
     recorder = HandRecorder.make(choice === 'shapes');
     recorder.onFinished = offerDownload;
     if (recorder.script) {
@@ -847,25 +859,51 @@ async function start(): Promise<void> {
       panelAtStart = false;
     }
   };
-  // The Testing switches (debug tools only): the overlays change live as a switch is pressed, and the settings panel and
-  // the recording begin when VR starts. All remembered in the browser, so no address is ever typed.
+  // The testing switches (debug tools only), preset in the browser's storage by the probe scripts (testing-options.ts): the
+  // overlays and menu screen at once, the settings panel and the recording when VR starts.
   if (DEBUG_TOOLS && debug) {
-    const tools = debug;
-    const applyOverlays = (t: { joints: boolean; shadow: boolean }) => {
-      tools.showOverlay('capsules', t.shadow);
-      tools.showOverlay('joints', t.joints);
-    };
-    applyOverlays(loadTesting());
-    showMenuChoice(loadTesting().menu);
-    window.addEventListener(TESTING_EVENT, (e) => {
-      const t = (e as CustomEvent<ReturnType<typeof loadTesting>>).detail;
-      applyOverlays(t);
-      showMenuChoice(t.menu);
-    });
+    const t = loadTesting();
+    debug.showOverlay('capsules', t.shadow);
+    debug.showOverlay('joints', t.joints);
+    showMenuChoice(t.menu);
     world.renderer.xr.addEventListener('sessionstart', () => {
       const t = loadTesting();
       if (t.settings) setTimeout(() => void openSettings(), 1000);
       armRecording(t.record);
+    });
+    // Alt+D at a desk: the Developer page without covering the candle first.
+    debug.onDeveloperKey = () => {
+      if (!world.renderer.xr.isPresenting) return;
+      if (settingsPanel.isOpen) settingsPanel.close();
+      else void openSettings(developer?.title);
+    };
+    const { developerPage } = await import('./developer-page'); // debug builds only, like the debug tools
+    developer = developerPage({
+      labShown: () => lab?.shown ?? false,
+      showLab,
+      recorder: () =>
+        recorder && { shapes: recorder.script !== null, started: recorder.started, finished: recorder.finished },
+      record: (shapes) => armRecording(shapes ? 'shapes' : 'free'),
+      flicker: () => flickerTest,
+      setFlicker: (choice) => {
+        flickerTest = choice;
+        saveTesting({ ...loadTesting(), flicker: choice });
+        if (choice !== null) {
+          settings.hold('flicker', true);
+          lanternLight.settings.amplitude = choice;
+        } else {
+          lanternLight.settings.amplitude = reduceMotion ? 0.3 : 1; // the device default, until the player's setting applies
+          settings.hold('flicker', false);
+        }
+      },
+      errorCount: () => diagnostics.errorCount,
+      lastError: () => diagnostics.lastError,
+      openRoomEditor: () => {
+        // Ending the session first saves the game (sessionend), then the page reloads into the editor.
+        const session = world.renderer.xr.getSession();
+        if (session) void session.end().finally(() => switchLaunch('room-editor', DEBUG_TOOLS));
+        else switchLaunch('room-editor', DEBUG_TOOLS);
+      },
     });
   }
   // The "Show me your hands" message: a second panel, in front of the wearer when it appears.
@@ -1081,6 +1119,10 @@ async function start(): Promise<void> {
               gameAudio.candleIgnited(candleView.flamePosition);
             } else if (action === 'settings') {
               wallPauseView.showSettings();
+            } else if (action === 'developer') {
+              // The room's settings screen at its Developer page; closing it brings the pause screen back.
+              wallPauseView.hide();
+              void openSettings(developer?.title);
             }
           }
         }
@@ -1266,6 +1308,10 @@ async function start(): Promise<void> {
         },
         get lab() {
           return lab;
+        },
+        /** The room's Developer page (debug builds), for the probes to press its buttons. */
+        get developer() {
+          return developer;
         },
         capabilities,
         handsStatus,

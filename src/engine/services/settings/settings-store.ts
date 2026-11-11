@@ -25,7 +25,7 @@ export interface SettingsStoreOptions {
   /**
    * Settings the player has not chosen yet are left to the game's own defaults rather than forced: the lantern
    * flicker, say, follows the device's reduced-motion preference until the player moves its slider.
-   * Keys listed here are never applied (the Developer panel's flicker switch overrides the setting, for testing).
+   * Keys listed here are not applied until `hold(key, false)` (the Developer page's test flicker overrides the setting).
    */
   neverApply?: readonly (keyof Settings)[];
   /** Keys applied only once the player has changed them this session or saved a non-default value. */
@@ -40,12 +40,14 @@ export class SettingsStore {
   private readonly live: Settings;
   private readonly listeners = new Set<SettingsListener>();
   private readonly chosen = new Set<keyof Settings>();
+  private readonly held: Set<keyof Settings>;
 
   constructor(
     private readonly targets: SettingsTargets = {},
     private readonly options: SettingsStoreOptions = {},
     initial: unknown = undefined,
   ) {
+    this.held = new Set(options.neverApply);
     this.live = repairSettings(initial).settings;
     this.value = this.live;
     for (const s of SETTING_SPECS) if (this.live[s.key] !== DEFAULT_SETTINGS[s.key]) this.chosen.add(s.key);
@@ -86,6 +88,15 @@ export class SettingsStore {
     this.emit(null);
   }
 
+  /**
+   * Holds a setting back (a test override owns its target meanwhile), or with `on` false applies it again. Releasing
+   * a setting the player has not chosen leaves the target as it is (see applyOnlyWhenChosen).
+   */
+  hold(key: keyof Settings, on: boolean): void {
+    if (on) this.held.add(key);
+    else if (this.held.delete(key)) this.apply(key);
+  }
+
   subscribe(fn: SettingsListener): () => void {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);
@@ -113,7 +124,7 @@ export class SettingsStore {
   private apply(key: keyof Settings): void {
     const t = this.targets;
     const v = this.live;
-    if (this.options.neverApply?.includes(key)) return;
+    if (this.held.has(key)) return;
     if (this.options.applyOnlyWhenChosen?.includes(key) && !this.chosen.has(key)) return;
     switch (key) {
       case 'tolerance':

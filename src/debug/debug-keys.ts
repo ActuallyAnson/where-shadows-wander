@@ -3,12 +3,17 @@
 // on any layout and on a Mac where Alt+letter types a symbol. Plain TypeScript.
 
 export type DebugKeyAction =
-  'capsules' | 'joints' | 'replay' | `system:${'shadow' | 'sharpen' | 'flicker' | 'candleLight' | 'handVisual'}`;
+  | 'capsules'
+  | 'joints'
+  | 'replay'
+  | 'developer'
+  | `system:${'shadow' | 'sharpen' | 'flicker' | 'candleLight' | 'handVisual'}`;
 
 export const DEBUG_KEYS: Readonly<Record<string, DebugKeyAction>> = {
   KeyK: 'capsules',
   KeyJ: 'joints',
   KeyR: 'replay',
+  KeyD: 'developer',
   Digit1: 'system:shadow',
   Digit2: 'system:sharpen',
   Digit3: 'system:flicker',
@@ -32,5 +37,6 @@ export const DEBUG_KEY_HELP: readonly (readonly [string, string])[] = [
   ['Alt+K', 'show the shadow capsules and outline'],
   ['Alt+J', 'show the joint dots'],
   ['Alt+R', 'start or stop replaying the demo recording'],
+  ['Alt+D', 'open or close the Developer page in the room (in a session)'],
   ['Alt+1 to Alt+5', 'switch off or on: shadow, sharpen, flicker, candle light, hand visual'],
 ];

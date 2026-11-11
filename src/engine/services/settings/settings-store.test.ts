@@ -96,6 +96,16 @@ describe('SettingsStore start-up', () => {
     s.set('flicker', 0);
     expect(b.lantern.settings.amplitude).toBe(0.3);
   });
+
+  it('holds a key back on demand and applies it again when released', () => {
+    const r = rig();
+    const s = new SettingsStore(r.targets);
+    s.hold('flicker', true);
+    s.set('flicker', 0);
+    expect(r.lantern.settings.amplitude).toBe(1); // still the default applied at start-up: held back
+    s.hold('flicker', false);
+    expect(r.lantern.settings.amplitude).toBe(0);
+  });
 });
 
 describe('SettingsStore listeners', () => {

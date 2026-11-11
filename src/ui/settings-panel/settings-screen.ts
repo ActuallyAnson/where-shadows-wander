@@ -57,12 +57,14 @@ export class SettingsScreen implements MenuContent {
     return this.opened && this.menu.showing === this;
   }
 
-  async open(head: ArrayLike<number>, fx: number, fz: number): Promise<boolean> {
+  /** Opens in front of `head`, facing (fx, fz), at the first page, or at the extra page titled `startAt` if there is one. */
+  async open(head: ArrayLike<number>, fx: number, fz: number, startAt?: string): Promise<boolean> {
     if (!this.extraLoaded) {
       this.extra = this.extraPages();
       this.extraLoaded = true;
     }
-    this.page = 0;
+    const extra = startAt === undefined ? -1 : this.extra.findIndex((p) => p.title === startAt);
+    this.page = extra < 0 ? 0 : PAGES.length + extra;
     this.readRows();
     const ok = await this.menu.showContent(this, head, fx, fz);
     if (ok && !this.opened) {

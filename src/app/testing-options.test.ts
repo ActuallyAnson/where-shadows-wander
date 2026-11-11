@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TESTING,
-  describeTesting,
   loadTesting,
   saveTesting,
   TESTING_KEY,
@@ -10,16 +9,7 @@ import {
   type TestingOptions,
 } from './testing-options';
 
-describe('describeTesting and nextChoice', () => {
-  it('lists what is on, in words', () => {
-    expect(describeTesting(DEFAULT_TESTING)).toEqual([]);
-    expect(describeTesting({ ...DEFAULT_TESTING, joints: true, record: 'shapes' })).toEqual([
-      'joint dots',
-      'guided shape recording (84 s)',
-    ]);
-    expect(describeTesting({ ...DEFAULT_TESTING, flicker: 0 })).toEqual(['lantern flicker 0']);
-  });
-
+describe('nextChoice', () => {
   it('cycles through a list and wraps', () => {
     expect(nextChoice(RECORD_CHOICES, 'off')).toBe('free');
     expect(nextChoice(RECORD_CHOICES, 'shapes')).toBe('off');
