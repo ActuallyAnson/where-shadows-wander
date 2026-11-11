@@ -98,7 +98,7 @@ import { isDeskMode, loadLaunch, switchLaunch, updateLaunch } from './launch-mod
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
-import { hideEmulatorInputSwitch, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
+import { hideEmulatorExtras, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
 import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -143,7 +143,7 @@ async function start(): Promise<void> {
   const emulated = !!emulatedDevice;
   if (emulatedDevice) {
     useEmulatorHands(emulatedDevice);
-    hideEmulatorInputSwitch(document); // and no switching it to controllers
+    hideEmulatorExtras(document); // and none of its buttons this game has no use for (controllers, gaze, ...)
     // Its "Enter XR" bar repeats the launcher's BEGIN (and the room editor never enters XR): hide it.
     hideEmulatorOfferBar(document);
   }

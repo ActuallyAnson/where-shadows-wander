@@ -10,14 +10,29 @@ export interface EmulatedDeviceLike {
   controlMode?: string;
 }
 
-/** Hides the panel's "Select input mode" button: its menu's only other choice is controllers (or gaze, which needs them). */
-export const HANDS_ONLY_CSS = 'button[title="Select input mode"]{display:none !important}';
+/**
+ * The panel's buttons this game has no use for, hidden:
+ * - "Select input mode": its menu's only other choice is controllers (or gaze, which needs them).
+ * - "Configure gaze emulation": gaze input needs controllers; the game is hands only.
+ * - "Field-of-view mask": unavailable for the emulated Quest 3, so it only ever shows greyed out.
+ * - "About IWER" and "Report issues" (the right-hand group, removed whole): the emulator's version and its GitHub.
+ * Kept: reset, play mode (mouse look), the headset menu, save pose, exit, and the Hand [L]/[R] panels. The synthetic
+ * environment's buttons are gone already (iwsdk.config.json loads no environment).
+ */
+export const HANDS_ONLY_CSS = [
+  'button[title="Select input mode"]',
+  'button[title="Configure gaze emulation"]',
+  'button[aria-label="Field-of-view mask"]',
+  'div:has(> button[title="About IWER"])',
+]
+  .map((sel) => `${sel}{display:none !important}`)
+  .join('');
 
 /**
- * Hides the emulator panel's input mode switch, now and in any panel added later. The panel is a div with an open shadow
- * root; a style in each such root hides the button however often React draws it again.
+ * Hides the emulator panel's unused buttons (HANDS_ONLY_CSS), now and in any panel added later. The panel is a div with
+ * an open shadow root; a style in each such root hides the buttons however often React draws them again.
  */
-export function hideEmulatorInputSwitch(doc: Document): void {
+export function hideEmulatorExtras(doc: Document): void {
   const style = (el: Element): void => {
     const root = el.shadowRoot;
     if (!root || root.querySelector('style[data-wsw-hands-only]')) return;
