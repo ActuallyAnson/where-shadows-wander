@@ -90,15 +90,7 @@ describe('GameAudio.onShapeEvents', () => {
   });
 });
 
-describe('GameAudio.puzzleSolved and setFlame', () => {
-  it('chimes from the top of the wall', () => {
-    const { audio, stage, rec } = setup();
-    audio.puzzleSolved(stage);
-    expect(rec.plays).toHaveLength(1);
-    expect(rec.plays[0].id).toBe(Sound.Chime);
-    expect(rec.plays[0].y).toBeCloseTo(1 + 0.35, 6);
-  });
-
+describe('GameAudio.setFlame', () => {
   it('starts the crackle when the flame is lit, follows it, and stops when it goes out', () => {
     const { audio, rec } = setup();
     audio.setFlame(false, [0, 1, 0]);
@@ -114,23 +106,7 @@ describe('GameAudio.puzzleSolved and setFlame', () => {
   });
 });
 
-describe('GameAudio.setRoom and candleMoved', () => {
-  it('starts the room tone, the music, the clock and the wind together, and stops them together', () => {
-    const { audio, rec } = setup();
-    audio.setRoom(true);
-    audio.setRoom(false);
-    expect(rec.loops.map((l) => [l.id, l.on])).toEqual([
-      [Sound.Hum, true],
-      [Sound.Music, true],
-      [Sound.Clock, true],
-      [Sound.Wind, true],
-      [Sound.Hum, false],
-      [Sound.Music, false],
-      [Sound.Clock, false],
-      [Sound.Wind, false],
-    ]);
-  });
-
+describe('GameAudio.candleMoved', () => {
   it('lifts and sets the candle down from the flame, and is silent on a frame where neither happened', () => {
     const { audio, rec } = setup();
     audio.candleMoved(false, false, [0.2, 1, -0.3]);
@@ -141,34 +117,5 @@ describe('GameAudio.setRoom and candleMoved', () => {
       [Sound.Lift, 0.2, 1, -0.3],
       [Sound.Set, 0.4, 0.9, -0.1],
     ]);
-  });
-});
-
-describe('GameAudio.lullabyNote', () => {
-  it('plays the lullaby note for each sleeper from where it is, and keeps a bad number to the five notes', () => {
-    const { audio, rec: player } = setup();
-    for (let i = 0; i < 5; i++) audio.lullabyNote(i, 1 + i, 1.5, -2);
-    expect(player.plays.map((p) => p.id)).toEqual([Sound.Note0, Sound.Note1, Sound.Note2, Sound.Note3, Sound.Note4]);
-    expect(player.plays[3].x).toBe(4);
-    player.plays.length = 0;
-    audio.lullabyNote(-3, 0, 0, 0);
-    audio.lullabyNote(99, 0, 0, 0);
-    audio.lullabyNote(NaN, 0, 0, 0);
-    expect(player.plays.map((p) => p.id)).toEqual([Sound.Note0, Sound.Note4, Sound.Note0]);
-  });
-});
-
-describe('GameAudio ambient and steps', () => {
-  it('moves the clock and the wind to where the room is, plays a window tick and a beam creak from the room, and alternates steps', () => {
-    const { audio, rec, stage } = setup();
-    audio.placeAmbient({ x: 1, y: 2, z: 3 }, { x: 4, y: 5, z: 6 });
-    expect(rec.moves).toBe(2);
-    audio.snowTick();
-    audio.creak(0.5, -1);
-    audio.stepAt(stage, 0, 0, false);
-    audio.stepAt(stage, 0, 0, true);
-    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Snowtick, Sound.Creak, Sound.Step0, Sound.Step1]);
-    expect(rec.plays[0]).toMatchObject({ x: 4, y: 5, z: 6 });
-    expect(rec.plays[1].y).toBeGreaterThan(2);
   });
 });

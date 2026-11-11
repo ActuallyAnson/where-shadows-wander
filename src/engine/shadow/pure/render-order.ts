@@ -17,30 +17,20 @@ export interface Pass {
 export const RenderOrder = {
   /** The paper and its painted scenery (one shader). */
   paper: 1,
-  /** Faint paintings of each prop, under the shadows. */
-  propSketch: 1.5,
-  /** The soft glows (solve bloom, a hand almost making a shape). */
-  glow: 1.8,
-  /** The black shadows: the hands', the props', the kindred's. */
+  /** The black shadows of the hands. */
   shadow: 2,
   /** The candle's dust and light shaft, and the in-VR title. */
   air: 2.2,
   /** The pause menu and the wall's menu. */
   menu: 2.5,
-  /** The sprites (the traveller and the world), the captions, the cutscene, the lantern's glow. */
+  /** The captions and the lantern's glow (and the story's puppets to come). */
   sprite: 3,
-  /** The hand's golden trail, and the ghost outline of a wanted shape. */
+  /** The hand's golden trail. */
   trail: 4,
   /** The ring of light when a shape is recognised. */
   ring: 5,
-  /** The puzzle-solved rewards (dust, sparks, drops, leaves, light) and the room's glows. */
-  reward: 6,
   /** The room's wonders (lamp, bunting, pictures, globe, window). */
   wonder: 6,
-  /** The page of the book in the lap. */
-  readingPage: 8,
-  /** The spark that flies across the room. */
-  sparkFlight: 60,
   /** The fade to black, over everything. */
   fade: 1000,
 } as const;
@@ -48,17 +38,12 @@ export const RenderOrder = {
 /** The layers as a list, for the inspector and the governor. */
 export const PASSES: readonly Pass[] = [
   { id: 'paper', order: RenderOrder.paper, optional: false },
-  { id: 'propSketch', order: RenderOrder.propSketch, optional: true },
-  { id: 'glow', order: RenderOrder.glow, optional: false },
   { id: 'shadow', order: RenderOrder.shadow, optional: false },
   { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
   { id: 'trail', order: RenderOrder.trail, optional: true },
   { id: 'ring', order: RenderOrder.ring, optional: true },
-  { id: 'reward', order: RenderOrder.reward, optional: true },
-  { id: 'readingPage', order: RenderOrder.readingPage, optional: false },
-  { id: 'sparkFlight', order: RenderOrder.sparkFlight, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },
 ];
 
