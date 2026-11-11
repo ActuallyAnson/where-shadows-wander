@@ -994,6 +994,7 @@ async function start(): Promise<void> {
           titleLighter.visible = true;
           titleLighter.update(hands.hands.right, cameraQuat, clock);
 
+          // Only the matchstick's flame lights the candle: a bare hand near the wick does not.
           let handTouchingWick = false;
           if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
             const lfx = titleLighter.flamePosition[0];
@@ -1009,10 +1010,6 @@ async function start(): Promise<void> {
               handTouchingWick = true;
             }
           }
-          if (!handTouchingWick && candleView.checkIgnition(handList)) {
-            handTouchingWick = true;
-          }
-          if (!handTouchingWick && frame && controllerPressed(frame)) handTouchingWick = true;
           // The room editor has no hands: its room is lit, as the editor needs to see it.
           if (!handTouchingWick && desk) handTouchingWick = true;
 

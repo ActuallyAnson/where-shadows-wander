@@ -104,38 +104,6 @@ describe('CandleView', () => {
     expect(candle.lightIntensity).toBe(0);
   });
 
-  it('handles unlit state and wick pinch ignition', () => {
-    const candle = new CandleView();
-    candle.place([0, 0.75, -0.4]);
-    candle.lit = false;
-    expect(candle.lit).toBe(false);
-    expect(candle.lightIntensity).toBe(0);
-
-    const hand = createHandFrame('right');
-    hand.tracked = true;
-    hand.validJoints = 25;
-
-    // Hand far away
-    for (let j = 0; j < 25; j++) {
-      hand.positions[j * 3] = 0.5;
-      hand.positions[j * 3 + 1] = 0.5;
-      hand.positions[j * 3 + 2] = -0.4;
-    }
-    expect(candle.checkIgnition([hand])).toBe(false);
-
-    // Touch index tip to wick (wick is at 0, 0.75 + 0.095 = 0.845, -0.4)
-    const idx = JOINT['index-finger-tip'] * 3;
-    hand.positions[idx] = 0;
-    hand.positions[idx + 1] = 0.85;
-    hand.positions[idx + 2] = -0.4;
-
-    expect(candle.checkIgnition([hand])).toBe(true);
-
-    // Once lit, ignition returns false
-    candle.lit = true;
-    expect(candle.checkIgnition([hand])).toBe(false);
-  });
-
   it('disables pickup when locked', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);

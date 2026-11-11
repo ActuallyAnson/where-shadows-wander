@@ -32,7 +32,7 @@ import {
   TorusGeometry,
 } from '@iwsdk/core';
 import type { Quaternion } from '@iwsdk/core';
-import { createPalm, derivePalm, JOINT, type HandFrame, type Handedness } from '../hands/hand';
+import { createPalm, derivePalm, type HandFrame, type Handedness } from '../hands/hand';
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 
@@ -336,75 +336,6 @@ export class CandleView {
   /** Current light occlusion factor (0 = fully blocked, 1 = fully open). */
   get occlusion(): number {
     return this.lightOcclusion;
-  }
-
-  /**
-   * Checks if an index fingertip touches near the wick, hand approaches, or a pinch gesture is near the wick.
-   * Zero per-frame allocations.
-   */
-  checkIgnition(hands: Readonly<Record<Handedness, HandFrame>> | readonly HandFrame[]): boolean {
-    if (this._lit) return false;
-    const fx = this.flamePosition[0];
-    const fy = this.flamePosition[1];
-    const fz = this.flamePosition[2];
-
-    const isArr = Array.isArray(hands);
-    const count = isArr ? hands.length : 2;
-    for (let i = 0; i < count; i++) {
-      const h = isArr
-        ? (hands as readonly HandFrame[])[i]
-        : i === 0
-          ? (hands as Readonly<Record<Handedness, HandFrame>>).left
-          : (hands as Readonly<Record<Handedness, HandFrame>>).right;
-      if (!h.tracked || h.validJoints < 3) continue;
-      const p = h.positions;
-
-      // 1. Check index tip touch (within 15 cm of wick)
-      const idx = JOINT['index-finger-tip'] * 3;
-      const idxDx = p[idx] - fx;
-      const idxDy = p[idx + 1] - fy;
-      const idxDz = p[idx + 2] - fz;
-      const idxDist = Math.sqrt(idxDx * idxDx + idxDy * idxDy + idxDz * idxDz);
-      if (idxDist < 0.15) return true;
-
-      // 2. Check thumb tip touch (within 15 cm of wick)
-      const thmb = JOINT['thumb-tip'] * 3;
-      const thmbDx = p[thmb] - fx;
-      const thmbDy = p[thmb + 1] - fy;
-      const thmbDz = p[thmb + 2] - fz;
-      const thmbDist = Math.sqrt(thmbDx * thmbDx + thmbDy * thmbDy + thmbDz * thmbDz);
-      if (thmbDist < 0.15) return true;
-
-      // 3. Check middle tip touch (within 15 cm of wick)
-      const mid = JOINT['middle-finger-tip'] * 3;
-      const midDx = p[mid] - fx;
-      const midDy = p[mid + 1] - fy;
-      const midDz = p[mid + 2] - fz;
-      const midDist = Math.sqrt(midDx * midDx + midDy * midDy + midDz * midDz);
-      if (midDist < 0.15) return true;
-
-      // 4. Check index-to-thumb pinch near wick (pinch < 6.5 cm, near wick < 20 cm)
-      const pdx = p[idx] - p[thmb];
-      const pdy = p[idx + 1] - p[thmb + 1];
-      const pdz = p[idx + 2] - p[thmb + 2];
-      const pinchDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
-      if (pinchDist < 0.065) {
-        const mx = (p[idx] + p[thmb]) * 0.5 - fx;
-        const my = (p[idx + 1] + p[thmb + 1]) * 0.5 - fy;
-        const mz = (p[idx + 2] + p[thmb + 2]) * 0.5 - fz;
-        const pinchWickDist = Math.sqrt(mx * mx + my * my + mz * mz);
-        if (pinchWickDist < 0.2) return true;
-      }
-
-      // 5. Check wrist/palm approach (within 16 cm of wick)
-      const wrist = JOINT['wrist'] * 3;
-      const wdx = p[wrist] - fx;
-      const wdy = p[wrist + 1] - fy;
-      const wdz = p[wrist + 2] - fz;
-      const wristDist = Math.sqrt(wdx * wdx + wdy * wdy + wdz * wdz);
-      if (wristDist < 0.16) return true;
-    }
-    return false;
   }
 
   /**
