@@ -3,7 +3,7 @@
 // array of sources, a second pose lookup for each radius). The fake frame reuses its pose object, so this
 // measures the reader. Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
-import { bytesPerFrame, gc, inCI } from '../sim/alloc-measure';
+import { bytesPerFrame, gc, inCI } from '../testing/alloc-measure';
 import { makeFakeXr } from './fake-xr-hands';
 import { XRHandReader } from './xr-hands';
 

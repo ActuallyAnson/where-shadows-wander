@@ -1,7 +1,7 @@
 // AudioEngine.update and moveLoop run every frame, so they must not allocate (see frame-pipeline.alloc.test.ts
 // for why). Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
-import { bytesPerFrame, gc, inCI } from '../../sim/alloc-measure';
+import { bytesPerFrame, gc, inCI } from '../../testing/alloc-measure';
 import { FakeContext } from './fake-audio';
 import { Bus, Mixer } from './mixer';
 import { Sound } from './sounds';

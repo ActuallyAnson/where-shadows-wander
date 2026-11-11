@@ -8,7 +8,6 @@ import type { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { ShadowDebug } from '../engine/shadow/shadow-debug';
 import type { SettingsStore } from '../engine/services/settings/settings-store';
-import type { EntityStore } from '../engine/sim/entity-store';
 import { JointDots } from '../engine/xr/joint-dots';
 import { DebugController, OVERLAYS, type OverlayKey, type SystemKey } from './debug-controller';
 import { debugKeyAction } from './debug-keys';
@@ -40,7 +39,6 @@ export class DebugTools {
   readonly replay = new HandReplay();
   private readonly shadowDebug = new ShadowDebug();
   readonly dots = new JointDots();
-  private entities: EntityStore | null = null;
   private savedFlicker = 1;
   private flickerOff = false;
   private readonly hud: HTMLDivElement;
@@ -85,16 +83,6 @@ export class DebugTools {
     this.removers.push(() => window.removeEventListener('keydown', onKey));
   }
 
-  /** The simulation's time control: main.ts calls `debug.time.advance(sim, delta)` in place of `sim.advance(delta)`. */
-  get time() {
-    return this.controller.time;
-  }
-
-  /** Where the entity colliders come from. A's game code calls this once it has an EntityStore. */
-  setEntityStore(store: EntityStore | null): void {
-    this.entities = store;
-  }
-
   /** Per frame, after the shadows are updated. Returns at once when nothing is shown. */
   frame(rigPlaced: boolean): void {
     const line = this.ctx.readout?.();
@@ -110,7 +98,6 @@ export class DebugTools {
         this.ctx.stage,
         this.ctx.projector.matrix,
       );
-    if (o.colliders && this.entities) this.shadowDebug.updateColliders(this.entities, this.ctx.stage);
     if (o.joints) this.dots.update(this.ctx.handList, rigPlaced ? this.ctx.flame() : null);
   }
 
@@ -127,7 +114,6 @@ export class DebugTools {
 
   private applyOverlay(key: OverlayKey, on: boolean): void {
     if (key === 'capsules') this.shadowDebug.setVisible('capsules', on);
-    else if (key === 'colliders') this.shadowDebug.setVisible('colliders', on);
     else this.dots.mesh.visible = on;
   }
 
@@ -167,7 +153,8 @@ export class DebugTools {
     const frames = this.ctx.readout?.();
     const text = this.controller.status();
     this.hud.textContent =
-      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+P pause  Alt+.  step  Alt+[ ]  speed') + (frames ? `  |  ${frames}` : '');
+      (text ? `DEBUG  ${text}` : 'DEBUG  Alt+K capsules  Alt+J joints  Alt+R replay') +
+      (frames ? `  |  ${frames}` : '');
   }
 }
 

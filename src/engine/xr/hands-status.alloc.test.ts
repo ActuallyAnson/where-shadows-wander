@@ -1,7 +1,7 @@
 // HandsStatus.update and the SessionVisibility getters run every XR frame, so they must not allocate
 // (see frame-pipeline.alloc.test.ts for why). Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
-import { bytesPerFrame, gc, inCI } from '../sim/alloc-measure';
+import { bytesPerFrame, gc, inCI } from '../testing/alloc-measure';
 import { HandsStatus } from './hands-status';
 import { SessionVisibility } from './session-visibility';
 

@@ -9,8 +9,8 @@ import { join } from 'node:path';
 
 /** Text that is in the bundle only if a debug tool is. Add one when a new debug tool is added. */
 const MARKERS = [
-  'Alt+P pause', // the HUD line (debug-tools.ts)
-  'Entity colliders', // the debug menu (debug-controller.ts)
+  'Alt+K capsules', // the HUD line (debug-tools.ts)
+  'Joint dots', // the debug menu (debug-controller.ts)
   'Testing: switches', // the launcher's Testing panel (testing-panel.ts)
   'Copy report', // the report panel (report-panel.ts)
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)

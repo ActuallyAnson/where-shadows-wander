@@ -1,5 +1,5 @@
-// Lint rules. The important one is the pure-code boundary: hand maths, the
-// simulation, stage maths and gameplay must not import IWSDK, three.js, the
+// Lint rules. The important one is the pure-code boundary: hand maths, stage
+// maths and the shadow projection must not import IWSDK, three.js, the
 // emulator or any engine-facing folder, and must not touch browser globals.
 // That keeps them unit-testable in Node and the plain three.js fallback cheap
 // (docs/adr/0001-iwsdk-as-xr-and-view-layer.md, 0002-plain-threejs-fallback.md).
@@ -10,13 +10,7 @@ import tseslint from 'typescript-eslint';
 
 // src/engine/shadow/pure holds the shadow projection maths: pure, so it's unit-tested
 // in Node, while the rest of src/engine/shadow draws with three.js.
-const PURE_FOLDERS = [
-  'src/engine/hands/**',
-  'src/engine/sim/**',
-  'src/engine/stage/**',
-  'src/game/**',
-  'src/engine/shadow/pure/**',
-];
+const PURE_FOLDERS = ['src/engine/hands/**', 'src/engine/stage/**', 'src/engine/shadow/pure/**'];
 
 export default tseslint.config(
   { ignores: ['dist/**', 'dist-*/**', 'spikes/**', 'recordings/**', 'node_modules/**'] },
