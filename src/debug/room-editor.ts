@@ -12,11 +12,13 @@
 // The candle's shadows are baked: they are cast again while a piece is dragged (once a frame) and whenever it is placed. The
 // headset marker shows where the player's eyes are and roughly what the headset can see, in every view but Eye.
 import {
+  AssetManager,
   BufferGeometry,
   Float32BufferAttribute,
   LineBasicMaterial,
   LineSegments,
   Object3D,
+  Plane,
   Raycaster,
   Vector2,
   Vector3,
@@ -28,12 +30,16 @@ import {
   copyPlacement,
   mergeLayout,
   nextPieceId,
+  placement,
   placementOr,
   roundPlacement,
   serializeRoomLayout,
 } from '../engine/stage/room-layout';
 import type { LayoutSection, Placement, RoomLayout, Vec3 } from '../engine/stage/room-layout';
-import type { PlacedModels, PlacedPiece } from '../engine/shadow/placed-models';
+import type { ModelLoader, PlacedModels, PlacedPiece } from '../engine/shadow/placed-models';
+import type { AssetFileInfo } from '../engine/services/assets/asset-tree';
+import { AssetClient } from './asset-client';
+import { AssetPanel, assetDragOf, ASSET_DRAG_TYPE } from './room-editor-assets';
 import { applyPlacement, readPlacement } from '../engine/shadow/room-placement';
 import type { EditablePiece, EditableSource } from '../engine/shadow/room-placement';
 import { RoomEditHistory } from './room-edit-history';
@@ -56,6 +62,8 @@ export interface RoomEditorDeps {
   placed: PlacedModels;
   /** The ids of the built-in pieces, per section, which a new piece may not take. */
   knownIds: Readonly<Record<LayoutSection, readonly string[]>>;
+  /** Every asset file the bundler saw when the page loaded (source path → URL): the asset browser without a dev server. */
+  assetFiles: Readonly<Record<string, string>>;
   /** The layout the game was built from; Save writes the pieces' placements into it and then to the file. */
   layout: RoomLayout;
   /** The file's name under content/rooms/. */
@@ -129,6 +137,12 @@ export class RoomEditor {
   /** Scene tree groups folded shut (`section:label`). */
   private readonly folded = new Set<string>();
   private readonly root = document.createElement('aside');
+  private readonly client: AssetClient;
+  private readonly assets: AssetPanel;
+  /** How the game loads placed models (through the manifest); the editor loads by file while it is open. */
+  private gameLoader: ModelLoader | null = null;
+  private readonly floor = new Plane();
+  private readonly up = new Vector3();
   /** What "Room only" hid, to show again when it is turned off. */
   private readonly hiddenByRoomOnly = new Set<Object3D>();
   private restoreBeforeRender: Object3D['onBeforeRender'] | null = null;
@@ -148,6 +162,31 @@ export class RoomEditor {
   private readonly onResize = () => this.fitCamera();
   private readonly onBeforeUnload = (e: BeforeUnloadEvent) => {
     if (this.dirty) e.preventDefault();
+  };
+  /** A file dropped anywhere else on the page would open it in the tab and end the session: refuse it. */
+  private readonly onWindowDrag = (e: DragEvent) => e.preventDefault();
+  private readonly onCanvasDragOver = (e: DragEvent) => {
+    if (e.dataTransfer?.types.includes(ASSET_DRAG_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+  private readonly onCanvasDrop = (e: DragEvent) => {
+    const drag = assetDragOf(e);
+    if (!drag || drag.folder) return;
+    e.preventDefault();
+    const file = this.client.current ? this.findFile(drag.path) : undefined;
+    const spot = this.spotAt(e.clientX, e.clientY);
+    if (file && spot) void this.addModel(file.id, placement(spot.pos), spot.section);
+  };
+  /** Loads a model from its file while the editor is open, so one imported since the page loaded can be placed. */
+  private readonly editorLoader: ModelLoader = async (id) => {
+    if (!this.client.current) await this.client.refresh();
+    const file = this.client.fileOf(id);
+    if (!file || !this.client.current?.live) return this.gameLoader ? this.gameLoader(id) : null;
+    const key = `editor:${file.path}:${file.mtimeMs}`;
+    await AssetManager.loadGLTF(this.client.urlOf(file), key);
+    return AssetManager.getGLTF(key)?.scene ?? null;
   };
 
   constructor(private readonly deps: RoomEditorDeps) {
@@ -184,6 +223,12 @@ export class RoomEditor {
     this.marker.renderOrder = 999;
     this.marker.matrixAutoUpdate = false;
     this.orbit.addEventListener('change', () => this.fadeMarker());
+    this.client = new AssetClient(deps.assetFiles);
+    this.assets = new AssetPanel(this.client, {
+      addToRoom: (file) => void this.addInView(file),
+      changed: () => this.render(),
+      resized: () => this.fitCamera(),
+    });
     this.mount();
   }
 
@@ -203,6 +248,13 @@ export class RoomEditor {
     window.addEventListener('beforeunload', this.onBeforeUnload);
     this.deps.canvas.addEventListener('pointerdown', this.onPointerDown);
     this.deps.canvas.addEventListener('pointerup', this.onPointerUp);
+    this.deps.canvas.addEventListener('dragover', this.onCanvasDragOver);
+    this.deps.canvas.addEventListener('drop', this.onCanvasDrop);
+    window.addEventListener('dragover', this.onWindowDrag);
+    window.addEventListener('drop', this.onWindowDrag);
+    this.gameLoader = this.deps.placed.currentLoader;
+    this.deps.placed.setLoader(this.editorLoader);
+    this.assets.show();
     this.fitCamera();
     this.view('Overview');
     this.setRoomOnly(true);
@@ -229,6 +281,12 @@ export class RoomEditor {
     window.removeEventListener('beforeunload', this.onBeforeUnload);
     this.deps.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.deps.canvas.removeEventListener('pointerup', this.onPointerUp);
+    this.deps.canvas.removeEventListener('dragover', this.onCanvasDragOver);
+    this.deps.canvas.removeEventListener('drop', this.onCanvasDrop);
+    window.removeEventListener('dragover', this.onWindowDrag);
+    window.removeEventListener('drop', this.onWindowDrag);
+    if (this.gameLoader) this.deps.placed.setLoader(this.gameLoader);
+    this.assets.hide();
     this.deps.camera.clearViewOffset();
     this.deps.suspendDesk(false);
   }
@@ -544,12 +602,55 @@ export class RoomEditor {
     this.orbit.update();
   }
 
-  /** The view fills the part of the window the panel doesn't cover. */
+  /** The view fills the part of the window the panels don't cover (the editor's on the right, the assets' on the left). */
   private fitCamera(): void {
     const w = window.innerWidth,
       h = window.innerHeight;
     if (w < 700) this.deps.camera.clearViewOffset();
-    else this.deps.camera.setViewOffset(w, h, PANEL_W / 2, 0, w, h);
+    else this.deps.camera.setViewOffset(w, h, (PANEL_W - this.assets.width) / 2, 0, w, h);
+  }
+
+  private findFile(path: string): AssetFileInfo | undefined {
+    const state = this.client.current;
+    if (!state) return undefined;
+    const files = (f: typeof state.tree): AssetFileInfo[] => [...f.files, ...f.folders.flatMap(files)];
+    return files(state.tree).find((f) => f.path === path);
+  }
+
+  /** Places a model where the view is looking: on the floor under the point the view turns about. */
+  private async addInView(file: AssetFileInfo): Promise<void> {
+    const room = this.deps.placed.parent('room');
+    room.updateMatrixWorld(true);
+    const at = room.worldToLocal(this.orbit.target.clone());
+    await this.addModel(file.id, placement([at.x, 0, at.z]));
+  }
+
+  /**
+   * Where a model dropped at a point of the window would stand: on the first upward-facing surface of the room under it (a
+   * table, the bed, the tray: then on the lap), else on the floor. In the section's own space; null if it misses the floor.
+   */
+  private spotAt(clientX: number, clientY: number): { section: LayoutSection; pos: Vec3 } | null {
+    const rect = this.deps.canvas.getBoundingClientRect();
+    this.pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.deps.camera.updateMatrixWorld();
+    this.raycaster.setFromCamera(this.pointer, this.deps.camera);
+    const lap = this.deps.placed.parent('lap');
+    for (const hit of this.raycaster.intersectObjects([...this.deps.roomRoots], true)) {
+      if (!hit.face || hit.object === this.marker || !isShown(hit.object)) continue;
+      const normal = this.up.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+      if (normal.y < 0.7) continue;
+      const section: LayoutSection = isWithin(hit.object, lap) ? 'lap' : 'room';
+      const p = this.deps.placed.parent(section).worldToLocal(hit.point.clone());
+      return { section, pos: [p.x, p.y, p.z] };
+    }
+    const room = this.deps.placed.parent('room');
+    room.updateMatrixWorld(true);
+    this.up.set(0, 1, 0).transformDirection(room.matrixWorld);
+    this.floor.setFromNormalAndCoplanarPoint(this.up, room.getWorldPosition(new Vector3()));
+    const point = this.raycaster.ray.intersectPlane(this.floor, new Vector3());
+    if (!point) return null;
+    const p = room.worldToLocal(point);
+    return { section: 'room', pos: [p.x, 0, p.z] };
   }
 
   /** A click on the canvas (not a drag of the view or the gizmo) selects the piece under it, or nothing. */

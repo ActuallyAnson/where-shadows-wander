@@ -16,6 +16,7 @@ const MARKERS = [
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
   'Copy Logs', // the launcher's log button (enter-ar-button.ts)
   'Save room layout', // the room editor (room-editor.ts)
+  'Add to room', // the room editor's asset browser (room-editor-assets.ts)
 ];
 
 const jsIn = (dir) =>

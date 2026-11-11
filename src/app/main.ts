@@ -100,7 +100,7 @@ import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
 import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
 import { BEDROOM_LAYOUT_FILE, BEDROOM_PIECE_IDS, readBedroomLayout } from '../engine/shadow/bedroom-layout';
-import assetManifest from './assets';
+import assetManifest, { assetFiles } from './assets';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { HandOccluder } from '../engine/xr/hand-occluder';
 import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
@@ -1144,6 +1144,7 @@ async function start(): Promise<void> {
       knownIds: BEDROOM_PIECE_IDS,
       layout: bedroomLayout.layout,
       fileName: BEDROOM_LAYOUT_FILE,
+      assetFiles,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
       suspendDesk: (on) => {
         desk.suspend(on);

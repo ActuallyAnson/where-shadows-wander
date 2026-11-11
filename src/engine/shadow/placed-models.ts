@@ -60,6 +60,16 @@ export class PlacedModels implements EditableSource {
     this.loader = loader;
   }
 
+  /** How models are loaded now. */
+  get currentLoader(): ModelLoader {
+    return this.loader;
+  }
+
+  /** What a section's pieces stand in (its space is the section's: room space, or the tray's). */
+  parent(section: LayoutSection): Object3D {
+    return this.parents[section];
+  }
+
   /** Loads every model the layout places, lit by `candle` and casting its shadows. Never rejects. Returns how many stand. */
   async load(candle: CandleLight): Promise<number> {
     this.candle = candle;

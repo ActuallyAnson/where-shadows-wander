@@ -42,3 +42,6 @@ const standIns = {
 };
 
 export default defineAssets({ ...standIns, ...manifestFromFiles(files, new Set(Object.keys(standIns))) });
+
+/** Every asset file as the bundler saw it when the page loaded (source path → URL), for the room editor's asset browser. */
+export const assetFiles: Readonly<Record<string, string>> = files;
