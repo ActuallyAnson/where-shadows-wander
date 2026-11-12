@@ -66,28 +66,30 @@ elif profile == 'cartoon':
     # Its mesh has fingers along +z, thumb towards +y, palm facing +x, about 6.8 units long. Measured in the turned frame
     # before scaling (units), from the centrelines of the fingers' vertices; the knuckles at the welding glove's phalanx
     # proportions along each finger's (slightly curled) centreline.
+    # The glove has no cuff: its mesh ends at the wrist, cut flat at y = 0, so the wrist joint sits just inside the cut
+    # (where its own rig's wrist bone starts) and the finger and thumb metacarpals close by, as WebXR's are.
     TURN = Matrix(((0, 1, 0), (0, 0, -1), (-1, 0, 0))).to_4x4()
-    WRIST_U = V((0.50, -1.90, -1.00))
-    SCALE = 0.05  # wrist to middle fingertip 4.8 units: 0.24 m, as the welding glove's
+    WRIST_U = V((0.50, -0.80, -1.00))
+    SCALE = 0.034  # wrist to the middle finger's knuckle 3.3 units: 0.112 m, as the welding glove's
     PREP = Matrix.Scale(SCALE, 4) @ Matrix.Translation(-WRIST_U) @ TURN
     U = {
         'wrist': WRIST_U,
-        'thumb-metacarpal': V((1.65, -2.00, -1.40)),
+        'thumb-metacarpal': V((1.50, -1.50, -1.40)),
         'thumb-phalanx-proximal': V((2.47, -2.64, -1.47)),
         'thumb-phalanx-distal': V((3.09, -3.00, -1.80)),
         'thumb-tip': V((3.75, -3.62, -1.92)),
     }
     for f, (cmc, mcp, mid, dist, tip) in {
-        'index': ((1.00, -2.30, -0.90), (1.45, -3.90, -0.55), (1.28, -5.00, -0.65), (1.30, -5.80, -0.98), (1.21, -6.35, -1.27)),
-        'middle': ((0.45, -2.30, -0.90), (0.42, -4.10, -0.60), (0.25, -5.25, -0.80), (0.18, -6.00, -1.15), (0.08, -6.62, -1.60)),
-        'ring': ((-0.05, -2.30, -0.95), (-0.52, -3.80, -0.75), (-0.62, -4.85, -1.12), (-0.82, -5.50, -1.55), (-0.93, -6.00, -1.95)),
-        'pinky': ((-0.45, -2.25, -1.00), (-1.10, -3.45, -0.90), (-1.55, -4.21, -1.25), (-1.80, -4.65, -1.50), (-2.03, -5.05, -1.73)),
+        'index': ((0.95, -1.40, -0.90), (1.45, -3.90, -0.55), (1.28, -5.00, -0.65), (1.30, -5.80, -0.98), (1.21, -6.35, -1.27)),
+        'middle': ((0.45, -1.40, -0.90), (0.42, -4.10, -0.60), (0.25, -5.25, -0.80), (0.18, -6.00, -1.15), (0.08, -6.62, -1.60)),
+        'ring': ((-0.05, -1.40, -0.95), (-0.52, -3.80, -0.75), (-0.62, -4.85, -1.12), (-0.82, -5.50, -1.55), (-0.93, -6.00, -1.95)),
+        'pinky': ((-0.45, -1.35, -1.00), (-1.10, -3.45, -0.90), (-1.55, -4.21, -1.25), (-1.80, -4.65, -1.50), (-2.03, -5.05, -1.73)),
     }.items():
         for part, p in zip(PARTS, (cmc, mcp, mid, dist, tip)):
             U[f'{f}-finger-{part}'] = V(p)
     for k, p in U.items():
         J[k] = SCALE * (p - WRIST_U)
-    CUFF = SCALE * (V((0.50, 0.00, -0.90)) - WRIST_U)
+    CUFF = SCALE * (V((0.50, 0.20, -0.90)) - WRIST_U)
     fingers = {f: None for f in ('index', 'middle', 'ring', 'pinky')}
 else:
     raise SystemExit(f'unknown profile {profile}')
