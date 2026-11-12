@@ -376,16 +376,8 @@ export class HandLab {
     const step = (arg: string, label: string, help: string) =>
       `<div class="step"><button type="button" data-act="step" data-arg="${arg}" ${why || this.busy ? 'disabled' : ''}>${label}</button><p class="keys">${help}</p></div>`;
     el.innerHTML = `<h2>Steps <span>emulator setups</span></h2>
-      ${step(
-        'candle',
-        'Hand over the candle',
-        "Sits the player where the room was placed, looking down at the candle, and holds the right hand's match just above the wick: the candle lights after 3 s. Before BEGIN, or once lit, there is no match to hold. Switches to the Device source.",
-      )}
-      ${step(
-        'reset',
-        'Reset position',
-        "Puts the headset and both hands back where the emulator started (or a pose saved with its save-pose button). The emulator's own reset button leaves the head where it was.",
-      )}
+      ${step('candle', 'Hand over the candle', 'Match over the wick: lights in 3 s.')}
+      ${step('reset', 'Reset position', 'Headset and hands back to the start.')}
       ${why ? `<p class="msg">${why}</p>` : '<p class="msg" id="lab-step-status"></p>'}`;
     this.renderStepStatus();
   }

@@ -16,7 +16,8 @@ export interface EmulatedDeviceLike {
  * - "Configure gaze emulation": gaze input needs controllers; the game is hands only.
  * - "Field-of-view mask": unavailable for the emulated Quest 3, so it only ever shows greyed out.
  * - "About IWER" and "Report issues" (the right-hand group, removed whole): the emulator's version and its GitHub.
- * Kept: reset, play mode (mouse look), the headset menu, save pose, exit, and the Hand [L]/[R] panels. The synthetic
+ * - "Reset device transforms": it leaves the head where it was; the Hand Lab's Steps tab has a reset that works.
+ * Kept: play mode (mouse look), the headset menu, save pose, exit, and the Hand [L]/[R] panels. The synthetic
  * environment's buttons are gone already (iwsdk.config.json loads no environment).
  */
 export const HANDS_ONLY_CSS = [
@@ -24,6 +25,7 @@ export const HANDS_ONLY_CSS = [
   'button[title="Configure gaze emulation"]',
   'button[aria-label="Field-of-view mask"]',
   'div:has(> button[title="About IWER"])',
+  'button[title="Reset device transforms"]',
 ]
   .map((sel) => `${sel}{display:none !important}`)
   .join('');
