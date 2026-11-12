@@ -1,6 +1,6 @@
 # Where Shadows Wander
 
-A seated, hands-only virtual reality story: light a candle in a child's bedroom at night, and watch a story played in shadow puppets on the wall, moving it on with the shapes of your hands.
+A seated, hands-only virtual reality story about grief and comfort. A boy who has recently lost his best friend wakes in the night, lights a candle, and goes back through their memories in shadow puppets on his bedroom wall, moving each one on with the shapes of his hands, until he can sleep again.
 
 **Status:** the bedroom, lighting the candle, your hands' shadows on the wall, the shape recogniser, pausing by covering the flame, sound, saves and settings are built. The puzzle game was removed on 11 Nov 2026 ([ADR 0016](docs/adr/0016-story-shadow-theatre.md)); the shadow-puppet story system is next. Built for the Meta VR Start Developer Competition 2026.
 

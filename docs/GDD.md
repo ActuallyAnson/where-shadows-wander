@@ -2,7 +2,7 @@
 
 ## Overview
 
-Where Shadows Wander is a seated, hands-only virtual reality story: a kid who can't sleep sits up in bed, lights a candle, and watches a story played as a shadow-puppet theatre on the bedroom wall. The player moves the story on by making a named shape with their hands, until the kid drifts off to sleep.
+Where Shadows Wander is a seated, hands-only virtual reality story about grief and comfort. A boy who has recently lost his best friend wakes in the middle of the night and can't get back to sleep. He lights a candle, and in shadow play on the bedroom wall he goes back through the memories he shared with his friend. The player moves each memory along by making a hand shape, and when the memories are done, the boy can sleep again.
 
 | Item | Detail |
 |----|----|
@@ -14,7 +14,7 @@ Where Shadows Wander is a seated, hands-only virtual reality story: a kid who ca
 | Engine | IWSDK (three.js) for the XR session and emulator; the game in our own TypeScript code |
 | Input | Hand tracking only; no controller needed. The player's hands are drawn as hand models in the room |
 | Session length | To be decided with the story (to measure in playtests) |
-| Audience | Casual and cozy-game players; people who play seated, on a couch, desk or plane |
+| Audience | Players of short narrative and cozy games; people who play seated, on a couch, desk or plane |
 
 ### Direction (5 Oct 2026): a virtual room
 
@@ -23,6 +23,8 @@ The game is set in a **virtual room**, not the player's real one. A candle light
 ### Direction (17 Oct 2026): a bedroom at night
 
 The virtual room is a **kid's bedroom at night**. The kid is a little restless and can't fall asleep, so he sits up in bed and plays with shadows on the wall until he drifts off. The tone is cozy and calm, never scary. The light is a candle on the bed tray, lit with a small flame carried in the right hand.
+
+*The bedroom, the night and the candle stay. The reason he is awake, and the tone, changed on 12 Nov 2026 (below).*
 
 ### Direction (11 Nov 2026): a story in shadow puppets
 
@@ -33,6 +35,17 @@ The game was a physics puzzle: a little traveller walked across the wall and the
 - **The player moves the story on** by making a named shape with their hands when the story asks for one.
 - **The room, the candle, the hand shadows and the cover-flame pause stay** as they are.
 
+### Direction (12 Nov 2026): a night of remembering
+
+The story now has a premise. The boy has recently lost his best friend. He wakes suddenly in the middle of the night and can't get back to sleep. He lights the candle and, through the shadow play, goes back through the memories they shared. By the end the shadow play lets him rest, and he falls asleep.
+
+- **The theme is grief and comfort.** The game does not try to fix the loss. It is about the night when remembering stops hurting and starts to help.
+- **The tone is tender and bittersweet, never bleak or frightening.** It stays as warm as the cozy bedroom it replaces, but now there is something underneath.
+- **The shadow play is how he remembers.** Each memory is a scene on the wall, and the hand shapes the player makes are what bring the memories back.
+- **The ending is sleep.** The session ends when the boy can rest, and that is what the game is building towards from its first moment.
+
+The shadow play itself (the scenes, the shapes they ask for, and the puppets) is not final. The sections below say which parts are settled and which are proposals.
+
 ### Design pillars
 
 1.  **Your hands are the toolkit.** Every action is a hand shape. Nothing on screen needs to be pointed at or pressed.
@@ -41,11 +54,13 @@ The game was a physics puzzle: a little traveller walked across the wall and the
 
 3.  **Readable at a glance.** Silhouettes, one light source, one surface.
 
-4.  **Short and complete.** Every session ends on a finished moment.
+4.  **Short and complete.** Every session ends on a finished moment: the boy falls asleep.
+
+5.  **Gentle with grief.** The loss is felt through absence and memory, never shown. Nothing on the wall should shock or upset the player, and no one is ever made to fail.
 
 ## Core experience and setup
 
-The player is the kid, sitting up in bed with a bed tray across their lap. A candle stands on the tray; they light it, reach into its light, and their hand shadows land on the bedroom wall in front of them.
+The player is the boy, sitting up in bed with a bed tray across their lap after waking in the night. A candle stands on the tray; they light it, reach into its light, and their hand shadows land on the bedroom wall in front of them. The VR title is the moment of waking: the title fades to black, and the room fades in, dark and cold, before the candle is lit.
 
 ### The candle
 
@@ -77,13 +92,48 @@ A physically accurate point light makes shadow size swing wildly with wall dista
 
 ## The story
 
-The story is told on the wall in shadow puppets. Its plot, characters and scenes are **to be written**. What is settled:
+The story is told on the wall in shadow puppets. A boy has recently lost his best friend. He wakes in the night, lights the candle, remembers their time together through the shadow play, and at the end he can sleep again.
+
+### Premise (settled 12 Nov 2026)
+
+- **Who:** the boy (the player) and his best friend, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet.
+- **When:** one night, soon after the loss. He wakes suddenly in the dark and can't get back to sleep.
+- **What happens:** through the shadow play he goes back through the memories they shared, one scene at a time, moving each on with his hands.
+- **How it ends:** the shadow play lets him rest. The candle burns low, the room settles and he goes back to sleep. Sleep is the only ending, and every session reaches it.
+
+### Tone
+
+- **Bittersweet, not tragic.** Most memories are happy and ordinary: playing, laughing, getting into small trouble. The sadness is in the fact that they are memories.
+- **The loss is never shown.** No illness, accident, funeral or hospital on the wall. It is felt through absence: a space beside the boy's puppet, a game set up for two, a shape that needs a second hand.
+- **Not frightening.** He wakes suddenly, but the waking is lonely, not scary: no monsters, no nightmare imagery, no jump scares.
+- **Few words.** The shadow play carries the story. Any captions are short, plain and in the boy's voice.
+
+### Shape of the night (proposed, not final)
+
+The shadow play is not finalised. This is the arc the scenes should follow, to test and change:
+
+1.  **Waking.** The title fades to black, then the room fades in, dark and cold. The boy is awake and alone.
+2.  **The candle.** Lighting it is the first thing the player does (built). The light makes the room feel safer.
+3.  **The first memory.** His own hand shadow becomes the start of a memory, so the player learns that shapes bring memories back without being told.
+4.  **The memories.** A few short scenes (about three to five) of their friendship, from first meeting to the last ordinary day. Each waits for a shape and plays when it commits.
+5.  **Letting go.** A last memory that admits the friend is gone, gently. It could be a goodbye, or the friend's shadow staying beside the boy's for a moment before it fades.
+6.  **Sleep.** The candle burns down, the wall darkens, and the session ends with a fade to black.
+
+### Ideas to try (proposals)
+
+- **The friend taught him shadow puppets.** Then every shape the player makes is one the friend showed him, and making it is how he remembers. This ties the hands to the theme more closely than any other idea here.
+- **A shape for each memory.** For example: the rabbit for the day they found a rabbit in the park; the fox for a game of chase; a flat hand for a wave goodbye at the school gate; a cupped hand to hold something small they found together.
+- **Two-hand moments.** When the memory showed the two friends together, the boy's second hand stands in for the friend's. Two-handed shapes are out of v1 for tracking reasons, so this would be two one-handed shapes, not one shape made by both hands together.
+- **Absence in the room.** Something of the friend's in the bedroom (a toy, a drawing, a borrowed cap) that the candle lights at the end.
+- **The candle as time passing.** It burns lower with each memory, so the player can see the night moving towards sleep.
+
+### What else is settled
 
 - **Scenes are played, not simulated.** A scene is a short piece of puppet theatre: cut-out puppets move by keyframes, with captions and sounds at marked moments.
 - **The player moves it on with a shape.** Between scenes the story waits for a named hand shape (for example a rabbit, or a flat hand), and the next scene plays when that shape commits.
-- **No failure.** The story waits for as long as it takes; how it helps a player who is stuck is to be designed.
-- **The prologue comes back** as the first scene of the puppet story.
-- **Kept for it, not yet wired:** a fade to black, poke to skip, and the sound palette (chime, notes, music, ambience).
+- **No failure.** The story waits for as long as it takes; how it helps a player who is stuck is to be designed. A grieving boy cannot get remembering wrong.
+- **The prologue comes back** as the waking scene at the start.
+- **Ready for it:** the fade to black (now used when the title is left), poke to skip, and the sound palette (chime, notes, music, ambience).
 
 Planned, not built, each with its own ADR when it is: a cut-out puppet format (parts, pivots, keyframes), a caster that renders the puppets from the flame onto the wall, a scene player with markers for captions and sounds, and a story graph (play a scene, wait for a shape, play the next).
 
@@ -118,7 +168,7 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 ### Visual style
 
-- **Palette:** Deep black shadows, warm amber light (around 2200 K feel), cream paper.
+- **Palette:** Deep black shadows, warm amber light (around 2200 K feel), cream paper. The room starts cold and blue when the boy wakes and warms as the candle is lit; at the end it dims towards sleep.
 
 - **Puppets:** Detailed cut-out silhouettes in parts, moving like rod puppets, with a little stiffness and bounce rather than smooth realism. The team does not use Blender, so the art is 2D (generated silhouette art, cut into parts).
 
@@ -132,7 +182,7 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 - **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, its crackle, and a sound when it is lifted and set down.
 
-- **For the story:** the sound definitions for a chime, notes, music and ambience are kept as a palette for the scenes. What each scene needs is to be written with it.
+- **For the story:** the sound definitions for a chime, notes, music and ambience are kept as a palette for the scenes. What each scene needs is to be written with it. The music should be quiet and bittersweet: the music-box notes suit memories from childhood, and the night ends in near silence as he falls asleep.
 
 ## Technical design
 
@@ -226,7 +276,15 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - [ ] Confirm hand tracking in an immersive-vr session on the Quest Browser.
 
-- [ ] Write the story: its plot, characters, scenes, and which shape moves on each.
+- [ ] Write the memories (premise settled 12 Nov): how many, what each one shows, and which shape moves on each.
+
+- [ ] The friend: name, age, and whether he is a child or a pet (the premise reads as a child; a pet would make the story lighter and easier to share with younger players).
+
+- [ ] What wakes the boy: a dream, a sound, or nothing at all.
+
+- [ ] The ending: what in the shadow play lets him rest (a goodbye, the friend's shadow fading, the candle going out), and whether the player chooses the moment.
+
+- [ ] Whether to put a short content note at the start (the game is about the death of a friend) and on the store page.
 
 - [ ] How the story helps a player who doesn't make the shape it waits for.
 
@@ -279,8 +337,8 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000). The organis
 
 | Award | Why Where Shadows Wander fits |
 |----|----|
-| Boldest Original Concept | Your own hands' shadows move a candle-lit shadow-puppet story. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
-| Best First Five Minutes | No instructions; lighting the candle is a ritual, and the first shape is made by instinct |
+| Boldest Original Concept | Your own hands' shadows bring back a boy's memories of a lost friend, as a candle-lit shadow-puppet story. (This award favours ideas that depend on real-world presence, so a virtual room is a weaker fit than the original real-room plan.) |
+| Best First Five Minutes | No instructions; waking in the dark sets the mood, lighting the candle is a ritual, and the first shape is made by instinct |
 | Best Accessibility Forward Experience | One-handed play, tolerance and hold-time settings, high-contrast mode |
 
 ### Submission checklist
