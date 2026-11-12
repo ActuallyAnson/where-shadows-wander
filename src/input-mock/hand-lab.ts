@@ -39,7 +39,22 @@ export interface LabView {
   onSourceKind?(kind: LabSource): void;
   /** Hides the panel (its Hide button). The hands stay with the source picked. */
   hide?(): void;
+  /** The Steps tab's ready-made setups, which move the emulator's headset and hands (absent without the emulator). */
+  steps?: LabSteps;
 }
+
+/** Ready-made setups for testing at a desk (the Steps tab). */
+export interface LabSteps {
+  /** Sits the player at the candle with the right hand's match over the wick (the device's hands play). */
+  candle(): void;
+  /** Puts the emulator's headset and hands back where they started. */
+  reset(): void;
+  /** What the last step did, for the panel. */
+  status(): string;
+}
+
+type LabTab = 'lab' | 'steps';
+const TAB_KEY = 'wsw.lab.tab';
 
 export class HandLab {
   /** The latest gesture events, newest first (copied: the detector reuses its event objects). */
@@ -60,6 +75,7 @@ export class HandLab {
   private message = '';
   /** The device's own hands play (the Device source): the mock source is kept but not used. */
   private device = true;
+  private tab: LabTab = readTab();
 
   constructor(
     private readonly mode: MockMode,
@@ -246,12 +262,15 @@ export class HandLab {
     this.root.innerHTML = `
       <header><h1>Hand Lab</h1><p>Whose hands play the game, in its own session. Press BEGIN, and move the head with the
         emulator's controls.</p><button type="button" data-act="hide-panel" data-arg="">Hide panel</button></header>
-      <section id="lab-controls"></section>
-      <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
+      <nav class="tabs" role="tablist"><button type="button" role="tab" data-act="tab" data-arg="lab">Lab</button
+      ><button type="button" role="tab" data-act="tab" data-arg="steps">Steps</button></nav>
+      <section class="tab-steps" id="lab-steps"></section>
+      <section class="tab-lab" id="lab-controls"></section>
+      <details class="guide tab-lab" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
           `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s, '#f0a24a', 'right', 168)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
       ).join('')}</div></details>
-      <section class="hand" id="lab-calibration">
+      <section class="hand tab-lab" id="lab-calibration">
         <h2>Calibration <span>your straight fingers</span></h2>
         <div class="row"><button type="button" data-act="calibrate" data-arg="left">Calibrate left</button
         ><button type="button" data-act="calibrate" data-arg="right">Calibrate right</button
@@ -259,10 +278,10 @@ export class HandLab {
         <div id="lab-cal-status"></div>
         <p class="keys">Hold the hand flat for 2 s: curl is then measured from your own straight. Saved in this browser.</p>
       </section>
-      <section class="hand" id="lab-gestures"></section>
-      <section class="hand" id="lab-hand-right"></section>
-      <section class="hand" id="lab-hand-left"></section>
-      <p class="foot">The big label is what the classifier has committed; "holding" shows a shape on its way
+      <section class="hand tab-lab" id="lab-gestures"></section>
+      <section class="hand tab-lab" id="lab-hand-right"></section>
+      <section class="hand tab-lab" id="lab-hand-left"></section>
+      <p class="foot tab-lab">The big label is what the classifier has committed; "holding" shows a shape on its way
       there (0.4 s for verbs, 1 s for rabbit and fox). The bars show how far inside each shape's ranges the hand
       is: above the line matches. <a href="./webcam.html">Webcam bench</a> shows the camera image with
       landmarks.</p>
@@ -304,7 +323,8 @@ export class HandLab {
       } else if (act === 'guided') {
         if (this.guided) this.finishGuided();
         else this.startGuided();
-      }
+      } else if (act === 'tab') this.setTab(arg === 'steps' ? 'steps' : 'lab');
+      else if (act === 'step') void this.runStep(arg ?? '');
       this.renderControls();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -323,7 +343,67 @@ export class HandLab {
     this.renderLive();
   }
 
+  private setTab(tab: LabTab): void {
+    this.tab = tab;
+    try {
+      localStorage.setItem(TAB_KEY, tab);
+    } catch {
+      // Storage unavailable: the tab lasts until reload.
+    }
+  }
+
+  /** Runs a Steps button. The candle step plays with the device's hands, so a mock source gives way to them first. */
+  private async runStep(step: string): Promise<void> {
+    const steps = this.view.steps;
+    if (!steps || this.busy || this.guided || this.recording) return;
+    if (step === 'candle') {
+      if (!this.device) await this.switchSource('device');
+      steps.candle();
+    } else if (step === 'reset') steps.reset();
+    this.renderControls();
+  }
+
+  /** The Steps tab: ready-made setups that move the emulator's headset and hands. */
+  private renderSteps(): void {
+    const el = this.root.querySelector('#lab-steps');
+    if (!el) return;
+    const steps = this.view.steps;
+    const why = !steps
+      ? "Needs the dev server's emulator."
+      : this.guided || this.recording
+        ? 'Stop the recording first.'
+        : '';
+    const step = (arg: string, label: string, help: string) =>
+      `<div class="step"><button type="button" data-act="step" data-arg="${arg}" ${why || this.busy ? 'disabled' : ''}>${label}</button><p class="keys">${help}</p></div>`;
+    el.innerHTML = `<h2>Steps <span>emulator setups</span></h2>
+      ${step(
+        'candle',
+        'Hand over the candle',
+        "Sits the player where the room was placed, looking down at the candle, and holds the right hand's match just above the wick: the candle lights after 3 s. Before BEGIN, or once lit, there is no match to hold. Switches to the Device source.",
+      )}
+      ${step(
+        'reset',
+        'Reset position',
+        "Puts the headset and both hands back where the emulator started (or a pose saved with its save-pose button). The emulator's own reset button leaves the head where it was.",
+      )}
+      ${why ? `<p class="msg">${why}</p>` : '<p class="msg" id="lab-step-status"></p>'}`;
+    this.renderStepStatus();
+  }
+
+  private renderStepStatus(): void {
+    const el = this.root.querySelector('#lab-step-status');
+    const status = this.view.steps?.status() ?? '';
+    if (el && el.textContent !== status) el.textContent = status;
+  }
+
   private renderControls(): void {
+    this.root.dataset.tab = this.tab;
+    for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-act="tab"]')) {
+      const on = b.dataset.arg === this.tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    }
+    this.renderSteps();
     const s = this.synthetic;
     const kind = this.kind;
     // While a guided recording runs, its clock must keep moving forward: no source changes or pausing. A recording keeps its
@@ -380,6 +460,7 @@ export class HandLab {
   }
 
   private renderLive(): void {
+    this.renderStepStatus();
     // The default view is from the player's eyes, looking down -Z.
     for (const side of ['right', 'left'] as const) {
       const el = this.root.querySelector(`#lab-hand-${side}`);
@@ -492,6 +573,15 @@ export class HandLab {
   }
 }
 
+/** The tab last open in this browser (Lab by default). */
+function readTab(): LabTab {
+  try {
+    return localStorage.getItem(TAB_KEY) === 'steps' ? 'steps' : 'lab';
+  } catch {
+    return 'lab';
+  }
+}
+
 function kindOf(sourceName: string): MockSourceKind {
   return sourceName.startsWith('replay') ? 'replay' : (sourceName as MockSourceKind);
 }
@@ -507,6 +597,13 @@ const CSS = `
 }
 @media (max-width: 699px) { .lab { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); } }
 .lab h1 { margin: 0; font-size: 18px; font-weight: 650; }
+.lab .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
+.lab .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 14px; color: var(--muted); }
+.lab .tabs button.on { background: none; color: var(--ink); border-bottom-color: var(--accent); }
+.lab[data-tab="steps"] .tab-lab, .lab[data-tab="lab"] .tab-steps { display: none; }
+.lab .tab-steps { display: grid; gap: 10px; }
+.lab .step { display: grid; gap: 4px; justify-items: start; }
+.lab .tab-steps h2 { margin: 0; }
 .lab header p, .lab .foot, .lab .keys { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 .lab .foot a, .lab header a { color: var(--accent); }
 .lab h2 { margin: 6px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }

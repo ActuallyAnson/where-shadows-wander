@@ -82,7 +82,7 @@ import { clearFor } from '../engine/xr/session-mode';
 import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { DeskFrame } from '../input-mock/desk-frame';
-import { HandLab } from '../input-mock/hand-lab';
+import { HandLab, type LabSteps } from '../input-mock/hand-lab';
 import { MockMode } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
@@ -99,6 +99,7 @@ import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
 import { hideEmulatorExtras, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
+import { CandleStep, defaultEmulatorPose, setEmulatorPose, type EmulatedRigLike } from './emulator-pose';
 import { showStartFailure } from './start-failure';
 
 const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
@@ -548,6 +549,45 @@ async function start(): Promise<void> {
   // (desk-frame.ts). Made the first time the panel is asked for (the developer overlay, or a reload that had it).
   let mock: MockMode | null = null;
   let lab: HandLab | null = null;
+  // The Hand Lab's Steps tab (dev, under the emulator only): ready-made setups that move the emulator's headset and hands.
+  const rigDevice = emulatedDevice as EmulatedRigLike | undefined;
+  const stepHeadPos = new Vector3();
+  const stepHeadQuat = new Quaternion();
+  const candleStep = rigDevice
+    ? new CandleStep(rigDevice, {
+        head: () => {
+          world.camera.getWorldPosition(stepHeadPos);
+          world.camera.getWorldQuaternion(stepHeadQuat);
+          return {
+            position: [stepHeadPos.x, stepHeadPos.y, stepHeadPos.z],
+            quaternion: [stepHeadQuat.x, stepHeadQuat.y, stepHeadQuat.z, stepHeadQuat.w],
+          };
+        },
+        rigHead: () => lastHead,
+        candleFlame: () => candleView.flamePosition,
+        matchFlame: () => (sessionState === 'title_vr' && titleLighter.visible ? titleLighter.flamePosition : null),
+      })
+    : null;
+  let stepStatus = '';
+  const labSteps: LabSteps | undefined =
+    rigDevice && candleStep
+      ? {
+          candle: () => {
+            stepStatus = '';
+            if (!world.renderer.xr.isPresenting)
+              stepStatus = 'Press BEGIN first: the step moves the hands in the session.';
+            else if (sessionState !== 'title_vr') stepStatus = 'The candle is already lit.';
+            else candleStep.start();
+          },
+          reset: () => {
+            candleStep.cancel();
+            const pose = defaultEmulatorPose(rigDevice);
+            setEmulatorPose(rigDevice, pose.head, pose.hands);
+            stepStatus = 'Headset and hands are back where the emulator started.';
+          },
+          status: () => stepStatus || candleStep.status,
+        }
+      : undefined;
   const openLab = (): HandLab => {
     if (lab) return lab;
     mock = new MockMode(new SyntheticSource());
@@ -566,6 +606,7 @@ async function start(): Promise<void> {
       // The lab remembers its source and whether it shows, for the next reload in this tab.
       onSourceKind: (kind) => updateLaunch({ hands: kind }, DEBUG_TOOLS),
       hide: () => showLab(false),
+      steps: labSteps,
     });
     return lab;
   };
@@ -1057,6 +1098,8 @@ async function start(): Promise<void> {
           failures.report('candle pickup', e);
         }
         world.camera.getWorldQuaternion(cameraQuat);
+        // The Steps tab's candle step: moves the emulator's right hand until its match is over the wick (dev only).
+        candleStep?.frame();
         if (sessionState === 'title_vr') {
           titleLighter.visible = true;
           titleLighter.update(heldHand.frame, cameraQuat, clock);
