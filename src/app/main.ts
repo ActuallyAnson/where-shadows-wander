@@ -115,7 +115,7 @@ const desk = isDeskMode(launch.mode);
 const SESSION_BLACK_HOLD_S = 0.4;
 const SESSION_FADE_IN_S = 1.6;
 /** The longest the headset waits on black for the title to go, should the title never say it has. */
-const SESSION_BLACK_FALLBACK_S = 3;
+const SESSION_BLACK_FALLBACK_S = 4;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {

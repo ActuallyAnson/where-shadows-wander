@@ -11,8 +11,8 @@ export interface LauncherHooks {
   titleGone?: () => void;
 }
 
-/** How long the title takes to fade to black after BEGIN (title-markup.ts: a 0.3 s delay, then 1.2 s). */
-const TITLE_FADE_MS = 1500;
+/** How long the title takes to fade to black after BEGIN (title-markup.ts: a 0.3 s delay, then 2.5 s). */
+const TITLE_FADE_MS = 2800;
 
 export async function mountEnterArButtonIfNeeded(
   world: World,
