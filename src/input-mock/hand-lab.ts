@@ -41,6 +41,14 @@ export interface LabView {
   hide?(): void;
   /** The Steps tab's ready-made setups, which move the emulator's headset and hands (absent without the emulator). */
   steps?: LabSteps;
+  /** The gloves the hands can be drawn with (the Glove row): which there are, which is drawn, and picking one. */
+  gloves?: LabGloves;
+}
+
+export interface LabGloves {
+  readonly options: readonly { readonly id: string; readonly label: string; readonly title: string }[];
+  current(): string;
+  choose(id: string): void;
 }
 
 /** Ready-made setups for testing at a desk (the Steps tab). */
@@ -325,6 +333,7 @@ export class HandLab {
         else this.startGuided();
       } else if (act === 'tab') this.setTab(arg === 'steps' ? 'steps' : 'lab');
       else if (act === 'step') void this.runStep(arg ?? '');
+      else if (act === 'glove') this.view.gloves?.choose(arg ?? '');
       this.renderControls();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -440,9 +449,18 @@ export class HandLab {
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>
-      <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
+      <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>
+      ${this.gloveRow(btn)}`;
     // Fill the new prompt element now rather than leaving it blank until the next live update.
     if (this.guided) this.renderLive();
+  }
+
+  /** Which glove the hands are drawn with (remembered in this browser). */
+  private gloveRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
+    const gloves = this.view.gloves;
+    if (!gloves) return '';
+    const now = gloves.current();
+    return `<h2>Glove</h2><div class="row">${gloves.options.map((g) => btn('glove', g.id, g.label, g.id === now, g.title)).join('')}</div>`;
   }
 
   /** For one hand in front of the webcam: say which it is, since MediaPipe often guesses a lone hand wrong. */

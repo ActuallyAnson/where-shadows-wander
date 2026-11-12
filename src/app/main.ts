@@ -71,6 +71,7 @@ import { RoomModels } from '../engine/shadow/room-models';
 import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
 import { BEDROOM_LAYOUT_FILE, BEDROOM_PIECE_IDS, readBedroomLayout } from '../engine/shadow/bedroom-layout';
 import assetManifest, { assetFiles } from './assets';
+import { GLOVES, isGloveId, readGlove, saveGlove, type GloveId } from './gloves';
 import { CapabilityDetector } from '../engine/xr/capabilities';
 import { CapsuleHandVisual, type HandVisual } from '../engine/xr/hand-visual';
 import { ModelHandVisual } from '../engine/xr/model-hand-visual';
@@ -568,6 +569,43 @@ async function start(): Promise<void> {
         matchFlame: () => (sessionState === 'title_vr' && titleLighter.visible ? titleLighter.flamePosition : null),
       })
     : null;
+  // The hands as the player sees them in the room: a glove model (src/assets/models/hands, rigged to the WebXR joints by
+  // scripts/blender/rig-glove.py) once it has loaded, the capsule gloves until then or if it cannot load. Which glove is
+  // the Hand Lab's Glove row's choice, remembered in this browser (the cartoon glove by default). Shown in VR (whoever's
+  // hands they are); over passthrough the real hands are visible, so it hides itself.
+  const capsuleHands = new CapsuleHandVisual();
+  let handVisual: HandVisual = capsuleHands;
+  let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
+  world.scene.add(handVisual.object);
+  // One visual per glove, kept once made: a model's bones are posed in place, so it cannot be set up from them again.
+  const gloveVisuals = new Map<GloveId, HandVisual>([['plain', capsuleHands]]);
+  let gloveId = readGlove();
+  let gloveLoad = 0;
+  const showHandVisual = (next: HandVisual) => {
+    if (next === handVisual) return;
+    next.fadeInS.set(handVisual.fadeInS);
+    world.scene.remove(handVisual.object);
+    handVisual = next;
+    world.scene.add(next.object);
+  };
+  const chooseGlove = (id: GloveId) => {
+    gloveId = id;
+    saveGlove(id);
+    const load = ++gloveLoad; // a later choice wins over a load still under way
+    const made = gloveVisuals.get(id);
+    if (made) return showHandVisual(made);
+    const models = GLOVES.find((g) => g.id === id)?.models;
+    if (!models) return;
+    void Promise.all([manifestModels(models[0]), manifestModels(models[1])])
+      .then(([left, right]) => {
+        if (!left || !right || gloveVisuals.has(id)) return;
+        const model = new ModelHandVisual(left, right, new Group(), candleLight);
+        gloveVisuals.set(id, model);
+        if (load === gloveLoad) showHandVisual(model);
+      })
+      .catch((e: unknown) => failures.report('glove model', e));
+  };
+  chooseGlove(gloveId);
   let stepStatus = '';
   const labSteps: LabSteps | undefined =
     rigDevice && candleStep
@@ -607,6 +645,13 @@ async function start(): Promise<void> {
       onSourceKind: (kind) => updateLaunch({ hands: kind }, DEBUG_TOOLS),
       hide: () => showLab(false),
       steps: labSteps,
+      gloves: {
+        options: GLOVES,
+        current: () => gloveId,
+        choose: (id) => {
+          if (isGloveId(id)) chooseGlove(id);
+        },
+      },
     });
     return lab;
   };
@@ -634,23 +679,6 @@ async function start(): Promise<void> {
   // Before then the left is an untracked stand-in, so a left hand left drawn from an earlier session fades out.
   const titleHands = [createHandFrame('left'), heldHand.frame];
   const blendHands = [hands.hands.left, heldHand.frame];
-  // The hands as the player sees them in the room: the welding gloves (src/assets/models/hands, rigged to the WebXR joints)
-  // once they have loaded, the capsule gloves until then or if they cannot load. Shown in VR (whoever's hands they are);
-  // over passthrough the real hands are visible, so it hides itself.
-  let handVisual: HandVisual = new CapsuleHandVisual();
-  let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
-  world.scene.add(handVisual.object);
-  void Promise.all([manifestModels('glove-left'), manifestModels('glove-right')])
-    .then(([left, right]) => {
-      if (!left || !right) return;
-      const model = new ModelHandVisual(left, right, new Group(), candleLight);
-      model.fadeInS.set(handVisual.fadeInS);
-      world.scene.remove(handVisual.object);
-      handVisual.dispose();
-      handVisual = model;
-      world.scene.add(model.object);
-    })
-    .catch((e: unknown) => failures.report('glove model', e));
   // Debug tools (src/debug, ADR 0012, getting-started section 17): only when DEBUG_TOOLS is on (the dev server, or a build made with
   // `vite build --mode tester`), and loaded on demand, so a normal build does not contain them. `debug` is null otherwise.
   const handFlags = { handVisual: true };

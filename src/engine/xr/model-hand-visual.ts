@@ -145,12 +145,14 @@ class Glove {
   }
 
   /**
-   * The model's material remade as the room's are: its own colours (its texture), lit per pixel by the moon and the candle
-   * (CandleLight), with the glove's bent normals, plus a small warm light from the flame near the hands (`match`), and
-   * the fade's dither. Without a candle (tests) it is the texture as it is.
+   * The model's material remade as the room's are: its own colours (its texture and base colour), lit per pixel by the moon
+   * and the candle (CandleLight), with the glove's bent normals, plus a small warm light from the flame near the hands
+   * (`match`), and the fade's dither. Without a candle (tests) it is the texture as it is.
    */
   private material(src: Material, candle: CandleLight | null, match: MatchUniforms): Material {
-    const m = new MeshBasicMaterial({ map: (src as MeshStandardMaterial).map ?? null, side: src.side });
+    const std = src as MeshStandardMaterial;
+    const m = new MeshBasicMaterial({ map: std.map ?? null, side: src.side });
+    if (std.color) m.color.copy(std.color);
     const fade = this.fadeUniform;
     if (candle) candle.light(m);
     const lit = m.onBeforeCompile;
