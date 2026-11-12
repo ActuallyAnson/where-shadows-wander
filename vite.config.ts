@@ -381,7 +381,16 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ['@babylonjs/havok'],
     // Pre-bundle the lucide subset so the first dev load doesn't re-optimise (504s).
-    include: ['@pmndrs/uikit-lucide/dist/Check.js', '@pmndrs/uikit-lucide/dist/ChevronDown.js'],
+    // Likewise the three.js add-ons the room editor loads on demand (behind DEBUG_TOOLS, so the first scan misses them): found
+    // late, they re-optimise mid-load and the editor's import fails with a 504.
+    include: [
+      '@pmndrs/uikit-lucide/dist/Check.js',
+      '@pmndrs/uikit-lucide/dist/ChevronDown.js',
+      'three/examples/jsm/controls/OrbitControls.js',
+      'three/examples/jsm/controls/TransformControls.js',
+      'three/examples/jsm/exporters/GLTFExporter.js',
+      'three/examples/jsm/loaders/GLTFLoader.js',
+    ],
     esbuildOptions: { target: 'esnext' },
   },
 }));
