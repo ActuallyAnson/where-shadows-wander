@@ -94,6 +94,8 @@ export const TITLE_CSS = `
 @keyframes wsw-snuff{0%{opacity:1}100%{opacity:.12}}
 .wsw-busy .wsw-flame{animation:wsw-snuff .9s ease-in forwards}
 .wsw-busy .wsw-item{pointer-events:none;color:#ffd89a;letter-spacing:.3em}
+.wsw-screen::after{content:'';position:absolute;inset:0;z-index:10;background:#000;opacity:0;pointer-events:none;transition:opacity .5s ease-out}
+.wsw-busy::after{opacity:1;transition:opacity 1.2s ease-in .3s}
 @keyframes wsw-flap{0%,100%{transform:rotate(0)}50%{transform:rotate(16deg)}}
 @keyframes wsw-glide{0%,100%{transform:translate(830px,372px)}50%{transform:translate(838px,362px)}}
 @keyframes wsw-steam{0%{stroke-dashoffset:40;opacity:0}30%{opacity:.7}100%{stroke-dashoffset:-40;opacity:0}}

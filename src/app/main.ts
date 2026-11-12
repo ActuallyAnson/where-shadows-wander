@@ -39,6 +39,7 @@ import type { MenuScreenId } from '../ui/menu-panel/screens';
 import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { createHandFrame, JOINT } from '../engine/hands/hand';
 import { FADE_IN_S } from '../engine/xr/hand-fade';
+import { FadeView } from '../engine/shadow/fade-view';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
@@ -110,6 +111,9 @@ const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 // mode, with no session. The address is always the plain page; the choice is kept in the tab and changed from the page.
 const launch = loadLaunch(DEBUG_TOOLS);
 const desk = isDeskMode(launch.mode);
+/** Seconds the headset stays black when the session starts, then seconds the room takes to fade in. */
+const SESSION_BLACK_HOLD_S = 0.4;
+const SESSION_FADE_IN_S = 1.6;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -420,6 +424,11 @@ async function start(): Promise<void> {
   // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
+  // The fade from black as the session starts (the title page fades to black as BEGIN is pressed): the headset opens on black,
+  // holds it a moment over the first frames (the slowest, while things settle), then the room fades in.
+  const fade = new FadeView();
+  const fadeHead = new Vector3();
+  world.scene.add(fade.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
@@ -822,6 +831,10 @@ async function start(): Promise<void> {
   };
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
+    guard('sessionstart: fade', () => {
+      fade.setBlack(true);
+      fade.fadeTo(1, SESSION_BLACK_HOLD_S, () => fade.fadeTo(0, SESSION_FADE_IN_S));
+    });
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: quality', () => {
       governor.reset();
@@ -1035,6 +1048,10 @@ async function start(): Promise<void> {
       const paused = visibility.paused;
       // The first frame after the headset was off carries the whole gap; these do not clamp their own.
       const step = Math.min(delta, MAX_STEP_S);
+      if (fade.alpha > 0 || fade.fading) {
+        world.camera.getWorldPosition(fadeHead);
+        fade.update(step, fadeHead);
+      }
       const shadowsVisible = candleView.lit && sessionState === 'playing';
       timings.begin(SLOT.read);
       if (debug?.replay.active) {
