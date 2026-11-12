@@ -40,6 +40,8 @@ import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { createHandFrame, JOINT } from '../engine/hands/hand';
 import { FADE_IN_S } from '../engine/xr/hand-fade';
 import { FadeView } from '../engine/shadow/fade-view';
+import { WakeView } from '../engine/shadow/wake-view';
+import { WakeTimeline } from '../engine/stage/wake-timeline';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
@@ -111,9 +113,6 @@ const HANDS_STATE_NAMES = ['tracking', 'lost', 'unavailable'] as const;
 // mode, with no session. The address is always the plain page; the choice is kept in the tab and changed from the page.
 const launch = loadLaunch(DEBUG_TOOLS);
 const desk = isDeskMode(launch.mode);
-/** Seconds the headset stays black when the session starts, then seconds the room takes to fade in. */
-const SESSION_BLACK_HOLD_S = 0.4;
-const SESSION_FADE_IN_S = 1.6;
 /** The longest the headset waits on black for the title to go, should the title never say it has. */
 const SESSION_BLACK_FALLBACK_S = 4;
 
@@ -426,13 +425,21 @@ async function start(): Promise<void> {
   // The debug menu (when the debug tools are on) is extra pages after the settings, built the first time it opens.
   const menu = new MenuPanel(settings);
   world.scene.add(menu.group);
-  // The fade from black as the session starts (the title page fades to black as BEGIN is pressed): the headset opens on black,
-  // holds it a moment over the first frames (the slowest, while things settle), then the room fades in.
+  // The session opens on black (the title page fades to black as BEGIN is pressed). Then scene 1 begins (docs/STORY.md, "Waking"):
+  // a word in the dark, and the boy's eyes open on the room in two slow blinks (wake-timeline.ts).
   const fade = new FadeView();
   const fadeHead = new Vector3();
-  const fadeInFromBlack = () => fade.fadeTo(0, SESSION_FADE_IN_S);
-  launcherHooks.titleGone = () => fade.fadeTo(1, SESSION_BLACK_HOLD_S, fadeInFromBlack);
-  world.scene.add(fade.group);
+  const wake = new WakeTimeline();
+  const wakeView = new WakeView(wake.script.text);
+  const wakeHead = new Quaternion();
+  /** The wake's lids take over from the plain black (they are as black while shut). Once a session. */
+  const startWake = () => {
+    if (wake.playing) return;
+    fade.setBlack(false);
+    wake.start();
+  };
+  launcherHooks.titleGone = startWake;
+  world.scene.add(fade.group, wakeView.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
@@ -838,7 +845,7 @@ async function start(): Promise<void> {
     guard('sessionstart: fade', () => {
       // Black until the page's title has faded out and gone (launcherHooks.titleGone), with a fallback should it never say so.
       fade.setBlack(true);
-      fade.fadeTo(1, SESSION_BLACK_FALLBACK_S, fadeInFromBlack);
+      fade.fadeTo(1, SESSION_BLACK_FALLBACK_S, startWake);
     });
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: quality', () => {
@@ -894,6 +901,8 @@ async function start(): Promise<void> {
       wallPauseView.hide();
       stopPrologue();
       prologuePlayed = false;
+      wake.finish();
+      wakeView.hide();
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -1056,6 +1065,12 @@ async function start(): Promise<void> {
       if (fade.alpha > 0 || fade.fading) {
         world.camera.getWorldPosition(fadeHead);
         fade.update(step, fadeHead);
+      }
+      if (wake.playing) {
+        wake.update(step);
+        world.camera.getWorldPosition(fadeHead);
+        world.camera.getWorldQuaternion(wakeHead);
+        wakeView.update(wake.lid, wake.text, fadeHead, wakeHead);
       }
       const shadowsVisible = candleView.lit && sessionState === 'playing';
       timings.begin(SLOT.read);
@@ -1449,6 +1464,11 @@ async function start(): Promise<void> {
         puppets,
         /** Plays the prologue now (the candle must be lit to see it). */
         playPrologue: () => startPrologue(),
+        /** Plays scene 1's waking (the word in the dark and the blinks) again. */
+        playWake: () => {
+          wake.finish();
+          startWake();
+        },
       },
     });
 }
