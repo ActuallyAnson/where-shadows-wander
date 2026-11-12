@@ -1,8 +1,8 @@
-import { Quaternion } from '@iwsdk/core';
+import { Quaternion, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
 import { emptyRoomLayout, placement } from '../../stage/room-layout';
-import { BedroomView, MOONLIGHT_COLOR } from './bedroom-view';
+import { BedroomView, MOONLIGHT_COLOR, PLAYER_SPOT_LIMITS } from './bedroom-view';
 
 describe('BedroomView', () => {
   it('constructs room shell, props, and moonlight within budget', () => {
@@ -70,8 +70,38 @@ describe('BedroomView', () => {
     const layout = emptyRoomLayout();
     layout.room['tin-can'] = placement([1.1, 0, 0.2], [0, 30, 0]);
     const v = new BedroomView(layout);
-    expect(v.editables().map((p) => p.id)).toEqual(['tin-can']);
+    expect(v.editables().map((p) => p.id)).toEqual(['tin-can', 'player']);
     expect(v.tinCanGroup.position.toArray()).toEqual([1.1, 0, 0.2]);
     expect(v.tinCanGroup.rotation.y).toBeCloseTo(Math.PI / 6, 6);
+  });
+
+  it("stands the room so the player's spot is under the head, with the front wall the stage's distance ahead of it", () => {
+    const layout = emptyRoomLayout();
+    layout.room.player = placement([0.5, 0, 0.3]);
+    const v = new BedroomView(layout);
+    v.place([1, 1.2, 2], Math.PI / 2, 2.0);
+    v.group.updateMatrixWorld(true);
+    const spot = v.playerSpot.getWorldPosition(new Vector3());
+    expect(spot.x).toBeCloseTo(1, 6);
+    expect(spot.z).toBeCloseTo(2, 6);
+    expect(v.frontWallMesh.position.z).toBeCloseTo(0.3 - 2.02, 6);
+  });
+
+  it("keeps the player's spot inside the room", () => {
+    const layout = emptyRoomLayout();
+    layout.room.player = placement([5, 0, -5]);
+    const v = new BedroomView(layout);
+    expect(v.playerX()).toBe(PLAYER_SPOT_LIMITS.x);
+    expect(v.playerZ()).toBe(PLAYER_SPOT_LIMITS.zMin);
+  });
+
+  it("tells main.ts when the editor moves the player's spot, and not for other pieces", () => {
+    const v = new BedroomView();
+    let told = 0;
+    v.onPlayerMoved = () => told++;
+    const [can, player] = v.editables();
+    v.moved(can);
+    v.moved(player);
+    expect(told).toBe(1);
   });
 });

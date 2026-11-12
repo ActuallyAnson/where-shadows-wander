@@ -629,9 +629,12 @@ export class RoomDressingView implements EditableSource {
     return new Mesh(geometry, material);
   }
 
-  /** Puts the wallpaper wall just in front of Damon's front wall, and the pictures and shelves in front of that (`stageDist` is how far the stage is from the player). */
-  place(stageDist = 2.0): void {
-    const z = -(Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M) + 0.012;
+  /**
+   * Puts the wallpaper wall just in front of Damon's front wall, and the pictures and shelves in front of that (`stageDist` is how
+   * far the stage is ahead of the player, and `playerZ` where the player sits in room space: the wall is that far ahead of them).
+   */
+  place(stageDist = 2.0, playerZ = 0): void {
+    const z = playerZ - (Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M) + 0.012;
     this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();

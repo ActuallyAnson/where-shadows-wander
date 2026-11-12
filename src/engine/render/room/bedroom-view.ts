@@ -15,6 +15,7 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   PlaneGeometry,
   RepeatWrapping,
   SRGBColorSpace,
@@ -28,7 +29,13 @@ import { placement, placementOr, type RoomLayout } from '../../stage/room-layout
 import { applyPlacement, type EditablePiece, type EditableSource } from '../../shadow/room-placement';
 
 /** The bedroom view's pieces the room layout file places (`room` section). */
-export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['tin-can'];
+export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['tin-can', 'player'];
+
+/**
+ * How far the player's spot may be from the room's middle (m): on x, inside the side walls; on z, from where the front wall
+ * (which keeps the stage's distance ahead of the player) would pass the far end of the room's walls, to short of the back wall.
+ */
+export const PLAYER_SPOT_LIMITS = { x: 1.6, zMin: -0.85, zMax: 1.4 } as const;
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
 export const NIGHT_AMBIENT = 0x141d2e;
@@ -92,6 +99,12 @@ export class BedroomView implements EditableSource {
   readonly windowGroup = new Group();
   readonly strawPalletGroup = new Group();
   readonly tinCanGroup = new Group();
+  /**
+   * Where the player sits, in room space (the `player` piece): the room is placed so this spot is under the head. Only its x and
+   * z count (the eyes' height is the headset's, and the player always faces the wall ahead). The room editor hangs its headset
+   * marker on it.
+   */
+  readonly playerSpot = new Object3D();
   readonly frontWallMesh: Mesh;
   private readonly leftWallMesh: Mesh;
   private readonly rightWallMesh: Mesh;
@@ -284,6 +297,11 @@ export class BedroomView implements EditableSource {
     applyPlacement(this.tinCanGroup, placementOr(layout, 'room', 'tin-can', canDefault));
     this.pieces.push({ id: 'tin-can', section: 'room', object: this.tinCanGroup, fallback: canDefault });
 
+    this.playerSpot.name = 'player';
+    const playerDefault = placement([0, 0, 0]);
+    applyPlacement(this.playerSpot, placementOr(layout, 'room', 'player', playerDefault));
+    this.pieces.push({ id: 'player', section: 'room', object: this.playerSpot, fallback: playerDefault });
+
     // -------------------------------------------------------------
     // 7. Directional Moonlight (Entering through the Left Window)
     // -------------------------------------------------------------
@@ -302,19 +320,33 @@ export class BedroomView implements EditableSource {
       this.windowGroup,
       this.strawPalletGroup,
       this.tinCanGroup,
+      this.playerSpot,
       this.moonlight,
       this.moonlight.target,
     );
   }
 
-  /** The tin can, for the room editor. */
+  /** The tin can and the player's spot, for the room editor. */
   editables(): readonly EditablePiece[] {
     return this.pieces;
   }
 
-  /** A piece moved (in the editor): the candle's shadows are cast again. */
-  moved(): void {
+  /** Called after the room editor moves the player's spot, before the shadows are cast again (main.ts places the rig again). */
+  onPlayerMoved: (() => void) | null = null;
+
+  /** A piece moved (in the editor): the candle's shadows are cast again; if it was the player's spot, the rig follows it. */
+  moved(piece?: EditablePiece): void {
+    if (piece?.object === this.playerSpot) this.onPlayerMoved?.();
     this.candle?.rebake();
+  }
+
+  /** The player's spot in room space (x, z), kept inside the room (PLAYER_SPOT_LIMITS). */
+  playerX(): number {
+    const { x } = PLAYER_SPOT_LIMITS;
+    return Math.min(x, Math.max(-x, this.playerSpot.position.x));
+  }
+  playerZ(): number {
+    return Math.min(PLAYER_SPOT_LIMITS.zMax, Math.max(PLAYER_SPOT_LIMITS.zMin, this.playerSpot.position.z));
   }
 
   /**
@@ -353,15 +385,20 @@ export class BedroomView implements EditableSource {
   }
 
   /**
-   * Aligns the bedroom around the player's seated pose on VR start.
-   * Player sits at (head[0], 0, head[2]) facing yaw.
-   * `stageDist` ensures the front wall backdrop is placed safely behind the stage.
+   * Aligns the bedroom around the player's seated pose: the room turns with the head's `yaw` and stands so that the player's spot
+   * (playerSpot) is under the head at (head[0], head[2]). `stageDist` is how far ahead the stage is: the front wall is just
+   * behind it, so it moves with the player's spot, and the stage stays where it was tuned.
    */
   place(head: ArrayLike<number>, yaw: number, stageDist = 2.0): void {
-    this.group.position.set(head[0], 0, head[2]);
+    const px = this.playerX(),
+      pz = this.playerZ();
+    const c = Math.cos(yaw),
+      s = Math.sin(yaw);
+    // The room's yaw turns its (px, pz) into the world's (px c + pz s, -px s + pz c): take that off the head.
+    this.group.position.set(head[0] - (px * c + pz * s), 0, head[2] - (-px * s + pz * c));
     this.group.rotation.y = yaw;
     // The front wall is the wall the stage is on: just behind the stage plane.
-    const wallZ = -(Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M);
+    const wallZ = pz - (Math.max(stageDist, 1.5) + ROOM_WALL_BEHIND_STAGE_M);
     this.frontWallMesh.position.set(0, 1.25, wallZ);
   }
 

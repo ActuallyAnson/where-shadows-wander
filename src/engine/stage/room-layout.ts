@@ -2,8 +2,10 @@
 // so the room can be arranged in the dev room editor (the developer overlay) rather than by editing numbers in code.
 //
 // A layout has two sections, each a map from a piece's id to its placement:
-//   room  room space: x right, y up from the floor, -z toward the wall the shadows play on (the player sits at the origin).
-//   lap   the bed tray and what is on the lap, in the tray's own space; `anchor` places the tray relative to the head.
+//   room  room space: x right, y up from the floor, -z toward the wall the shadows play on. The player sits at the `player`
+//         piece (the origin when the file says nothing): the room is placed so that spot is under the head.
+//   lap   the bed tray and what is on the lap, in the tray's own space; `anchor` places the tray relative to the head. The
+//         `candle` stands on the tray, in the tray's space.
 // A placement is a position (metres), a rotation (degrees, applied x then y then z, as three.js's default Euler order)
 // and a scale (a multiplier on the piece's own size, so 1 is the size the code gives it).
 //

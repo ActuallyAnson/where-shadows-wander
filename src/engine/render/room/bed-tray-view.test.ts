@@ -6,7 +6,7 @@ describe('BedTrayView', () => {
   it('creates the lap view within the <= 400 triangle budget', () => {
     const view = new BedTrayView();
     let meshes = 0;
-    view.group.traverse((o) => void (o.type === 'Mesh' && meshes++));
+    view.group.traverse((o) => void (o.type === 'Mesh' && !o.userData.pickOnly && meshes++));
     expect(meshes).toBe(8);
     expect(view.triangleCount).toBeLessThanOrEqual(400);
     expect(view.triangleCount).toBeGreaterThan(50);
@@ -49,6 +49,27 @@ describe('BedTrayView', () => {
     view.getCandleSaucerPosition(out);
     expect(out[1]).toBeCloseTo(0.74, 6);
     expect(out[2]).toBeCloseTo(-0.52, 6);
+  });
+
+  it("stands the candle where the layout says, in the tray's space, so it goes with the tray", () => {
+    const layout = emptyRoomLayout();
+    layout.lap.tray = placement([0.1, 0, 0]);
+    layout.lap.candle = placement([-0.15, 0.01, 0.05]);
+    const view = new BedTrayView(layout);
+    expect(view.editables().map((p) => p.id)).toEqual(['tray', 'quilt', 'candle']);
+    view.place(0, 0.7, -0.5, 0);
+    const out = new Float64Array(3);
+    view.getCandleSaucerPosition(out);
+    expect(out[0]).toBeCloseTo(-0.05, 6);
+    expect(out[1]).toBeCloseTo(0.71, 6);
+    expect(out[2]).toBeCloseTo(-0.45, 6);
+  });
+
+  it("casts no shadow from the candle's unseen click box", () => {
+    const view = new BedTrayView();
+    const cast: unknown[] = [];
+    view.useCandleLight({ light: () => {}, cast: (m: unknown) => cast.push(m) } as never);
+    expect(cast.length).toBe(8);
   });
 
   it('disposes resources cleanly without error', () => {

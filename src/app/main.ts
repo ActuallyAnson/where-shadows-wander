@@ -521,7 +521,7 @@ async function start(): Promise<void> {
       sdz = stage.origin[2] - head[2];
     const stageDist = Math.sqrt(sdx * sdx + sdz * sdz);
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
-    roomDressing.place(stageDist > 0.5 ? stageDist : 2.0);
+    roomDressing.place(stageDist > 0.5 ? stageDist : 2.0, bedroomView.playerZ());
 
     // Position bed tray and lap blanket across player's lap
     const trayDist = 0.45;
@@ -749,6 +749,7 @@ async function start(): Promise<void> {
       fileName: BEDROOM_LAYOUT_FILE,
       assetFiles,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
+      playerSpot: bedroomView.playerSpot,
       setFullBright: (on) => {
         candleLight.fullBright = on;
       },
@@ -760,6 +761,13 @@ async function start(): Promise<void> {
     // The candle stands on the tray: when the tray moves, the rig is placed again so the candle (the light) follows it.
     bedTray.onPieceMoved = () => {
       if (rigPlaced) placeRig(lastHead, lastYaw);
+    };
+    // Moving the player's spot keeps the room still: the head goes to the spot, and the stage, the tray and the candle with it.
+    bedroomView.onPlayerMoved = () => {
+      if (!rigPlaced) return;
+      bedroomView.group.updateMatrixWorld(true);
+      const at = bedroomView.group.localToWorld(new Vector3(bedroomView.playerX(), lastHead[1], bedroomView.playerZ()));
+      placeRig([at.x, lastHead[1], at.z], lastYaw);
     };
     roomEditor.show();
   }

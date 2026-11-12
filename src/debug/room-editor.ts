@@ -10,14 +10,19 @@
 //   Ctrl+Z undo · Ctrl+Y or Ctrl+Shift+Z redo · Ctrl+S save
 //
 // The candle's shadows are baked: they are cast again while a piece is dragged (once a frame) and whenever it is placed. The
-// headset marker shows where the player's eyes are and roughly what the headset can see, in every view but Eye.
+// headset marker shows where the player's eyes are and roughly what the headset can see, in every view but Eye. It is the
+// `player` piece: click it and drag it across the floor to move where the player sits (the room stays; the stage, the tray and
+// the candle follow). The candle is a piece on the tray.
 import {
   AssetManager,
+  BoxGeometry,
   BufferGeometry,
   Euler,
   Float32BufferAttribute,
   LineBasicMaterial,
   LineSegments,
+  Mesh,
+  MeshBasicMaterial,
   Object3D,
   Plane,
   Raycaster,
@@ -71,6 +76,11 @@ export interface RoomEditorDeps {
   layout: RoomLayout;
   /** The file's name under content/rooms/. */
   fileName: string;
+  /**
+   * The `player` piece's object: where the player sits, in room space (only its x and z count). The headset marker hangs on it,
+   * so it is what is clicked and dragged to move the player.
+   */
+  playerSpot: Object3D;
   /** Scene roots that are part of the room, still shown with "Room only" on (everything else at the top of the scene is hidden). */
   roomRoots: readonly Object3D[];
   /** Draws the room at full colour, unlit (true), or by the candle and the moon as in the game (false). */
@@ -145,8 +155,10 @@ export class RoomEditor {
   private readonly orbit: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly helper: Object3D;
-  /** The player's headset and what it sees, in room space. */
+  /** The player's headset and what it sees, on the player's spot. */
   private readonly marker: LineSegments;
+  /** An unseen box round the headset, for clicking the player's spot (the marker's lines are not clicked). */
+  private readonly markerPick = new Mesh(new BoxGeometry(0.3, 0.24, 0.3), new MeshBasicMaterial({ visible: false }));
   private readonly markerEye = new Vector3();
   /** A piece dragged since the last frame: its view is told it moved (and the shadows are baked again) once a frame. */
   private draggedPiece: EditablePiece | null = null;
@@ -276,6 +288,8 @@ export class RoomEditor {
     );
     this.marker.renderOrder = 999;
     this.marker.matrixAutoUpdate = false;
+    this.marker.raycast = () => {}; // its lines would be hit from a metre away: the player is clicked by markerPick
+    this.markerPick.userData.pickOnly = true; // not a surface to drop models on
     this.orbit.addEventListener('change', () => this.fadeMarker());
     this.client = new AssetClient(deps.assetFiles);
     this.assets = new AssetPanel(
@@ -329,7 +343,7 @@ export class RoomEditor {
     this.select(null);
     this.setRoomOnly(false);
     this.deps.scene.remove(this.helper);
-    this.deps.room.remove(this.marker);
+    this.deps.playerSpot.remove(this.marker, this.markerPick);
     cancelAnimationFrame(this.draggedFrame);
     this.draggedFrame = 0;
     this.draggedPiece = null;
@@ -422,6 +436,7 @@ export class RoomEditor {
   async exportSelected(): Promise<string> {
     const piece = this.selected;
     if (!piece || isPlaced(piece)) return this.say('Pick a built-in piece to export');
+    if (!hasLook(piece.object)) return this.say(`${piece.id} is a spot, with nothing to see to export`);
     const { root, warnings } = prepareForExport(piece.object, piece.id);
     let bytes: Uint8Array | null = null;
     for (const size of [Infinity, 512, 256]) {
@@ -597,15 +612,16 @@ export class RoomEditor {
     geo.setAttribute('position', new Float32BufferAttribute(v, 3));
     this.marker.geometry = geo;
     this.marker.updateMatrix();
-    this.deps.room.add(this.marker);
+    this.markerPick.position.set(0, eyeY, 0);
+    this.deps.playerSpot.add(this.marker, this.markerPick);
     this.fadeMarker();
   }
 
   /** Hides the marker when the camera is at the player's eyes (it would fill the view), shows it otherwise. */
   private fadeMarker(): void {
-    const room = this.deps.room;
-    room.updateMatrixWorld(true);
-    room.localToWorld(this.markerEye.set(0, this.deps.eyeHeight(), 0));
+    const spot = this.deps.playerSpot;
+    spot.updateMatrixWorld(true);
+    spot.localToWorld(this.markerEye.set(0, this.deps.eyeHeight(), 0));
     this.marker.visible = this.deps.camera.position.distanceTo(this.markerEye) > MARKER_HIDE_NEAR_M;
   }
 
@@ -650,10 +666,19 @@ export class RoomEditor {
     this.selected = piece;
     if (piece) this.gizmo.attach(piece.object);
     else this.gizmo.detach();
+    // The player's spot only slides across the floor: its height is the headset's, and the player always faces the wall ahead.
+    const player = this.isPlayer(piece);
+    if (player) this.gizmo.setMode('translate');
+    this.gizmo.showY = !player;
     this.render();
   }
 
+  private isPlayer(piece: EditablePiece | null): boolean {
+    return piece?.object === this.deps.playerSpot;
+  }
+
   private setMode(mode: Mode): void {
+    if (this.isPlayer(this.selected)) mode = 'translate';
     this.gizmo.setMode(mode);
     this.render();
   }
@@ -710,10 +735,13 @@ export class RoomEditor {
     if (!v) return;
     const room = this.deps.room;
     room.updateMatrixWorld(true);
-    // Eye stands at the player's eyes; the others stand where they say.
-    const up = name === 'Eye' ? this.deps.eyeHeight() : 0;
-    const eye = room.localToWorld(new Vector3(v[0][0], v[0][1] + up, v[0][2]));
-    const target = room.localToWorld(new Vector3(v[1][0], v[1][1] + up, v[1][2]));
+    // Eye stands at the player's eyes (wherever the player sits); the others stand where they say.
+    const isEye = name === 'Eye';
+    const up = isEye ? this.deps.eyeHeight() : 0;
+    const sx = isEye ? this.deps.playerSpot.position.x : 0,
+      sz = isEye ? this.deps.playerSpot.position.z : 0;
+    const eye = room.localToWorld(new Vector3(v[0][0] + sx, v[0][1] + up, v[0][2] + sz));
+    const target = room.localToWorld(new Vector3(v[1][0] + sx, v[1][1] + up, v[1][2] + sz));
     this.deps.camera.position.copy(eye);
     this.orbit.target.copy(target);
     this.orbit.update();
@@ -792,7 +820,7 @@ export class RoomEditor {
     this.raycaster.setFromCamera(this.pointer, this.deps.camera);
     const lap = this.deps.placed.parent('lap');
     for (const hit of this.raycaster.intersectObjects([...this.deps.roomRoots], true)) {
-      if (!hit.face || hit.object === this.marker || !isShown(hit.object)) continue;
+      if (!hit.face || hit.object.userData.pickOnly || !isShown(hit.object)) continue;
       const normal = this.up.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
       if (normal.y < 0.7) continue;
       const section: LayoutSection = isWithin(hit.object, lap) ? 'lap' : 'room';
@@ -1146,6 +1174,15 @@ function isWithin(o: Object3D, ancestor: Object3D): boolean {
 }
 
 /** Whether `o` and everything above it is visible (a hidden painted stand-in is not picked). */
+/** Whether an object has anything drawn (the player's spot and the candle's hold only unseen click boxes). */
+function hasLook(o: Object3D): boolean {
+  let seen = false;
+  o.traverse((c) => {
+    if ((c as Mesh).isMesh && !c.userData.pickOnly) seen = true;
+  });
+  return seen;
+}
+
 function isShown(o: Object3D): boolean {
   for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false;
   return true;

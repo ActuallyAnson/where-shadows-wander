@@ -8,7 +8,8 @@
 // - Zero allocations per frame.
 //
 // The tray (with its rims and legs) and the quilt are pieces of the room layout's `lap` section
-// (content/rooms/bedroom.json), in the tray's own space: the room editor moves them, and the candle stands on the tray.
+// (content/rooms/bedroom.json), in the tray's own space: the room editor moves them. The candle is a piece too, standing on the
+// tray: its placement is in the tray's space, so it goes where the tray goes.
 import {
   BoxGeometry,
   CanvasTexture,
@@ -16,6 +17,7 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   PlaneGeometry,
   SRGBColorSpace,
   Vector3,
@@ -49,7 +51,10 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
 }
 
 /** The lap pieces' ids in the layout file's `lap` section. */
-export const LAP_PIECE_IDS = ['tray', 'quilt'] as const;
+export const LAP_PIECE_IDS = ['tray', 'quilt', 'candle'] as const;
+
+/** Where the candle stands when the layout file says nothing, in the tray's space: in the middle, on its top. */
+const CANDLE_DEFAULT: Placement = placement([0, 0.01, 0]);
 
 /** Where the code puts the quilt when the layout file says nothing: draped across the lap, just below the tray. */
 const QUILT_DEFAULT: Placement = placement([0, -0.07, 0.14], [-180 / 2.3, 0, 0]);
@@ -59,6 +64,10 @@ export class BedTrayView implements EditableSource {
   readonly group = new Group();
   /** The tray, its rims and its legs: one piece. The candle stands on it. */
   private readonly tray = new Group();
+  /** Where the candle stands (its saucer's foot), a child of the tray. Holds only an unseen box, for the room editor to click. */
+  private readonly candleSpot = new Object3D();
+  private readonly candlePickGeo = new BoxGeometry(0.08, 0.16, 0.08);
+  private readonly candlePickMat = new MeshBasicMaterial({ visible: false });
   private readonly pieces: EditablePiece[];
   private readonly saucer = new Vector3();
   /** Called after the room editor moves a piece (the candle is put back on the tray). */
@@ -137,9 +146,17 @@ export class BedTrayView implements EditableSource {
     applyPlacement(this.tray, placementOr(layout, 'lap', 'tray', trayDefault));
     // Orient blanket to lay gently draped across the lap
     applyPlacement(blanketMesh, placementOr(layout, 'lap', 'quilt', QUILT_DEFAULT));
+    this.candleSpot.name = 'candle';
+    const candlePick = new Mesh(this.candlePickGeo, this.candlePickMat);
+    candlePick.position.y = 0.08;
+    candlePick.userData.pickOnly = true; // casts no shadow
+    this.candleSpot.add(candlePick);
+    this.tray.add(this.candleSpot);
+    applyPlacement(this.candleSpot, placementOr(layout, 'lap', 'candle', CANDLE_DEFAULT));
     this.pieces = [
       { id: 'tray', section: 'lap', object: this.tray, fallback: trayDefault },
       { id: 'quilt', section: 'lap', object: blanketMesh, fallback: QUILT_DEFAULT },
+      { id: 'candle', section: 'lap', object: this.candleSpot, fallback: CANDLE_DEFAULT },
     ];
 
     // Count triangles
@@ -174,7 +191,7 @@ export class BedTrayView implements EditableSource {
     candle.light(this.woodMat);
     candle.light(this.blanketMat);
     this.group.traverse((o) => {
-      if (o instanceof Mesh) candle.cast(o);
+      if (o instanceof Mesh && !o.userData.pickOnly) candle.cast(o);
     });
   }
 
@@ -184,10 +201,10 @@ export class BedTrayView implements EditableSource {
     this.group.rotation.y = yaw;
   }
 
-  /** Copies world position of the candle saucer resting spot on top of the tray (wherever the layout puts the tray). */
+  /** Copies the world position of where the candle stands (the `candle` piece, on the tray wherever the layout puts them). */
   getCandleSaucerPosition(out: Float64Array | number[]): void {
     this.group.updateMatrixWorld(true);
-    this.tray.localToWorld(this.saucer.set(0, 0.01, 0));
+    this.candleSpot.localToWorld(this.saucer.set(0, 0, 0));
     out[0] = this.saucer.x;
     out[1] = this.saucer.y;
     out[2] = this.saucer.z;
@@ -199,6 +216,8 @@ export class BedTrayView implements EditableSource {
     this.rimLeftRightGeo.dispose();
     this.legGeo.dispose();
     this.blanketGeo.dispose();
+    this.candlePickGeo.dispose();
+    this.candlePickMat.dispose();
     this.woodMat.dispose();
     this.blanketMat.dispose();
     this.quiltTexture.dispose();
