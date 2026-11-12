@@ -87,9 +87,10 @@ We develop on a Pico and confirm on a Quest ([ADR 0003](adr/0003-pico-as-stand-i
 2. In the headset browser, open the **Network** address from section 3, e.g. `https://192.168.1.95:8081/`.
 3. Accept the certificate warning (usually **Advanced**, then **Proceed**; the wording varies by browser).
 4. Make sure the headset's room or space setup is done.
-5. Press **BEGIN**, allow hand tracking, and put the controllers down.
-6. Look around for about 30 seconds and move your hands in front of you. Dots should follow your fingers (orange right, blue left).
-7. Exit XR and press **Copy report**. Paste it into the team chat or an issue.
+5. Press **BEGIN**, allow hand tracking (if it won't start, reload the page and press it again), and put the controllers down.
+6. Look around for about 30 seconds and move your hands in front of you. You should see the dark room, the paper wall 2 m ahead, the candle, and your hands as gloves with their shadows on the wall. (To see a dot on every joint instead, press **🛠 Dev**, then **Joint dots**, before BEGIN; dev and tester builds only.)
+7. Exit XR and press **Copy report** at the bottom left. Paste it into the team chat or an issue. If copy doesn't work, press **Show**, then select and copy the text.
+8. To check that settings are saved between sessions: close the browser completely, reopen the page, enter XR again for about 10 seconds, and send a second report (its `saves` section).
 
 **The developer overlay (no address to type; dev server and tester builds only, section 17).** A **🛠 Dev** button sits at the top left of the page, in the style of the emulator's own panels. It is page UI, not part of the room: at a desk it stays over the emulator's view during the session; on a headset use it on the title page before BEGIN (a page cannot be seen inside VR). It opens one panel (`src/app/developer-overlay.ts`) with:
 

@@ -101,14 +101,7 @@ At 72 fps a frame has **13.9 ms**. Judges require at least 60 fps (16.7 ms), so 
 
 These are starting estimates. Desktop measurements so far: our whole frame was about 0.06 ms, and 500 instanced quads about 0.08 ms. Expect a headset to be 3–5× slower. Teammate B's profiler (`src/debug`) will measure each module against this table on the Pico, and the table should be updated from real numbers.
 
-### Measuring it
-
-| What | How | What it tells you |
-|---|---|---|
-| Our stages on a headset | `perf` in the diagnostics report (Copy report): `msAvg` and `msWorst` per stage (`read`, `classify`, `gestures`, `shadow`, `handVisual`, `audio`, `lab`, `total`; the shape-event sounds are timed inside `shadow`; `frameErrors` counts any part of the frame that threw) over the last 300 frames | Compare each stage with the table above. Browsers coarsen timers on Pages, so trust averages, not single frames |
-| Our stages on a desktop | `npm run perf` | Per-stage time per frame. Headset budget divided by 4 is the desktop guide: read 0.1 ms, classify and gestures 0.175 ms, shadow 0.225 ms. Measured 3 Oct 2026: recognizer 3.4 µs, shadow 4.3 µs per frame |
-| Allocation | `frame-pipeline.alloc.test.ts`, part of `npm test` | Runs recognizer, gestures and projector for 3,000 frames with no garbage collection inside the window (it fails if one runs) and fails above 700 B a frame. The stages build no objects or arrays. Measured about 530 B a frame (recognizer, gestures, projector, sharpen and lantern light), which is the engine boxing numbers returned by small helpers; it was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths |
-| GPU time | Pico or Quest performance overlay | Not visible from JavaScript. Check with both shadows covering the stage and the Developer panel's shadow capsules on |
+How to measure against this table, and the numbers so far, are in [PERFORMANCE.md](PERFORMANCE.md).
 
 ## The virtual room (v1)
 
