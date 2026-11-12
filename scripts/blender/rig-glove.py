@@ -6,7 +6,7 @@
 # not already so, the turn and scale that put it in the frame all profiles share: a right hand in metres, wrist near the
 # origin, fingers along -y, thumb towards +x, palm facing -z.
 #   welding  the welding glove (asset-inbox/welding-glove, CC BY 4.0, see CREDITS.md); the default
-#   cartoon  the white cartoon glove (asset-inbox/cartoon-glove, see CREDITS.md)
+#   cartoon  the white cartoon glove (asset-inbox/cartoon-glove, CC BY 4.0, see CREDITS.md)
 #
 #   test (renders rest, fist and grip poses into <outdir> and saves glove-rig.blend there):
 #     blender -b --python scripts/blender/rig-glove.py -- asset-inbox/welding-glove/welding_glove.glb <outdir> test

@@ -20,6 +20,7 @@ The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/s
 | `candleStick.glb` ("Candlestick") | CreativeTrio | https://poly.pizza/m/tknOVwxT8B | CC0 1.0 |
 | `candles.glb` ("Candles") | Quaternius | https://poly.pizza/m/AnzHB44wlW | CC0 1.0 |
 | `hands/glove-right.glb`, `hands/glove-left.glb` ("Welding Glove"; changes: rigged to the WebXR hand joints by `scripts/blender/rig-glove.py`, the left hand mirrored from the right, textures resized to 512 px WebP) | vr.district.0 | https://skfb.ly/oQvDI | CC BY 4.0 |
+| `hands/cartoon-glove-right.glb`, `hands/cartoon-glove-left.glb` ("Slap Battles Glove Rig"; changes: its own rig replaced by one on the WebXR hand joints by `scripts/blender/rig-glove.py --profile cartoon`, turned and scaled to metres, the left hand mirrored from the right) | senseiwords203 | https://skfb.ly/oBPuD | CC BY 4.0 |
 
 ## Other assets
 
