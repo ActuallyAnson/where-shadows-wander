@@ -39,7 +39,7 @@ function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fi
 }
 
 /**
- * The wall behind the stage (4 m by 2.5 m, any canvas of that shape): striped wallpaper with a small repeating motif, a
+ * The wall behind the stage (4 m by 2.5 m, any canvas of that shape): plain, softly mottled plaster (no pattern, for the shadows), a
  * picture rail with paper bunting, framed pictures, two shelves of keepsakes and wooden panelling below. The middle, where
  * the paper stage hangs, is left calm so the shadows read against it. `bunting` false leaves the paper bunting out (the wall behind the stage has the real, swinging one). The pictures and shelves are not in it: they are
  * paintWallThings, held off the wall. Its edges and corners are shaded, so the wall sits in the room rather than on the screen.
@@ -51,24 +51,18 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, bun
   g.lineJoin = 'round';
   g.lineCap = 'round';
 
-  // Wallpaper: soft vertical stripes with a small diamond between them.
+  // Plain plaster, no pattern: the shadow play is on this wall, and stripes or a motif fight the shadows' edges. Only a
+  // soft, broad mottle, too large and faint to read as a pattern, so it is not a flat screen.
   rect(g, 0, 0, 1024, 640, '#5a4636');
-  for (let x = 0; x < 1024; x += 64) {
-    rect(g, x, 0, 32, 640, 'rgba(255, 230, 190, 0.05)');
-    rect(g, x + 31, 0, 2, 640, 'rgba(20, 10, 4, 0.18)');
-  }
-  g.fillStyle = 'rgba(255, 220, 160, 0.10)';
-  for (let y = 40; y < 430; y += 56) {
-    for (let x = 16; x < 1024; x += 64) {
-      const o = (Math.floor(y / 56) % 2) * 32;
-      g.beginPath();
-      g.moveTo(x + o, y - 8);
-      g.lineTo(x + o + 6, y);
-      g.lineTo(x + o, y + 8);
-      g.lineTo(x + o - 6, y);
-      g.closePath();
-      g.fill();
-    }
+  for (let i = 0; i < 40; i++) {
+    const cx = r() * 1024,
+      cy = r() * 440,
+      rad = 60 + r() * 120;
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    grad.addColorStop(0, i % 2 ? 'rgba(255, 230, 190, 0.035)' : 'rgba(20, 10, 4, 0.05)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = grad;
+    g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
   }
   // Damp and age, in a few soft patches.
   for (let i = 0; i < 9; i++) {

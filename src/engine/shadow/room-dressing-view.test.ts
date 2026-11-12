@@ -44,8 +44,8 @@ const light = (lit: boolean, intensity = 1) => ({ lit, intensity }) as unknown a
 
 describe('room art painters', () => {
   it.each([
-    ['wall', (g: CanvasRenderingContext2D) => paintWall(g, 1024, 640), 100],
-    ['side wall', (g: CanvasRenderingContext2D) => paintWall(g, 1280, 640), 100],
+    ['wall', (g: CanvasRenderingContext2D) => paintWall(g, 1024, 640), 60],
+    ['side wall', (g: CanvasRenderingContext2D) => paintWall(g, 1280, 640), 60],
     ['wall pictures', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'pictures'), 40],
     ['wall shelves', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'shelves'), 40],
     ['wood', (g: CanvasRenderingContext2D) => paintWood(g, 128, 128), 20],
