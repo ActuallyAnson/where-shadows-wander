@@ -106,7 +106,7 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 - **Bittersweet, not tragic.** Most memories are happy and ordinary: playing, laughing, getting into small trouble. The sadness is in the fact that they are memories.
 - **The loss is never shown.** No illness, accident, funeral or hospital on the wall. It is felt through absence: a space beside the boy's puppet, a game set up for two, a shape that needs a second hand.
 - **Not frightening.** He wakes suddenly, but the waking is lonely, not scary: no monsters, no nightmare imagery, no jump scares.
-- **Few words.** The shadow play carries the story. Any captions are short, plain and in the boy's voice.
+- **Show, don't tell.** The shadow play carries the story on its own, with no dialogue or narration. At most a word or two may be written on the wall where a picture cannot do the job (for example a name). Meaning comes from the puppets, the light, the music and the sound, so every scene must make sense to a player who reads nothing. Test this by playing it to someone who doesn't know the premise.
 
 ### Shape of the night (proposed, not final)
 
@@ -310,7 +310,7 @@ The whole game can be played seated, with one hand, within a two-foot radius.
 
 - **High-contrast mode:** Pure black on bright white stage, no paper texture. The wall is pure white, fully lit and opaque, the shadows fully solid, and the settings panel itself is black on white.
 
-- **Captions:** The story's sounds and lines will have optional text captions. The setting exists and is saved; nothing shows captions until the story does.
+- **Captions:** The story has no dialogue, so captions would describe the sounds that carry meaning (laughter, a school bell, the music changing) for players who can't hear them. The setting exists and is saved; nothing shows captions until the story does.
 
 - **Main hand:** The panel opens beside the chosen hand. Both hands always work, so a one-handed player is never locked out by the choice.
 
