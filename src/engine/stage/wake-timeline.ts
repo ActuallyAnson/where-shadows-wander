@@ -1,4 +1,4 @@
-// Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black (a word can come out of the dark; none does yet), then the
+// Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black and far thunder rolls (it is what wakes him), then the
 // eyes open: a slow heavy blink, a quicker wider one, then open. This is the timing only, as numbers: how open the
 // eyes are and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
 
@@ -15,13 +15,17 @@ export interface WakeScript {
   readonly textKeys: readonly WakeKey[];
   /** How open the eyes are (0 shut .. 1 fully open). */
   readonly lidKeys: readonly WakeKey[];
+  /** When the far thunder rolls in the dark and wakes him, seconds; none if left out. */
+  readonly thunderAt?: number;
 }
 
 /** Seconds and levels of the opening. Tune here. */
 export const WAKE_SCRIPT: WakeScript = {
-  // No word for now (a whisper, "noo…", read wrong); the slot stays for whatever replaces it.
+  // No word (a whisper, "noo…", read wrong): a far thunder in the black wakes him instead. Its roll swells over the first
+  // second and is still rumbling away as the eyes first open.
   text: '',
   textKeys: [{ t: 0, v: 0 }],
+  thunderAt: 0.3,
   lidKeys: [
     { t: 0, v: 0 },
     { t: 2.0, v: 0 }, // a moment of plain black first
@@ -64,6 +68,7 @@ export function wakeDuration(script: WakeScript): number {
 export class WakeTimeline {
   private t = 0;
   private running = false;
+  private thunderNow = false;
   private readonly duration: number;
 
   constructor(readonly script: WakeScript = WAKE_SCRIPT) {
@@ -74,12 +79,14 @@ export class WakeTimeline {
   start(): void {
     this.t = 0;
     this.running = true;
+    this.thunderNow = false;
   }
 
-  /** Jumps to the end: eyes open, no word. */
+  /** Jumps to the end: eyes open, no word, no thunder. */
   finish(): void {
     this.t = this.duration;
     this.running = false;
+    this.thunderNow = false;
   }
 
   /** Whether it is playing (started and not yet at its end). */
@@ -93,8 +100,12 @@ export class WakeTimeline {
 
   /** Moves on by `dt` seconds. Returns true on the update it finishes. */
   update(dt: number): boolean {
+    this.thunderNow = false;
     if (!this.running) return false;
+    const before = this.t;
     this.t += dt > 0 ? dt : 0;
+    const at = this.script.thunderAt;
+    if (at !== undefined && before <= at && this.t > at) this.thunderNow = true;
     if (this.t >= this.duration) {
       this.t = this.duration;
       this.running = false;
@@ -106,6 +117,11 @@ export class WakeTimeline {
   /** How open the eyes are now (0..1); 1 when not playing. */
   get lid(): number {
     return this.running ? sampleKeys(this.script.lidKeys, this.t) : 1;
+  }
+
+  /** True on the one update the thunder in the dark should start. */
+  get thunder(): boolean {
+    return this.thunderNow;
   }
 
   /** How visible the word is now (0..1); 0 when not playing. */

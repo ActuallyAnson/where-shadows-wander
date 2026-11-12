@@ -1372,7 +1372,8 @@ async function start(): Promise<void> {
         gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
         roomDressing.windowPoint(windowAt);
         gameAudio.setRain(true, windowAt);
-        if (storm.thunder) gameAudio.thunder(windowAt);
+        // The storm's thunder, and the one in the black that wakes him (scene 1).
+        if (storm.thunder || wake.thunder) gameAudio.thunder(windowAt);
         audio.update(audioPose);
       } catch (e) {
         failures.report('audio', e);

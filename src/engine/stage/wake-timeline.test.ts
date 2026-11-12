@@ -59,6 +59,28 @@ describe('WakeTimeline', () => {
     expect(w.lid).toBe(1);
   });
 
+  it('rolls the thunder once, in the black, before the eyes first open', () => {
+    const at = WAKE_SCRIPT.thunderAt;
+    expect(at).toBeDefined();
+    expect(sampleKeys(WAKE_SCRIPT.lidKeys, at!)).toBe(0);
+    const w = new WakeTimeline();
+    expect(w.thunder).toBe(false);
+    w.start();
+    const fired: number[] = [];
+    for (let i = 0; i < 2000; i++) {
+      w.update(1 / 72);
+      if (w.thunder) fired.push(w.time);
+    }
+    expect(fired).toHaveLength(1);
+    expect(fired[0]).toBeGreaterThan(at!);
+    expect(fired[0]).toBeLessThan(at! + 0.05);
+    // Played again, it rolls again; skipped, it does not.
+    w.start();
+    w.finish();
+    w.update(1);
+    expect(w.thunder).toBe(false);
+  });
+
   it('can be skipped to the end', () => {
     const w = new WakeTimeline();
     w.start();
