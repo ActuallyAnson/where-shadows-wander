@@ -335,12 +335,12 @@ export type NightLayer = 'sky' | 'hills' | 'village' | 'near' | 'curtains';
 export const NIGHT_MARGIN = 24;
 
 /**
- * The night seen through the window, one layer at a time (each a canvas of the same shape, 220 by 260 units plus the margin on
- * every side, except the curtains, which are exactly the window): the `sky` is a deep winter sky with a faint aurora, stars, a
- * large moon in a halo and thin cloud; the `hills` are far mountains and a first row of snowy roofs; the `village` is the
- * nearer roofs, a steeple, chimneys with smoke and lit windows; `near` is the snowy slope and dark pines; the `curtains` are
- * tied back to each side. The room view slides the layers by different amounts as the head moves, so the outside has depth.
- * The snow that falls over it is a separate layer (paintSnow).
+ * The rainy night seen through the window, one layer at a time (each a canvas of the same shape, 220 by 260 units plus the margin
+ * on every side, except the curtains, which are exactly the window): the `sky` is low, heavy rain cloud with the moon a faint
+ * glow somewhere behind it; the `hills` are dark hills going into mist and a first row of wet roofs; the `village` is the nearer
+ * roofs, a steeple, chimneys and lit windows; `near` is wet ground with puddles holding the windows' light, and dark pines; the
+ * `curtains` are tied back to each side. The room view slides the layers by different amounts as the head moves, so the outside
+ * has depth. The rain that falls over it is a separate layer (paintRain).
  */
 export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, layer: NightLayer = 'sky'): void {
   const r = rng(29);
@@ -353,141 +353,81 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
 
   if (layer === 'sky') {
     const sky = g.createLinearGradient(0, 0, 0, 260);
-    sky.addColorStop(0, '#060a20');
-    sky.addColorStop(0.35, '#16215a');
-    sky.addColorStop(0.7, '#34478a');
-    sky.addColorStop(1, '#7a86b8');
+    sky.addColorStop(0, '#0a0d17');
+    sky.addColorStop(0.45, '#182032');
+    sky.addColorStop(0.8, '#2a3348');
+    sky.addColorStop(1, '#3a4258'); // a little lighter low down, where the village's lights catch the rain
     g.fillStyle = sky;
     g.fillRect(-M, -M, 220 + 2 * M, 260 + 2 * M);
 
-    // A faint aurora: two soft bands.
-    for (const [y, c] of [
-      [52, 'rgba(90, 220, 190, 0.16)'],
-      [74, 'rgba(150, 110, 230, 0.12)'],
-    ] as const) {
-      const band = g.createLinearGradient(0, y - 26, 0, y + 26);
-      band.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      band.addColorStop(0.5, c);
-      band.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      g.fillStyle = band;
-      g.beginPath();
-      g.moveTo(-M, y);
-      g.bezierCurveTo(60, y - 30, 120, y + 22, 220 + M, y - 14);
-      g.lineTo(220 + M, y + 40);
-      g.bezierCurveTo(120, y + 52, 60, y + 14, -M, y + 40);
-      g.closePath();
-      g.fill();
+    // The moon, lost behind the cloud: only a faint wide glow.
+    const glow = g.createRadialGradient(140, 58, 4, 140, 58, 90);
+    glow.addColorStop(0, 'rgba(170, 185, 215, 0.32)');
+    glow.addColorStop(0.4, 'rgba(120, 135, 170, 0.12)');
+    glow.addColorStop(1, 'rgba(120, 135, 170, 0)');
+    g.fillStyle = glow;
+    g.fillRect(30, -M, 220, 170);
+
+    // Rain cloud: rows of soft, heavy shapes, dark underneath, a little lit on top near the moon.
+    for (let row = 0; row < 4; row++) {
+      const y0 = -10 + row * 34;
+      for (let i = 0; i < 12; i++) {
+        const x = -M + r() * (220 + 2 * M);
+        const y = y0 + r() * 22;
+        const rx = 24 + r() * 34;
+        const ry = 7 + r() * 9;
+        const nearMoon = Math.max(0, 1 - Math.hypot(x - 140, y - 58) / 90);
+        const cl = g.createLinearGradient(x, y - ry, x, y + ry);
+        cl.addColorStop(
+          0,
+          `rgba(${90 + 60 * nearMoon}, ${100 + 60 * nearMoon}, ${125 + 60 * nearMoon}, ${0.22 + 0.2 * nearMoon})`,
+        );
+        cl.addColorStop(1, `rgba(12, 15, 24, ${0.35 + 0.2 * r()})`);
+        g.fillStyle = cl;
+        g.beginPath();
+        g.ellipse(x, y, rx, ry, (r() - 0.5) * 0.2, 0, TWO_PI);
+        g.fill();
+      }
     }
 
-    // Stars: many small, a few large with a glint.
-    for (let i = 0; i < 90; i++) {
-      star(
-        g,
-        -M + r() * (220 + 2 * M),
-        -M + r() * (150 + M),
-        0.5 + r() * 1.1,
-        `rgba(255, 246, 214, ${0.35 + r() * 0.6})`,
-      );
-    }
-    for (let i = 0; i < 7; i++) {
-      const x = 8 + r() * 204,
-        y = 6 + r() * 100;
-      star(g, x, y, 2.4, 'rgba(255, 250, 225, 0.95)');
-      g.strokeStyle = 'rgba(255, 250, 225, 0.5)';
-      g.lineWidth = 0.7;
-      g.beginPath();
-      g.moveTo(x - 5, y);
-      g.lineTo(x + 5, y);
-      g.moveTo(x, y - 5);
-      g.lineTo(x, y + 5);
-      g.stroke();
-    }
-
-    // The moon: a wide halo, a bright disc with soft seas and a lit rim.
-    const halo = g.createRadialGradient(132, 74, 6, 132, 74, 96);
-    halo.addColorStop(0, 'rgba(225, 235, 255, 0.6)');
-    halo.addColorStop(0.35, 'rgba(180, 200, 255, 0.22)');
-    halo.addColorStop(1, 'rgba(180, 200, 255, 0)');
-    g.fillStyle = halo;
-    g.fillRect(20, 0, 200, 170);
-    const disc = g.createRadialGradient(126, 68, 4, 132, 74, 30);
-    disc.addColorStop(0, '#ffffee');
-    disc.addColorStop(1, '#e6e4c6');
-    g.fillStyle = disc;
+    // Far rain as a veil: long faint slanted lines over the whole sky.
+    g.strokeStyle = 'rgba(160, 175, 205, 0.07)';
+    g.lineWidth = 0.6;
     g.beginPath();
-    g.arc(132, 74, 28, 0, TWO_PI);
-    g.fill();
-    g.fillStyle = 'rgba(140, 140, 120, 0.3)';
-    for (const [x, y, rx, ry, rot] of [
-      [123, 66, 9, 6, 0.5],
-      [140, 82, 7, 5, -0.3],
-      [136, 60, 4, 3, 0],
-      [120, 84, 5, 4, 0.2],
-      [146, 68, 3, 3, 0],
-    ]) {
-      g.beginPath();
-      g.ellipse(x, y, rx, ry, rot, 0, TWO_PI);
-      g.fill();
+    for (let i = 0; i < 70; i++) {
+      const x = -M + r() * (220 + 2 * M + 40);
+      const y = -M + r() * (260 + M);
+      const l = 20 + r() * 40;
+      g.moveTo(x, y);
+      g.lineTo(x - l * RAIN_SLANT, y + l);
     }
-    g.strokeStyle = 'rgba(255, 255, 240, 0.55)';
-    g.lineWidth = 1.2;
-    g.beginPath();
-    g.arc(132, 74, 28, -2.4, -0.7);
     g.stroke();
-
-    // Thin cloud across the moon's lower edge, and two more.
-    for (const [x, y, rx, ry, a] of [
-      [112, 96, 56, 6, 0.3],
-      [176, 112, 40, 5, 0.22],
-      [42, 126, 46, 5, 0.18],
-    ]) {
-      const cl = g.createLinearGradient(x, y - ry, x, y + ry);
-      cl.addColorStop(0, `rgba(210, 220, 255, ${a})`);
-      cl.addColorStop(1, `rgba(120, 140, 210, ${a * 0.4})`);
-      g.fillStyle = cl;
-      g.beginPath();
-      g.ellipse(x, y, rx, ry, 0, 0, TWO_PI);
-      g.fill();
-    }
   }
 
   if (layer === 'hills') {
-    // Far mountains, with snow on their ridges.
-    g.fillStyle = '#2b3a78';
+    // Dark hills, their tops lost in the rain.
+    g.fillStyle = '#1b2232';
     g.beginPath();
-    g.moveTo(-M, 190);
-    g.lineTo(-M, 168);
-    g.lineTo(34, 146);
-    g.lineTo(58, 170);
-    g.lineTo(92, 138);
-    g.lineTo(128, 172);
-    g.lineTo(160, 150);
-    g.lineTo(220 + M, 180);
+    g.moveTo(-M, 200);
+    g.lineTo(-M, 166);
+    g.quadraticCurveTo(30, 146, 70, 160);
+    g.quadraticCurveTo(110, 140, 150, 156);
+    g.quadraticCurveTo(190, 146, 220 + M, 170);
     g.lineTo(220 + M, 200);
     g.closePath();
     g.fill();
-    g.fillStyle = 'rgba(215, 225, 255, 0.55)';
-    for (const [x, y] of [
-      [34, 146],
-      [92, 138],
-      [160, 150],
-    ]) {
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x - 11, y + 14);
-      g.lineTo(x - 4, y + 11);
-      g.lineTo(x, y + 16);
-      g.lineTo(x + 5, y + 11);
-      g.lineTo(x + 12, y + 15);
-      g.closePath();
-      g.fill();
-    }
+    const mist = g.createLinearGradient(0, 136, 0, 186);
+    mist.addColorStop(0, 'rgba(60, 70, 92, 0.55)');
+    mist.addColorStop(1, 'rgba(60, 70, 92, 0)');
+    g.fillStyle = mist;
+    g.fillRect(-M, 136, 220 + 2 * M, 50);
   }
 
-  // Village roofs, three rows from far to near, each darker, with a snow line along every roof.
-  const roofs = (base: number, tone: string, snow: string, seed: number) => {
+  // Village roofs, from far to near, each darker, each with a wet sheen along its slope.
+  const roofs = (base: number, tone: string, sheen: string, seed: number) => {
     const q = rng(seed);
     let x = -M - 6;
+    g.lineWidth = 1;
     while (x < 224 + M) {
       const w = 26 + q() * 22,
         h = 7 + q() * 9;
@@ -500,26 +440,22 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
       g.lineTo(x + w, base + 60);
       g.closePath();
       g.fill();
-      // the snow lying on the roof: a cap that follows its slope and hangs a little at the eaves
-      g.fillStyle = snow;
+      // the rain on the roof: a thin light along the ridge and down one slope
+      g.strokeStyle = sheen;
       g.beginPath();
-      g.moveTo(x - 1.5, base + 3);
-      g.lineTo(x + w / 2, base - h - 1);
-      g.lineTo(x + w + 1.5, base + 3);
-      g.lineTo(x + w - 2, base + 1);
-      g.lineTo(x + w / 2, base - h + 3);
-      g.lineTo(x + 2, base + 1);
-      g.closePath();
-      g.fill();
+      g.moveTo(x + 1, base + 1.5);
+      g.lineTo(x + w / 2, base - h + 0.6);
+      g.lineTo(x + w - 1, base + 1.5);
+      g.stroke();
       x += w - 4;
     }
   };
-  if (layer === 'hills') roofs(190, '#1a2252', 'rgba(200, 215, 250, 0.7)', 5);
-  if (layer === 'village') roofs(208, '#10173c', 'rgba(200, 215, 250, 0.75)', 9);
+  if (layer === 'hills') roofs(190, '#141a2a', 'rgba(140, 160, 200, 0.3)', 5);
+  if (layer === 'village') roofs(208, '#0d1220', 'rgba(150, 170, 210, 0.38)', 9);
 
   if (layer === 'village') {
     // The church: a steeple among the roofs.
-    g.fillStyle = '#10173c';
+    g.fillStyle = '#0d1220';
     g.beginPath();
     g.moveTo(170, 214);
     g.lineTo(170, 180);
@@ -530,29 +466,29 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
     g.fill();
     g.fillRect(176, 138, 2, 12);
     g.fillRect(172.5, 143, 9, 2);
-    g.fillStyle = 'rgba(255, 210, 130, 0.9)';
+    g.fillStyle = 'rgba(255, 210, 130, 0.85)';
     g.beginPath();
     g.arc(177, 188, 3, Math.PI, 0);
     g.fillRect(174, 188, 6, 8);
     g.fill();
 
-    // Chimneys with smoke.
+    // Chimneys (no smoke rises far in the rain).
     for (const [x, y] of [
       [38, 190],
       [116, 186],
       [66, 205],
     ]) {
-      g.fillStyle = '#0b1030';
+      g.fillStyle = '#090d18';
       g.fillRect(x, y, 7, 16);
-      g.strokeStyle = 'rgba(190, 200, 230, 0.3)';
-      g.lineWidth = 3.2;
+      g.strokeStyle = 'rgba(150, 160, 185, 0.14)';
+      g.lineWidth = 2.6;
       g.beginPath();
       g.moveTo(x + 3.5, y);
-      g.bezierCurveTo(x - 6, y - 12, x + 14, y - 20, x + 2, y - 34);
+      g.quadraticCurveTo(x + 1, y - 6, x + 6, y - 12);
       g.stroke();
     }
 
-    // Lit windows, with a warm glow round each.
+    // Lit windows, with a warm glow round each, softened by the rain.
     for (const [x, y] of [
       [24, 216],
       [52, 222],
@@ -562,25 +498,32 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
       [196, 220],
       [160, 230],
     ]) {
-      const glow = g.createRadialGradient(x + 3, y + 4, 0, x + 3, y + 4, 13);
-      glow.addColorStop(0, 'rgba(255, 190, 100, 0.55)');
-      glow.addColorStop(1, 'rgba(255, 190, 100, 0)');
+      const glow = g.createRadialGradient(x + 3, y + 4, 0, x + 3, y + 4, 15);
+      glow.addColorStop(0, 'rgba(255, 185, 100, 0.5)');
+      glow.addColorStop(1, 'rgba(255, 185, 100, 0)');
       g.fillStyle = glow;
-      g.fillRect(x - 11, y - 10, 28, 28);
-      g.fillStyle = '#ffd488';
+      g.fillRect(x - 13, y - 12, 32, 32);
+      g.fillStyle = '#f2c47e';
       g.fillRect(x, y, 6, 8);
       g.fillStyle = 'rgba(40, 20, 8, 0.7)';
       g.fillRect(x + 2.7, y, 0.6, 8);
       g.fillRect(x, y + 3.7, 6, 0.6);
     }
+
+    // Rain haze in front of the village.
+    const haze = g.createLinearGradient(0, 196, 0, 244);
+    haze.addColorStop(0, 'rgba(70, 80, 104, 0)');
+    haze.addColorStop(1, 'rgba(70, 80, 104, 0.22)');
+    g.fillStyle = haze;
+    g.fillRect(-M, 196, 220 + 2 * M, 48);
   }
 
   if (layer === 'near') {
-    // The near ground: a snowy slope and dark pines on each side.
-    const snow = g.createLinearGradient(0, 232, 0, 260);
-    snow.addColorStop(0, '#9aa8d4');
-    snow.addColorStop(1, '#5a6aa0');
-    g.fillStyle = snow;
+    // The near ground: dark and wet, with puddles that hold the windows' light and a little of the sky.
+    const ground = g.createLinearGradient(0, 232, 0, 260);
+    ground.addColorStop(0, '#1a2130');
+    ground.addColorStop(1, '#0b0f18');
+    g.fillStyle = ground;
     g.beginPath();
     g.moveTo(-M, 260 + M);
     g.lineTo(-M, 244);
@@ -589,8 +532,20 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
     g.lineTo(220 + M, 260 + M);
     g.closePath();
     g.fill();
+    for (const [x, y, rx] of [
+      [62, 248, 18],
+      [128, 252, 24],
+      [176, 256, 14],
+    ]) {
+      g.fillStyle = 'rgba(70, 82, 110, 0.55)';
+      g.beginPath();
+      g.ellipse(x, y, rx, 2.6, 0, 0, TWO_PI);
+      g.fill();
+      g.fillStyle = 'rgba(255, 190, 110, 0.35)';
+      for (let k = 0; k < 2; k++) g.fillRect(x - rx * 0.5 + k * rx * 0.6 + r() * 4, y - 1, 1.6, 2.2);
+    }
     const pine = (x: number, base: number, h: number) => {
-      g.fillStyle = '#070b22';
+      g.fillStyle = '#060912';
       for (let t = 0; t < 4; t++) {
         const y = base - h + t * (h / 4.4);
         const w = 8 + t * 6;
@@ -602,10 +557,11 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
         g.fill();
       }
       g.fillRect(x - 1.5, base - 4, 3, 8);
-      g.fillStyle = 'rgba(200, 215, 255, 0.4)';
+      // wet needles catching a little light
+      g.fillStyle = 'rgba(130, 150, 190, 0.18)';
       for (let t = 0; t < 4; t++) {
         const y = base - h + t * (h / 4.4);
-        g.fillRect(x - 2 - t, y + 2 + t * 0.6, 4 + 2 * t, 1.4);
+        g.fillRect(x - 2 - t, y + 2 + t * 0.6, 4 + 2 * t, 0.8);
       }
     };
     pine(30, 246, 70);
@@ -666,36 +622,46 @@ export function paintNight(g: CanvasRenderingContext2D, W: number, H: number, la
   g.restore();
 }
 
+/** How far rain leans as it falls: across per unit down (it falls down and a little to the left of the picture). */
+export const RAIN_SLANT = 0.12;
+
 /**
- * A tileable layer of falling snow (any canvas: it wraps at every edge): soft white flakes of mixed sizes. Two layers at
- * different scales and speeds make the snow outside the window (the room scrolls their texture offsets).
+ * A tileable layer of falling rain (any canvas: it wraps at every edge): thin pale streaks, faint at the top and brighter at the
+ * drop's end, leaning by RAIN_SLANT. Two layers at different scales and speeds make the rain outside the window (the room scrolls
+ * their texture offsets along the lean).
  */
-export function paintSnow(
+export function paintRain(
   g: CanvasRenderingContext2D,
   W: number,
   H: number,
   seed: number,
   count: number,
-  rMax: number,
+  length: number,
 ): void {
   const r = rng(seed);
   g.clearRect(0, 0, W, H);
+  g.lineCap = 'round';
   for (let i = 0; i < count; i++) {
     const x = r() * W,
       y = r() * H,
-      rad = rMax * (0.35 + 0.65 * r() * r());
-    const a = 0.35 + 0.6 * r();
+      l = length * (0.55 + 0.45 * r());
+    const a = 0.18 + 0.32 * r();
+    g.lineWidth = 0.8 + r() * 0.9;
     for (const dx of [-W, 0, W]) {
       for (const dy of [-H, 0, H]) {
-        const cx = x + dx,
-          cy = y + dy;
-        if (cx < -rad * 2 || cx > W + rad * 2 || cy < -rad * 2 || cy > H + rad * 2) continue;
-        const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad * 2);
-        grad.addColorStop(0, `rgba(255, 255, 255, ${a})`);
-        grad.addColorStop(0.45, `rgba(235, 242, 255, ${a * 0.55})`);
-        grad.addColorStop(1, 'rgba(235, 242, 255, 0)');
-        g.fillStyle = grad;
-        g.fillRect(cx - rad * 2, cy - rad * 2, rad * 4, rad * 4);
+        const x0 = x + dx,
+          y0 = y + dy,
+          x1 = x0 - l * RAIN_SLANT,
+          y1 = y0 + l;
+        if (Math.max(x0, x1) < -2 || Math.min(x0, x1) > W + 2 || y1 < -2 || y0 > H + 2) continue;
+        const grad = g.createLinearGradient(x0, y0, x1, y1);
+        grad.addColorStop(0, 'rgba(200, 215, 240, 0)');
+        grad.addColorStop(1, `rgba(215, 228, 250, ${a})`);
+        g.strokeStyle = grad;
+        g.beginPath();
+        g.moveTo(x0, y0);
+        g.lineTo(x1, y1);
+        g.stroke();
       }
     }
   }

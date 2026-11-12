@@ -23,6 +23,7 @@ const NOTES: readonly SoundId[] = [Sound.Note0, Sound.Note1, Sound.Note2, Sound.
 export class GameAudio {
   private readonly at = { x: 0, y: 0, z: 0 };
   private flameLit = false;
+  private raining = false;
 
   constructor(private readonly player: SoundPlayer) {}
 
@@ -69,6 +70,18 @@ export class GameAudio {
     else if (!lit && this.flameLit) this.player.setLoop(Sound.Crackle, false, flame[0], flame[1], flame[2]);
     if (lit) this.player.moveLoop(Sound.Crackle, flame[0], flame[1], flame[2]);
     this.flameLit = lit;
+  }
+
+  /** Call every frame: the rain plays while `on`, from the window (`at`, its world position). */
+  setRain(on: boolean, at: Readonly<{ x: number; y: number; z: number }>): void {
+    if (on !== this.raining) this.player.setLoop(Sound.Rain, on, at.x, at.y, at.z);
+    else if (on) this.player.moveLoop(Sound.Rain, at.x, at.y, at.z);
+    this.raining = on;
+  }
+
+  /** Thunder far off, from the window's side (`at`, its world position). */
+  thunder(at: Readonly<{ x: number; y: number; z: number }>): void {
+    this.player.playAt(Sound.Thunder, at.x, at.y, at.z);
   }
 
   /** Puts the middle of a hand's shadow (or its side of the wall when it has none) into `this.at`. */

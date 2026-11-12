@@ -7,6 +7,7 @@ import {
   renderPlaceholder,
   renderRateFor,
   takeSamples,
+  THUNDER_S,
 } from './placeholder-sounds';
 import { Sound, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
@@ -30,6 +31,7 @@ describe('renderPlaceholder', () => {
         [Sound.Snowtick]: 0.6,
         [Sound.Step0]: 0.6,
         [Sound.Step1]: 0.6,
+        [Sound.Rain]: 0.35,
       };
       const peak = peaks[id] ?? 0.8;
       expect(a.length).toBeGreaterThan(rate * 0.05);
@@ -46,11 +48,12 @@ describe('renderPlaceholder', () => {
     expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(6);
   });
 
-  it('keeps every one-shot under two seconds, and each loop at six seconds or less (the music, at its low rate, at 24)', () => {
+  it('keeps every one-shot under two seconds (but the thunder, a long roll), and each loop at six seconds or less (the music, at its low rate, at 24)', () => {
     for (let id = 0; id < SOUND_COUNT; id++) {
       const rate = renderRateFor(id as SoundId, SR);
       const s = renderPlaceholder(id as SoundId, rate).length / rate;
       if (id === Sound.Music) expect(s).toBe(MUSIC_S);
+      else if (id === Sound.Thunder) expect(s).toBe(THUNDER_S);
       else if (SOUND_DEFS[id].loop) expect(s).toBeLessThanOrEqual(6);
       else expect(s).toBeLessThan(2);
     }
@@ -76,10 +79,11 @@ describe('renderPlaceholder', () => {
     }
   });
 
-  it('joins the room tone and the music at their loop point with no jump', () => {
+  it('joins the room tone, the music and the rain at their loop point with no jump', () => {
     for (const [id, rate, ceiling] of [
       [Sound.Hum, SR, 0.01],
       [Sound.Music, MUSIC_RATE, 0.02],
+      [Sound.Rain, SR, 0.05],
     ] as const) {
       const s = renderPlaceholder(id, rate);
       // The step across the join must be no bigger than the biggest step anywhere else in the loop.

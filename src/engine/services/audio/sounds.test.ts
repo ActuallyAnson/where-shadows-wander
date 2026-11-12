@@ -35,8 +35,15 @@ describe('SOUND_DEFS', () => {
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the room tone, the music, the clock and the wind', () => {
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'hum', 'music', 'clock', 'wind']);
+  it('loops only the flame, the room tone, the music, the clock, the wind and the rain', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
+      'crackle',
+      'hum',
+      'music',
+      'clock',
+      'wind',
+      'rain',
+    ]);
   });
 
   it('keeps the first four sounds where they were: rustle, thump and chime on effects, the crackle on ambience', () => {

@@ -8,6 +8,10 @@ const TAU = Math.PI * 2;
 /** The clock and wind loops' lengths, seconds. */
 export const CLOCK_S = 4;
 export const WIND_S = 6;
+/** The rain loop's length, seconds. */
+export const RAIN_S = 6;
+/** The thunder's length, seconds: a long, slow roll. */
+export const THUNDER_S = 6;
 /** The candle loop's length, seconds: long enough that the repeat is not noticed. */
 export const CRACKLE_S = 6;
 /** How loud the candle is rendered (the others peak at 0.8): it is a quiet bed, not an event. */
@@ -55,6 +59,8 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Snowtick]: 0.6,
   [Sound.Step0]: 0.6,
   [Sound.Step1]: 0.6,
+  [Sound.Rain]: 0.35,
+  [Sound.Thunder]: 0.8,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -85,6 +91,10 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
       return footstep(sr, 0);
     case Sound.Step1:
       return footstep(sr, 1);
+    case Sound.Rain:
+      return rain(sr);
+    case Sound.Thunder:
+      return thunder(sr);
     case Sound.Twinkle:
       return twinkle(sr);
     case Sound.Hop:
@@ -232,6 +242,100 @@ function wind(sr: number): Float32Array<ArrayBuffer> {
   for (let i = 0; i < edge; i++) {
     const f = i / edge;
     out[i] = made[i] * f + made[n + i] * (1 - f);
+  }
+  return out;
+}
+
+/** A one-pole low-pass's coefficient for a cutoff of `hz` at `sr`: the same tone at any sample rate. */
+function lowPass(hz: number, sr: number): number {
+  return 1 - Math.exp((-TAU * hz) / sr);
+}
+
+/**
+ * Rain heard from inside: a soft, steady hiss (noise with its lows and its highest highs taken off, as the glass and walls do),
+ * a little low roar of it on the roof, and the patter of single drops on the window over it, each a tiny damped tick. It
+ * breathes a little, so the loop does not sound like a held note. A loop that joins its own start.
+ */
+function rain(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * RAIN_S);
+  // Made a little longer; the extra is blended over the start, so the end runs on into it with no seam.
+  const edge = Math.floor(sr * 0.3);
+  const total = n + edge;
+  const made = new Float32Array(total);
+  const rnd = seeded(103);
+  const kHiss = lowPass(3200, sr);
+  const kBody = lowPass(500, sr);
+  const kRoof = lowPass(140, sr);
+  let hiss = 0;
+  let body = 0;
+  let roof = 0;
+  for (let i = 0; i < total; i++) {
+    const t = i / sr;
+    const x = rnd() * 2 - 1;
+    hiss += (x - hiss) * kHiss;
+    body += (hiss - body) * kBody;
+    roof += (x - roof) * kRoof;
+    const swell = 0.85 + 0.15 * Math.sin((TAU * t) / RAIN_S) * Math.sin((TAU * 2 * t) / RAIN_S + 1);
+    made[i] = ((hiss - body) * 0.9 + roof * 2.2) * swell;
+  }
+  // The patter: drops at random times, each a short bright tick, some near and clear, most soft.
+  const drops = Math.floor(RAIN_S * 55);
+  const len = Math.floor(sr * 0.012);
+  const kDrop = lowPass(2400, sr);
+  for (let d = 0; d < drops; d++) {
+    const start = Math.floor(rnd() * (total - len));
+    const level = 0.08 + 0.35 * rnd() * rnd();
+    const hz = 1400 + 1800 * rnd();
+    let lp = 0;
+    for (let j = 0; j < len; j++) {
+      const t = j / sr;
+      lp += (rnd() * 2 - 1 - lp) * kDrop;
+      made[start + j] +=
+        (Math.sin(TAU * hz * t) * 0.6 + lp * 0.8) * Math.exp(-t * 420) * Math.min(1, t / 0.0004) * level;
+    }
+  }
+  const out = made.slice(0, n);
+  for (let i = 0; i < edge; i++) {
+    const f = i / edge;
+    out[i] = made[i] * f + made[n + i] * (1 - f);
+  }
+  return out;
+}
+
+/**
+ * Thunder a long way off, heard through the walls: no crack, only a deep, slow roll. Low-passed noise that swells in over half
+ * a second, rumbles in four uneven waves, each softer, and dies away. Silent at both ends.
+ */
+function thunder(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * THUNDER_S);
+  const out = new Float32Array(n);
+  const rnd = seeded(107);
+  const k1 = lowPass(180, sr);
+  const k2 = lowPass(110, sr);
+  const kWobble = lowPass(9, sr);
+  let a = 0;
+  let b = 0;
+  let wobble = 0;
+  // The rolls: when each peaks (s), how wide it is (s), and how loud.
+  const rolls: readonly (readonly [number, number, number])[] = [
+    [0.7, 0.45, 1],
+    [1.6, 0.6, 0.8],
+    [2.7, 0.8, 0.55],
+    [3.9, 1.0, 0.3],
+  ];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const x = rnd() * 2 - 1;
+    a += (x - a) * k1;
+    b += (a - b) * k2;
+    wobble += (rnd() * 2 - 1 - wobble) * kWobble; // a slow, uneven flutter, as a roll breaks up
+    let env = 0;
+    for (let k = 0; k < rolls.length; k++) {
+      const d = (t - rolls[k][0]) / rolls[k][1];
+      env += rolls[k][2] * Math.exp(-d * d);
+    }
+    const tail = Math.min(1, t / 0.5) * Math.min(1, (THUNDER_S - t) / 1.2);
+    out[i] = b * env * tail * (0.75 + 2.5 * Math.abs(wobble));
   }
   return out;
 }

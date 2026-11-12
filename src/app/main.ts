@@ -42,6 +42,7 @@ import { FADE_IN_S } from '../engine/xr/hand-fade';
 import { FadeView } from '../engine/shadow/fade-view';
 import { WakeView } from '../engine/shadow/wake-view';
 import { WakeTimeline } from '../engine/stage/wake-timeline';
+import { Storm } from '../engine/stage/storm';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
@@ -430,6 +431,9 @@ async function start(): Promise<void> {
   const fade = new FadeView();
   const fadeHead = new Vector3();
   const wake = new WakeTimeline();
+  // The rain outside: a constant loop from the window, and now and then a flash there and, after it, far thunder (storm.ts).
+  const storm = new Storm();
+  const windowAt = new Vector3();
   const wakeView = new WakeView(wake.script.text);
   const wakeHead = new Quaternion();
   /** The wake's lids take over from the plain black (they are as black while shut). Once a session. */
@@ -1333,6 +1337,9 @@ async function start(): Promise<void> {
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
         // Waiting to be lit, the candle holds a small, bright pool of light round itself, to draw the eye to it.
         roomDressing.waiting = sessionState === 'title_vr';
+        // The storm moves on only in the story (not on the title, not paused); its flash lights the window.
+        storm.update(sessionState === 'playing' ? step : 0);
+        roomDressing.lightning = storm.flash;
         roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).
@@ -1343,7 +1350,7 @@ async function start(): Promise<void> {
         }
         candleLight.setMoon(moonLift);
         candleLight.bakeIfDirty(world.renderer, world.scene);
-        // While paused the snow holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
+        // While paused the rain holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
         candleView.update(lanternLight.light, cameraQuat);
       } catch (e) {
@@ -1363,6 +1370,9 @@ async function start(): Promise<void> {
         audioPose[7] = m[5];
         audioPose[8] = m[6];
         gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
+        roomDressing.windowPoint(windowAt);
+        gameAudio.setRain(true, windowAt);
+        if (storm.thunder) gameAudio.thunder(windowAt);
         audio.update(audioPose);
       } catch (e) {
         failures.report('audio', e);
@@ -1464,11 +1474,14 @@ async function start(): Promise<void> {
         puppets,
         /** Plays the prologue now (the candle must be lit to see it). */
         playPrologue: () => startPrologue(),
-        /** Plays scene 1's waking (the word in the dark and the blinks) again. */
+        /** Plays scene 1's waking (the blinks) again. */
         playWake: () => {
           wake.finish();
           startWake();
         },
+        storm,
+        /** A lightning flash in the window now, and its thunder a few seconds later (while the story plays). */
+        thunder: () => storm.strikeNow(),
       },
     });
 }

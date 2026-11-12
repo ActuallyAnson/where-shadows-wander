@@ -106,6 +106,29 @@ describe('GameAudio.setFlame', () => {
   });
 });
 
+describe('GameAudio weather', () => {
+  it('starts the rain once from the window, follows the window while it plays, and stops it once', () => {
+    const { audio, rec } = setup();
+    const at = { x: -1.9, y: 1.45, z: -0.8 };
+    audio.setRain(false, at);
+    expect(rec.loops).toEqual([]);
+    audio.setRain(true, at);
+    audio.setRain(true, at);
+    expect(rec.loops).toEqual([{ id: Sound.Rain, on: true, x: -1.9 }]);
+    expect(rec.moves).toBe(1);
+    audio.setRain(false, at);
+    audio.setRain(false, at);
+    expect(rec.loops).toHaveLength(2);
+    expect(rec.loops.at(-1)).toEqual({ id: Sound.Rain, on: false, x: -1.9 });
+  });
+
+  it('plays the thunder from the window', () => {
+    const { audio, rec } = setup();
+    audio.thunder({ x: -1.9, y: 1.45, z: -0.8 });
+    expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Thunder, -1.9, 1.45, -0.8]]);
+  });
+});
+
 describe('GameAudio.candleMoved', () => {
   it('lifts and sets the candle down from the flame, and is silent on a frame where neither happened', () => {
     const { audio, rec } = setup();

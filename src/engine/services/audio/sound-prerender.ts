@@ -13,6 +13,7 @@ export const PRERENDER_ORDER: readonly SoundId[] = [
   Sound.Hum,
   Sound.Crackle,
   Sound.Music,
+  Sound.Rain,
   Sound.Clock,
   Sound.Wind,
   Sound.Ignite,

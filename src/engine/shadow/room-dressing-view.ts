@@ -24,15 +24,16 @@ import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
   NIGHT_MARGIN,
+  RAIN_SLANT,
   type NightLayer,
   paintBookcase,
   paintMoonPatch,
   paintNight,
   paintPillow,
   paintQuilt,
+  paintRain,
   paintRug,
   paintSill,
-  paintSnow,
   paintStraw,
   paintWall,
   paintWallThings,
@@ -55,9 +56,12 @@ const WALL_ORDER = -11;
  * is a faint shape in the dark room rather than its brightest thing.
  */
 const OUTSIDE_TINT = new Color(0.22, 0.26, 0.38);
-/** Seconds a snowflake takes to fall the height of one tile of each layer, and how far each sways. */
-const SNOW_FALL = [0.075, 0.045] as const;
-const SNOW_SWAY = [0.03, 0.02] as const;
+/** Tiles of each rain layer (near, far) that fall past in a second. */
+const RAIN_FALL = [2.2, 1.5] as const;
+/** The colour the window takes at the height of a lightning flash (it eases there from OUTSIDE_TINT by the flash). */
+const FLASH_TINT = new Color(0.62, 0.68, 0.82);
+/** How much a flash adds to the moonlight's patch on the floor, as a multiple of its usual brightness. */
+const FLASH_PATCH = 2.5;
 
 /** How far the framed pictures and the shelves stand out from the wallpaper, in metres (the shelves' keepsakes stand further). */
 const PICTURES_OUT = 0.03;
@@ -216,9 +220,9 @@ export class RoomDressingView implements EditableSource {
 
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: MeshBasicMaterial[] = [];
-  /** The window's own pictures (the night, the snow), which keep one cool colour whatever the room does. */
+  /** The window's own pictures (the night, the rain), which keep one cool colour whatever the room does. */
   private readonly outdoor: MeshBasicMaterial[] = [];
-  private readonly snow: CanvasTexture[] = [];
+  private readonly rain: CanvasTexture[] = [];
   private readonly moonPatch: MeshBasicMaterial;
   /** The outside layers' textures and how far each slides with the head (parallel to OUTSIDE_LAYERS). */
   private readonly outside: CanvasTexture[] = [];
@@ -291,7 +295,7 @@ export class RoomDressingView implements EditableSource {
 
     // The night in the left window, in five layers that slide against each other as the head moves, so the outside has depth: sky,
     // hills, village, near ground, then the curtains (which belong to the window and do not slide). They sit in front of the paper,
-    // behind the window's frame, with two layers of snow falling between the near ground and the curtains.
+    // behind the window's frame, with two layers of rain falling between the near ground and the curtains.
     const marginU = NIGHT_MARGIN / (220 + 2 * NIGHT_MARGIN);
     const marginV = NIGHT_MARGIN / (260 + 2 * NIGHT_MARGIN);
     const nightMeshes: Mesh[] = [];
@@ -319,20 +323,21 @@ export class RoomDressingView implements EditableSource {
     curtains.renderOrder = 6;
     this.moveToOutdoor(curtains);
     nightMeshes.push(curtains);
-    const snowLayers: Mesh[] = [];
+    const rainLayers: Mesh[] = [];
     for (let i = 0; i < 2; i++) {
+      // Near: fewer, longer streaks; far: more, shorter and finer (a smaller tile repeated more).
       const tile = this.texture(
-        paintedCanvas(256, 256, (g, w, h) => paintSnow(g, w, h, 3 + i * 7, i === 0 ? 34 : 70, i === 0 ? 5.5 : 3.2)),
+        paintedCanvas(256, 256, (g, w, h) => paintRain(g, w, h, 3 + i * 7, i === 0 ? 38 : 70, i === 0 ? 46 : 30)),
       );
       tile.wrapS = tile.wrapT = RepeatWrapping;
       tile.repeat.set(i === 0 ? 2 : 3.2, i === 0 ? 2.4 : 3.8);
-      this.snow.push(tile);
+      this.rain.push(tile);
       const layer = this.quad(1.1, 1.3, tile, true);
       layer.rotation.y = Math.PI / 2;
       layer.position.set(-1.985 + i * 0.002, 1.45, -0.8);
       layer.renderOrder = 4 + i;
       this.moveToOutdoor(layer);
-      snowLayers.push(layer);
+      rainLayers.push(layer);
     }
 
     // The sill: a fern, a paper bird on two books, a candle stub (it stands on Damon's sill, whose top is at 0.875 m).
@@ -436,7 +441,7 @@ export class RoomDressingView implements EditableSource {
       left,
       right,
       ...nightMeshes,
-      ...snowLayers,
+      ...rainLayers,
       sill,
       patch,
       bookcase,
@@ -453,7 +458,7 @@ export class RoomDressingView implements EditableSource {
       left,
       right,
       ...nightMeshes,
-      ...snowLayers,
+      ...rainLayers,
       sill,
       patch,
       bookcase,
@@ -622,6 +627,8 @@ export class RoomDressingView implements EditableSource {
   ignition = 0;
   /** Whether the candle is waiting to be lit for the first time: then it holds a small, bright pool of light (WAITING_GLOW). */
   waiting = false;
+  /** How bright a lightning flash is on the window now (0..1; storm.ts): the outside and the moonlight on the floor brighten with it. */
+  lightning = 0;
   /** The glow the hold had reached, held while the newly lit flame's own light fades in (see HANDOVER_S). */
   private glowCarry = 0;
 
@@ -644,9 +651,11 @@ export class RoomDressingView implements EditableSource {
     this.warmNow = Math.min(1, Math.max(0, brightness / 0.5));
     this.flameOn = brightness > 0 && flame !== undefined;
     this.candle?.set(brightness, flame ?? null, this.reachNow);
-    for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT);
-    // The moonlight on the floor stays as it is: the candle adds its light, it never takes the moon's away.
-    this.moonPatch.color.setRGB(0.5 * MOON_PATCH, 0.62 * MOON_PATCH, MOON_PATCH);
+    const flash = this.lightning > 0 ? Math.min(1, this.lightning) : 0;
+    for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT).lerp(FLASH_TINT, flash);
+    // The moonlight on the floor stays as it is (the candle adds its light, it never takes the moon's away), but for a flash.
+    const patch = MOON_PATCH * (1 + FLASH_PATCH * flash);
+    this.moonPatch.color.setRGB(0.5 * patch, 0.62 * patch, patch);
   }
   /**
    * The candle's light spreading through the room: while `lit` it grows out from the flame to the whole room over SPREAD_S, and
@@ -681,6 +690,13 @@ export class RoomDressingView implements EditableSource {
     const spec = GLOWS.find((g) => g.wonder === i) ?? GLOWS[0];
     if (spec.wall) out.set((spec.wall[0] / 1024) * 4 - 2, 2.5 - (spec.wall[1] / 640) * 2.5, this.wallZ + spec.wall[2]);
     else this.glowAt(spec, out);
+    this.group.updateWorldMatrix(true, false);
+    return this.group.localToWorld(out);
+  }
+
+  /** Where the window is, in the world (the middle of the glass): where the rain and the thunder are heard from. Writes into `out` and returns it. */
+  windowPoint(out: Vector3): Vector3 {
+    out.set(-1.95, WINDOW_Y, WINDOW_Z);
     this.group.updateWorldMatrix(true, false);
     return this.group.localToWorld(out);
   }
@@ -743,7 +759,7 @@ export class RoomDressingView implements EditableSource {
   }
 
   /**
-   * Moves the snow outside the window and slides the outside layers against each other for where the head is (call once a frame
+   * Moves the rain outside the window and slides the outside layers against each other for where the head is (call once a frame
    * with the frame's seconds and the head's world position). Allocates nothing.
    */
   tick(dt: number, headWorld?: Readonly<{ x: number; y: number; z: number }>): void {
@@ -752,10 +768,12 @@ export class RoomDressingView implements EditableSource {
     this.time += Math.min(dt, 0.1);
     this.easeWonders(Math.min(dt, 0.1));
     this.bunting.update(Math.min(dt, 0.1));
-    for (let i = 0; i < this.snow.length; i++) {
-      const t = this.snow[i];
-      t.offset.y += Math.min(dt, 0.1) * SNOW_FALL[i];
-      t.offset.x = Math.sin(this.time * (0.5 + i * 0.3)) * SNOW_SWAY[i];
+    for (let i = 0; i < this.rain.length; i++) {
+      // Down and along the streaks' lean, kept in 0..1 so the offsets never grow large enough to lose precision.
+      const t = this.rain[i];
+      const fall = Math.min(dt, 0.1) * RAIN_FALL[i];
+      t.offset.y = (t.offset.y + fall) % 1;
+      t.offset.x = (t.offset.x + fall * RAIN_SLANT) % 1;
     }
   }
 

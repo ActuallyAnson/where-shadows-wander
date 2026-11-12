@@ -9,7 +9,7 @@ import {
   paintQuilt,
   paintRug,
   paintSill,
-  paintSnow,
+  paintRain,
   paintWall,
   paintWallThings,
   paintWood,
@@ -57,7 +57,7 @@ describe('room art painters', () => {
     ['bookcase', (g: CanvasRenderingContext2D) => paintBookcase(g, 400, 720), 100],
     ['quilt', (g: CanvasRenderingContext2D) => paintQuilt(g, 256, 256), 100],
     ['rug', (g: CanvasRenderingContext2D) => paintRug(g, 512, 360), 100],
-    ['snow', (g: CanvasRenderingContext2D) => paintSnow(g, 256, 256, 3, 34, 5.5), 30],
+    ['rain', (g: CanvasRenderingContext2D) => paintRain(g, 256, 256, 3, 38, 46), 30],
     ['moon patch', (g: CanvasRenderingContext2D) => paintMoonPatch(g, 256, 256), 30],
     ['sill', (g: CanvasRenderingContext2D) => paintSill(g, 300, 180), 60],
   ])('paints the %s without throwing, and draws a fair amount', (_name, paint, min) => {
@@ -77,7 +77,7 @@ describe('room art painters', () => {
 });
 
 describe('RoomDressingView', () => {
-  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of snow, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
+  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
     const v = new RoomDressingView();
     expect(v.group.children).toHaveLength(24);
     v.dispose();
@@ -271,16 +271,42 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('moves the snow down and side to side, and stays finite for any frame time', () => {
+  it('moves the rain down along its lean, the near layer faster, keeps the offsets small, and stays finite for any frame time', () => {
     const v = new RoomDressingView();
-    const tiles = (v as unknown as { snow: { offset: { x: number; y: number } }[] }).snow;
+    const tiles = (v as unknown as { rain: { offset: { x: number; y: number } }[] }).rain;
     expect(tiles).toHaveLength(2);
     const y0 = tiles.map((t) => t.offset.y);
-    for (let i = 0; i < 120; i++) v.tick(1 / 60);
-    tiles.forEach((t, i) => expect(t.offset.y).toBeGreaterThan(y0[i]));
+    const x0 = tiles.map((t) => t.offset.x);
+    for (let i = 0; i < 10; i++) v.tick(1 / 60);
+    tiles.forEach((t, i) => {
+      expect(t.offset.y).toBeGreaterThan(y0[i]);
+      expect(t.offset.x).toBeGreaterThan(x0[i]); // along the lean
+    });
+    expect(tiles[0].offset.y - y0[0]).toBeGreaterThan(tiles[1].offset.y - y0[1]);
+    for (let i = 0; i < 72 * 600; i++) v.tick(1 / 72);
     v.tick(1e9);
     v.tick(NaN);
-    tiles.forEach((t) => expect(Number.isFinite(t.offset.x)).toBe(true));
+    tiles.forEach((t) => {
+      expect(Number.isFinite(t.offset.x)).toBe(true);
+      expect(Math.abs(t.offset.y)).toBeLessThan(1);
+    });
+    v.dispose();
+  });
+
+  it('brightens the window and the moonlight on the floor with a lightning flash, and lets them go after', () => {
+    const v = new RoomDressingView();
+    const outdoor = (v as unknown as { outdoor: { color: { r: number } }[] }).outdoor;
+    const patch = (v as unknown as { moonPatch: { color: { b: number } } }).moonPatch;
+    v.update(light(false));
+    const calm = [outdoor[0].color.r, patch.color.b];
+    v.lightning = 1;
+    v.update(light(false));
+    expect(outdoor[0].color.r).toBeGreaterThan(calm[0] * 2);
+    expect(patch.color.b).toBeGreaterThan(calm[1] * 2);
+    v.lightning = 0;
+    v.update(light(false));
+    expect(outdoor[0].color.r).toBeCloseTo(calm[0]);
+    expect(patch.color.b).toBeCloseTo(calm[1]);
     v.dispose();
   });
 

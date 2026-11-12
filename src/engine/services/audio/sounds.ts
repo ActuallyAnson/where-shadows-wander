@@ -47,6 +47,10 @@ export const Sound = {
   /** The traveller's footsteps: two soft steps, alternated. */
   Step0: 24,
   Step1: 25,
+  /** Rain outside, on the window and the roof, a loop (ambience): the night's constant bed. */
+  Rain: 26,
+  /** Thunder far off, low and muffled by the distance and the walls: now and then, after a flash in the window (storm.ts). */
+  Thunder: 27,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -328,6 +332,28 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     minGapS: 0.12,
     refDistance: 0.6,
     maxDistance: 4,
+  },
+  {
+    name: 'rain',
+    bus: Bus.Ambience,
+    gain: 0.55,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    // From the window, but heard about as loud anywhere in the room.
+    refDistance: 3,
+    maxDistance: 20,
+  },
+  {
+    name: 'thunder',
+    bus: Bus.Ambience,
+    gain: 0.6,
+    loop: false,
+    priority: 2,
+    minGapS: 4,
+    // Far away: the same loudness anywhere in the room, from the window's side.
+    refDistance: 50,
+    maxDistance: 100,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

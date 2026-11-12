@@ -105,6 +105,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ## Throughout the night
 
 - **The candle burns lower** after each memory, so the player can see the night moving towards sleep. The room warms when it is lit and cools again towards the end.
+- **The rain** falls all night outside the window, and its sound is a steady bed from the window's side. Now and then the window flickers pale and, a few seconds later, thunder rolls far off, low and muffled: safe inside on a wet night, never a threat (`src/engine/stage/storm.ts` times it; `__wsw.thunder()` brings a flash now). Later it could ease off as he nears sleep.
 - **The music** is the music-box tune, fuller in scenes 2 to 4, thinning in 5, a single note in 6, silent in 7.
 - **Puppets in total:** about eight (the two boys, a rabbit, a fox, a blanket fort, trees, a school gate, a jar and fireflies), each with simple rod-puppet motion: slides, bobs and turns on one pivot.
 
@@ -121,3 +122,4 @@ So that every step leaves a game we could submit:
 - 12 Nov 2026: first draft of all seven scenes.
 - 12 Nov 2026: scene 1 opens on black with a word in the dark ("noo…"), then the eyes open in two blinks.
 - 12 Nov 2026: the word in the dark is dropped; the black before the blinks is shorter, and the second blink quicker.
+- 12 Nov 2026: it rains outside instead of snowing: a rainy night in the window, a constant rain sound, and now and then a far, muffled thunder after a faint flash.
