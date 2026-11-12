@@ -42,11 +42,11 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ### 1. Waking
 
 - **Purpose:** set the mood without a word. He is awake, alone and it is late.
-- **What happens:** BEGIN fades the title to black (built). The headset stays black for a moment, then a faint word comes out of the dark, "noo…", as if he said it in his sleep, and fades. Black again; then his eyes open on the room in two slow blinks, each a little wider, and stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
+- **What happens:** BEGIN fades the title to black (built). The headset stays black for a moment; then his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
 - **The player:** lights the candle.
 - **Must make the player feel:** lonely, then a little safer once the light is there.
-- **Built already:** the fade to black, the word in the dark and the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
-- **To try:** whether the word works: it tells us a dream woke him, but it must read as a sleepy murmur, not a nightmare (the story is never frightening). A breath or a soft sound under it might do more than the word. Whether something of the friend's is in the room from the start, unlit until the end.
+- **Built already:** the fade to black, the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
+- **To try:** something in the dark before the eyes open, to say what woke him. A whispered "noo…" was tried and dropped (it read wrong); a breath or a soft sound might work, and the timeline still has a slot for a word. Whether something of the friend's is in the room from the start, unlit until the end.
 
 ### 2. How they met
 
@@ -120,3 +120,4 @@ So that every step leaves a game we could submit:
 
 - 12 Nov 2026: first draft of all seven scenes.
 - 12 Nov 2026: scene 1 opens on black with a word in the dark ("noo…"), then the eyes open in two blinks.
+- 12 Nov 2026: the word in the dark is dropped; the black before the blinks is shorter, and the second blink quicker.

@@ -1,5 +1,5 @@
-// Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black, a faint word comes out of the dark (what he says in his
-// sleep), then the eyes open: two heavy blinks, each a little wider, then open. This is the timing only, as numbers: how open the
+// Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black (a word can come out of the dark; none does yet), then the
+// eyes open: a slow heavy blink, a quicker wider one, then open. This is the timing only, as numbers: how open the
 // eyes are and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
 
 /** One point of a curve: at `t` seconds the value is `v`; between points it eases (smoothstep). */
@@ -19,26 +19,21 @@ export interface WakeScript {
 
 /** Seconds and levels of the opening. Tune here. */
 export const WAKE_SCRIPT: WakeScript = {
-  text: 'noo…',
-  textKeys: [
-    { t: 0, v: 0 },
-    { t: 1.2, v: 0 }, // a moment of plain black first
-    { t: 2.4, v: 1 },
-    { t: 3.6, v: 1 },
-    { t: 5.0, v: 0 },
-  ],
+  // No word for now (a whisper, "noo…", read wrong); the slot stays for whatever replaces it.
+  text: '',
+  textKeys: [{ t: 0, v: 0 }],
   lidKeys: [
     { t: 0, v: 0 },
-    { t: 6.0, v: 0 }, // black again after the word, then he wakes
-    { t: 6.8, v: 0.25 }, // first blink: a slit
-    { t: 7.1, v: 0.25 },
-    { t: 7.4, v: 0 },
-    { t: 7.9, v: 0 },
-    { t: 8.6, v: 0.55 }, // second: wider
-    { t: 9.0, v: 0.55 },
-    { t: 9.25, v: 0.05 },
-    { t: 9.6, v: 0.05 },
-    { t: 11.2, v: 1 }, // open
+    { t: 2.0, v: 0 }, // a moment of plain black first
+    { t: 2.8, v: 0.25 }, // first blink: a slit, slow and heavy
+    { t: 3.1, v: 0.25 },
+    { t: 3.4, v: 0 },
+    { t: 3.9, v: 0 },
+    { t: 4.25, v: 0.55 }, // second: wider and quicker
+    { t: 4.4, v: 0.55 },
+    { t: 4.55, v: 0.05 },
+    { t: 4.8, v: 0.05 },
+    { t: 6.4, v: 1 }, // open
   ],
 };
 
