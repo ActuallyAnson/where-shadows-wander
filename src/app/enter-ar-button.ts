@@ -7,7 +7,12 @@ import type { UiSound } from './ui-sound';
 /** Things the page's own screens ask of the app, filled in once the app has them (the settings exist after the title does). */
 export interface LauncherHooks {
   openSettings?: () => void;
+  /** The title has finished fading to black and is gone, so the session's own fade-in can start (it would be hidden before). */
+  titleGone?: () => void;
 }
+
+/** How long the title takes to fade to black after BEGIN (title-markup.ts: a 0.3 s delay, then 1.2 s). */
+const TITLE_FADE_MS = 1500;
 
 export async function mountEnterArButtonIfNeeded(
   world: World,
@@ -109,7 +114,10 @@ export async function mountEnterArButtonIfNeeded(
   // the older XRWebGLLayer if three.js can't bind the session with a projection layer (the Pico's driver has none).
   /** Shows the launch log on the page (set below in debug builds). */
   let showLaunchLog: (() => void) | null = null;
+  /** When BEGIN was pressed (performance.now()), so the title stays up until its fade to black has finished. */
+  let pressedAt = -Infinity;
   const launchDirect = async (mode: XRSessionMode) => {
+    pressedAt = performance.now();
     title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
@@ -281,12 +289,23 @@ export async function mountEnterArButtonIfNeeded(
   uiContainer.append(note, buttonRow);
   document.body.append(uiContainer);
 
+  // A session can start a few milliseconds after BEGIN (the emulator): the title stays up, fading, until it is black. The
+  // count makes a hide meant for an earlier session do nothing.
+  let sessions = 0;
   world.renderer.xr.addEventListener('sessionstart', () => {
+    const which = ++sessions;
     uiContainer.style.display = 'none';
-    title?.setVisible(false);
     world.scene.visible = true;
+    const wait = Math.max(0, pressedAt + TITLE_FADE_MS - performance.now());
+    setTimeout(() => {
+      if (which !== sessions || !world.renderer.xr.isPresenting) return;
+      title?.setVisible(false);
+      hooks.titleGone?.();
+    }, wait);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    sessions++;
+    pressedAt = -Infinity;
     uiContainer.style.display = 'flex';
     title?.setVisible(true);
     title?.setBusy(false);

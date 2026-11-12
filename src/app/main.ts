@@ -114,6 +114,8 @@ const desk = isDeskMode(launch.mode);
 /** Seconds the headset stays black when the session starts, then seconds the room takes to fade in. */
 const SESSION_BLACK_HOLD_S = 0.4;
 const SESSION_FADE_IN_S = 1.6;
+/** The longest the headset waits on black for the title to go, should the title never say it has. */
+const SESSION_BLACK_FALLBACK_S = 3;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -428,6 +430,8 @@ async function start(): Promise<void> {
   // holds it a moment over the first frames (the slowest, while things settle), then the room fades in.
   const fade = new FadeView();
   const fadeHead = new Vector3();
+  const fadeInFromBlack = () => fade.fadeTo(0, SESSION_FADE_IN_S);
+  launcherHooks.titleGone = () => fade.fadeTo(1, SESSION_BLACK_HOLD_S, fadeInFromBlack);
   world.scene.add(fade.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
@@ -832,8 +836,9 @@ async function start(): Promise<void> {
   world.renderer.xr.addEventListener('sessionstart', () => {
     const session = world.renderer.xr.getSession();
     guard('sessionstart: fade', () => {
+      // Black until the page's title has faded out and gone (launcherHooks.titleGone), with a fallback should it never say so.
       fade.setBlack(true);
-      fade.fadeTo(1, SESSION_BLACK_HOLD_S, () => fade.fadeTo(0, SESSION_FADE_IN_S));
+      fade.fadeTo(1, SESSION_BLACK_FALLBACK_S, fadeInFromBlack);
     });
     guard('sessionstart: audio', () => audio.unlock());
     guard('sessionstart: quality', () => {
