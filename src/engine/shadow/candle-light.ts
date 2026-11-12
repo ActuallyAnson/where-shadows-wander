@@ -13,6 +13,7 @@ import {
   Mesh,
   NearestFilter,
   ShaderMaterial,
+  Vector2,
   Vector3,
   Vector4,
   WebGLCubeRenderTarget,
@@ -83,8 +84,21 @@ const distanceFragment = /* glsl */ `
   }
 `;
 
-/** What a patched material adds to its fragment shader: the candle's light at this point, shadows included. */
-const lightGlsl = /* glsl */ `
+/** How far the wall's normal map leans a bumped surface's normal (0 flat, 1 as the map has it). Tune in the headset. */
+export const BUMP_STRENGTH = 0.6;
+
+/** A normal map for a flat quad (a PlaneGeometry: +x along it, +y up it), and how many times it repeats across the quad. */
+export interface CandleBump {
+  readonly map: Texture;
+  readonly repeat: readonly [number, number];
+}
+
+/**
+ * What a patched material adds to its fragment shader: the candle's light at this point, shadows included. With `bump`, the
+ * normal is leaned by a normal map first, so the light catches the surface's lumps (most where it rakes, at the pool's edge).
+ */
+const lightGlsl = (bump: boolean) => /* glsl */ `
+  ${bump ? '#define CANDLE_BUMP' : ''}
   uniform vec3 uCandlePos;
   uniform float uCandleIntensity;
   uniform vec3 uCandleColour;
@@ -97,6 +111,14 @@ const lightGlsl = /* glsl */ `
   uniform vec4 uCandleBeam;
   varying vec3 vCandleWorld;
   varying vec3 vCandleNormal;
+  #ifdef CANDLE_BUMP
+    uniform sampler2D uCandleBump;
+    uniform vec2 uCandleBumpRepeat;
+    uniform float uCandleBumpStrength;
+    varying vec2 vCandleUv;
+    varying vec3 vCandleTangent;
+    varying vec3 vCandleBitangent;
+  #endif
   ${packGlsl}
   float candleShadowTap(vec3 dir, float dist) {
     float stored = candleUnpack(textureCube(uCandleShadow, dir)) * uCandleFar;
@@ -111,7 +133,13 @@ const lightGlsl = /* glsl */ `
     // How squarely the surface faces the flame (either side: the room's quads are two-sided), softened so nothing goes flat black.
     // A mesh with no normals (the bunting's ribbons) is taken to face it.
     float nl = length(vCandleNormal);
-    float facing = nl > 1e-4 ? 0.35 + 0.65 * abs(dot(vCandleNormal / nl, l)) : 1.0;
+    vec3 n = nl > 1e-4 ? vCandleNormal / nl : vec3(0.0);
+    #ifdef CANDLE_BUMP
+      vec2 b = texture2D(uCandleBump, vCandleUv * uCandleBumpRepeat).xy * 2.0 - 1.0;
+      if (nl > 1e-4)
+        n = normalize(n + (normalize(vCandleTangent) * b.x + normalize(vCandleBitangent) * b.y) * uCandleBumpStrength);
+    #endif
+    float facing = nl > 1e-4 ? 0.35 + 0.65 * abs(dot(n, l)) : 1.0;
     float reach = 1.0 / (1.0 + d2 / (uCandleReach * uCandleReach));
     // The beam: x, y the cosines of its inner and outer angles, z the light off to the side, w its brightness on the axis.
     float cone = smoothstep(uCandleBeam.y, uCandleBeam.x, dot(-l, uCandleDir));
@@ -143,6 +171,7 @@ export class CandleLight {
     uCandleShadow: { value: null as Texture | null },
     uCandleShadowOn: { value: 0 },
     uCandleFar: { value: SHADOW_FAR },
+    uCandleBumpStrength: { value: BUMP_STRENGTH },
     uCandleDir: { value: new Vector3(0, 0, -1) },
     uCandleBeam: {
       value: new Vector4(
@@ -179,14 +208,30 @@ export class CandleLight {
 
   /**
    * Makes `material` lit by the room's light: its colour (the surface's own, its albedo) is multiplied by the moon's light plus
-   * the candle's. This is the room's only lighting: nothing else should tint the material for the light.
+   * the candle's. This is the room's only lighting: nothing else should tint the material for the light. `bump` (flat quads
+   * only): a normal map whose lumps the light catches; how strongly is shared by all, `uniforms.uCandleBumpStrength`.
    */
-  light(material: MeshBasicMaterial): void {
+  light(material: MeshBasicMaterial, bump?: CandleBump): void {
     const u = this.uniforms;
+    const own = bump
+      ? { uCandleBump: { value: bump.map }, uCandleBumpRepeat: { value: new Vector2(bump.repeat[0], bump.repeat[1]) } }
+      : {};
+    const bumpVaryings = bump
+      ? '\nvarying vec2 vCandleUv;\nvarying vec3 vCandleTangent;\nvarying vec3 vCandleBitangent;'
+      : '';
+    const bumpVertex = bump
+      ? `
+          vCandleUv = uv;
+          vCandleTangent = mat3(modelMatrix) * vec3(1.0, 0.0, 0.0);
+          vCandleBitangent = mat3(modelMatrix) * vec3(0.0, 1.0, 0.0);`
+      : '';
     material.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, u);
+      Object.assign(shader.uniforms, u, own);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vCandleWorld;\nvarying vec3 vCandleNormal;')
+        .replace(
+          '#include <common>',
+          `#include <common>\nvarying vec3 vCandleWorld;\nvarying vec3 vCandleNormal;${bumpVaryings}`,
+        )
         .replace(
           '#include <project_vertex>',
           `#include <project_vertex>
@@ -197,13 +242,13 @@ export class CandleLight {
             candleN = mat3(instanceMatrix) * candleN;
           #endif
           vCandleWorld = (modelMatrix * candleP).xyz;
-          vCandleNormal = mat3(modelMatrix) * candleN;`,
+          vCandleNormal = mat3(modelMatrix) * candleN;${bumpVertex}`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n${lightGlsl}`)
+        .replace('#include <common>', `#include <common>\n${lightGlsl(!!bump)}`)
         .replace('#include <opaque_fragment>', 'outgoingLight *= candleLight();\n#include <opaque_fragment>');
     };
-    material.customProgramCacheKey = () => 'candle-light-3';
+    material.customProgramCacheKey = () => (bump ? 'candle-light-3-bump' : 'candle-light-3');
     material.needsUpdate = true;
   }
 

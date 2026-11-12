@@ -8,14 +8,19 @@ import {
   BufferGeometry,
   CanvasTexture,
   Color,
+  DataTexture,
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  LinearFilter,
+  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
   RepeatWrapping,
+  RGBAFormat,
   SRGBColorSpace,
+  UnsignedByteType,
   Vector3,
 } from '@iwsdk/core';
 import type { Material, Object3D } from '@iwsdk/core';
@@ -41,8 +46,9 @@ import {
   WALL_THINGS,
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
+import { plasterNormals } from './pure/plaster-bump';
 import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
-import { CANDLE_REACH_M, type CandleLight } from './candle-light';
+import { CANDLE_REACH_M, type CandleBump, type CandleLight } from './candle-light';
 import type { StandIn } from './room-models';
 import { placementOr, type RoomLayout } from '../stage/room-layout';
 import { applyPlacement, readPlacement, type EditablePiece, type EditableSource } from './room-placement';
@@ -206,6 +212,22 @@ function paintedCanvas(
   return canvas;
 }
 
+/** How wide one tile of the plaster's lumps is on the wall (m), and its texture's size (px). */
+const PLASTER_TILE_M = 0.6;
+const PLASTER_PX = 256;
+
+/** The plaster's normal map as a repeating texture, mipmapped so it calms into flat with distance instead of shimmering. */
+function plasterTexture(): DataTexture {
+  const t = new DataTexture(plasterNormals(PLASTER_PX, 5, 2), PLASTER_PX, PLASTER_PX, RGBAFormat, UnsignedByteType);
+  t.wrapS = RepeatWrapping;
+  t.wrapT = RepeatWrapping;
+  t.magFilter = LinearFilter;
+  t.minFilter = LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.needsUpdate = true;
+  return t;
+}
+
 export class RoomDressingView implements EditableSource {
   readonly group = new Group();
   /** The pieces the room layout places (the pictures, the shelf, the sill, the moonlight's patch), for the room editor. */
@@ -232,6 +254,9 @@ export class RoomDressingView implements EditableSource {
   /** The room art the candle lights (the walls, and everything on and by them), and the props that cast its shadows. */
   private readonly lit: Mesh[] = [];
   private readonly casters: Mesh[] = [];
+  /** The walls' plaster, as a normal map the candle's light catches (plaster-bump.ts), and which materials it is on. */
+  private readonly plaster = plasterTexture();
+  private readonly bumps = new Map<MeshBasicMaterial, CandleBump>();
   /** The painted bed, bookcase and rug, hidden when real models take their place (room-models.ts). */
   private readonly standIns: Record<StandIn, Mesh[]> = { bed: [], bookcase: [], rug: [] };
 
@@ -495,6 +520,15 @@ export class RoomDressingView implements EditableSource {
     this.group.add(this.bunting.mesh);
     this.materials.push(this.bunting.material);
     this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
+    // The walls are plaster: the candle catches its lumps (one tile about every PLASTER_TILE_M).
+    this.bumps.set(this.wall.material as MeshBasicMaterial, {
+      map: this.plaster,
+      repeat: [4 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
+    });
+    this.bumps.set(left.material as MeshBasicMaterial, {
+      map: this.plaster,
+      repeat: [5 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
+    });
     // The props that stand in the candle's light and stay still (the bunting swings, so it casts none).
     this.casters.push(...this.things, caseBox, ...bed);
     this.place();
@@ -612,7 +646,7 @@ export class RoomDressingView implements EditableSource {
     for (const m of this.lit) {
       const material = m.material as MeshBasicMaterial;
       material.color.setScalar(LIT_PEAK); // the art's own colour; the light does the rest
-      candle.light(material);
+      candle.light(material, this.bumps.get(material));
     }
     for (const m of this.casters) candle.cast(m);
   }
@@ -816,6 +850,7 @@ export class RoomDressingView implements EditableSource {
     this.wonderMat.dispose();
     this.bunting.dispose();
     for (const t of this.textures) t.dispose();
+    this.plaster.dispose();
     for (const g of this.geometries) g.dispose();
     for (const m of this.materials as Material[]) m.dispose();
     for (const m of this.outdoor as Material[]) m.dispose();
