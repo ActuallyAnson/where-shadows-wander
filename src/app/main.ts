@@ -749,6 +749,9 @@ async function start(): Promise<void> {
       fileName: BEDROOM_LAYOUT_FILE,
       assetFiles,
       roomRoots: [bedroomView.group, bedTray.group, candleView.group],
+      setFullBright: (on) => {
+        candleLight.fullBright = on;
+      },
       // Closing the editor leaves for the game (its desk has nothing else on it).
       suspendDesk: (on) => {
         if (!on) switchLaunch('game', DEBUG_TOOLS);
@@ -1484,6 +1487,11 @@ async function start(): Promise<void> {
         /** A lightning flash in the window now, and its thunder a few seconds later (while the story plays). */
         thunder: () => storm.strikeNow(),
         /** How strongly the candle catches the walls' plaster (0 flat; default BUMP_STRENGTH): try it live. Returns it. */
+        /** Debug: lights everything fully (true) or as in the game (false); with no argument, flips it. */
+        fullBright: (on?: boolean) => {
+          candleLight.fullBright = on ?? !candleLight.fullBright;
+          return candleLight.fullBright;
+        },
         wallBump: (strength?: number) => {
           const u = candleLight.uniforms.uCandleBumpStrength;
           if (typeof strength === 'number' && strength >= 0) u.value = strength;

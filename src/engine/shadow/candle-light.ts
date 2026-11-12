@@ -100,6 +100,7 @@ export interface CandleBump {
 const lightGlsl = (bump: boolean) => /* glsl */ `
   ${bump ? '#define CANDLE_BUMP' : ''}
   uniform vec3 uCandlePos;
+  uniform float uFullBright;
   uniform float uCandleIntensity;
   uniform vec3 uCandleColour;
   uniform float uCandleReach;
@@ -125,6 +126,11 @@ const lightGlsl = (bump: boolean) => /* glsl */ `
     return dist - (0.03 + 0.015 * dist) <= stored ? 1.0 : 0.0;
   }
   vec3 candleLight() {
+    // Full bright (debug): a plain light from above, a little less on the sides and less again underneath, so shapes still read.
+    if (uFullBright > 0.5) {
+      float len = length(vCandleNormal);
+      return vec3(0.8 + 0.2 * (len > 1e-4 ? vCandleNormal.y / len : 0.0));
+    }
     if (uCandleIntensity <= 0.0) return uMoonLight;
     vec3 toFlame = uCandlePos - vCandleWorld;
     float d2 = max(dot(toFlame, toFlame), 1e-6);
@@ -165,6 +171,8 @@ export class CandleLight {
   readonly uniforms = {
     uCandlePos: { value: new Vector3() },
     uCandleIntensity: { value: 0 },
+    /** A debug switch: 1 lights everything evenly and lifts the dark tones (the room editor's "Full bright"). */
+    uFullBright: { value: 0 },
     uCandleColour: { value: CANDLE_COLOUR.clone() },
     uCandleReach: { value: CANDLE_REACH_M },
     uMoonLight: { value: MOON_LIGHT.clone() },
@@ -246,7 +254,11 @@ export class CandleLight {
         );
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${lightGlsl(!!bump)}`)
-        .replace('#include <opaque_fragment>', 'outgoingLight *= candleLight();\n#include <opaque_fragment>');
+        // Full bright (debug) also lifts the dark tones: the room's own colours are near black.
+        .replace(
+          '#include <opaque_fragment>',
+          'outgoingLight *= candleLight();\nif (uFullBright > 0.5) outgoingLight = sqrt(outgoingLight);\n#include <opaque_fragment>',
+        );
     };
     material.customProgramCacheKey = () => (bump ? 'candle-light-3-bump' : 'candle-light-3');
     material.needsUpdate = true;
@@ -300,6 +312,17 @@ export class CandleLight {
       else dir.set(0, 0, -1);
     }
     if (u.uCandlePos.value.distanceToSquared(this.baked) > REBAKE_MOVE * REBAKE_MOVE) this.dirty = true;
+  }
+
+  /**
+   * Debug: lights every lit material evenly from above (no candle, moon or shadows) and lifts its dark tones, so the dark room
+   * can be seen. Not how anything looks in the game.
+   */
+  get fullBright(): boolean {
+    return this.uniforms.uFullBright.value > 0.5;
+  }
+  set fullBright(on: boolean) {
+    this.uniforms.uFullBright.value = on ? 1 : 0;
   }
 
   /** Sets the moon's light as a multiple of its night level (MOON_LIGHT): 1 is the night, more is a brighter moon. */

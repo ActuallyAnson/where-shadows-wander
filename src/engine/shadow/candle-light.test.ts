@@ -48,3 +48,19 @@ describe('CandleLight.light', () => {
     candle.dispose();
   });
 });
+
+describe('CandleLight.fullBright', () => {
+  it('is a switch shared by every lit material that lights them evenly', () => {
+    const candle = new CandleLight();
+    const m = new MeshBasicMaterial();
+    candle.light(m);
+    const s = patched(m);
+    expect(s.fragmentShader).toContain('if (uFullBright > 0.5) outgoingLight = sqrt(outgoingLight);');
+    expect(candle.fullBright).toBe(false);
+    candle.fullBright = true;
+    expect(s.uniforms.uFullBright.value).toBe(1);
+    candle.fullBright = false;
+    expect(s.uniforms.uFullBright.value).toBe(0);
+    candle.dispose();
+  });
+});

@@ -6,7 +6,7 @@
 // piece's placement as the file stores it: position in metres, rotation in degrees and scale, in the piece's own space
 // (room space for the room, the tray's space for the lap). Save writes the file through the dev server.
 //
-//   W move · E rotate · R scale · Q local/world · hold Shift to snap (1 cm, 5°, 0.05) · Esc deselect
+//   W move · E rotate · R scale · Q local/world · hold Shift to snap (1 cm, 5°, 0.05) · Esc deselect · L full bright
 //   Ctrl+Z undo · Ctrl+Y or Ctrl+Shift+Z redo · Ctrl+S save
 //
 // The candle's shadows are baked: they are cast again while a piece is dragged (once a frame) and whenever it is placed. The
@@ -73,6 +73,8 @@ export interface RoomEditorDeps {
   fileName: string;
   /** Scene roots that are part of the room, still shown with "Room only" on (everything else at the top of the scene is hidden). */
   roomRoots: readonly Object3D[];
+  /** Draws the room at full colour, unlit (true), or by the candle and the moon as in the game (false). */
+  setFullBright(on: boolean): void;
   /** Told when the editor takes the desk view (true) and when it closes (false: main.ts returns to the game). */
   suspendDesk(on: boolean): void;
 }
@@ -173,6 +175,7 @@ export class RoomEditor {
   private savedText: string;
   private status = '';
   private roomOnly = false;
+  private fullBright = false;
   private open = false;
   /** The piece the selection section was last built for (it is rebuilt only when that changes, so typing keeps its focus). */
   private shownKey: string | null | undefined = undefined;
@@ -686,6 +689,13 @@ export class RoomEditor {
     this.render();
   }
 
+  /** "Full bright" draws the room at its full colour, unlit, to see it in the dark; again turns the game's lighting back on. */
+  private setFullBright(on: boolean): void {
+    this.fullBright = on;
+    this.deps.setFullBright(on);
+    this.render();
+  }
+
   private hideNonRoom(): void {
     for (const child of this.deps.scene.children)
       if (child.visible && child !== this.helper && !this.deps.roomRoots.includes(child) && !isCameraOrLight(child)) {
@@ -912,6 +922,7 @@ export class RoomEditor {
     else if (k === 'w') this.setMode('translate');
     else if (k === 'e') this.setMode('rotate');
     else if (k === 'r') this.setMode('scale');
+    else if (k === 'l') this.setFullBright(!this.fullBright);
     else if (k === 'q') {
       this.gizmo.setSpace(this.gizmo.space === 'local' ? 'world' : 'local');
       this.render();
@@ -934,7 +945,7 @@ export class RoomEditor {
         <button data-act="tab:scene">Scene <small id="re-count"></small></button></nav>
       <div class="pane" data-tab="inspect">
         <p class="hint">Click a piece, then drag the gizmo or type numbers. W move · E rotate · R scale · Q local/world ·
-        Shift snaps · Esc deselects · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
+        Shift snaps · Esc deselects · L full bright · Ctrl+Z / Ctrl+Y undo, redo · Ctrl+D copies · Delete removes · Ctrl+S saves.
         Drag empty space to orbit; hold the right button to fly (mouse looks, WASD moves, Q/E down/up, Shift faster);
         arrow keys move any time.</p>
         <section><div class="row" id="re-modes"></div><div class="row" id="re-views"></div></section>
@@ -967,6 +978,7 @@ export class RoomEditor {
         this.render();
       } else if (act === 'view') this.view(arg);
       else if (act === 'roomonly') this.setRoomOnly(!this.roomOnly);
+      else if (act === 'bright') this.setFullBright(!this.fullBright);
       else if (act === 'pick') this.selectId(b.dataset.key ?? '');
       else if (act === 'undo') this.step(true);
       else if (act === 'redo') this.step(false);
@@ -1019,7 +1031,9 @@ export class RoomEditor {
     this.root.querySelector('#re-views')!.innerHTML =
       Object.keys(VIEWS)
         .map((v) => `<button data-act="view:${v}">${v}</button>`)
-        .join('') + `<button data-act="roomonly" class="${this.roomOnly ? 'on' : ''}">Room only</button>`;
+        .join('') +
+      `<button data-act="roomonly" class="${this.roomOnly ? 'on' : ''}">Room only</button>` +
+      `<button data-act="bright" class="${this.fullBright ? 'on' : ''}" title="Light everything fully (L)">Full bright L</button>`;
 
     const piece = this.selected;
     const shown = piece ? keyOf(piece) : null;
