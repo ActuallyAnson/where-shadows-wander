@@ -108,24 +108,9 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 - **Not frightening.** He wakes suddenly, but the waking is lonely, not scary: no monsters, no nightmare imagery, no jump scares.
 - **Show, don't tell.** The shadow play carries the story on its own, with no dialogue or narration. At most a word or two may be written on the wall where a picture cannot do the job (for example a name). Meaning comes from the puppets, the light, the music and the sound, so every scene must make sense to a player who reads nothing. Test this by playing it to someone who doesn't know the premise.
 
-### Shape of the night (proposed, not final)
+### The scenes
 
-The shadow play is not finalised. This is the arc the scenes should follow, to test and change:
-
-1.  **Waking.** The title fades to black, then the room fades in, dark and cold. The boy is awake and alone.
-2.  **The candle.** Lighting it is the first thing the player does (built). The light makes the room feel safer.
-3.  **The first memory.** His own hand shadow becomes the start of a memory, so the player learns that shapes bring memories back without being told.
-4.  **The memories.** A few short scenes (about three to five) of their friendship, from first meeting to the last ordinary day. Each waits for a shape and plays when it commits.
-5.  **Letting go.** A last memory that admits the friend is gone, gently. It could be a goodbye, or the friend's shadow staying beside the boy's for a moment before it fades.
-6.  **Sleep.** The candle burns down, the wall darkens, and the session ends with a fade to black.
-
-### Ideas to try (proposals)
-
-- **The friend taught him shadow puppets.** Then every shape the player makes is one the friend showed him, and making it is how he remembers. This ties the hands to the theme more closely than any other idea here.
-- **A shape for each memory.** For example: the rabbit for the day they found a rabbit in the park; the fox for a game of chase; a flat hand for a wave goodbye at the school gate; a cupped hand to hold something small they found together.
-- **Two-hand moments.** When the memory showed the two friends together, the boy's second hand stands in for the friend's. Two-handed shapes are out of v1 for tracking reasons, so this would be two one-handed shapes, not one shape made by both hands together.
-- **Absence in the room.** Something of the friend's in the bedroom (a toy, a drawing, a borrowed cap) that the candle lights at the end.
-- **The candle as time passing.** It burns lower with each memory, so the player can see the night moving towards sleep.
+The night is told in seven scenes: waking, four memories, a goodbye and sleep. Before each memory the friend's hand shadow appears and shows a shape, and when the player copies it their shadow becomes the memory. The scene-by-scene design is in [STORY.md](STORY.md). Each scene is a first draft, built and rewritten one at a time.
 
 ### What else is settled
 
@@ -276,13 +261,13 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - [ ] Confirm hand tracking in an immersive-vr session on the Quest Browser.
 
-- [ ] Write the memories (premise settled 12 Nov): how many, what each one shows, and which shape moves on each.
+- [ ] Build and play-test each scene in [STORY.md](STORY.md), one at a time (first drafts written 12 Nov).
 
 - [ ] The friend: name, age, and whether he is a child or a pet (the premise reads as a child; a pet would make the story lighter and easier to share with younger players).
 
 - [ ] What wakes the boy: a dream, a sound, or nothing at all.
 
-- [ ] The ending: what in the shadow play lets him rest (a goodbye, the friend's shadow fading, the candle going out), and whether the player chooses the moment.
+- [ ] The ending: STORY.md proposes palm to palm with the friend's hand, then covering the flame to put the candle out; confirm it in the headset.
 
 - [ ] Whether to put a short content note at the start (the game is about the death of a friend) and on the store page.
 
