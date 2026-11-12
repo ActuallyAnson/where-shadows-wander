@@ -61,8 +61,9 @@ describe('fontFaceCss', () => {
 });
 
 describe('the busy look', () => {
-  it('guttering flame and locked items come from one class', () => {
+  it('the guttering flame and the fade to black come from one class, and the items keep their look', () => {
     expect(TITLE_CSS).toContain('.wsw-busy .wsw-flame');
-    expect(TITLE_CSS).toContain('.wsw-busy .wsw-item{pointer-events:none');
+    expect(TITLE_CSS).toContain('.wsw-busy::after{opacity:1');
+    expect(TITLE_CSS).not.toContain('.wsw-busy .wsw-item');
   });
 });
