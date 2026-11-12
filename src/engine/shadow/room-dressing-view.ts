@@ -11,6 +11,7 @@ import {
   DataTexture,
   DoubleSide,
   Float32BufferAttribute,
+  FrontSide,
   Group,
   LinearFilter,
   LinearMipmapLinearFilter,
@@ -317,6 +318,9 @@ export class RoomDressingView implements EditableSource {
     right.rotation.y = -Math.PI / 2;
     right.position.set(1.995, 1.25, -0.4);
     right.renderOrder = WALL_ORDER;
+    // The walls all face into the room, so they are one-sided: from inside nothing changes, and from outside (the room editor's
+    // views) the near walls drop away and the room can be seen into, like Damon's own walls, floor and ceiling.
+    for (const m of [this.wall, left]) (m.material as MeshBasicMaterial).side = FrontSide;
 
     // The night in the left window, in five layers that slide against each other as the head moves, so the outside has depth: sky,
     // hills, village, near ground, then the curtains (which belong to the window and do not slide). They sit in front of the paper,

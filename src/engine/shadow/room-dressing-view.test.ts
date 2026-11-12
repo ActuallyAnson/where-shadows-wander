@@ -1,4 +1,4 @@
-import { Vector3 } from '@iwsdk/core';
+import { FrontSide, Mesh, MeshBasicMaterial, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
 import {
@@ -80,6 +80,22 @@ describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
     const v = new RoomDressingView();
     expect(v.group.children).toHaveLength(24);
+    v.dispose();
+  });
+
+  it('has one-sided walls facing into the room, so from outside (the room editor) the near ones drop away', () => {
+    const v = new RoomDressingView();
+    v.group.updateMatrixWorld(true);
+    const walls = v.group.children.filter((o): o is Mesh => o instanceof Mesh && o.renderOrder === v.wall.renderOrder);
+    expect(walls).toHaveLength(3); // the wall behind the stage and the two side walls
+    const normal = new Vector3();
+    const inward = new Vector3();
+    for (const w of walls) {
+      expect((w.material as MeshBasicMaterial).side).toBe(FrontSide);
+      normal.set(0, 0, 1).transformDirection(w.matrixWorld);
+      inward.set(0, 1.25, -0.4).sub(w.position); // towards the middle of the room
+      expect(normal.dot(inward)).toBeGreaterThan(0);
+    }
     v.dispose();
   });
 
