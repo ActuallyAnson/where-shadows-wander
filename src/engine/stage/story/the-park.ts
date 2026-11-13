@@ -5,7 +5,7 @@
 // two boys running between them.) Every time is in seconds from the chapter's start.
 import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
 import { bobKeys, swingKeys, type Cue, type PuppetPart, type Track } from '../puppet/puppet-scene';
-import { FLOOR_Y, FORT_DEPTH, RABBIT_REST } from './how-they-met';
+import { FLOOR_Y, FORT_DEPTH, FORT_OFF_X, RABBIT_REST } from './how-they-met';
 
 /** The puppet fox: from the player's shadow (the handoff) to where it lands, behind the rabbit on the blanket. */
 export const FOX_LANDS: readonly [number, number] = [-0.16, FLOOR_Y];
@@ -123,7 +123,7 @@ const tracks: Track[] = [
     keys: [[STARTLE_S, 0], ...swingKeys(BOLT_S, runEnd, RABBIT_STRIDE_S, 0.08).slice(1)],
   },
   // The fort and the kids slide away to the left behind them (the fort, standing back, a little behind).
-  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -OFF_WALL_X, FORT_DEPTH, true) },
+  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -FORT_OFF_X, FORT_DEPTH, true) },
   { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -OFF_WALL_X, 0, true) },
 ];
 

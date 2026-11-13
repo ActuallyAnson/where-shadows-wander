@@ -14,6 +14,7 @@ import {
   type Track,
   type Wobble,
 } from '../puppet/puppet-scene';
+import { ROOM_WALL_HEIGHT_M, ROOM_WALL_WIDTH_M, STORY_SCALE } from '../stage-frame';
 
 /** The floor of the fort, metres up the wall from its centre (above the panelling's rail, as the prologue's path was). */
 export const FLOOR_Y = -0.12;
@@ -73,6 +74,15 @@ const LEAN_HAND_X = 0.07 * KID_SCALE;
 
 /** How far back the fort stands (PuppetPart.depth): a paler, softer shadow behind the kids, the torch and the rabbits. */
 export const FORT_DEPTH = 0.6;
+/** Half the wall's width and height in stage metres: the fort fills the wall, so the kids are inside it with the player. */
+const WALL_HALF_W = ROOM_WALL_WIDTH_M / 2 / STORY_SCALE;
+const WALL_HALF_H = ROOM_WALL_HEIGHT_M / 2 / STORY_SCALE;
+/** The fort's size: its chair backs just past the wall's sides, and its blanket's peak just past the wall's top. */
+const FORT_W = 2 * WALL_HALF_W + 0.12;
+const FORT_BASE_Y = FLOOR_Y - 0.01;
+const FORT_H = (WALL_HALF_H - FORT_BASE_Y) / 0.94;
+/** How far the fort slides to be off the wall: it is wider than the other places, so it starts and ends further out. */
+export const FORT_OFF_X = WALL_HALF_W + FORT_W / 2 + 0.02;
 
 const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[] => [
   { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE },
@@ -103,15 +113,15 @@ const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[
 ];
 
 const parts: PuppetPart[] = [
-  // The fort, standing back, and in front of it the torch and the two kids (the scenery), sliding in together.
+  // The fort, standing back and filling the wall, and in front of it the torch and the two kids (the scenery), sliding in together.
   {
     id: 'fort',
     art: 'fort',
-    w: 1.12,
-    h: 0.62,
+    w: FORT_W,
+    h: FORT_H,
     pivot: [0.5, 0],
-    x: OFF_WALL_X,
-    y: FLOOR_Y - 0.01,
+    x: FORT_OFF_X,
+    y: FORT_BASE_Y,
     depth: FORT_DEPTH,
   },
   { id: 'scenery', art: '', w: 1, h: 1, x: OFF_WALL_X },
@@ -197,7 +207,7 @@ const downHops = hops(DOWN_HOPS_S, 2, DOWN_HOP_S, RABBIT_AT_HAND, RABBIT_REST, 0
 const downEnd = DOWN_HOPS_S + 2 * DOWN_HOP_S;
 
 const tracks: Track[] = [
-  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, OFF_WALL_X, 0, FORT_DEPTH) },
+  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, FORT_OFF_X, 0, FORT_DEPTH) },
   { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, OFF_WALL_X, 0) },
   // The rabbit comes off the player's shadow, sits, hops to the friend's hand and shrinks to sit on it.
   {

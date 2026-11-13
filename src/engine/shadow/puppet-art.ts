@@ -341,8 +341,8 @@ function fort(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.lineTo(w, h);
   g.lineTo(w * 0.9, h);
   g.quadraticCurveTo(w * 0.86, h * 0.7, w * 0.88, h * 0.3);
-  // The hanging edge, scalloped from right to left.
-  const n = 7;
+  // The hanging edge, scalloped from right to left (the fort fills the wall, so it has many).
+  const n = 11;
   for (let i = 0; i < n; i++) {
     const u0 = 0.88 - (i * 0.76) / n,
       u1 = 0.88 - ((i + 1) * 0.76) / n;
