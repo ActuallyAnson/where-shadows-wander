@@ -124,10 +124,8 @@ describe('StageFrame.setStoryArea', () => {
     }
   });
 
-  it('fills most of the room wall (80 to 90 percent each way)', () => {
-    expect((WALL_WIDTH_M * STORY_SCALE) / 4).toBeGreaterThanOrEqual(0.8);
-    expect((WALL_WIDTH_M * STORY_SCALE) / 4).toBeLessThanOrEqual(0.9);
-    expect((WALL_HEIGHT_M * STORY_SCALE) / 2.5).toBeGreaterThanOrEqual(0.8);
-    expect((WALL_HEIGHT_M * STORY_SCALE) / 2.5).toBeLessThanOrEqual(0.9);
+  it('fills 95 percent of the room wall each way', () => {
+    expect((WALL_WIDTH_M * STORY_SCALE) / 4).toBeCloseTo(0.95, 6);
+    expect((WALL_HEIGHT_M * STORY_SCALE) / 2.5).toBeCloseTo(0.95, 6);
   });
 });
