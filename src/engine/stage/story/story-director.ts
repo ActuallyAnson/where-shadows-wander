@@ -16,7 +16,7 @@ export interface FriendBeat {
   readonly shape: Shape;
   readonly x: number;
   readonly y: number;
-  /** Stage metres it rises as it appears (and sinks as it goes): the friend lifting his hand. Default 0. */
+  /** Stage metres it rises as it appears (and sinks as it goes): the friend lifting her hand. Default 0. */
   readonly rise?: number;
   /** Which of the friend's painted hands (friend-puppet.ts) shows the shape, e.g. 'wave'. Default the shape's own. */
   readonly puppet?: string;

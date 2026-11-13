@@ -26,10 +26,10 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '3 · The park',
     candle: 'rainy',
     beats: [
-      // In the fort, between the kids, the friend's hand rises beyond his puppet's raised one, making a fox: now this one.
+      // In the fort, between the kids, the friend's hand rises beyond her puppet's raised one, making a fox: now this one.
       { kind: 'friend', shape: 'fox', x: -0.08, y: 0.17, rise: 0.08 },
       // The player's fox pounces at the rabbit on the blanket, and the chase carries them out of the fort into the park, where
-      // they become the boys, tumble into the grass, and lie there at dusk under a firefly.
+      // they become the two kids, tumble into the grass, and lie there at dusk under a firefly.
       { kind: 'memory', from: 'fox', ...chapter('the-park') },
     ],
   },
@@ -38,7 +38,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '4 · Fireflies',
     candle: 'dusk',
     beats: [
-      // Lying in the grass, the friend reaches up; his hand rises at the wall's left, cupped.
+      // Lying in the grass, the friend reaches up; her hand rises at the wall's left, cupped.
       { kind: 'friend', shape: 'cup', x: -0.34, y: 0.24, rise: 0.08 },
       // The firefly sits in the player's cup, then the hill, the jar, and the walk to school.
       { kind: 'memory', from: 'firefly', handoff: CUP_HOLD_S, ...chapter('fireflies') },
@@ -49,7 +49,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '5 · The last ordinary day',
     candle: 'morning',
     beats: [
-      // At the gate the friend raises his hand, and his hand's shadow rises beside him, waving.
+      // At the gate the friend raises her hand, and her hand's shadow rises beside her, waving.
       { kind: 'friend', shape: 'flat', puppet: 'wave', x: -0.32, y: 0.16, rise: 0.08 },
       // The boy waves back; they go opposite ways; the friend's second wave goes unseen; the hill comes back with one boy.
       { kind: 'memory', ...chapter('last-ordinary-day') },

@@ -1,6 +1,7 @@
 // The puppets' cut-outs, painted in code: each is a white silhouette whose alpha is the shape (the view draws it as a shadow or a
 // glow). Windows and gates are cut out of the card, as a shadow puppet's would be. A scene part can name one of these, or an
 // image instead (puppet-scene.ts). Painted once when a scene loads.
+import { DRESS_EXTRA_H, DRESS_W_RATIO } from '../stage/story/story-kit';
 
 /** Paints a cut-out filling w × h pixels (y down, as a canvas is). */
 export type PuppetPainter = (g: CanvasRenderingContext2D, w: number, h: number) => void;
@@ -314,6 +315,48 @@ function kidHead(g: CanvasRenderingContext2D, w: number, h: number): void {
   });
 }
 
+function girlHead(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The friend's head: the same round head and nose as the boy's, but smooth hair over the crown instead of his tuft (her
+  // ponytail is a part of its own, 'ponytail', so it can swing), and a little bow on top.
+  g.beginPath();
+  g.arc(w * 0.48, h * 0.55, w * 0.36, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.8, h * 0.48);
+  g.lineTo(w * 0.94, h * 0.6);
+  g.lineTo(w * 0.8, h * 0.66);
+  g.fill();
+  // Hair a little fuller than the head over the crown and down the back, with a fringe over the brow.
+  g.beginPath();
+  g.moveTo(w * 0.48, h * 0.55);
+  g.arc(w * 0.46, h * 0.53, w * 0.4, Math.PI * 0.8, Math.PI * 1.82);
+  g.closePath();
+  g.fill();
+  // The bow: two small loops either side of a knot.
+  g.beginPath();
+  g.ellipse(w * 0.3, h * 0.12, w * 0.09, h * 0.06, 0.5, 0, Math.PI * 2);
+  g.ellipse(w * 0.5, h * 0.08, w * 0.09, h * 0.06, -0.5, 0, Math.PI * 2);
+  g.fill();
+  cut(g, () => {
+    g.beginPath();
+    g.arc(w * 0.68, h * 0.48, w * 0.04, 0, Math.PI * 2);
+    g.fill();
+  });
+}
+
+function ponytail(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A ponytail tied at the top right (where it hangs from the back of her head) and falling down and back to a soft tip.
+  g.beginPath();
+  g.arc(w * 0.82, h * 0.16, w * 0.14, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.72, h * 0.08);
+  g.quadraticCurveTo(w * 0.2, h * 0.1, w * 0.12, h * 0.96);
+  g.quadraticCurveTo(w * 0.4, h * 0.7, w * 0.92, h * 0.26);
+  g.closePath();
+  g.fill();
+}
+
 function arm(g: CanvasRenderingContext2D, w: number, h: number): void {
   // An arm from the shoulder (bottom) to a small hand (top), tapering.
   g.beginPath();
@@ -503,6 +546,28 @@ function kidTorso(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.quadraticCurveTo(w * 0.14, h * 0.04, w * 0.46, h * 0.02);
   g.quadraticCurveTo(w * 0.84, h * 0.02, w * 0.84, h * 0.36);
   g.quadraticCurveTo(w * 0.9, h * 0.6, w * 0.82, h);
+  g.closePath();
+  g.fill();
+}
+
+function girlTorso(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The friend standing, side on, facing right: the same shoulders as the boy's, in a dress whose skirt flares out from the
+  // waist to a hem over her knees (the bottom DRESS_EXTRA_H of the part hangs below where the boy's jumper ends).
+  const body = 1 / DRESS_W_RATIO; // the boy's torso's width, as a fraction of this one
+  const top = 0.1 / (0.1 + DRESS_EXTRA_H); // the boy's torso's height, as a fraction of this one
+  const X = (f: number) => w * (0.5 + (f - 0.5) * body);
+  const Y = (f: number) => h * f * top;
+  g.beginPath();
+  g.moveTo(X(0.2), Y(0.62));
+  g.lineTo(X(0.16), Y(0.4));
+  g.quadraticCurveTo(X(0.14), Y(0.04), X(0.46), Y(0.02));
+  g.quadraticCurveTo(X(0.84), Y(0.02), X(0.84), Y(0.36));
+  g.lineTo(X(0.8), Y(0.62));
+  // The skirt: out to a wide hem, a gentle wave along it.
+  g.quadraticCurveTo(w * 0.94, h * 0.8, w * 1.0, h);
+  g.quadraticCurveTo(w * 0.75, h * 0.95, w * 0.5, h);
+  g.quadraticCurveTo(w * 0.25, h * 0.95, 0, h);
+  g.quadraticCurveTo(w * 0.06, h * 0.8, X(0.2), Y(0.62));
   g.closePath();
   g.fill();
 }
@@ -749,6 +814,9 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   'friend-ear': friendEar,
   'friend-fox': friendFox,
   'kid-torso': kidTorso,
+  'girl-head': girlHead,
+  ponytail,
+  'girl-torso': girlTorso,
   'leafy-tree': leafyTree,
   grass,
   hill,

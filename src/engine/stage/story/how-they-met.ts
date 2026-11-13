@@ -2,7 +2,7 @@
 // has copied the friend's rabbit. The player's rabbit becomes a puppet rabbit, and the fort slides in around it: two small kids
 // under a blanket fort with a torch between them. The rabbit hops onto the friend's raised hand; the new kid tries, makes a lumpy
 // shape, the friend leans over to help, and his rabbit comes right; the two rabbits nod at each other, and the kids laugh. Then
-// the rabbit hops down onto the blanket, and the friend raises his hand again for the next shape: the chapter ends on that, and
+// the rabbit hops down onto the blanket, and the friend raises her hand again for the next shape: the chapter ends on that, and
 // the story holds the picture while the friend's hand shows the fox. Every time is in seconds from the chapter's start.
 import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
 import { bobKeys, swingKeys, type Cue, type PuppetPart, type Track, type Wobble } from '../puppet/puppet-scene';
@@ -43,7 +43,7 @@ export const RABBIT_REST_SCALE = 0.85;
 
 const RABBIT_AT_HAND = handAt(FRIEND_X, 1);
 const BOY_HAND = handAt(BOY_X, -1);
-/** How far the friend leans over to help, and his hand with him. */
+/** How far the friend leans over to help, and her hand with her. */
 const LEAN_X = 0.04 * KID_SCALE;
 const LEAN_HAND_X = 0.07 * KID_SCALE;
 
@@ -93,7 +93,7 @@ const parts: PuppetPart[] = [
     y: FLOOR_Y,
     angle: 0.15,
   },
-  ...sittingKid('friend', FRIEND_X, 1, { parent: 'scenery', y: FLOOR_Y, armUp: true }),
+  ...sittingKid('friend', FRIEND_X, 1, { parent: 'scenery', y: FLOOR_Y, armUp: true, girl: true }),
   ...sittingKid('boy', BOY_X, -1, { parent: 'scenery', y: FLOOR_Y }),
   // The boy's first try: a lump on his hand, which comes right as his rabbit.
   {
@@ -251,7 +251,7 @@ const tracks: Track[] = [
       [RIGHT_S + 1.2, FRIEND_X, 'smooth'],
     ],
   },
-  // While the friend leans, the rabbit on his hand goes with him.
+  // While the friend leans, the rabbit on her hand goes with her.
   {
     part: 'rabbit',
     prop: 'x',
@@ -296,7 +296,7 @@ const tracks: Track[] = [
     part: 'friend-head',
     prop: 'angle',
     keys: [
-      // He looks at the boy's lump, then laughs with his head back (he faces right, so back is counter-clockwise).
+      // She looks at the boy's lump, then laughs with her head back (she faces right, so back is counter-clockwise).
       [LUMP_S + 0.6, 0],
       [LUMP_S + 1.2, -0.12, 'smooth'],
       [RIGHT_S + 1.2, -0.12],
@@ -305,7 +305,7 @@ const tracks: Track[] = [
       [LAUGH_S + 0.55, 0.3, 'out'],
       [LAUGH_S + LAUGH_LEN_S, 0.3],
       [LAUGH_S + LAUGH_LEN_S + 0.8, 0, 'smooth'],
-      // He looks up at his raised hand: now this one.
+      // She looks up at her raised hand: now this one.
       [ASK_S + 0.2, 0],
       [ASK_S + 0.9, 0.18, 'smooth'],
     ],

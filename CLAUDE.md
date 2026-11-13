@@ -1,6 +1,6 @@
 # Where Shadows Wander
 
-A seated, hands-only WebXR story for the Meta VR Start Developer Competition 2026 (deadline 19 Nov 2026, 4:00am SGT). A boy who has recently lost his best friend wakes in the night, lights a candle, and relives their memories in shadow puppets on his bedroom wall, moving each on with a hand shape, until he can sleep again.
+A seated, hands-only WebXR story for the Meta VR Start Developer Competition 2026 (deadline 19 Nov 2026, 4:00am SGT). A boy who has recently lost his best friend, a girl, wakes in the night, lights a candle, and relives their memories in shadow puppets on his bedroom wall, moving each on with a hand shape, until he can sleep again.
 
 ## Where things are written down
 

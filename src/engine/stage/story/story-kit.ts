@@ -1,6 +1,7 @@
 // The story's stock puppets and moves (docs/STORY.md): the two kids sitting (scene 2's fort, scene 4's hill) and standing (running
 // in the park, walking to school), and the keys that make them walk, run and hop. Every memory builds its kids from here, so the
-// boy and the friend look the same in all of them. Plain data, built on load.
+// boy and the friend look the same in all of them. The friend is a girl (`girl`): a bow and a ponytail, and a dress when she
+// stands, so the two read apart at a glance. Plain data, built on load.
 import { bobKeys, swingKeys, type Key, type PuppetPart, type Track, type Wobble } from '../puppet/puppet-scene';
 
 /** The floor of the story's places, metres up the wall from its centre (above the panelling's rail). */
@@ -34,11 +35,59 @@ export interface KidOptions {
   readonly opacity?: number;
   /** Whether its arm is raised at rest. */
   readonly armUp?: boolean;
+  /** The friend: a girl's head with a bow and a ponytail (`id-hair`), and a dress when standing. */
+  readonly girl?: boolean;
+}
+
+/** The ponytail's size, and where it is tied on the head (relative to the head's pivot at the neck; x towards where she faces). */
+const HAIR_W = 0.036;
+/** How much taller and wider the friend's dress is than the boy's jumper: its skirt flares down over the tops of her legs. */
+export const DRESS_EXTRA_H = 0.035;
+export const DRESS_W_RATIO = 0.095 / 0.075;
+const HAIR_H = 0.05;
+const HAIR_AT: readonly [number, number] = [-0.026, 0.042];
+
+/** The head (the boy's, or the friend's) and, for the friend, her ponytail hanging from it. */
+function head(
+  id: string,
+  parent: string,
+  x: number,
+  y: number,
+  facing: 1 | -1,
+  girl: boolean | undefined,
+): PuppetPart[] {
+  const parts: PuppetPart[] = [
+    {
+      id: `${id}-head`,
+      art: girl ? 'girl-head' : 'kid-head',
+      parent,
+      w: 0.08,
+      h: 0.08,
+      pivot: [0.5, 0.12],
+      x,
+      y,
+      mirror: facing < 0,
+    },
+  ];
+  if (girl)
+    parts.push({
+      id: `${id}-hair`,
+      art: 'ponytail',
+      parent: `${id}-head`,
+      w: HAIR_W,
+      h: HAIR_H,
+      pivot: [0.82, 0.84],
+      x: HAIR_AT[0] * facing,
+      y: HAIR_AT[1],
+      angle: 0.1 * facing,
+      mirror: facing < 0,
+    });
+  return parts;
 }
 
 /**
  * A kid sitting with knees up, side on, facing right (1) or left (-1): `id` (an invisible root at its seat), `id-body`,
- * `id-head` and `id-arm`.
+ * `id-head` (and the friend's `id-hair`) and `id-arm`.
  */
 export function sittingKid(id: string, x: number, facing: 1 | -1, o: KidOptions = {}): PuppetPart[] {
   return [
@@ -55,17 +104,7 @@ export function sittingKid(id: string, x: number, facing: 1 | -1, o: KidOptions 
       depth: 0,
     },
     { id: `${id}-body`, art: 'kid', parent: id, w: 0.13, h: 0.15, pivot: [0.5, 0], mirror: facing < 0 },
-    {
-      id: `${id}-head`,
-      art: 'kid-head',
-      parent: `${id}-body`,
-      w: 0.08,
-      h: 0.08,
-      pivot: [0.5, 0.12],
-      x: 0.012 * facing,
-      y: 0.135,
-      mirror: facing < 0,
-    },
+    ...head(id, `${id}-body`, 0.012 * facing, 0.135, facing, o.girl),
     {
       id: `${id}-arm`,
       art: 'arm',
@@ -87,7 +126,7 @@ const TORSO_H = 0.1;
 const STAND_SHOULDER_Y = 0.088;
 /** How tall a standing kid is on the stage (feet to the top of its head), metres. */
 export const STANDING_H = KID_SCALE * (LEG_H + TORSO_H + 0.075);
-/** A standing kid's arm down along its side, and raised up and forward, clear of his head (both times -facing, like the sitting kid's). */
+/** A standing kid's arm down along its side, and raised up and forward, clear of the head (both times -facing, like the sitting kid's). */
 export const STAND_ARM_DOWN = 2.95;
 export const STAND_ARM_UP = 0.8;
 /** How far a lying kid's root (its feet) is lifted so its back rests on the ground and does not sink into it. */
@@ -95,7 +134,7 @@ export const LYING_LIFT = 0.045;
 
 /**
  * A kid standing, side on, facing right (1) or left (-1): `id` (an invisible root at its feet, which it turns about to lie down),
- * `id-leg-back`, `id-leg-front`, `id-torso`, `id-head`, `id-arm-back` and `id-arm-front`.
+ * `id-leg-back`, `id-leg-front`, `id-torso`, `id-head` (and the friend's `id-hair`), `id-arm-back` and `id-arm-front`.
  */
 export function standingKid(id: string, x: number, facing: 1 | -1, o: KidOptions = {}): PuppetPart[] {
   const m = facing < 0;
@@ -137,29 +176,31 @@ export function standingKid(id: string, x: number, facing: 1 | -1, o: KidOptions
     },
     // The far arm and leg first, so the body draws over them.
     leg('back', -0.006),
-    {
-      id: `${id}-torso`,
-      art: 'kid-torso',
-      parent: id,
-      w: 0.075,
-      h: TORSO_H,
-      pivot: [0.5, 0],
-      y: LEG_H - 0.012,
-      mirror: m,
-    },
+    // The friend's dress hangs DRESS_EXTRA_H below where the boy's jumper ends; its pivot stays at the same point, the waist.
+    o.girl
+      ? {
+          id: `${id}-torso`,
+          art: 'girl-torso',
+          parent: id,
+          w: 0.075 * DRESS_W_RATIO,
+          h: TORSO_H + DRESS_EXTRA_H,
+          pivot: [0.5, DRESS_EXTRA_H / (TORSO_H + DRESS_EXTRA_H)],
+          y: LEG_H - 0.012,
+          mirror: m,
+        }
+      : {
+          id: `${id}-torso`,
+          art: 'kid-torso',
+          parent: id,
+          w: 0.075,
+          h: TORSO_H,
+          pivot: [0.5, 0],
+          y: LEG_H - 0.012,
+          mirror: m,
+        },
     arm('back', -0.004),
     leg('front', 0.006),
-    {
-      id: `${id}-head`,
-      art: 'kid-head',
-      parent: `${id}-torso`,
-      w: 0.08,
-      h: 0.08,
-      pivot: [0.5, 0.12],
-      x: 0.008 * facing,
-      y: TORSO_H - 0.006,
-      mirror: m,
-    },
+    ...head(id, `${id}-torso`, 0.008 * facing, TORSO_H - 0.006, facing, o.girl),
     arm('front', 0.004),
   ];
 }
@@ -184,6 +225,8 @@ export interface StepOptions {
   readonly y?: number;
   /** Leave its arms alone (they are doing something else: waving, carrying). */
   readonly armsBusy?: boolean | 'front' | 'back';
+  /** The friend: her ponytail (`id-hair`) bounces with each step. */
+  readonly girl?: boolean;
 }
 
 /**
@@ -205,6 +248,12 @@ export function stepTracks(
     { part: `${id}-leg-front`, prop: 'angle', keys: swingKeys(t0, t1, gait.stride, gait.legs, 0, 0, -1) },
     { part: id, prop: 'y', keys: bobKeys(t0, t1, gait.stride / 2, y, gait.lift) },
   ];
+  if (o.girl)
+    tracks.push({
+      part: `${id}-hair`,
+      prop: 'angle',
+      keys: swingKeys(t0, t1, gait.stride / 2, gait.lift * 12, 0.1 * facing, 0.1 * facing, facing),
+    });
   // The arms swing against the legs: the back arm with the front leg.
   if (o.armsBusy !== true && o.armsBusy !== 'back')
     tracks.push({

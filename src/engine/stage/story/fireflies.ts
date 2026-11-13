@@ -1,10 +1,10 @@
 // Scene 4, "Fireflies" (docs/STORY.md): the chapter after the friend's cup. The firefly settles into the player's cupped shadow
-// and glows there, then goes back to hover over the boys. They get up, and walk on as the park slides away to the left and a
+// and glows there, then goes back to hover over the kids. They get up, and walk on as the park slides away to the left and a
 // long hill slides in under them from the right, more fireflies rising out of its grass. They sit on its top side by side, a jar
 // between them; they fill it, a firefly at a time, and then let them go, a few at a time, until it is empty. The friend puts the
 // empty jar in the boy's hands. They stand and walk on, the boy carrying the jar; the hill slides off to the left and a school
-// gate slides in from the right in a pale autumn morning, leaves falling. At the gate the friend turns to go his own way and
-// raises his hand: the chapter ends on that, and the story holds the picture while the friend's hand waves.
+// gate slides in from the right in a pale autumn morning, leaves falling. At the gate the friend turns to go her own way and
+// raises her hand: the chapter ends on that, and the story holds the picture while the friend's hand waves.
 // Every time is in seconds from the chapter's start.
 import { slideKeys, type Chapter } from '../puppet/chapters';
 import type { Cue, Key, PuppetPart, Track, Wobble } from '../puppet/puppet-scene';
@@ -24,9 +24,9 @@ import {
 } from './story-kit';
 import { BOY_LIES_X, FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, PARK_FROM_DX, PARK_TREES } from './the-park';
 
-/** The firefly sits in the player's cup this long (the handoff), glowing brighter, then goes back to hover over the boys. */
+/** The firefly sits in the player's cup this long (the handoff), glowing brighter, then goes back to hover over the kids. */
 export const CUP_HOLD_S = 2.6;
-/** The boys get up, and the friend's reaching arm comes down. */
+/** The kids get up, and the friend's reaching arm comes down. */
 const GETUP_S = 1.2;
 const GETUP_LEN_S = 0.9;
 /** They walk on while the park slides off and the hill slides in. */
@@ -61,7 +61,7 @@ const HILL_OUT_LEN_S = 4.0;
 const GATE_IN_S = HILL_OUT_S + 1.4;
 const GATE_IN_LEN_S = 4.0;
 const STOP_S = GATE_IN_S + GATE_IN_LEN_S + 0.8;
-/** At the gate the friend turns to go his own way, and raises his hand. */
+/** At the gate the friend turns to go her own way, and raises her hand. */
 const TURN_S = STOP_S + 0.8;
 const TURN_LEN_S = 0.3;
 const RAISE_S = TURN_S + 0.7;
@@ -88,7 +88,7 @@ export const JAR_LAP_DY = 0.055;
 /** The jar's mouth on the wall, where the fireflies go in and come out. */
 const JAR_MOUTH: readonly [number, number] = [HILL_X + JAR_DX, HILL_Y + 0.075];
 
-/** The school gate: its middle and size. The boys stop at it, the boy at its gateway, the friend on the near side. */
+/** The school gate: its middle and size. The kids stop at it, the boy at its gateway, the friend on the near side. */
 export const GATE_X = 0.24;
 const GATE_W = 0.9;
 const GATE_H = 0.46;
@@ -115,8 +115,8 @@ const ALL_FLIES = ['firefly', ...FLIES.map((_, i) => `fly-${i}`)];
 /** Where each goes when it is let go: up and away over the top of the wall. */
 const flyAway = (i: number): [number, number] => [-0.7 + (i * 1.5) / 8 + 0.08 * Math.sin(i * 2.3), 0.62];
 
-/** The leaves falling at the gate as the boys arrive: where each starts, when (after the gate is in), and where it lands. */
-/** Seconds a leaf takes to fall: they are all down before the friend raises his hand. */
+/** The leaves falling at the gate as the kids arrive: where each starts, when (after the gate is in), and where it lands. */
+/** Seconds a leaf takes to fall: they are all down before the friend raises her hand. */
 const LEAF_FALL_S = 2.4;
 export const LEAVES: readonly { x: number; t: number; land: number }[] = [
   { x: -0.5, t: 0.0, land: -0.38 },
@@ -158,7 +158,7 @@ const parts: PuppetPart[] = [
     y: HILL_Y,
     depth: HILL_DEPTH,
   },
-  ...sittingKid('hill-friend', SIT_FRIEND_DX, 1, { parent: 'hill', opacity: 0 }),
+  ...sittingKid('hill-friend', SIT_FRIEND_DX, 1, { parent: 'hill', opacity: 0, girl: true }),
   ...sittingKid('hill-boy', SIT_BOY_DX, 1, { parent: 'hill', opacity: 0 }),
   {
     id: 'hill-jar',
@@ -185,11 +185,11 @@ const parts: PuppetPart[] = [
   },
   // The fireflies from the grass.
   ...FLIES.flatMap((f, i) => firefly(`fly-${i}`, f.x, -0.2, 0.06)),
-  // The walk to school: the boys again, the boy carrying the jar; and the friend turned the other way, to go his own.
-  ...standingKid('walk-friend', FRIEND_SIT_X, 1, { opacity: 0 }),
+  // The walk to school: the kids again, the boy carrying the jar; and the friend turned the other way, to go her own.
+  ...standingKid('walk-friend', FRIEND_SIT_X, 1, { opacity: 0, girl: true }),
   ...standingKid('walk-boy', BOY_SIT_X, 1, { opacity: 0 }),
   { id: 'walk-jar', art: 'jar', parent: 'walk-boy', w: 0.04, h: 0.054, pivot: [0.5, 0], x: 0.05, y: 0.11 },
-  ...standingKid('walk-friend-back', FRIEND_GATE_X, -1, { opacity: 0 }),
+  ...standingKid('walk-friend-back', FRIEND_GATE_X, -1, { opacity: 0, girl: true }),
   // The leaves.
   ...LEAVES.map((l, i): PuppetPart => ({
     id: `leaf-${i}`,
@@ -213,7 +213,7 @@ const flyTracks: Track[] = ALL_FLIES.flatMap((id, i): Track[] => {
   const group = Math.floor(i / 3);
   const outAt = RELEASE_S + group * RELEASE_GROUP_S + (i % 3) * 0.35;
   const [ax, ay] = flyAway(i);
-  // The first firefly is already over the boys; the others rise from the grass to their places first.
+  // The first firefly is already over the kids; the others rise from the grass to their places first.
   const hover: readonly [number, number] = i === 0 ? FIREFLY_HOVER : [FLIES[i - 1].x, FLIES[i - 1].y];
   const rise = RISE_S + (i - 1) * 0.35;
   const x: Key[] = i === 0 ? [[CUP_HOLD_S, hover[0]]] : [[rise, hover[0]]];
@@ -270,7 +270,7 @@ const tracks: Track[] = [
     ],
   },
   ...flyTracks,
-  // The boys get up off the grass: the friend's reaching arm comes down, and they stand.
+  // The kids get up off the grass: the friend's reaching arm comes down, and they stand.
   {
     part: 'run-friend-arm-front',
     prop: 'angle',
@@ -287,7 +287,7 @@ const tracks: Track[] = [
   { part: 'run-boy-torso', prop: 'angle', keys: move(GETUP_S, -0.12, GETUP_S + GETUP_LEN_S, 0) },
   // They walk on to the hill's top, the park sliding away under them and the hill coming in.
   ...stepTracks('run-boy', 1, WALK_S, SIT_S, WALK),
-  ...stepTracks('run-friend', 1, WALK_S, SIT_S, WALK),
+  ...stepTracks('run-friend', 1, WALK_S, SIT_S, WALK, { girl: true }),
   { part: 'run-boy', prop: 'x', keys: move(WALK_S, BOY_LIES_X, SIT_S, BOY_SIT_X, 'linear') },
   { part: 'run-friend', prop: 'x', keys: move(WALK_S, FRIEND_LIES_X, SIT_S, FRIEND_SIT_X, 'linear') },
   ...PARK_TREES.map((t): Track => ({
@@ -297,12 +297,12 @@ const tracks: Track[] = [
   })),
   { part: 'grass', prop: 'x', keys: slideKeys(PARK_OUT_S, PARK_OUT_LEN_S, 0, -GRASS_W, 0.25, true) },
   { part: 'hill', prop: 'x', keys: slideKeys(HILL_IN_S, HILL_IN_LEN_S, HILL_X + HILL_OFF_DX, HILL_X, HILL_DEPTH) },
-  // They sit: the standing boys give way to the sitting ones.
+  // They sit: the standing kids give way to the sitting ones.
   { part: 'run-boy', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 1, 0) },
   { part: 'run-friend', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 1, 0) },
   { part: 'hill-boy', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 0, 1) },
   { part: 'hill-friend', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 0, 1) },
-  // The friend reaches over and sets the jar down between them; later he takes it up and puts it in the boy's lap.
+  // The friend reaches over and sets the jar down between them; later she takes it up and puts it in the boy's lap.
   {
     part: 'hill-friend-arm',
     prop: 'angle',
@@ -354,7 +354,7 @@ const tracks: Track[] = [
     keys: [[0, -1.7]],
   },
   ...stepTracks('walk-boy', 1, WALK2_S, STOP_S, WALK, { armsBusy: 'front' }),
-  ...stepTracks('walk-friend', 1, WALK2_S, STOP_S, WALK),
+  ...stepTracks('walk-friend', 1, WALK2_S, STOP_S, WALK, { girl: true }),
   { part: 'walk-boy', prop: 'x', keys: move(WALK2_S, BOY_SIT_X, STOP_S, BOY_GATE_X, 'linear') },
   { part: 'walk-friend', prop: 'x', keys: move(WALK2_S, FRIEND_SIT_X, STOP_S, FRIEND_GATE_X, 'linear') },
   {
@@ -388,7 +388,7 @@ const tracks: Track[] = [
       },
     ];
   }),
-  // At the gate, the friend turns to go his own way (he is the other way about now)...
+  // At the gate, the friend turns to go her own way (she is the other way about now)...
   {
     part: 'walk-friend',
     prop: 'opacity',
@@ -411,11 +411,11 @@ const tracks: Track[] = [
     prop: 'angle',
     keys: move(RAISE_S, STAND_ARM_DOWN, RAISE_S + 0.9, STAND_ARM_UP),
   },
-  // The boy, at the gateway, looks back at him.
+  // The boy, at the gateway, looks back at her.
   { part: 'walk-boy-head', prop: 'angle', keys: move(TURN_S, 0, TURN_S + 0.6, 0.12) },
 ];
 
-/** A sitting kid's head turning up to the sky (he faces right: up is counter-clockwise), and back down. */
+/** A sitting kid's head turning up to the sky (it faces right: up is counter-clockwise), and back down. */
 function lookUp(t0: number, t1: number): Key[] {
   return [
     [t0, 0],
@@ -427,7 +427,7 @@ function lookUp(t0: number, t1: number): Key[] {
 
 const wobbles: Wobble[] = [
   ...ALL_FLIES.slice(1).flatMap((id, i) => fireflyWobbles(id, i + 1)),
-  // The jar's light breathes; the sitting boys breathe; the tree's leaves stir.
+  // The jar's light breathes; the sitting kids breathe; the tree's leaves stir.
   { part: 'jar-glow', prop: 'scale', amp: 0.05, period: 2.4 },
   { part: 'hill-friend-body', prop: 'angle', amp: 0.01, period: 3.6 },
   { part: 'hill-boy-body', prop: 'angle', amp: 0.01, period: 3.9, phase: 2 },

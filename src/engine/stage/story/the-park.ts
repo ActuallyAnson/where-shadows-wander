@@ -1,7 +1,7 @@
 // Scene 3, "The park" (docs/STORY.md): the chapter after the friend's fox. The player's fox lands in the fort, crouches and
 // pounces at the rabbit on the blanket, and the rabbit bolts. They run, the fox after the rabbit, and the fort slides off to the
 // left while the park's trees slide in from the right, the light warming into spring. Mid-run the rabbit and the fox become the
-// two boys, still running, the friend chasing the boy; he catches him, and they tumble over into the grass and lie there
+// two kids, still running, the friend chasing the boy; she catches him, and they tumble over into the grass and lie there
 // laughing. The light goes to dusk, and a single firefly blinks over them; the friend reaches up towards it: the chapter ends on
 // that, and the story holds the picture while the friend's hand shows the cup. Every time is in seconds from the chapter's start.
 import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
@@ -77,7 +77,7 @@ const DUSK_S = LAUGH_S + 1.2;
 const FIREFLY_S = LAUGH_S + LAUGH_LEN_S + 0.8;
 const FIREFLY_LEN_S = 4.2;
 export const FIREFLY_HOVER: readonly [number, number] = [-0.21, 0.13];
-/** The friend reaches up towards it: the chapter ends with his arm up. */
+/** The friend reaches up towards it: the chapter ends with her arm up. */
 const REACH_S = FIREFLY_S + FIREFLY_LEN_S + 0.4;
 export const THE_PARK_LENGTH_S = REACH_S + 1.4;
 
@@ -121,8 +121,8 @@ const parts: PuppetPart[] = [
   },
   // The player's fox: over the fort, as the rabbit was.
   { id: 'fox', art: 'fox', w: 0.22, h: 0.15, pivot: [0.5, 0], x: FOX_LANDS[0], y: FOX_LANDS[1], opacity: 0 },
-  // The two boys, standing and running, brought on as the rabbit and the fox turn into them.
-  ...standingKid('run-friend', FOX_RUN_X, 1, { opacity: 0 }),
+  // The two kids, standing and running, brought on as the rabbit and the fox turn into them.
+  ...standingKid('run-friend', FOX_RUN_X, 1, { opacity: 0, girl: true }),
   ...standingKid('run-boy', RABBIT_RUN_X, 1, { opacity: 0 }),
   // The firefly: a small green-gold light (its root holds where it is and whether it is there; the light blinks).
   ...firefly('firefly', 0.5, 0.32),
@@ -210,11 +210,11 @@ const tracks: Track[] = [
   // The fort and the kids slide away to the left behind them (the fort, standing back, a little behind).
   { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -FORT_OFF_X, FORT_DEPTH, true) },
   { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -OFF_WALL_X, 0, true) },
-  // The boys come in where the animals were, running.
+  // The kids come in where the animals were, running.
   { part: 'run-boy', prop: 'opacity', keys: fadeKeys(CHANGE_S, CHANGE_LEN_S, 0, 1) },
   { part: 'run-friend', prop: 'opacity', keys: fadeKeys(CHANGE_S, CHANGE_LEN_S, 0, 1) },
   ...stepTracks('run-boy', 1, CHANGE_S - 0.2, FALL_S, RUN),
-  ...stepTracks('run-friend', 1, CHANGE_S - 0.2, CATCH_S, RUN),
+  ...stepTracks('run-friend', 1, CHANGE_S - 0.2, CATCH_S, RUN, { girl: true }),
   {
     part: 'run-boy',
     prop: 'x',
@@ -233,7 +233,7 @@ const tracks: Track[] = [
       [CHANGE_S, FOX_RUN_X],
       [DRIFT_TO_S, FRIEND_DRIFT_X, 'smooth'],
       [CATCH_S, FRIEND_CATCH_X, 'in'],
-      // He tumbles back over himself, rolling past the boy's head, and comes to rest on his back.
+      // She tumbles back over herself, rolling past the boy's head, and comes to rest on her back.
       [FALL_S + ROLL_LEN_S, FRIEND_LIES_X, 'out'],
     ],
   },
@@ -246,12 +246,12 @@ const tracks: Track[] = [
       [CATCH_S + 0.25, -1.45, 'out'],
       [FALL_S + FALL_LEN_S, -1.2],
       [LAUGH_S, -STAND_ARM_DOWN + 0.4, 'smooth'],
-      // Lying on his back, he reaches up to the firefly (his body turned a quarter, so straight up is a quarter clockwise).
+      // Lying on her back, she reaches up to the firefly (her body turned a quarter, so straight up is a quarter clockwise).
       [REACH_S, -STAND_ARM_DOWN + 0.4],
       [REACH_S + 1.0, -1.45, 'smooth'],
     ],
   },
-  // Over they go, backwards; the friend rolls right over and back onto his back.
+  // Over they go, backwards; the friend rolls right over and back onto her back.
   {
     part: 'run-boy',
     prop: 'angle',
@@ -329,7 +329,7 @@ const tracks: Track[] = [
   },
 ];
 
-/** A lying kid's head tipping back as he laughs (he faces right in his own frame, so back is counter-clockwise), and forward again. */
+/** A lying kid's head tipping back as it laughs (it faces right in its own frame, so back is counter-clockwise), and forward again. */
 function laughHead(t0: number): Key[] {
   return [
     [t0, 0],
@@ -345,7 +345,7 @@ const wobbles: Wobble[] = [
   ...PARK_TREES.map((t, i): Wobble => ({ part: t.id, prop: 'angle', amp: 0.006, period: 4.1 + i * 0.7, phase: i })),
 ];
 
-/** Notes as the fox lands and pounces, as they become the boys, as they tumble, and one as the firefly comes. */
+/** Notes as the fox lands and pounces, as they become the kids, as they tumble, and one as the firefly comes. */
 const cues: Cue[] = [
   { t: 0.1, kind: 'note', note: 1 },
   { t: POUNCE_S, kind: 'note', note: 3 },

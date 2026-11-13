@@ -36,7 +36,7 @@ const TURN_BACK_S = FRIEND_STOPS_S + 0.3;
 const TURN_LEN_S = 0.3;
 const WAVE2_S = TURN_BACK_S + 0.5;
 const WAVE2_LEN_S = 2.8;
-/** He lowers his hand, turns away and walks off. */
+/** She lowers her hand, turns away and walks off. */
 const TURN_AWAY_S = WAVE2_S + WAVE2_LEN_S + 1.0;
 const FRIEND_GONE_S = TURN_AWAY_S + 3.4;
 /** The gate slides away to the right, and the hill comes back in from the left, with only the boy on it. */
@@ -82,7 +82,7 @@ const tracks: Track[] = [
   // They go their ways.
   ...stepTracks('walk-boy', 1, PART_S + 0.1, BOY_GONE_S, WALK, { armsBusy: 'front' }),
   { part: 'walk-boy', prop: 'x', keys: move(PART_S + 0.1, BOY_GATE_X, BOY_GONE_S, 1.25, 'linear') },
-  ...stepTracks('walk-friend-back', -1, PART_S + 0.2, FRIEND_STOPS_S, WALK),
+  ...stepTracks('walk-friend-back', -1, PART_S + 0.2, FRIEND_STOPS_S, WALK, { girl: true }),
   {
     part: 'walk-friend-back',
     prop: 'x',
@@ -123,8 +123,8 @@ const tracks: Track[] = [
     ],
   },
   { part: 'walk-friend-head', prop: 'angle', keys: move(WAVE2_S + WAVE2_LEN_S, 0, WAVE2_S + WAVE2_LEN_S + 0.8, -0.12) },
-  // Then he walks off the left edge.
-  ...stepTracks('walk-friend-back', -1, TURN_AWAY_S + 0.3, FRIEND_GONE_S, WALK),
+  // Then she walks off the left edge.
+  ...stepTracks('walk-friend-back', -1, TURN_AWAY_S + 0.3, FRIEND_GONE_S, WALK, { girl: true }),
   {
     part: 'walk-friend-back',
     prop: 'x',

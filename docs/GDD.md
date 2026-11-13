@@ -2,7 +2,7 @@
 
 ## Overview
 
-Where Shadows Wander is a seated, hands-only virtual reality story about grief and comfort. A boy who has recently lost his best friend wakes in the middle of the night and can't get back to sleep. He lights a candle, and in shadow play on the bedroom wall he goes back through the memories he shared with his friend. The player moves each memory along by making a hand shape, and when the memories are done, the boy can sleep again.
+Where Shadows Wander is a seated, hands-only virtual reality story about grief and comfort. A boy who has recently lost his best friend, a girl, wakes in the middle of the night and can't get back to sleep. He lights a candle, and in shadow play on the bedroom wall he goes back through the memories he shared with his friend. The player moves each memory along by making a hand shape, and when the memories are done, the boy can sleep again.
 
 | Item | Detail |
 |----|----|
@@ -96,7 +96,7 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 
 ### Premise (settled 12 Nov 2026)
 
-- **Who:** the boy (the player) and his best friend, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet.
+- **Who:** the boy (the player) and his best friend, a girl, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet. Making her a girl lets the player tell the two kids apart at a glance (her bow, ponytail and dress against his tuft of hair, jumper and shorts). They are best friends, children; it is not a romance.
 - **When:** one night, soon after the loss. He wakes suddenly in the dark and can't get back to sleep.
 - **What happens:** through the shadow play he goes back through the memories they shared, one scene at a time, moving each on with his hands.
 - **How it ends:** the shadow play lets him rest. The candle burns low, the room settles and he goes back to sleep. Sleep is the only ending, and every session reaches it.
@@ -110,7 +110,7 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 
 ### The scenes
 
-The night is told as one continuous puppet show in seven scenes: waking, four memories, a goodbye and sleep. The memories follow the friendship through one year, in order, and each ends on the picture that leads into the next. There the friend's puppet raises his hand and the friend's hand shadow shows the next shape; when the player copies it, their shadow joins the story and carries it on. Scenes change like a shadow theatre: one place slides off the wall as the next slides in, and the wall never goes black between memories. The scene-by-scene design is in [STORY.md](STORY.md). Each scene is a first draft, built and rewritten one at a time.
+The night is told as one continuous puppet show in seven scenes: waking, four memories, a goodbye and sleep. The memories follow the friendship through one year, in order, and each ends on the picture that leads into the next. There the friend's puppet raises her hand and the friend's hand shadow shows the next shape; when the player copies it, their shadow joins the story and carries it on. Scenes change like a shadow theatre: one place slides off the wall as the next slides in, and the wall never goes black between memories. The scene-by-scene design is in [STORY.md](STORY.md). Each scene is a first draft, built and rewritten one at a time.
 
 ### What else is settled
 
@@ -263,7 +263,7 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - [ ] Build and play-test each scene in [STORY.md](STORY.md), one at a time (first drafts written 12 Nov).
 
-- [ ] The friend: name, age, and whether he is a child or a pet (the premise reads as a child; a pet would make the story lighter and easier to share with younger players).
+- [ ] The friend: name and age. (Decided 13 Nov: a girl, the boy's best friend, so the two read apart on the wall.)
 
 - [ ] What wakes the boy: a dream, a sound, or nothing at all.
 
