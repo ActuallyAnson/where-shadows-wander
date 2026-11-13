@@ -91,3 +91,29 @@ describe('WakeTimeline', () => {
     expect(w.text).toBe(0);
   });
 });
+
+describe('the flash in the black', () => {
+  it('flashes once while the eyes are shut, before the thunder, and is gone before the first blink', () => {
+    const keys = WAKE_SCRIPT.flashKeys!;
+    expect(keys).toBeDefined();
+    for (let i = 1; i < keys.length; i++) expect(keys[i].t).toBeGreaterThanOrEqual(keys[i - 1].t);
+    const peak = keys.reduce((a, k) => (k.v > a.v ? k : a));
+    expect(peak.t).toBeLessThan(WAKE_SCRIPT.thunderAt!);
+    for (let t = 0; t < wakeDuration(WAKE_SCRIPT); t += 0.02)
+      if (sampleKeys(keys, t) > 0.001) expect(sampleKeys(WAKE_SCRIPT.lidKeys, t)).toBe(0);
+  });
+
+  it('is dark before it starts and once it has finished', () => {
+    const w = new WakeTimeline();
+    expect(w.flash).toBe(0);
+    w.start();
+    expect(w.flash).toBe(0);
+    let max = 0;
+    for (let i = 0; i < 2000; i++) {
+      w.update(1 / 72);
+      max = Math.max(max, w.flash);
+    }
+    expect(max).toBeGreaterThan(0.8);
+    expect(w.flash).toBe(0);
+  });
+});

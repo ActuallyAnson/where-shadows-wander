@@ -42,11 +42,11 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ### 1. Waking
 
 - **Purpose:** set the mood without a word. He is awake, alone and it is late.
-- **What happens:** BEGIN fades the title to black (built). The headset stays black, and far off thunder rolls, low and muffled: it is what woke him (built). While it rumbles away his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
+- **What happens:** BEGIN fades the title to black (built). The headset stays black. Lightning flickers through the shut lids, and for a moment his friend stands in its pale light, a small soft-edged silhouette lifting a hand to wave, before it fades like a dream letting go (built). Then far off thunder rolls, low and muffled: it is what woke him (built). While it rumbles away his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
 - **The player:** lights the candle.
 - **Must make the player feel:** lonely, then a little safer once the light is there.
 - **Built already:** the fade to black, the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
-- **To try:** a faint glow through the shut lids just before the thunder in the black, as lightning would give. A whispered "noo…" was tried in the dark and dropped (it read wrong); the timeline still has a slot for a word. Whether something of the friend's is in the room from the start, unlit until the end.
+- **To try:** whether the friend in the flash reads as a friend and never as a figure to fear (keep it small, soft and brief); `__wsw.playWake()` replays it. A whispered "noo…" was tried in the dark and dropped (it read wrong); the timeline still has a slot for a word. Whether something of the friend's is in the room from the start, unlit until the end.
 
 ### 2. How they met
 
@@ -124,3 +124,4 @@ So that every step leaves a game we could submit:
 - 12 Nov 2026: the word in the dark is dropped; the black before the blinks is shorter, and the second blink quicker.
 - 12 Nov 2026: it rains outside instead of snowing: a rainy night in the window, a constant rain sound, and now and then a far, muffled thunder after a faint flash.
 - 12 Nov 2026: a far thunder roll in the black is what wakes him; the eyes open as it rumbles away.
+- 13 Nov 2026: before the thunder, lightning flashes through the shut lids with the friend's silhouette in it, waving; the thunder follows the flash.

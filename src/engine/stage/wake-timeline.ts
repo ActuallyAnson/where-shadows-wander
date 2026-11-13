@@ -1,6 +1,7 @@
 // Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black and far thunder rolls (it is what wakes him), then the
-// eyes open: a slow heavy blink, a quicker wider one, then open. This is the timing only, as numbers: how open the
-// eyes are and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
+// eyes open: a slow heavy blink, a quicker wider one, then open. Just before the thunder, lightning flashes through the shut
+// lids with his friend's silhouette in it. This is the timing only, as numbers: how open the eyes are, how bright the flash
+// and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
 
 /** One point of a curve: at `t` seconds the value is `v`; between points it eases (smoothstep). */
 export interface WakeKey {
@@ -17,6 +18,11 @@ export interface WakeScript {
   readonly lidKeys: readonly WakeKey[];
   /** When the far thunder rolls in the dark and wakes him, seconds; none if left out. */
   readonly thunderAt?: number;
+  /**
+   * A lightning flash through the shut lids, just before the thunder (0 none .. 1 brightest), with his friend's silhouette
+   * standing in its light: a dream he is waking from. Left out: no flash.
+   */
+  readonly flashKeys?: readonly WakeKey[];
 }
 
 /** Seconds and levels of the opening. Tune here. */
@@ -25,7 +31,17 @@ export const WAKE_SCRIPT: WakeScript = {
   // second and is still rumbling away as the eyes first open.
   text: '',
   textKeys: [{ t: 0, v: 0 }],
-  thunderAt: 0.3,
+  // Before it, the flash: a quick flicker that shows his friend standing there, then a slow fade, as a dream lets go. The
+  // thunder follows it, as thunder does, and the black holds a moment before the first blink.
+  flashKeys: [
+    { t: 0, v: 0 },
+    { t: 0.35, v: 0 },
+    { t: 0.4, v: 1 },
+    { t: 0.5, v: 0.35 },
+    { t: 0.58, v: 0.85 },
+    { t: 1.6, v: 0 },
+  ],
+  thunderAt: 0.9,
   lidKeys: [
     { t: 0, v: 0 },
     { t: 2.0, v: 0 }, // a moment of plain black first
@@ -122,6 +138,12 @@ export class WakeTimeline {
   /** True on the one update the thunder in the dark should start. */
   get thunder(): boolean {
     return this.thunderNow;
+  }
+
+  /** How bright the flash through the lids is now (0..1); 0 when not playing. */
+  get flash(): number {
+    const keys = this.script.flashKeys;
+    return this.running && keys ? sampleKeys(keys, this.t) : 0;
   }
 
   /** How visible the word is now (0..1); 0 when not playing. */
