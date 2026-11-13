@@ -58,8 +58,11 @@ export interface LabCheckpoint {
 /** The Story tab: checkpoints to jump to, and moving the story on by hand. */
 export interface LabStory {
   readonly checkpoints: readonly LabCheckpoint[];
-  /** Jumps to checkpoint `id`; with `play`, as if its shape were copied at once, so its memory plays. Says what it did. */
-  jump(id: string, play: boolean): string;
+  /**
+   * Jumps to checkpoint `id`; with `play`, as if its shape were copied at once, so its memory plays. Starts the session first
+   * if it is not running (a promise then). Says what it did.
+   */
+  jump(id: string, play: boolean): string | Promise<string>;
   /** Copies the shape the friend's hand is waiting for (or covers the flame, at the end). Says what it did. */
   advance(): string;
   /** Skips the memory playing to its last picture. Says what it did. */
@@ -363,7 +366,7 @@ export class HandLab {
         else this.startGuided();
       } else if (act === 'tab') this.setTab(TABS.find((t) => t === arg) ?? 'lab');
       else if (act === 'story' || act === 'story-play') {
-        if (this.view.story && arg) this.storyMessage = this.view.story.jump(arg, act === 'story-play');
+        if (this.view.story && arg) void this.storyJump(arg, act === 'story-play');
       } else if (act === 'story-make') void this.makeStoryShape();
       else if (act === 'story-advance') this.storyMessage = this.view.story?.advance() ?? '';
       else if (act === 'story-skip') this.storyMessage = this.view.story?.skip() ?? '';
@@ -439,7 +442,7 @@ export class HandLab {
       `<div class="checkpoint"><span>${c.label}${c.shape ? ` <em>${c.shape}</em>` : ''}</span><button type="button" data-act="story" data-arg="${c.id}" title="${c.shape ? `Jump here: the friend's hand waits for the ${c.shape}` : 'Jump here'}">${c.shape ? 'Wait' : 'Go'}</button>${c.shape ? `<button type="button" data-act="story-play" data-arg="${c.id}" title="Jump here and copy the ${c.shape} at once: the memory plays">Play</button>` : ''}</div>`;
     el.innerHTML = `<h2>Story <span>checkpoints</span></h2>
       <p class="keys">Jumps to a scene, its picture on the wall and its light already set; the candle is lit first if it was not.
-      Wait shows the friend's hand; Play copies its shape at once. Press BEGIN first. While the hand waits, Make shape forms it
+      Wait shows the friend's hand; Play copies its shape at once. Before BEGIN, a checkpoint starts the session itself. While the hand waits, Make shape forms it
       with the Lab's synthetic hand (switching to it from the device's), so the real gesture recognition moves the story on;
       Copy shape skips the recognition.</p>
       ${story.checkpoints.map(row).join('')}
@@ -448,6 +451,19 @@ export class HandLab {
       ><button type="button" data-act="story-skip" data-arg="" title="Skip the memory playing to its last picture">Skip memory</button></div>
       <p class="msg" id="lab-story-message"></p>
       <p class="keys" id="lab-story-status"></p>`;
+    this.renderStoryStatus();
+  }
+
+  /** A Story checkpoint's Wait, Play or Go: the session is started first if need be, so the message may come later. */
+  private async storyJump(id: string, play: boolean): Promise<void> {
+    const story = this.view.story;
+    if (!story) return;
+    const r = story.jump(id, play);
+    if (typeof r !== 'string') {
+      this.storyMessage = 'Starting the session…';
+      this.renderStoryStatus();
+    }
+    this.storyMessage = await r;
     this.renderStoryStatus();
   }
 

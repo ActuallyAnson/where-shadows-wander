@@ -467,7 +467,8 @@ async function start(): Promise<void> {
   const wakeHead = new Quaternion();
   /** The wake's lids take over from the plain black (they are as black while shut). Once a session. */
   const startWake = () => {
-    if (wake.playing) return;
+    // A Story checkpoint may have lit the candle before the title was gone: no waking then.
+    if (wake.playing || sessionState !== 'title_vr') return;
     fade.setBlack(false);
     wake.start();
   };
@@ -680,6 +681,16 @@ async function start(): Promise<void> {
           status: () => stepStatus || candleStep.status,
         }
       : undefined;
+  /** The Story tab's jump, in the session: the waking again (only before the candle is lit), or scene `id`. */
+  const jumpTo = (id: string, play: boolean): string => {
+    if (id === 'wake') {
+      if (sessionState !== 'title_vr') return 'The candle is lit: reload to see the waking and light it again.';
+      wake.finish();
+      startWake();
+      return 'Waking again.';
+    }
+    return jumpToScene(Number(id), play);
+  };
   // The Story tab: a checkpoint for the waking and for each scene of story-script.ts.
   const labStory: LabStory = {
     checkpoints: [
@@ -690,14 +701,10 @@ async function start(): Promise<void> {
       }),
     ],
     jump: (id, play) => {
-      if (!world.renderer.xr.isPresenting) return 'Press BEGIN first.';
-      if (id === 'wake') {
-        if (sessionState !== 'title_vr') return 'The candle is lit: reload to see the waking and light it again.';
-        wake.finish();
-        startWake();
-        return 'Waking again.';
-      }
-      return jumpToScene(Number(id), play);
+      if (world.renderer.xr.isPresenting) return jumpTo(id, play);
+      // Not in the session yet: start it, as BEGIN would, then jump.
+      if (!launcherHooks.begin) return 'Press BEGIN first.';
+      return launcherHooks.begin().then((ok) => (ok ? jumpTo(id, play) : "Couldn't start the session."));
     },
     advance: () => {
       const b = story.beat;

@@ -9,6 +9,11 @@ export interface LauncherHooks {
   openSettings?: () => void;
   /** The title has finished fading to black and is gone, so the session's own fade-in can start (it would be hidden before). */
   titleGone?: () => void;
+  /**
+   * Set by the launcher (where VR is supported): starts the session as BEGIN does, without waiting on the title's slow fade.
+   * Resolves to whether a session is running. For dev tools (the Hand Lab's Story tab); call it from a click, like BEGIN.
+   */
+  begin?: () => Promise<boolean>;
 }
 
 /** How long the title takes to fade to black after BEGIN (title-markup.ts: a 0.3 s delay, then 2.5 s). */
@@ -116,8 +121,9 @@ export async function mountEnterArButtonIfNeeded(
   let showLaunchLog: (() => void) | null = null;
   /** When BEGIN was pressed (performance.now()), so the title stays up until its fade to black has finished. */
   let pressedAt = -Infinity;
-  const launchDirect = async (mode: XRSessionMode) => {
-    pressedAt = performance.now();
+  /** `quick`: the title is hidden as soon as the session starts, not after its fade to black. */
+  const launchDirect = async (mode: XRSessionMode, quick = false) => {
+    pressedAt = quick ? performance.now() - TITLE_FADE_MS : performance.now();
     title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
@@ -232,6 +238,14 @@ export async function mountEnterArButtonIfNeeded(
   };
 
   const vrSupported = await xr.isSessionSupported('immersive-vr').catch(() => false);
+  if (vrSupported)
+    hooks.begin = async () => {
+      if (!world.renderer.xr.isPresenting) {
+        sound?.begin();
+        await launchDirect('immersive-vr', true);
+      }
+      return world.renderer.xr.isPresenting;
+    };
 
   appendLog(`XR Support: immersive-vr=${vrSupported}`);
 
