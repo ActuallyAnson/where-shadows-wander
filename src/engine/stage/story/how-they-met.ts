@@ -68,12 +68,11 @@ const fadeOut = (from: number): Key[] => [
   [HOW_THEY_MET_LENGTH_S - 0.4, 0, 'smooth'],
 ];
 
-/** How far back each layer stands (PuppetPart.depth): the fort behind, the kids and torch inside it, the rabbits nearest. */
+/** How far back the fort stands (PuppetPart.depth): a paler, softer shadow behind the kids, the torch and the rabbits. */
 const FORT_DEPTH = 0.6;
-const KIDS_DEPTH = 0.2;
 
 const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[] => [
-  { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE, depth: KIDS_DEPTH },
+  { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE },
   { id: `${id}-body`, art: 'kid', parent: id, w: 0.13, h: 0.15, pivot: [0.5, 0], mirror: facing < 0 },
   {
     id: `${id}-head`,
@@ -133,7 +132,6 @@ const parts: PuppetPart[] = [
     pivot: [0.5, 0],
     y: FLOOR_Y,
     angle: 0.15,
-    depth: KIDS_DEPTH,
   },
   ...kid('friend', FRIEND_X, 1, true),
   ...kid('boy', BOY_X, -1, false),

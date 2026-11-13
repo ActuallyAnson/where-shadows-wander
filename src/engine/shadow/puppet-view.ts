@@ -2,8 +2,11 @@
 // image) lying on the wall. Shadow parts darken the lit wall the way the hands' shadows do, but where two parts overlap (a leg
 // over the cloak) they never darken twice: they blend by taking the darker of the wall and the shadow (a min blend), as one
 // shadow would. A part's depth (PuppetPart.depth) makes its shadow paler and softer, so the scenery stands back from the near
-// puppets. Glow parts add their light. Built when a scene loads; a frame only sets matrices and one opacity each.
+// puppets; a pale shadow can't be a min blend (the candle-lit wall is darker than its floor, so it would vanish), so a part
+// standing back darkens the wall in proportion instead, over black as the hands' shadows do (overlaps there do darken twice,
+// which reads as one layer in front of another). Glow parts add their light. Built when a scene loads; a frame only sets matrices and one opacity each.
 import {
+  AddEquation,
   AdditiveBlending,
   CanvasTexture,
   CustomBlending,
@@ -14,9 +17,11 @@ import {
   MeshBasicMaterial,
   MinEquation,
   OneFactor,
+  OneMinusSrcAlphaFactor,
   PlaneGeometry,
   ShaderMaterial,
   SRGBColorSpace,
+  ZeroFactor,
   type Material,
 } from '@iwsdk/core';
 import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
@@ -49,6 +54,17 @@ void main() {
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
   gl_FragColor = vec4(vec3(1.0 - a), 1.0);
+}`;
+
+// A shadow standing back: black over the wall at its alpha, so it takes the same share of the light however dim the wall is.
+const FAR_SHADOW_FRAGMENT = /* glsl */ `
+uniform sampler2D map;
+uniform float opacity;
+varying vec2 vUv;
+void main() {
+  float a = texture2D(map, vUv).a * opacity;
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(0.0, 0.0, 0.0, a);
 }`;
 
 interface Piece {
@@ -132,6 +148,22 @@ export class PuppetView {
           toneMapped: false,
         });
         material.color.setRGB(tint[0], tint[1], tint[2]);
+      } else if (depth > 0) {
+        material = new ShaderMaterial({
+          uniforms: { map: { value: texture }, opacity: { value: 0 } },
+          vertexShader: VERTEX,
+          fragmentShader: FAR_SHADOW_FRAGMENT,
+          transparent: true,
+          blending: CustomBlending,
+          blendEquation: AddEquation,
+          blendSrc: ZeroFactor,
+          blendDst: OneMinusSrcAlphaFactor,
+          blendSrcAlpha: OneFactor,
+          blendDstAlpha: OneMinusSrcAlphaFactor,
+          depthWrite: false,
+          side: DoubleSide,
+          toneMapped: false,
+        });
       } else {
         material = new ShaderMaterial({
           uniforms: { map: { value: texture }, opacity: { value: 0 } },
