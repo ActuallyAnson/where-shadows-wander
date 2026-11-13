@@ -96,7 +96,7 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 
 ### Premise (settled 12 Nov 2026)
 
-- **Who:** the boy (the player) and his best friend, a girl, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet. Making her a girl lets the player tell the two kids apart at a glance (her bow, ponytail and dress against his tuft of hair, jumper and shorts). They are best friends, children; it is not a romance.
+- **Who:** the boy (the player) and his best friend, a girl, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet. Making her a girl lets the player tell the two kids apart at a glance (her bow, ponytail and dress against his tuft of hair, jumper and shorts). The story calls them best friends and says no more; whether it was anything else is left to the player.
 - **When:** one night, soon after the loss. He wakes suddenly in the dark and can't get back to sleep.
 - **What happens:** through the shadow play he goes back through the memories they shared, one scene at a time, moving each on with his hands.
 - **How it ends:** the shadow play lets him rest. The candle burns low, the room settles and he goes back to sleep. Sleep is the only ending, and every session reaches it.
