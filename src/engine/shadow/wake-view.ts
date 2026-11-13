@@ -1,6 +1,6 @@
 // Scene 1's opening, drawn (the timing is wake-timeline.ts): eyelids, a flash and a word in the dark. All follow the head: a small
 // black sphere round the eyes (like FadeView's) whose shader leaves an eye-shaped opening, wider as the eyes open, with soft lids;
-// a lightning flash through the shut lids, a pale glow with his friend's silhouette standing in it, soft-edged like a dream; and a
+// a glow through the shut lids, in which his friend's silhouette slowly gathers, faint and soft-edged like a dream; and a
 // faint word floating in front, drawn over the black. Nothing is allocated per frame.
 import {
   BackSide,
@@ -26,6 +26,8 @@ const FLASH_DISTANCE_M = 3;
 const FLASH_SIZE_M = 3.6;
 const FLASH_COLOR = '#b4bed2';
 const FLASH_MAX_OPACITY = 0.6;
+/** How dark the friend's silhouette is at most against the glow (1 black): faint, half there. */
+const FRIEND_MAX_OPACITY = 0.45;
 
 const VERTEX = /* glsl */ `
 varying vec3 vDir;
@@ -61,6 +63,9 @@ export class WakeView {
   private readonly flashMat: MeshBasicMaterial;
   private readonly flashMesh: Mesh;
   private readonly flashTexture: CanvasTexture;
+  private readonly friendMat: MeshBasicMaterial;
+  private readonly friendMesh: Mesh;
+  private readonly friendTexture: CanvasTexture;
 
   constructor(text: string) {
     this.lidMat = new ShaderMaterial({
@@ -93,7 +98,7 @@ export class WakeView {
     this.textMesh.frustumCulled = false;
     this.group.add(this.textMesh);
 
-    this.flashTexture = paintFlash();
+    this.flashTexture = paintFlash(false);
     this.flashMat = new MeshBasicMaterial({
       map: this.flashTexture,
       transparent: true,
@@ -108,12 +113,28 @@ export class WakeView {
     this.flashMesh.renderOrder = RenderOrder.fade + 0.05;
     this.flashMesh.frustumCulled = false;
     this.group.add(this.flashMesh);
+
+    // The friend: a dark shape over the glow, fading in on its own, slower than the glow.
+    this.friendTexture = paintFlash(true);
+    this.friendMat = new MeshBasicMaterial({
+      map: this.friendTexture,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    this.friendMesh = new Mesh(new PlaneGeometry(FLASH_SIZE_M, FLASH_SIZE_M), this.friendMat);
+    this.friendMesh.position.copy(this.flashMesh.position);
+    this.friendMesh.renderOrder = RenderOrder.fade + 0.06;
+    this.friendMesh.frustumCulled = false;
+    this.group.add(this.friendMesh);
     this.group.visible = false;
   }
 
   /**
    * Once per frame: how open the eyes are (0..1, 1 hides the lids), how visible the word is (0..1), where the head is and which
-   * way it faces (world), and how bright the flash through the lids is (0..1).
+   * way it faces (world), how bright the glow through the lids is (0..1), and how clearly the friend shows in it (0..1).
    */
   update(
     open: number,
@@ -121,6 +142,7 @@ export class WakeView {
     headPos: Readonly<{ x: number; y: number; z: number }>,
     headQuat: Readonly<{ x: number; y: number; z: number; w: number }>,
     flash = 0,
+    friend = 0,
   ): void {
     const lidsOn = open < 0.999;
     const textOn = text > 0.001;
@@ -128,11 +150,13 @@ export class WakeView {
     this.lids.visible = lidsOn;
     this.textMesh.visible = textOn;
     this.flashMesh.visible = flashOn;
+    this.friendMesh.visible = flashOn && friend > 0.001;
     this.group.visible = lidsOn || textOn || flashOn;
     if (!this.group.visible) return;
     this.lidMat.uniforms.open.value = open < 0 ? 0 : open;
     this.textMat.opacity = (text > 1 ? 1 : text) * TEXT_MAX_OPACITY;
     this.flashMat.opacity = (flash > 1 ? 1 : flash) * FLASH_MAX_OPACITY;
+    this.friendMat.opacity = (friend > 1 ? 1 : friend) * FRIEND_MAX_OPACITY;
     this.group.position.set(headPos.x, headPos.y, headPos.z);
     this.group.quaternion.set(headQuat.x, headQuat.y, headQuat.z, headQuat.w);
   }
@@ -151,14 +175,17 @@ export class WakeView {
     this.flashMesh.geometry.dispose();
     this.flashMat.dispose();
     this.flashTexture.dispose();
+    this.friendMesh.geometry.dispose();
+    this.friendMat.dispose();
+    this.friendTexture.dispose();
   }
 }
 
 /**
- * The flash, drawn once: a pale glow with a boy standing in it, cut out as a soft dark
- * shape. He is small and a little way off, one hand lifted in a wave: a friend, not a stranger in the doorway.
+ * The dream, drawn once: a pale glow (friend false), or the boy who stands in it as a soft dark shape (friend true), the
+ * two faded separately. He is small and a little way off, one hand lifted in a wave: a friend, not a stranger in the doorway.
  */
-function paintFlash(): CanvasTexture {
+function paintFlash(friend: boolean): CanvasTexture {
   const size = 512;
   let canvas: HTMLCanvasElement | undefined;
   if (typeof document !== 'undefined') canvas = document.createElement('canvas');
@@ -166,17 +193,18 @@ function paintFlash(): CanvasTexture {
   canvas.width = size;
   canvas.height = size;
   const g = canvas.getContext ? canvas.getContext('2d') : null;
-  if (g) {
+  if (g && !friend) {
     const glow = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
     glow.addColorStop(0, FLASH_COLOR);
     glow.addColorStop(0.45, 'rgba(180,190,210,0.55)');
     glow.addColorStop(1, 'rgba(180,190,210,0)');
     g.fillStyle = glow;
     g.fillRect(0, 0, size, size);
-    // The boy, cut out of the glow with a soft edge (the lids are black behind it, so the cut reads as his silhouette).
+  }
+  if (g && friend) {
+    // The boy, dark with a very soft edge: laid over the glow, he darkens it where he stands.
     g.save();
-    g.globalCompositeOperation = 'destination-out';
-    g.filter = 'blur(5px)';
+    g.filter = 'blur(9px)';
     g.fillStyle = '#000';
     const X = (f: number) => f * size;
     const Y = (f: number) => (1 - f) * size; // f up from the bottom

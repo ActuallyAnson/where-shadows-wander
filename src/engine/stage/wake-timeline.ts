@@ -1,6 +1,6 @@
 // Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black and far thunder rolls (it is what wakes him), then the
-// eyes open: a slow heavy blink, a quicker wider one, then open. Just before the thunder, lightning flashes through the shut
-// lids with his friend's silhouette in it. This is the timing only, as numbers: how open the eyes are, how bright the flash
+// eyes open: a slow heavy blink, a quicker wider one, then open. Before the thunder, a glow gathers behind the shut lids with
+// his friend's silhouette slowly gathering in it, and the thunder breaks it. This is the timing only, as numbers: how open the eyes are, how bright the flash
 // and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
 
 /** One point of a curve: at `t` seconds the value is `v`; between points it eases (smoothstep). */
@@ -19,10 +19,11 @@ export interface WakeScript {
   /** When the far thunder rolls in the dark and wakes him, seconds; none if left out. */
   readonly thunderAt?: number;
   /**
-   * A lightning flash through the shut lids, just before the thunder (0 none .. 1 brightest), with his friend's silhouette
-   * standing in its light: a dream he is waking from. Left out: no flash.
+   * A pale glow through the shut lids before the thunder (0 none .. 1 brightest): the dream he is waking from. Left out: none.
    */
   readonly flashKeys?: readonly WakeKey[];
+  /** How clearly his friend's silhouette shows in that glow (0 not at all .. 1 as clear as it gets, still faint). */
+  readonly friendKeys?: readonly WakeKey[];
 }
 
 /** Seconds and levels of the opening. Tune here. */
@@ -31,29 +32,35 @@ export const WAKE_SCRIPT: WakeScript = {
   // second and is still rumbling away as the eyes first open.
   text: '',
   textKeys: [{ t: 0, v: 0 }],
-  // Before it, the flash: a quick flicker that shows his friend standing there, then a slow fade, as a dream lets go. The
-  // thunder follows it, as thunder does, and the black holds a moment before the first blink.
+  // Before it, the dream: a pale glow gathers slowly in the black, and his friend's silhouette slowly gathers in it, never
+  // quite clear. The thunder breaks it: the glow and the friend fade as it rolls, and the black holds before the first blink.
   flashKeys: [
     { t: 0, v: 0 },
-    { t: 0.35, v: 0 },
-    { t: 0.4, v: 1 },
-    { t: 0.5, v: 0.35 },
-    { t: 0.58, v: 0.85 },
-    { t: 1.6, v: 0 },
+    { t: 0.3, v: 0 },
+    { t: 2.0, v: 0.7 },
+    { t: 2.9, v: 0.7 },
+    { t: 3.5, v: 0 },
   ],
-  thunderAt: 0.9,
+  friendKeys: [
+    { t: 0, v: 0 },
+    { t: 0.9, v: 0 },
+    { t: 2.6, v: 1 },
+    { t: 2.9, v: 1 },
+    { t: 3.4, v: 0 },
+  ],
+  thunderAt: 2.9,
   lidKeys: [
     { t: 0, v: 0 },
-    { t: 2.0, v: 0 }, // a moment of plain black first
-    { t: 2.8, v: 0.25 }, // first blink: a slit, slow and heavy
-    { t: 3.1, v: 0.25 },
-    { t: 3.4, v: 0 },
-    { t: 3.9, v: 0 },
-    { t: 4.25, v: 0.55 }, // second: wider and quicker
-    { t: 4.4, v: 0.55 },
-    { t: 4.55, v: 0.05 },
-    { t: 4.8, v: 0.05 },
-    { t: 6.4, v: 1 }, // open
+    { t: 3.6, v: 0 }, // the dream, then a moment of plain black
+    { t: 4.4, v: 0.25 }, // first blink: a slit, slow and heavy
+    { t: 4.7, v: 0.25 },
+    { t: 5.0, v: 0 },
+    { t: 5.5, v: 0 },
+    { t: 5.85, v: 0.55 }, // second: wider and quicker
+    { t: 6.0, v: 0.55 },
+    { t: 6.15, v: 0.05 },
+    { t: 6.4, v: 0.05 },
+    { t: 8.0, v: 1 }, // open
   ],
 };
 
@@ -140,9 +147,15 @@ export class WakeTimeline {
     return this.thunderNow;
   }
 
-  /** How bright the flash through the lids is now (0..1); 0 when not playing. */
+  /** How bright the glow through the lids is now (0..1); 0 when not playing. */
   get flash(): number {
     const keys = this.script.flashKeys;
+    return this.running && keys ? sampleKeys(keys, this.t) : 0;
+  }
+
+  /** How clearly the friend shows in the glow now (0..1); 0 when not playing. */
+  get friend(): number {
+    const keys = this.script.friendKeys;
     return this.running && keys ? sampleKeys(keys, this.t) : 0;
   }
 

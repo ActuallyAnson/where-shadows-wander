@@ -1085,7 +1085,7 @@ async function start(): Promise<void> {
         wake.update(step);
         world.camera.getWorldPosition(fadeHead);
         world.camera.getWorldQuaternion(wakeHead);
-        wakeView.update(wake.lid, wake.text, fadeHead, wakeHead, wake.flash);
+        wakeView.update(wake.lid, wake.text, fadeHead, wakeHead, wake.flash, wake.friend);
       }
       const shadowsVisible = candleView.lit && sessionState === 'playing';
       timings.begin(SLOT.read);

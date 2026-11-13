@@ -42,7 +42,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ### 1. Waking
 
 - **Purpose:** set the mood without a word. He is awake, alone and it is late.
-- **What happens:** BEGIN fades the title to black (built). The headset stays black. Lightning flickers through the shut lids, and for a moment his friend stands in its pale light, a small soft-edged silhouette lifting a hand to wave, before it fades like a dream letting go (built). Then far off thunder rolls, low and muffled: it is what woke him (built). While it rumbles away his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
+- **What happens:** BEGIN fades the title to black (built). The headset stays black. A pale glow slowly gathers behind the shut lids, and in it, more slowly still, his friend: a faint, soft-edged silhouette lifting a hand to wave, never quite clear, like a dream (built). Then far off thunder rolls, low and muffled, and the dream goes with it: it is what woke him (built). While it rumbles away his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). The room is dark and cold blue. A short silence, then the room tone. The player lights the candle (built), and the room warms.
 - **The player:** lights the candle.
 - **Must make the player feel:** lonely, then a little safer once the light is there.
 - **Built already:** the fade to black, the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
@@ -125,3 +125,4 @@ So that every step leaves a game we could submit:
 - 12 Nov 2026: it rains outside instead of snowing: a rainy night in the window, a constant rain sound, and now and then a far, muffled thunder after a faint flash.
 - 12 Nov 2026: a far thunder roll in the black is what wakes him; the eyes open as it rumbles away.
 - 13 Nov 2026: before the thunder, lightning flashes through the shut lids with the friend's silhouette in it, waving; the thunder follows the flash.
+- 13 Nov 2026: the flash becomes a slow glow, and the friend fades in over it gradually and faintly (he appeared too quickly and too plainly); the thunder breaks the dream, and the blinks start 1.6 s later.
