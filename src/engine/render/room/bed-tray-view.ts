@@ -1,5 +1,7 @@
-// Lightweight wooden bed tray and quilted patchwork blanket mesh across the player's lap.
-// Provides seated look-down embodiment inside the dark bedroom at night.
+// Lightweight wooden bed tray, and the patchwork quilt the player has just sat up in: it runs from a turned-back fold at the
+// waist, over the thighs (the tray stands on them) and the knees, down over the shins and the feet to the foot of the bed, and
+// hangs over its end and its sides. The bed itself is a model in the room (room-models.ts), under the player, its own neat
+// cover hidden: this quilt is the one he slept under. Seated look-down embodiment inside the dark bedroom at night.
 // Belongs to Teammate B's presentation domain (src/engine/render/room).
 //
 // Constraints:
@@ -56,8 +58,81 @@ export const LAP_PIECE_IDS = ['tray', 'quilt', 'candle'] as const;
 /** Where the candle stands when the layout file says nothing, in the tray's space: in the middle, on its top. */
 const CANDLE_DEFAULT: Placement = placement([0, 0.01, 0]);
 
-/** Where the code puts the quilt when the layout file says nothing: draped across the lap, just below the tray. */
-const QUILT_DEFAULT: Placement = placement([0, -0.07, 0.14], [-180 / 2.3, 0, 0]);
+/** Where the code puts the quilt when the layout file says nothing: its shape is already in the tray's space (QUILT_*). */
+const QUILT_DEFAULT: Placement = placement([0, 0, 0]);
+
+/** The quilt's size (m): across, and from the waist (+z, by the body) to past the foot of the bed (-z); its grid. */
+const QUILT_W = 1.0;
+const QUILT_NEAR_Z = 0.34;
+const QUILT_FAR_Z = -0.8;
+const QUILT_SEG_X = 10;
+const QUILT_SEG_Z = 14;
+/** Half the bed's width (m): past it, the quilt hangs down the bed's sides. */
+const BED_HALF_W = 0.42;
+
+/**
+ * The quilt's height (m, in the tray's space: 0 is the tray's top) along its length, from the waist to the end, as (z, y)
+ * points: the turned-back fold at the waist, the thighs under the tray (its legs stand on them at -0.12), the knees a little
+ * raised, the shins, the feet making a bump, then over the foot of the bed (about 0.75 m ahead of the tray) and down.
+ */
+const QUILT_PROFILE: readonly (readonly [number, number])[] = [
+  [0.34, -0.15],
+  [0.29, -0.07], // the fold he pushed back, rolled up at the waist
+  [0.23, -0.1],
+  [0.12, -0.12], // thighs, under the tray
+  [-0.12, -0.12],
+  [-0.27, -0.08], // knees
+  [-0.45, -0.17],
+  [-0.6, -0.2], // shins
+  [-0.67, -0.13], // feet
+  [-0.73, -0.19],
+  [-0.76, -0.3], // the foot of the bed
+  [-0.8, -0.46],
+];
+
+/** The quilt's height at `z` along its middle (QUILT_PROFILE, eased between its points). */
+export function quiltHeight(z: number): number {
+  const p = QUILT_PROFILE;
+  if (z >= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) {
+    if (z >= p[i][0]) {
+      const [z0, y0] = p[i - 1];
+      const [z1, y1] = p[i];
+      const s = (z0 - z) / (z0 - z1);
+      return y0 + (y1 - y0) * (s * s * (3 - 2 * s));
+    }
+  }
+  return p[p.length - 1][1];
+}
+
+/** The quilt's surface: QUILT_PROFILE along it, the legs as two soft ridges, the sides hanging over the bed's edge, and creases. */
+function quiltGeometry(): PlaneGeometry {
+  const g = new PlaneGeometry(QUILT_W, QUILT_NEAR_Z - QUILT_FAR_Z, QUILT_SEG_X, QUILT_SEG_Z);
+  // Lay it flat: its +y (the top of the texture) towards the end of the bed (-z), its face up.
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, (QUILT_NEAR_Z + QUILT_FAR_Z) / 2);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const ax = Math.abs(x);
+    let y = quiltHeight(z);
+    // The legs under it, a little apart, from the hips to the feet.
+    if (z < 0.2 && z > -0.7) y += 0.018 * Math.exp(-((ax - 0.11) ** 2) / 0.006);
+    // Past the edge of the bed it falls away down the sides.
+    if (ax > BED_HALF_W - 0.08) {
+      const s = Math.min(1, (ax - (BED_HALF_W - 0.08)) / (QUILT_W / 2 - (BED_HALF_W - 0.08)));
+      y -= 0.24 * s * s;
+    } else if (ax > 0.24) {
+      y -= 0.04 * ((ax - 0.24) / (BED_HALF_W - 0.32));
+    }
+    // Creases from being slept in (fixed, not random: the same quilt every time).
+    y += 0.008 * Math.sin(x * 23 + z * 7) * Math.cos(z * 17 - x * 5) + 0.006 * Math.sin(z * 31 + 1.3);
+    pos.setY(i, y);
+  }
+  g.computeVertexNormals();
+  return g;
+}
 
 export class BedTrayView implements EditableSource {
   /** Placed in front of the player by `place`; the tray and the quilt are placed inside it by the layout. */
@@ -123,18 +198,8 @@ export class BedTrayView implements EditableSource {
     const legRight = new Mesh(this.legGeo, this.woodMat);
     legRight.position.set(0.22, -0.06, 0);
 
-    // 4. Quilted Blanket: draped across the lap below the tray (96 triangles)
-    this.blanketGeo = new PlaneGeometry(0.85, 0.65, 8, 6);
-    const pos = this.blanketGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const vx = pos.getX(i);
-      const vy = pos.getY(i);
-      // Gentle drape curve across the lap
-      const sag = Math.sin(((vx + 0.425) / 0.85) * Math.PI) * 0.035 - Math.pow(vx / 0.425, 2) * 0.07;
-      const wave = Math.sin(vx * 10.0) * Math.cos(vy * 8.0) * 0.008;
-      pos.setZ(i, pos.getZ(i) + sag + wave);
-    }
-    this.blanketGeo.computeVertexNormals();
+    // 4. The quilt he sat up in, from the waist to the foot of the bed (QUILT_SEG_X * QUILT_SEG_Z * 2 triangles)
+    this.blanketGeo = quiltGeometry();
 
     const blanketMesh = new Mesh(this.blanketGeo, this.blanketMat);
     blanketMesh.name = 'quilt';
@@ -144,7 +209,6 @@ export class BedTrayView implements EditableSource {
     this.group.add(this.tray, blanketMesh);
     const trayDefault = placement([0, 0, 0]);
     applyPlacement(this.tray, placementOr(layout, 'lap', 'tray', trayDefault));
-    // Orient blanket to lay gently draped across the lap
     applyPlacement(blanketMesh, placementOr(layout, 'lap', 'quilt', QUILT_DEFAULT));
     this.candleSpot.name = 'candle';
     const candlePick = new Mesh(this.candlePickGeo, this.candlePickMat);

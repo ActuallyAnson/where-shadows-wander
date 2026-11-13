@@ -61,6 +61,7 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Step1]: 0.6,
   [Sound.Rain]: 0.35,
   [Sound.Thunder]: 0.8,
+  [Sound.Covers]: 0.8,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -95,6 +96,8 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
       return rain(sr);
     case Sound.Thunder:
       return thunder(sr);
+    case Sound.Covers:
+      return covers(sr);
     case Sound.Twinkle:
       return twinkle(sr);
     case Sound.Hop:
@@ -298,6 +301,41 @@ function rain(sr: number): Float32Array<ArrayBuffer> {
   for (let i = 0; i < edge; i++) {
     const f = i / edge;
     out[i] = made[i] * f + made[n + i] * (1 - f);
+  }
+  return out;
+}
+
+/**
+ * The bedclothes as he sits up: a soft slide of heavy cloth, not paper. Low-passed noise (dull, no crinkle) in two pulls, the
+ * second longer, as the quilt slides down from the shoulders to the lap, with a faint uneven grain of cloth rubbing on cloth.
+ */
+function covers(sr: number): Float32Array<ArrayBuffer> {
+  const n = Math.floor(sr * 1.4);
+  const out = new Float32Array(n);
+  const rnd = seeded(131);
+  const k1 = lowPass(1400, sr);
+  const k2 = lowPass(700, sr);
+  const kGrain = lowPass(30, sr);
+  let a = 0;
+  let b = 0;
+  let grain = 0;
+  // The pulls: when each peaks (s), how wide it is (s), and how loud.
+  const pulls: readonly (readonly [number, number, number])[] = [
+    [0.18, 0.1, 0.7],
+    [0.6, 0.28, 1],
+  ];
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const x = rnd() * 2 - 1;
+    a += (x - a) * k1;
+    b += (a - b) * k2;
+    grain += (rnd() * 2 - 1 - grain) * kGrain;
+    let env = 0;
+    for (let k = 0; k < pulls.length; k++) {
+      const d = (t - pulls[k][0]) / pulls[k][1];
+      env += pulls[k][2] * Math.exp(-d * d);
+    }
+    out[i] = b * env * (0.75 + 2.5 * grain) * Math.min(1, t / 0.02);
   }
   return out;
 }

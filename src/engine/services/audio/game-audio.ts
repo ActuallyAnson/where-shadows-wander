@@ -84,6 +84,11 @@ export class GameAudio {
     this.player.playAt(Sound.Thunder, at.x, at.y, at.z);
   }
 
+  /** The bedclothes sliding as he sits up, from his lap (`at`, its world position). */
+  covers(at: ArrayLike<number>): void {
+    this.player.playAt(Sound.Covers, at[0], at[1], at[2]);
+  }
+
   /** Puts the middle of a hand's shadow (or its side of the wall when it has none) into `this.at`. */
   private fromShadow(shadow: HandShadow, hand: Handedness, stage: StagePlane): void {
     let sx: number;

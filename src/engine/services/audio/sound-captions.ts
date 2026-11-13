@@ -18,6 +18,7 @@ export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
   [Sound.Hop]: '[a soft landing]',
   [Sound.Ignite]: '[a match strikes]',
   [Sound.Thunder]: '[thunder, far off]',
+  [Sound.Covers]: '[bedclothes rustle]',
 };
 
 /** The least time between two captions, seconds, so a run of sparkles does not flood the wall. */

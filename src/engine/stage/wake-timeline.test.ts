@@ -81,6 +81,26 @@ describe('WakeTimeline', () => {
     expect(w.thunder).toBe(false);
   });
 
+  it('slides the covers once as he sits up: after the second blink, before the eyes are fully open', () => {
+    const at = WAKE_SCRIPT.coversAt!;
+    expect(at).toBeGreaterThan(7.85); // the second blink's start
+    expect(sampleKeys(WAKE_SCRIPT.lidKeys, at)).toBeLessThan(1);
+    const w = new WakeTimeline();
+    w.start();
+    const fired: number[] = [];
+    for (let i = 0; i < 2000; i++) {
+      w.update(1 / 72);
+      if (w.covers) fired.push(w.time);
+    }
+    expect(fired).toHaveLength(1);
+    expect(fired[0]).toBeGreaterThan(at);
+    expect(fired[0]).toBeLessThan(at + 0.05);
+    w.start();
+    w.finish();
+    w.update(1);
+    expect(w.covers).toBe(false);
+  });
+
   it('can be skipped to the end', () => {
     const w = new WakeTimeline();
     w.start();

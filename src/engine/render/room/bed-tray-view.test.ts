@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyRoomLayout, placement } from '../../stage/room-layout';
-import { BedTrayView } from './bed-tray-view';
+import { BedTrayView, quiltHeight } from './bed-tray-view';
 
 describe('BedTrayView', () => {
   it('creates the lap view within the <= 400 triangle budget', () => {
@@ -10,6 +10,21 @@ describe('BedTrayView', () => {
     expect(meshes).toBe(8);
     expect(view.triangleCount).toBeLessThanOrEqual(400);
     expect(view.triangleCount).toBeGreaterThan(50);
+  });
+
+  it('lays the quilt from a fold at the waist, under the tray, over the knees and feet, and down over the foot of the bed', () => {
+    expect(quiltHeight(0)).toBeCloseTo(-0.12, 3); // where the tray's legs stand
+    expect(quiltHeight(0.29)).toBeGreaterThan(quiltHeight(0.2)); // the turned-back fold
+    expect(quiltHeight(-0.27)).toBeGreaterThan(quiltHeight(0)); // the knees
+    expect(quiltHeight(-0.67)).toBeGreaterThan(quiltHeight(-0.6)); // the feet
+    expect(quiltHeight(-0.8)).toBeLessThan(-0.4); // hanging over the foot of the bed
+    const view = new BedTrayView();
+    const quilt = view.editables().find((p) => p.id === 'quilt')!.object as import('@iwsdk/core').Mesh;
+    quilt.geometry.computeBoundingBox();
+    const box = quilt.geometry.boundingBox!;
+    expect(box.max.z).toBeCloseTo(0.34, 3);
+    expect(box.min.z).toBeCloseTo(-0.8, 3);
+    expect(box.max.y).toBeLessThan(-0.04); // never up through the tray
   });
 
   it('initializes at default lap position (Y ≈ 0.65m, Z ≈ -0.45m)', () => {
@@ -43,7 +58,7 @@ describe('BedTrayView', () => {
     expect(tray.object.position.y).toBeCloseTo(0.03, 6);
     expect(quilt.object.position.z).toBeCloseTo(0.2, 6);
     expect(quilt.object.rotation.x).toBeCloseTo((-80 * Math.PI) / 180, 6);
-    expect(quilt.fallback.rotDeg[0]).toBeCloseTo(-180 / 2.3, 6);
+    expect(quilt.fallback.rotDeg[0]).toBe(0); // its shape is made in the tray's space
     view.place(0, 0.7, -0.5, 0);
     const out = new Float64Array(3);
     view.getCandleSaucerPosition(out);

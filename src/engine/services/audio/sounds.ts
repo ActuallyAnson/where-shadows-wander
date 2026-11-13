@@ -51,6 +51,8 @@ export const Sound = {
   Rain: 26,
   /** Thunder far off, low and muffled by the distance and the walls: now and then, after a flash in the window (storm.ts). */
   Thunder: 27,
+  /** The bedclothes as he sits up in bed (scene 1, as his eyes open): a soft slide of heavy cloth. */
+  Covers: 28,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -354,6 +356,17 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     // Far away: the same loudness anywhere in the room, from the window's side.
     refDistance: 50,
     maxDistance: 100,
+  },
+  {
+    name: 'covers',
+    bus: Bus.Effects,
+    gain: 0.55,
+    loop: false,
+    priority: 2,
+    minGapS: 1,
+    // From the lap: close.
+    refDistance: 1,
+    maxDistance: 6,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

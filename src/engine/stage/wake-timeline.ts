@@ -19,6 +19,8 @@ export interface WakeScript {
   readonly lidKeys: readonly WakeKey[];
   /** When the far thunder rolls in the dark and wakes him, seconds; none if left out. */
   readonly thunderAt?: number;
+  /** When he sits up in bed and the covers slide off his shoulders (a sound), seconds; none if left out. */
+  readonly coversAt?: number;
   /**
    * Before the thunder, his friend in the black behind the shut lids, a faint pale glow of him: the dream he is waking from.
    * How clearly he shows (0 not at all .. 1 as clear as he gets, still faint). Left out: no dream.
@@ -42,6 +44,8 @@ export const WAKE_SCRIPT: WakeScript = {
     { t: 5.4, v: 0 },
   ],
   thunderAt: 4.9,
+  // After the second blink he sits up: the covers slide down to his lap as the eyes open the rest of the way.
+  coversAt: 8.45,
   lidKeys: [
     { t: 0, v: 0 },
     { t: 5.6, v: 0 }, // the dream, then a moment of plain black
@@ -85,6 +89,7 @@ export class WakeTimeline {
   private t = 0;
   private running = false;
   private thunderNow = false;
+  private coversNow = false;
   private readonly duration: number;
 
   constructor(readonly script: WakeScript = WAKE_SCRIPT) {
@@ -96,6 +101,7 @@ export class WakeTimeline {
     this.t = 0;
     this.running = true;
     this.thunderNow = false;
+    this.coversNow = false;
   }
 
   /** Jumps to the end: eyes open, no word, no thunder. */
@@ -103,6 +109,7 @@ export class WakeTimeline {
     this.t = this.duration;
     this.running = false;
     this.thunderNow = false;
+    this.coversNow = false;
   }
 
   /** Whether it is playing (started and not yet at its end). */
@@ -117,11 +124,14 @@ export class WakeTimeline {
   /** Moves on by `dt` seconds. Returns true on the update it finishes. */
   update(dt: number): boolean {
     this.thunderNow = false;
+    this.coversNow = false;
     if (!this.running) return false;
     const before = this.t;
     this.t += dt > 0 ? dt : 0;
     const at = this.script.thunderAt;
     if (at !== undefined && before <= at && this.t > at) this.thunderNow = true;
+    const coversAt = this.script.coversAt;
+    if (coversAt !== undefined && before <= coversAt && this.t > coversAt) this.coversNow = true;
     if (this.t >= this.duration) {
       this.t = this.duration;
       this.running = false;
@@ -138,6 +148,11 @@ export class WakeTimeline {
   /** True on the one update the thunder in the dark should start. */
   get thunder(): boolean {
     return this.thunderNow;
+  }
+
+  /** True on the one update he sits up and the covers slide (WakeScript.coversAt). */
+  get covers(): boolean {
+    return this.coversNow;
   }
 
   /** How clearly the friend shows in the dark now (0..1); 0 when not playing. */

@@ -1554,6 +1554,7 @@ async function start(): Promise<void> {
         gameAudio.setRain(true, windowAt);
         // The storm's thunder, and the one in the black that wakes him (scene 1).
         if (storm.thunder || wake.thunder) gameAudio.thunder(windowAt);
+        if (wake.covers) gameAudio.covers(saucerPos); // he sits up: the covers slide, at his lap
         audio.update(audioPose);
       } catch (e) {
         failures.report('audio', e);

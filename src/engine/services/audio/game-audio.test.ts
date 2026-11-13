@@ -127,6 +127,12 @@ describe('GameAudio weather', () => {
     audio.thunder({ x: -1.9, y: 1.45, z: -0.8 });
     expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Thunder, -1.9, 1.45, -0.8]]);
   });
+
+  it('plays the covers from the lap', () => {
+    const { audio, rec } = setup();
+    audio.covers([0, 0.7, -0.45]);
+    expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Covers, 0, 0.7, -0.45]]);
+  });
 });
 
 describe('GameAudio.candleMoved', () => {

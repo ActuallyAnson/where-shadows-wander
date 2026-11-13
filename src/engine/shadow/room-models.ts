@@ -39,6 +39,8 @@ export interface RoomPiece {
   readonly yaw?: number;
   /** The painted stand-in it replaces, hidden once the model is in (see RoomDressingView.hideStandIn). */
   readonly replaces?: StandIn;
+  /** Parts of the model (by node name) left out: something of the game's own is there instead. */
+  readonly hide?: readonly string[];
 }
 
 /**
@@ -56,6 +58,9 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     size: [0.9, 1.7],
     yaw: Math.PI,
     replaces: 'bed',
+    // Its neat cover: the player has just sat up in the bed, under the lap's own rumpled quilt (bed-tray-view.ts), which runs
+    // to the bed's foot; the sheet shows behind them, where they lay.
+    hide: ['cover'],
   },
   // The bookcase on the right wall past the bed's foot, its open side to the room: 0.6 m wide, 1.32 m high.
   {
@@ -148,6 +153,10 @@ export class RoomModels implements EditableSource {
     const holder = new Group();
     holder.name = piece.id;
     holder.add(model);
+    for (const name of piece.hide ?? []) {
+      const part = model.getObjectByName(name);
+      if (part) part.visible = false;
+    }
     const box = new Box3().setFromObject(model);
     const dims = box.getSize(new Vector3());
     const [w, d] = piece.size;
