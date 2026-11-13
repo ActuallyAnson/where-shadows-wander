@@ -310,7 +310,7 @@ async function start(): Promise<void> {
   // read as the player's: fainter, and softer at the edges.
   const FRIEND_SHADOW_OPACITY = 0.5;
   const friendHand = new FriendHand('left');
-  const friendProjector = new ShadowProjector({ ...REAL_WALL_SHADOW_SETTINGS, blurPerM: 0.04, maxBlurM: 0.02 });
+  const friendProjector = new ShadowProjector({ ...REAL_WALL_SHADOW_SETTINGS, blurPerM: 0.02, maxBlurM: 0.012 });
   const friendShadow = new ShadowRenderer(FRIEND_SHADOW_OPACITY);
   const startStory = (scene = 0) => {
     storyWait = -1;

@@ -17,8 +17,8 @@ export interface WallFrame {
   readonly normal: V3;
 }
 
-/** How far off the wall the hand is held, metres: near enough for a shadow a little bigger than a hand, a little soft. */
-export const FRIEND_HAND_OFF_WALL_M = 0.42;
+/** How far off the wall the hand is held, metres: far enough towards the candle for a shadow about twice a hand, still crisp. */
+export const FRIEND_HAND_OFF_WALL_M = 0.75;
 /** A child's hand. */
 export const FRIEND_HAND_SCALE = 0.9;
 /** Seconds to form the shape from a resting hand. */
@@ -33,6 +33,14 @@ const LOOSEN = 0.45;
 const BREATH_M = 0.004;
 const BREATH_S = 3.6;
 const SWAY_RAD = 0.035;
+
+/**
+ * How far each shape's hand is turned side-on to the wall, radians, palm swinging to the right as seen. Held square, a rabbit's
+ * shadow is two fingers up on a fist (a peace sign); turned, the thumb pinched to the curled fingers sticks out as its snout.
+ */
+const TURN: Partial<Record<Shape, number>> = { rabbit: (45 * Math.PI) / 180 };
+/** Degrees the rabbit's ears are spread past the preset's, each way, so they stay two ears in a soft shadow. */
+const EAR_SPREAD_DEG = 9;
 
 const smooth = (k: number) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 
@@ -74,7 +82,12 @@ export class FriendHand {
    * wall's centre when cast from `light`. `tilt` leans the fingers off straight up (radians, counter-clockwise as seen).
    */
   update(shape: Shape, t: number, wall: WallFrame, light: V3, x: number, y: number, tilt = 0): HandFrame {
-    lerpPose(PRESETS.relaxed, PRESETS[shape], formAt(t), this.pose);
+    const form = formAt(t);
+    lerpPose(PRESETS.relaxed, PRESETS[shape], form, this.pose);
+    if (shape === 'rabbit') {
+      this.pose.fingers[0].splayDeg -= EAR_SPREAD_DEG * form;
+      this.pose.fingers[1].splayDeg += EAR_SPREAD_DEG * form;
+    }
     const lp = writeHandPose(this.pose, this.zero, this.local, FRIEND_HAND_SCALE).positions;
     // The hand's middle: its joints' mean, which is what lands on (x, y).
     let mx = 0,
@@ -116,14 +129,24 @@ export class FriendHand {
     const ay0 = u[0] * c - r[0] * s,
       ay1 = u[1] * c - r[1] * s,
       ay2 = u[2] * c - r[2] * s;
+    // Turned side-on about the up axis: the back of the hand swings from facing the player towards the left.
+    const turn = TURN[shape] ?? 0,
+      tc = Math.cos(turn),
+      ts = Math.sin(turn);
+    const bx0 = ax0 * tc + n[0] * ts,
+      bx1 = ax1 * tc + n[1] * ts,
+      bx2 = ax2 * tc + n[2] * ts;
+    const bn0 = n[0] * tc - ax0 * ts,
+      bn1 = n[1] * tc - ax1 * ts,
+      bn2 = n[2] * tc - ax2 * ts;
     const out = this.frame.positions;
     for (let j = 0; j < JOINT_COUNT; j++) {
       const dx = lp[j * 3] - mx,
         dy = lp[j * 3 + 1] - my,
         dz = mz - lp[j * 3 + 2];
-      out[j * 3] = hx + ax0 * dx + n[0] * dy + ay0 * dz;
-      out[j * 3 + 1] = hy + ax1 * dx + n[1] * dy + ay1 * dz;
-      out[j * 3 + 2] = hz + ax2 * dx + n[2] * dy + ay2 * dz;
+      out[j * 3] = hx + bx0 * dx + bn0 * dy + ay0 * dz;
+      out[j * 3 + 1] = hy + bx1 * dx + bn1 * dy + ay1 * dz;
+      out[j * 3 + 2] = hz + bx2 * dx + bn2 * dy + ay2 * dz;
     }
     this.frame.radii.set(this.local.radii);
     this.frame.tracked = true;

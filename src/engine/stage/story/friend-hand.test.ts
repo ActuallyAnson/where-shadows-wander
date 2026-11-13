@@ -51,6 +51,13 @@ describe('FriendHand', () => {
     expect(f.hands.right.tracked).toBe(false);
   });
 
+  it('turns the rabbit side-on, so the pinched thumb sticks out as a snout to the right of its neck', () => {
+    const p = new FriendHand('left').update('rabbit', 2, wall, candle, 0, 0).positions;
+    expect(p[JOINT['thumb-tip'] * 3]).toBeGreaterThan(p[JOINT.wrist * 3] + 0.04);
+    // The two ears stay apart on the wall.
+    expect(Math.abs(p[JOINT['index-finger-tip'] * 3] - p[JOINT['middle-finger-tip'] * 3])).toBeGreaterThan(0.015);
+  });
+
   it('clears to no hand', () => {
     const f = new FriendHand('right');
     f.update('fox', 1, wall, candle, 0, 0);
