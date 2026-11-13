@@ -106,7 +106,7 @@ import { isDeskMode, loadLaunch, switchLaunch, updateLaunch } from './launch-mod
 import { reportSource } from './report-source';
 import { showNoXrNoticeIfNeeded } from './no-xr-notice';
 import { hideEmulatorOfferBar } from './emulator-offer';
-import { hideEmulatorExtras, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
+import { hideEmulatorExtras, listenForGizmoKey, useEmulatorHands, type EmulatedDeviceLike } from './emulator-hands';
 import { CandleStep, defaultEmulatorPose, setEmulatorPose, type EmulatedRigLike } from './emulator-pose';
 import { showStartFailure } from './start-failure';
 
@@ -154,6 +154,7 @@ async function start(): Promise<void> {
   const emulated = !!emulatedDevice;
   if (emulatedDevice) {
     useEmulatorHands(emulatedDevice);
+    listenForGizmoKey(window, emulatedDevice); // Alt+G hides the emulator's gizmos (and its panel) for a clean view
     hideEmulatorExtras(document); // and none of its buttons this game has no use for (controllers, gaze, ...)
     // Its "Enter XR" bar repeats the launcher's BEGIN (and the room editor never enters XR): hide it.
     hideEmulatorOfferBar(document);

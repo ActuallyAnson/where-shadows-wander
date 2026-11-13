@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { useEmulatorHands } from './emulator-hands';
+import { toggleEmulatorGizmos, useEmulatorHands } from './emulator-hands';
 
 /** A stand-in device that records the control modes it is set to, as the emulator's panel would see them. */
 function device(controlMode: string) {
@@ -32,5 +32,15 @@ describe('useEmulatorHands', () => {
     useEmulatorHands(d);
     expect(d.primaryInputMode).toBe('hand');
     expect(d.seen).toEqual([]);
+  });
+});
+
+describe('toggleEmulatorGizmos', () => {
+  it('hides the gizmos by turning the control mode programmatic, and shows them again by turning it back', () => {
+    const d = device('manual');
+    expect(toggleEmulatorGizmos(d)).toBe(true);
+    expect(d.controlMode).toBe('programmatic');
+    expect(toggleEmulatorGizmos(d)).toBe(false);
+    expect(d.controlMode).toBe('manual');
   });
 });

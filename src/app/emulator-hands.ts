@@ -54,6 +54,31 @@ export function hideEmulatorExtras(doc: Document): void {
   }).observe(doc.body, { childList: true });
 }
 
+/** The key (with Alt) that hides or shows the emulator's gizmos and panel (toggleEmulatorGizmos). */
+export const GIZMO_KEY_CODE = 'KeyG';
+
+/**
+ * Hides the emulator's move/rotate gizmos (and its panel with them), or shows them again, for a clean view or screenshot.
+ * IWER has no switch for the gizmos alone: it hides them in play mode, and when the control mode is programmatic, which is
+ * what this uses. While hidden, the mouse and keyboard no longer move the head or the hands; the Hand Lab's sources still pose
+ * the hands, and code can still set the device's pose. Returns true when they are now hidden.
+ */
+export function toggleEmulatorGizmos(device: EmulatedDeviceLike): boolean {
+  const hide = device.controlMode !== 'programmatic';
+  device.controlMode = hide ? 'programmatic' : 'manual';
+  return hide;
+}
+
+/** Alt+G toggles the emulator's gizmos (toggleEmulatorGizmos), unless the key is typed into a field. */
+export function listenForGizmoKey(target: Pick<Window, 'addEventListener'>, device: EmulatedDeviceLike): void {
+  target.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.code !== GIZMO_KEY_CODE || !e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    e.preventDefault();
+    toggleEmulatorGizmos(device);
+  });
+}
+
 /** Puts the emulator, and its control panel, in hand mode. */
 export function useEmulatorHands(device: EmulatedDeviceLike): void {
   device.primaryInputMode = 'hand';

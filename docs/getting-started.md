@@ -49,7 +49,8 @@ The dev server adds IWER, an emulated Quest 3 with hands. (Its synthetic environ
 3. Press **BEGIN** on the title screen. (The emulator's own Enter XR bar is hidden: it repeats BEGIN, `src/app/emulator-offer.ts`.)
 4. In the emulator toolbar, open the input menu and choose **Hands**. Dots appear on each finger joint, orange for the right hand and blue for the left.
 5. Use the hand panels to try pose presets, the pinch slider, and the move/rotate handles.
-6. Exit XR, then press **Copy report** (bottom left) to see what the app measured: hands, planes, anchors, frame rate.
+6. For a clean view or a screenshot, press **Alt+G**: the move/rotate gizmos and the emulator's panel hide (IWER has no switch for the gizmos alone, so this turns its control mode to programmatic: the mouse and keys stop moving the head and hands until you press Alt+G again; the Hand Lab still poses the hands). The small marker at the room's origin stays.
+7. Exit XR, then press **Copy report** (bottom left) to see what the app measured: hands, planes, anchors, frame rate.
 
 The emulator's hands are perfect and synthetic. It's for checking that code works, not how tracking feels.
 
