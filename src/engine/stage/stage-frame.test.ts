@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { StageFrame, WALL_CENTRE_BELOW_EYES_M, WALL_DISTANCE_M, WALL_HEIGHT_M, WALL_WIDTH_M } from './stage-frame';
+import {
+  STORY_SCALE,
+  StageFrame,
+  WALL_CENTRE_BELOW_EYES_M,
+  WALL_DISTANCE_M,
+  WALL_HEIGHT_M,
+  WALL_WIDTH_M,
+} from './stage-frame';
 
 const dot = (a: ArrayLike<number>, b: ArrayLike<number>) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const len = (a: ArrayLike<number>) => Math.sqrt(dot(a, a));
@@ -99,5 +106,28 @@ describe('StageFrame', () => {
     expect(() => f.setWall([0, 0, 0], [0, 0, 0], [0, 1, 0], 1, 1)).toThrow(RangeError);
     expect(() => f.setWall([0, 0, 0], [0, 1, 0], [0, 2, 0], 1, 1)).toThrow(RangeError);
     expect(() => f.setWall([0, 0, 0], [0, 0, 1], [0, 1, 0], 0, 1)).toThrow(RangeError);
+  });
+});
+
+describe('StageFrame.setStoryArea', () => {
+  it('is the stage, scaled and moved up the same wall', () => {
+    const stage = new StageFrame();
+    stage.placeInFront([0.3, 1.2, -0.4], 0.6);
+    const story = new StageFrame();
+    story.setStoryArea(stage, STORY_SCALE, 0.25);
+    expect(story.width).toBeCloseTo(stage.width * STORY_SCALE, 12);
+    expect(story.height).toBeCloseTo(stage.height * STORY_SCALE, 12);
+    for (let i = 0; i < 3; i++) {
+      expect(story.normal[i]).toBeCloseTo(stage.normal[i], 12);
+      expect(story.right[i]).toBeCloseTo(stage.right[i], 12);
+      expect(story.origin[i]).toBeCloseTo(stage.origin[i] + stage.up[i] * 0.25, 12);
+    }
+  });
+
+  it('fills most of the room wall (80 to 90 percent each way)', () => {
+    expect((WALL_WIDTH_M * STORY_SCALE) / 4).toBeGreaterThanOrEqual(0.8);
+    expect((WALL_WIDTH_M * STORY_SCALE) / 4).toBeLessThanOrEqual(0.9);
+    expect((WALL_HEIGHT_M * STORY_SCALE) / 2.5).toBeGreaterThanOrEqual(0.8);
+    expect((WALL_HEIGHT_M * STORY_SCALE) / 2.5).toBeLessThanOrEqual(0.9);
   });
 });

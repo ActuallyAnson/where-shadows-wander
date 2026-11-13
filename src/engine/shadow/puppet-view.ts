@@ -24,10 +24,10 @@ import { isImageArt, PUPPET_ART } from './puppet-art';
 import { RenderOrder } from './pure/render-order';
 import type { StagePlane } from './pure/stage-plane';
 
-/** Pixels painted per metre of cut-out, within these bounds. */
+/** Pixels painted per metre of cut-out as drawn on the wall (scene metres times `scale`), within these bounds. */
 const PX_PER_M = 1100;
 const PX_MIN = 32;
-const PX_MAX = 1024;
+const PX_MAX = 2048;
 /** Lifted off the wall toward the player, metres, and a little more for each later part so they keep their order. */
 const LIFT_M = 0.003;
 const LIFT_STEP_M = 0.0002;
@@ -68,6 +68,8 @@ export class PuppetView {
   private pieces: Piece[] = [];
   private scene: PuppetScene | null = null;
   private static readonly quad = new PlaneGeometry(1, 1);
+  /** How many wall metres one scene metre is: scenes are written for the 1.6 by 1 m stage and drawn bigger (STORY_SCALE). */
+  scale = 1;
 
   constructor() {
     this.group.visible = false;
@@ -81,8 +83,8 @@ export class PuppetView {
     scene.parts.forEach((part, i) => {
       if (!part.art) return;
       const canvas = document.createElement('canvas');
-      canvas.width = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.w * PX_PER_M)));
-      canvas.height = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.h * PX_PER_M)));
+      canvas.width = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.w * PX_PER_M * this.scale)));
+      canvas.height = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.h * PX_PER_M * this.scale)));
       const texture = new CanvasTexture(canvas);
       texture.colorSpace = SRGBColorSpace;
       const g = canvas.getContext('2d');
@@ -175,14 +177,14 @@ export class PuppetView {
       else (p.material as ShaderMaterial).uniforms.opacity.value = opacity;
       const c = Math.cos(world[b + 2]),
         s = Math.sin(world[b + 2]),
-        sc = world[b + 3];
+        sc = world[b + 3] * this.scale;
       const w = p.w * sc,
         h = p.h * sc;
       // The quad's centre, from the pivot: its offset to the centre turned with the part.
       const dx = (0.5 - p.px) * w,
         dy = (0.5 - p.py) * h;
-      const x = world[b] + c * dx - s * dy,
-        y = world[b + 1] + s * dx + c * dy;
+      const x = world[b] * this.scale + c * dx - s * dy,
+        y = world[b + 1] * this.scale + s * dx + c * dy;
       // Its axes in stage coordinates: x along (c, s), y along (-s, c); then into the scene through the stage's frame.
       const ax = c * w * p.mirror,
         ay = s * w * p.mirror,

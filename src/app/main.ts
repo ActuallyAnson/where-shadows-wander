@@ -68,7 +68,7 @@ import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-au
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
-import { StageFrame } from '../engine/stage/stage-frame';
+import { STORY_SCALE, StageFrame } from '../engine/stage/stage-frame';
 import { lightArea } from '../engine/shadow/stage-edge-glsl';
 import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
@@ -205,6 +205,9 @@ async function start(): Promise<void> {
   let lastYaw = 0;
   const stageFrame = new StageFrame();
   const stage: StagePlane = stageFrame;
+  // The story's area: the same wall, drawn STORY_SCALE times the stage and centred on the wall's middle, so the memories, the
+  // friend's hand and the story's words fill most of the wall. The hands' own shadows (and the captions) keep the stage.
+  const storyFrame = new StageFrame();
   const lantern = new Float64Array(3);
   // The wall's shadow settings are in real-wall.ts (blend 0.65, a low edge blur).
   const projector = new ShadowProjector(REAL_WALL_SHADOW_SETTINGS);
@@ -295,6 +298,7 @@ async function start(): Promise<void> {
   // `__wsw.playStory()` in dev), the story director plays the scenes in story-script.ts: the friend's hand shows a shape and
   // waits, the player copies it, and a memory plays in puppets. Words, if a memory has any, are written in ink by two lines.
   const puppets = new PuppetView();
+  puppets.scale = STORY_SCALE;
   const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
   const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
   const storySkip = new SkipTouch();
@@ -311,6 +315,7 @@ async function start(): Promise<void> {
   // by time. As dark as the memories' puppets: a puppet darkens the wall down to 1 - opacity (a min blend), so a fainter one
   // vanishes on the dim wall.
   const friendView = new PuppetView();
+  friendView.scale = STORY_SCALE;
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
   const startStory = (scene = 0) => {
     storyWait = -1;
@@ -547,6 +552,7 @@ async function start(): Promise<void> {
     lantern[2] = saucerPos[2];
 
     stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
+    storyFrame.setStoryArea(stageFrame, STORY_SCALE, lightPoolArea[3]);
     stageView.place(stage, lantern);
     candleView.place(lantern);
 
@@ -1300,7 +1306,7 @@ async function start(): Promise<void> {
             friendView.load(friendScene);
             friendView.update(
               fp,
-              stage,
+              storyFrame,
               shadowsVisible ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion : 0,
             );
           } else friendView.hide();
@@ -1318,10 +1324,10 @@ async function start(): Promise<void> {
               tips++;
             }
             if (storyStep > 0 && storySkip.update(storyStep, skipTips, tips, stage)) story.skipMemory();
-            puppets.update(memory, stage, lineOpacity);
+            puppets.update(memory, storyFrame, lineOpacity);
           } else puppets.hide();
-          storyTitle.update(storyStep, stage, lineOpacity);
-          storyLine.update(storyStep, stage, lineOpacity);
+          storyTitle.update(storyStep, storyFrame, lineOpacity);
+          storyLine.update(storyStep, storyFrame, lineOpacity);
           if (menu.group.visible) {
             // The fingertips that can reach the menu: each tracked hand's index tip.
             let tips = 0;

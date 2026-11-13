@@ -27,6 +27,11 @@ export const WALL_CENTRE_BELOW_EYES_M = 0.2;
  * fall on the wallpaper), so the wall sits just behind it: far enough not to fight it in depth, too near to see a gap.
  */
 export const ROOM_WALL_BEHIND_STAGE_M = 0.02;
+/**
+ * How much bigger the story is drawn than the stage: the memories, the friend's hand and the story's words are written for the
+ * 1.6 by 1 m stage and drawn 2.1 times that (3.4 by 2.1 m), most of the room's 4 by 2.5 m wall. The hands' shadows keep the stage.
+ */
+export const STORY_SCALE = 2.1;
 
 export class StageFrame {
   /** The wall's centre, scene space, metres. */
@@ -108,6 +113,20 @@ export class StageFrame {
     n[1] = 0;
     n[2] = -fz;
     this.setWall(c, n, WORLD_UP, width, height);
+  }
+
+  /**
+   * Makes this frame the story's area on the same wall as `stage`: `scale` times its size, its centre moved `lift` metres up the
+   * wall (to the wall's middle, which is higher than the stage's).
+   */
+  setStoryArea(stage: StageFrame, scale: number, lift: number): void {
+    const o = stage.origin,
+      u = stage.up,
+      c = SCRATCH_CENTRE;
+    c[0] = o[0] + u[0] * lift;
+    c[1] = o[1] + u[1] * lift;
+    c[2] = o[2] + u[2] * lift;
+    this.setWall(c, stage.normal, u, stage.width * scale, stage.height * scale);
   }
 
   /**
