@@ -1,6 +1,6 @@
-// Scene 1's opening, drawn (the timing is wake-timeline.ts): eyelids, a flash and a word in the dark. All follow the head: a small
+// Scene 1's opening, drawn (the timing is wake-timeline.ts): eyelids, a dream and a word in the dark. All follow the head: a small
 // black sphere round the eyes (like FadeView's) whose shader leaves an eye-shaped opening, wider as the eyes open, with soft lids;
-// a glow through the shut lids, in which his friend's silhouette slowly gathers, faint and soft-edged like a dream; and a
+// his friend in the black behind the shut lids, a faint pale glow of him slowly gathering, soft-edged like a dream; and a
 // faint word floating in front, drawn over the black. Nothing is allocated per frame.
 import {
   BackSide,
@@ -21,13 +21,11 @@ const TEXT_WIDTH_M = 0.7;
 const TEXT_COLOR = '#c9cdd6';
 /** At most this visible: it is a whisper. */
 const TEXT_MAX_OPACITY = 0.75;
-/** The flash: how far away its picture hangs, how big it is, its colour, and how bright at most (it comes through the lids). */
-const FLASH_DISTANCE_M = 3;
-const FLASH_SIZE_M = 3.6;
-const FLASH_COLOR = '#b4bed2';
-const FLASH_MAX_OPACITY = 0.6;
-/** How dark the friend's silhouette is at most against the glow (1 black): faint, half there. */
-const FRIEND_MAX_OPACITY = 0.45;
+/** The friend in the dark: how far away his picture hangs, how big it is, his colour, and how bright at most: faint, half there. */
+const FRIEND_DISTANCE_M = 3;
+const FRIEND_SIZE_M = 3.6;
+const FRIEND_COLOR = '#aeb8cc';
+const FRIEND_MAX_OPACITY = 0.3;
 
 const VERTEX = /* glsl */ `
 varying vec3 vDir;
@@ -60,9 +58,6 @@ export class WakeView {
   private readonly textMat: MeshBasicMaterial;
   private readonly textMesh: Mesh;
   private readonly texture: CanvasTexture;
-  private readonly flashMat: MeshBasicMaterial;
-  private readonly flashMesh: Mesh;
-  private readonly flashTexture: CanvasTexture;
   private readonly friendMat: MeshBasicMaterial;
   private readonly friendMesh: Mesh;
   private readonly friendTexture: CanvasTexture;
@@ -98,24 +93,8 @@ export class WakeView {
     this.textMesh.frustumCulled = false;
     this.group.add(this.textMesh);
 
-    this.flashTexture = paintFlash(false);
-    this.flashMat = new MeshBasicMaterial({
-      map: this.flashTexture,
-      transparent: true,
-      opacity: 0,
-      depthTest: false,
-      depthWrite: false,
-      toneMapped: false,
-    });
-    this.flashMesh = new Mesh(new PlaneGeometry(FLASH_SIZE_M, FLASH_SIZE_M), this.flashMat);
-    this.flashMesh.position.set(0, -0.25, -FLASH_DISTANCE_M);
-    // Over the lids, under the word.
-    this.flashMesh.renderOrder = RenderOrder.fade + 0.05;
-    this.flashMesh.frustumCulled = false;
-    this.group.add(this.flashMesh);
-
-    // The friend: a dark shape over the glow, fading in on its own, slower than the glow.
-    this.friendTexture = paintFlash(true);
+    // The friend: a faint pale glow of him in the black, over the lids and under the word.
+    this.friendTexture = paintFriend();
     this.friendMat = new MeshBasicMaterial({
       map: this.friendTexture,
       transparent: true,
@@ -124,8 +103,8 @@ export class WakeView {
       depthWrite: false,
       toneMapped: false,
     });
-    this.friendMesh = new Mesh(new PlaneGeometry(FLASH_SIZE_M, FLASH_SIZE_M), this.friendMat);
-    this.friendMesh.position.copy(this.flashMesh.position);
+    this.friendMesh = new Mesh(new PlaneGeometry(FRIEND_SIZE_M, FRIEND_SIZE_M), this.friendMat);
+    this.friendMesh.position.set(0, -0.25, -FRIEND_DISTANCE_M);
     this.friendMesh.renderOrder = RenderOrder.fade + 0.06;
     this.friendMesh.frustumCulled = false;
     this.group.add(this.friendMesh);
@@ -134,28 +113,25 @@ export class WakeView {
 
   /**
    * Once per frame: how open the eyes are (0..1, 1 hides the lids), how visible the word is (0..1), where the head is and which
-   * way it faces (world), how bright the glow through the lids is (0..1), and how clearly the friend shows in it (0..1).
+   * way it faces (world), and how clearly the friend shows in the dark (0..1).
    */
   update(
     open: number,
     text: number,
     headPos: Readonly<{ x: number; y: number; z: number }>,
     headQuat: Readonly<{ x: number; y: number; z: number; w: number }>,
-    flash = 0,
     friend = 0,
   ): void {
     const lidsOn = open < 0.999;
     const textOn = text > 0.001;
-    const flashOn = flash > 0.001;
+    const friendOn = friend > 0.001;
     this.lids.visible = lidsOn;
     this.textMesh.visible = textOn;
-    this.flashMesh.visible = flashOn;
-    this.friendMesh.visible = flashOn && friend > 0.001;
-    this.group.visible = lidsOn || textOn || flashOn;
+    this.friendMesh.visible = friendOn;
+    this.group.visible = lidsOn || textOn || friendOn;
     if (!this.group.visible) return;
     this.lidMat.uniforms.open.value = open < 0 ? 0 : open;
     this.textMat.opacity = (text > 1 ? 1 : text) * TEXT_MAX_OPACITY;
-    this.flashMat.opacity = (flash > 1 ? 1 : flash) * FLASH_MAX_OPACITY;
     this.friendMat.opacity = (friend > 1 ? 1 : friend) * FRIEND_MAX_OPACITY;
     this.group.position.set(headPos.x, headPos.y, headPos.z);
     this.group.quaternion.set(headQuat.x, headQuat.y, headQuat.z, headQuat.w);
@@ -172,9 +148,6 @@ export class WakeView {
     this.textMesh.geometry.dispose();
     this.textMat.dispose();
     this.texture.dispose();
-    this.flashMesh.geometry.dispose();
-    this.flashMat.dispose();
-    this.flashTexture.dispose();
     this.friendMesh.geometry.dispose();
     this.friendMat.dispose();
     this.friendTexture.dispose();
@@ -182,10 +155,9 @@ export class WakeView {
 }
 
 /**
- * The dream, drawn once: a pale glow (friend false), or the boy who stands in it as a soft dark shape (friend true), the
- * two faded separately. He is small and a little way off, one hand lifted in a wave: a friend, not a stranger in the doorway.
+ * The friend, drawn once: a pale, softly glowing shape of a boy on transparent, with a wider faint halo round him. He is small and a little way off, one hand lifted in a wave: a friend, not a stranger in the doorway.
  */
-function paintFlash(friend: boolean): CanvasTexture {
+function paintFriend(): CanvasTexture {
   const size = 512;
   let canvas: HTMLCanvasElement | undefined;
   if (typeof document !== 'undefined') canvas = document.createElement('canvas');
@@ -193,64 +165,66 @@ function paintFlash(friend: boolean): CanvasTexture {
   canvas.width = size;
   canvas.height = size;
   const g = canvas.getContext ? canvas.getContext('2d') : null;
-  if (g && !friend) {
-    const glow = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    glow.addColorStop(0, FLASH_COLOR);
-    glow.addColorStop(0.45, 'rgba(180,190,210,0.55)');
-    glow.addColorStop(1, 'rgba(180,190,210,0)');
-    g.fillStyle = glow;
-    g.fillRect(0, 0, size, size);
-  }
-  if (g && friend) {
-    // The boy, dark with a very soft edge: laid over the glow, he darkens it where he stands.
-    g.save();
-    g.filter = 'blur(9px)';
-    g.fillStyle = '#000';
-    const X = (f: number) => f * size;
-    const Y = (f: number) => (1 - f) * size; // f up from the bottom
-    // Head, and a tuft of hair.
-    g.beginPath();
-    g.arc(X(0.5), Y(0.59), X(0.045), 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.ellipse(X(0.488), Y(0.632), X(0.03), X(0.014), -0.4, 0, Math.PI * 2);
-    g.fill();
-    // Neck and body: a T-shirt, a little wider at the shoulders.
-    g.fillRect(X(0.488), Y(0.55), X(0.024), X(0.02));
-    g.beginPath();
-    g.moveTo(X(0.455), Y(0.535));
-    g.lineTo(X(0.545), Y(0.535));
-    g.lineTo(X(0.54), Y(0.39));
-    g.lineTo(X(0.46), Y(0.39));
-    g.closePath();
-    g.fill();
-    // Legs (shorts and bare legs, one slightly out).
-    g.lineCap = 'round';
-    g.strokeStyle = '#000';
-    g.lineWidth = X(0.034);
-    g.beginPath();
-    g.moveTo(X(0.48), Y(0.4));
-    g.lineTo(X(0.474), Y(0.2));
-    g.moveTo(X(0.52), Y(0.4));
-    g.lineTo(X(0.532), Y(0.2));
-    g.stroke();
-    // The arm at his side, and the other lifted in a wave, the open hand by his head.
-    g.lineWidth = X(0.026);
-    g.beginPath();
-    g.moveTo(X(0.46), Y(0.525));
-    g.lineTo(X(0.44), Y(0.4));
-    g.moveTo(X(0.54), Y(0.525));
-    g.lineTo(X(0.6), Y(0.56));
-    g.lineTo(X(0.615), Y(0.65));
-    g.stroke();
-    g.beginPath();
-    g.ellipse(X(0.618), Y(0.675), X(0.021), X(0.03), 0.15, 0, Math.PI * 2);
-    g.fill();
-    g.restore();
-  }
+  // Twice: a wide faint halo, then the boy himself, still soft-edged.
+  if (g)
+    for (const [blur, alpha] of [
+      [22, 0.45],
+      [7, 1],
+    ] as const) {
+      g.save();
+      g.filter = `blur(${blur}px)`;
+      g.globalAlpha = alpha;
+      drawBoy(g, size);
+      g.restore();
+    }
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
   return texture;
+}
+
+/** The boy's shape, filled and stroked in the friend's colour over the whole square. */
+function drawBoy(g: CanvasRenderingContext2D, size: number): void {
+  g.fillStyle = FRIEND_COLOR;
+  const X = (f: number) => f * size;
+  const Y = (f: number) => (1 - f) * size; // f up from the bottom
+  // Head, and a tuft of hair.
+  g.beginPath();
+  g.arc(X(0.5), Y(0.59), X(0.045), 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.ellipse(X(0.488), Y(0.632), X(0.03), X(0.014), -0.4, 0, Math.PI * 2);
+  g.fill();
+  // Neck and body: a T-shirt, a little wider at the shoulders.
+  g.fillRect(X(0.488), Y(0.55), X(0.024), X(0.02));
+  g.beginPath();
+  g.moveTo(X(0.455), Y(0.535));
+  g.lineTo(X(0.545), Y(0.535));
+  g.lineTo(X(0.54), Y(0.39));
+  g.lineTo(X(0.46), Y(0.39));
+  g.closePath();
+  g.fill();
+  // Legs (shorts and bare legs, one slightly out).
+  g.lineCap = 'round';
+  g.strokeStyle = FRIEND_COLOR;
+  g.lineWidth = X(0.034);
+  g.beginPath();
+  g.moveTo(X(0.48), Y(0.4));
+  g.lineTo(X(0.474), Y(0.2));
+  g.moveTo(X(0.52), Y(0.4));
+  g.lineTo(X(0.532), Y(0.2));
+  g.stroke();
+  // The arm at his side, and the other lifted in a wave, the open hand by his head.
+  g.lineWidth = X(0.026);
+  g.beginPath();
+  g.moveTo(X(0.46), Y(0.525));
+  g.lineTo(X(0.44), Y(0.4));
+  g.moveTo(X(0.54), Y(0.525));
+  g.lineTo(X(0.6), Y(0.56));
+  g.lineTo(X(0.615), Y(0.65));
+  g.stroke();
+  g.beginPath();
+  g.ellipse(X(0.618), Y(0.675), X(0.021), X(0.03), 0.15, 0, Math.PI * 2);
+  g.fill();
 }
 
 /** The word, drawn once: pale, small, slanted, like something said half asleep. */

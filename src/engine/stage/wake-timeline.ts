@@ -1,7 +1,8 @@
 // Scene 1's opening (docs/STORY.md, "Waking"): the headset stays black and far thunder rolls (it is what wakes him), then the
-// eyes open: a slow heavy blink, a quicker wider one, then open. Before the thunder, a glow gathers behind the shut lids with
-// his friend's silhouette slowly gathering in it, and the thunder breaks it. This is the timing only, as numbers: how open the eyes are, how bright the flash
-// and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three, no clock.
+// eyes open: a slow heavy blink, a quicker wider one, then open. Before the thunder, his friend slowly gathers behind the shut
+// lids as a faint glow, and the thunder breaks the dream. This is the timing only, as numbers: how open the eyes are, how
+// clearly the friend shows and how visible the word is at a time `t`. The view (wake-view.ts) draws them. Pure: no three,
+// no clock.
 
 /** One point of a curve: at `t` seconds the value is `v`; between points it eases (smoothstep). */
 export interface WakeKey {
@@ -19,10 +20,9 @@ export interface WakeScript {
   /** When the far thunder rolls in the dark and wakes him, seconds; none if left out. */
   readonly thunderAt?: number;
   /**
-   * A pale glow through the shut lids before the thunder (0 none .. 1 brightest): the dream he is waking from. Left out: none.
+   * Before the thunder, his friend in the black behind the shut lids, a faint pale glow of him: the dream he is waking from.
+   * How clearly he shows (0 not at all .. 1 as clear as he gets, still faint). Left out: no dream.
    */
-  readonly flashKeys?: readonly WakeKey[];
-  /** How clearly his friend's silhouette shows in that glow (0 not at all .. 1 as clear as it gets, still faint). */
   readonly friendKeys?: readonly WakeKey[];
 }
 
@@ -32,18 +32,11 @@ export const WAKE_SCRIPT: WakeScript = {
   // second and is still rumbling away as the eyes first open.
   text: '',
   textKeys: [{ t: 0, v: 0 }],
-  // Before it, the dream: a pale glow gathers slowly in the black, and his friend's silhouette slowly gathers in it, never
-  // quite clear. The thunder breaks it: the glow and the friend fade as it rolls, and the black holds before the first blink.
-  flashKeys: [
-    { t: 0, v: 0 },
-    { t: 0.3, v: 0 },
-    { t: 2.0, v: 0.7 },
-    { t: 2.9, v: 0.7 },
-    { t: 3.5, v: 0 },
-  ],
+  // Before it, the dream: his friend slowly gathers in the black as a faint glow, never quite clear. The thunder breaks it: he
+  // fades as it rolls, and the black holds before the first blink.
   friendKeys: [
     { t: 0, v: 0 },
-    { t: 0.9, v: 0 },
+    { t: 0.6, v: 0 },
     { t: 2.6, v: 1 },
     { t: 2.9, v: 1 },
     { t: 3.4, v: 0 },
@@ -147,13 +140,7 @@ export class WakeTimeline {
     return this.thunderNow;
   }
 
-  /** How bright the glow through the lids is now (0..1); 0 when not playing. */
-  get flash(): number {
-    const keys = this.script.flashKeys;
-    return this.running && keys ? sampleKeys(keys, this.t) : 0;
-  }
-
-  /** How clearly the friend shows in the glow now (0..1); 0 when not playing. */
+  /** How clearly the friend shows in the dark now (0..1); 0 when not playing. */
   get friend(): number {
     const keys = this.script.friendKeys;
     return this.running && keys ? sampleKeys(keys, this.t) : 0;

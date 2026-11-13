@@ -93,8 +93,8 @@ describe('WakeTimeline', () => {
 });
 
 describe('the dream in the black', () => {
-  it('glows, and shows the friend, only while the eyes are shut, peaking before the thunder', () => {
-    for (const keys of [WAKE_SCRIPT.flashKeys!, WAKE_SCRIPT.friendKeys!]) {
+  it('shows the friend only while the eyes are shut, peaking before the thunder', () => {
+    for (const keys of [WAKE_SCRIPT.friendKeys!]) {
       expect(keys).toBeDefined();
       for (let i = 1; i < keys.length; i++) expect(keys[i].t).toBeGreaterThanOrEqual(keys[i - 1].t);
       const peak = keys.reduce((a, k) => (k.v > a.v ? k : a));
@@ -104,26 +104,23 @@ describe('the dream in the black', () => {
     }
   });
 
-  it('fades the friend in slowly, after the glow has begun, and never before it', () => {
-    const glow = WAKE_SCRIPT.flashKeys!;
+  it('fades the friend in slowly, not in a flash', () => {
     const friend = WAKE_SCRIPT.friendKeys!;
-    const start = (k: typeof glow) => k.find((p, i) => i > 0 && p.v > 0 && k[i - 1].v === 0)!;
     const i = friend.findIndex((p) => p.v > 0);
-    expect(friend[i].t - friend[i - 1].t).toBeGreaterThanOrEqual(1.5); // a gradual fade in, not a flash
-    expect(friend[i - 1].t).toBeGreaterThan(glow[glow.indexOf(start(glow)) - 1].t);
+    expect(friend[i].t - friend[i - 1].t).toBeGreaterThanOrEqual(1.5);
   });
 
   it('is dark before it starts and once it has finished', () => {
     const w = new WakeTimeline();
-    expect(w.flash).toBe(0);
+    expect(w.friend).toBe(0);
     w.start();
-    expect(w.flash).toBe(0);
+    expect(w.friend).toBe(0);
     let max = 0;
     for (let i = 0; i < 2000; i++) {
       w.update(1 / 72);
-      max = Math.max(max, w.flash);
+      max = Math.max(max, w.friend);
     }
-    expect(max).toBeGreaterThan(0.5);
-    expect(w.flash).toBe(0);
+    expect(max).toBe(1);
+    expect(w.friend).toBe(0);
   });
 });
