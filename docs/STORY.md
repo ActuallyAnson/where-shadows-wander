@@ -23,7 +23,7 @@ Each memory (scenes 2 to 6) starts the same way:
 
 This is the tutorial, the help for a stuck player, and the friend's presence in one. Making a shape the friend shows you is how the boy remembers.
 
-**How to build it (to decide):** the friend's hand can be a synthetic posed hand (`src/engine/hands/synthetic-hand.ts`, `posed-hand.ts`) or a recorded one (`hand-recording.ts`, the `.handrec.json` files in `recordings/`), drawn through the same hand shadow renderer as the player's hands. A recording has a real person's small movements, which suits a hand that is meant to feel alive.
+**How it is built:** the story director (`src/engine/stage/story/story-director.ts`) plays each scene as a list of beats in `story-script.ts`: a `friend` beat shows the friend's hand and waits for the player's commit of its shape; a `memory` beat plays a puppet scene (keyframed tracks, `src/engine/stage/puppet/`) and can start one of its puppets where the player's shadow was. The friend's hand is a synthetic posed hand (`friend-hand.ts`) cast from the candle by a shadow renderer of its own, at half the darkness and with softer edges; it forms the shape, holds it, and every few seconds eases half out of it and back. A recorded hand (`hand-recording.ts`) could replace the pose later if it should feel more alive. In dev, `__wsw.playStory()` starts the story and `__wsw.commitShape('rabbit')` copies the shape without a hand; `node scripts/story-probe.mjs` takes screenshots.
 
 ## The scenes
 
@@ -56,6 +56,8 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Must make the player feel:** delight at the transformation; warmth towards the friend.
 - **Puppets:** the boy, the friend, the blanket fort, a rabbit.
 - **Note:** the rabbit is slow to commit and the classifier is weakest on it, so accept it generously here. It is the first shape, and it must not frustrate.
+- **Built (first pass, 13 Nov):** the friend's rabbit on the left of the wall, waiting; the player's rabbit becoming a puppet rabbit that hops to the friend's raised hand; the fort, the torch and the two kids fading up around it; the boy's lumpy try, the friend leaning over to help, the boy's rabbit coming right, the rabbits nodding to each other, and both laughing; then it fades (about 23 s). Its timing and places are in `src/engine/stage/story/how-they-met.ts`, the cut-outs in `src/engine/shadow/puppet-art.ts`.
+- **To try:** whether the friend's hand reads as a rabbit (it is seen from the back, two fingers up); the sizes on the wall in a headset; laughter in the sound, which the memory has only notes for so far.
 
 ### 3. The park
 
@@ -113,7 +115,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 
 So that every step leaves a game we could submit:
 
-1.  The story graph, the friend's hand, and scene 2 from start to finish.
+1.  The story graph, the friend's hand, and scene 2 from start to finish (first pass built 13 Nov).
 2.  Scenes 6 and 7. With scenes 1, 2, 6 and 7, the game is short but complete.
 3.  Scenes 3, 4 and 5, in that order. If time runs short, cut from the end; scene 5 can be merged into 6 by having the friend's hand wave before it waits.
 
@@ -128,3 +130,4 @@ So that every step leaves a game we could submit:
 - 13 Nov 2026: the flash becomes a slow glow, and the friend fades in over it gradually and faintly (he appeared too quickly and too plainly); the thunder breaks the dream, and the blinks start 1.6 s later.
 - 13 Nov 2026: the glow behind him is dropped (too bright); the friend is now himself a faint pale glow in the black, not a shadow on a light.
 - 13 Nov 2026: the friend stays 2 s longer at his clearest before the thunder (held 2.3 s); the thunder and the blinks move 2 s later.
+- 13 Nov 2026: the story graph, the friend's hand and scene 2 are built (first pass); the old prologue no longer plays after the candle is lit.

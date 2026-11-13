@@ -51,9 +51,10 @@ import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { PuppetView } from '../engine/shadow/puppet-view';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
-import { ScenePlayer } from '../engine/stage/puppet/scene-player';
-import { PROLOGUE_SCENE } from '../engine/stage/puppet/prologue-scene';
 import type { Cue } from '../engine/stage/puppet/puppet-scene';
+import { StoryDirector } from '../engine/stage/story/story-director';
+import { STORY_SCRIPT } from '../engine/stage/story/story-script';
+import { FriendHand } from '../engine/stage/story/friend-hand';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
@@ -289,35 +290,43 @@ async function start(): Promise<void> {
   const ambientLight = new AmbientLight(0x101422, 0.008);
   // The captions (a setting): a small line of ink low on the wall that names the sounds.
   const captionLine = new StoryLineView({ y: 0.27, width: 0.4 });
-  // The puppet story (ADR 0016): for now its first scene, the prologue, played on the wall a moment after the candle is lit, once
-  // a session (and again from `__wsw.playPrologue()` in dev). Its title and line are written in ink by two lines of their own.
-  const prologue = new ScenePlayer(PROLOGUE_SCENE);
+  // The puppet story (ADR 0016, docs/STORY.md): a moment after the candle is lit, once a session (and again from
+  // `__wsw.playStory()` in dev), the story director plays the scenes in story-script.ts: the friend's hand shows a shape and
+  // waits, the player copies it, and a memory plays in puppets. Words, if a memory has any, are written in ink by two lines.
   const puppets = new PuppetView();
-  puppets.load(PROLOGUE_SCENE);
   const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
   const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
   const storySkip = new SkipTouch();
-  /** Seconds left before the prologue starts (it waits for the candle's light to spread), or -1: not waiting. */
-  const PROLOGUE_AFTER_LIGHT_S = 1.8;
-  let prologueWait = -1;
-  let prologuePlayed = false;
+  /** Seconds left before the story starts (it waits for the candle's light to spread), or -1: not waiting. */
+  const STORY_AFTER_LIGHT_S = 1.8;
+  let storyWait = -1;
+  let storyStarted = false;
   const onStoryCue = (cue: Cue) => {
     if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
     else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
-  const startPrologue = () => {
-    prologueWait = -1;
-    prologuePlayed = true;
+  const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
+  // The friend's hand: a posed hand (friend-hand.ts) cast from the candle by a projector and renderer of its own, so it is never
+  // read as the player's: fainter, and softer at the edges.
+  const FRIEND_SHADOW_OPACITY = 0.5;
+  const friendHand = new FriendHand('left');
+  const friendProjector = new ShadowProjector({ ...REAL_WALL_SHADOW_SETTINGS, blurPerM: 0.04, maxBlurM: 0.02 });
+  const friendShadow = new ShadowRenderer(FRIEND_SHADOW_OPACITY);
+  const startStory = (scene = 0) => {
+    storyWait = -1;
+    storyStarted = true;
     storyTitle.clear();
     storyLine.clear();
-    prologue.start(onStoryCue);
+    story.start(scene);
   };
-  const stopPrologue = () => {
-    prologueWait = -1;
-    prologue.skip();
+  const stopStory = () => {
+    storyWait = -1;
+    story.stop();
     storyTitle.clear();
     storyLine.clear();
     puppets.hide();
+    friendHand.clear();
+    friendShadow.mesh.visible = false;
   };
   const skipTips = new Float32Array(6);
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
@@ -340,6 +349,7 @@ async function start(): Promise<void> {
     wallPauseView.group,
     bedroomView.group,
     shadowRenderer.mesh,
+    friendShadow.mesh,
     puppets.group,
     storyTitle.group,
     storyLine.group,
@@ -914,8 +924,8 @@ async function start(): Promise<void> {
       candleView.setLocked(false);
       titleLighter.visible = false;
       wallPauseView.hide();
-      stopPrologue();
-      prologuePlayed = false;
+      stopStory();
+      storyStarted = false;
       wake.finish();
       wakeView.hide();
     });
@@ -1040,7 +1050,7 @@ async function start(): Promise<void> {
     candleView.setLocked(true);
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
-    if (!prologuePlayed) prologueWait = PROLOGUE_AFTER_LIGHT_S;
+    if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
   };
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
@@ -1266,11 +1276,39 @@ async function start(): Promise<void> {
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
           const storyStep = paused || sessionState !== 'playing' ? 0 : step;
-          if (prologueWait >= 0 && storyStep > 0) {
-            prologueWait -= storyStep;
-            if (prologueWait < 0) startPrologue();
+          if (storyWait >= 0 && storyStep > 0) {
+            storyWait -= storyStep;
+            if (storyWait < 0) startStory();
           }
-          if (prologue.playing) {
+          // A commit of the shape the friend's hand shows moves the story on, its memory starting where the player's shadow is.
+          if (storyStep > 0 && story.waitingForShape)
+            for (let i = 0; i < shapes.events.count; i++) {
+              const e = shapes.events.at(i);
+              if (e.type !== 'commit') continue;
+              const sh = projector.shadows[e.hand];
+              const o = JOINT['middle-finger-phalanx-proximal'] * 2;
+              if (story.commit(e.shape, sh.active ? sh.joints[o] : NaN, sh.active ? sh.joints[o + 1] : NaN)) break;
+            }
+          story.update(storyStep);
+          // The friend's hand, while it shows its shape and while it fades.
+          if (story.friendShape !== null && story.friendOpacity > 0.001) {
+            friendHand.update(
+              story.friendShape,
+              story.friendT,
+              stage,
+              candleView.flamePosition,
+              story.friendX,
+              story.friendY,
+              story.friendTilt,
+            );
+            friendProjector.update(friendHand.hands, stage, candleView.flamePosition);
+            friendShadow.baseOpacity = FRIEND_SHADOW_OPACITY * story.friendOpacity;
+            friendShadow.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
+            friendShadow.update(friendProjector.shadows, stage, null, shadowsVisible ? candleView.occlusion : 0);
+          } else friendShadow.mesh.visible = false;
+          const memory = story.memory;
+          if (memory) {
+            puppets.load(memory.scene);
             // A fingertip held on the wall's lower right corner skips it.
             let tips = 0;
             for (const h of handList) {
@@ -1281,11 +1319,8 @@ async function start(): Promise<void> {
               skipTips[tips * 3 + 2] = h.positions[o + 2];
               tips++;
             }
-            if (storyStep > 0 && storySkip.update(storyStep, skipTips, tips, stage)) stopPrologue();
-            else {
-              prologue.update(storyStep);
-              puppets.update(prologue, stage, lineOpacity);
-            }
+            if (storyStep > 0 && storySkip.update(storyStep, skipTips, tips, stage)) story.skipMemory();
+            puppets.update(memory, stage, lineOpacity);
           } else puppets.hide();
           storyTitle.update(storyStep, stage, lineOpacity);
           storyLine.update(storyStep, stage, lineOpacity);
@@ -1482,10 +1517,13 @@ async function start(): Promise<void> {
         igniteCandle: () => {
           if (sessionState === 'title_vr') igniteCandle();
         },
-        prologue,
+        story,
         puppets,
-        /** Plays the prologue now (the candle must be lit to see it). */
-        playPrologue: () => startPrologue(),
+        friendHand,
+        /** Plays the story from scene `scene` of story-script.ts (0, scene 2, by default; the candle must be lit to see it). */
+        playStory: (scene = 0) => startStory(scene),
+        /** As if the player's hand had committed `shape` (e.g. 'rabbit') with its shadow at x, y on the wall. */
+        commitShape: (shape: Parameters<StoryDirector['commit']>[0], x = 0.1, y = 0.05) => story.commit(shape, x, y),
         /** Plays scene 1's waking (the blinks) again. */
         playWake: () => {
           wake.finish();

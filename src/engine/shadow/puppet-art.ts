@@ -202,6 +202,135 @@ function orb(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.fillRect(0, 0, w, h);
 }
 
+// Scene 2, "How they met": a rabbit, two small kids sitting cross-legged, the blanket fort round them, the torch, and the
+// boy's first lumpy try at a rabbit. All face right; a part is mirrored to face left.
+
+function rabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A sitting rabbit in profile: round body, head forward, two long ears leaning back, a tail, a paw; the eye cut out.
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
+  e(0.42, 0.7, 0.28, 0.26);
+  e(0.68, 0.46, 0.15, 0.16);
+  e(0.78, 0.53, 0.09, 0.08);
+  e(0.56, 0.2, 0.055, 0.2, -0.45);
+  e(0.66, 0.18, 0.05, 0.19, -0.18);
+  e(0.13, 0.72, 0.07, 0.08);
+  e(0.62, 0.95, 0.13, 0.05);
+  cut(g, () => e(0.74, 0.42, 0.022, 0.026));
+}
+
+function kid(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A small kid sitting with knees up, side on, facing right: back, shoulders, the thigh out to a knee, the shin down to a foot.
+  g.beginPath();
+  g.moveTo(w * 0.34, h * 0.02);
+  g.quadraticCurveTo(w * 0.6, -h * 0.01, w * 0.62, h * 0.12);
+  g.lineTo(w * 0.6, h * 0.48);
+  g.quadraticCurveTo(w * 0.78, h * 0.4, w * 0.9, h * 0.5);
+  g.lineTo(w * 0.94, h * 0.92);
+  g.lineTo(w * 1.0, h * 0.95);
+  g.lineTo(w * 1.0, h);
+  g.lineTo(w * 0.12, h);
+  g.quadraticCurveTo(w * 0.06, h * 0.72, w * 0.2, h * 0.5);
+  g.quadraticCurveTo(w * 0.22, h * 0.1, w * 0.34, h * 0.02);
+  g.closePath();
+  g.fill();
+}
+
+function kidHead(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A round head facing right: a little nose, a tuft of hair standing up, an ear's notch.
+  g.beginPath();
+  g.arc(w * 0.48, h * 0.55, w * 0.36, 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.8, h * 0.48);
+  g.lineTo(w * 0.94, h * 0.6);
+  g.lineTo(w * 0.8, h * 0.66);
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.32, h * 0.26);
+  g.lineTo(w * 0.36, h * 0.04);
+  g.lineTo(w * 0.44, h * 0.2);
+  g.lineTo(w * 0.52, h * 0.02);
+  g.lineTo(w * 0.56, h * 0.22);
+  g.fill();
+  cut(g, () => {
+    g.beginPath();
+    g.arc(w * 0.68, h * 0.48, w * 0.04, 0, Math.PI * 2);
+    g.fill();
+  });
+}
+
+function arm(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // An arm from the shoulder (bottom) to a small hand (top), tapering.
+  g.beginPath();
+  g.moveTo(0, h);
+  g.lineTo(w * 0.2, h * 0.14);
+  g.lineTo(w * 0.8, h * 0.14);
+  g.lineTo(w, h);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.ellipse(w * 0.5, h * 0.1, w * 0.48, h * 0.1, 0, 0, Math.PI * 2);
+  g.fill();
+}
+
+function fort(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A blanket over two chairs: it peaks over the middle, its edge hangs in soft scallops, and its sides fall to the floor as
+  // the fort's walls. The middle is open, so the kids inside show.
+  const top = (u: number) => 0.04 + 0.16 * Math.abs(u - 0.5) * 2 + 0.02 * Math.sin(u * 23);
+  g.beginPath();
+  g.moveTo(0, h);
+  for (let i = 0; i <= 60; i++) {
+    const u = i / 60;
+    g.lineTo(u * w, top(u) * h);
+  }
+  g.lineTo(w, h);
+  g.lineTo(w * 0.9, h);
+  g.quadraticCurveTo(w * 0.86, h * 0.7, w * 0.88, h * 0.3);
+  // The hanging edge, scalloped from right to left.
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const u0 = 0.88 - (i * 0.76) / n,
+      u1 = 0.88 - ((i + 1) * 0.76) / n;
+    const y = 0.24 + 0.04 * Math.sin((i / (n - 1)) * Math.PI);
+    g.quadraticCurveTo(((u0 + u1) / 2) * w, (y + 0.06) * h, u1 * w, y * h);
+  }
+  g.quadraticCurveTo(w * 0.14, h * 0.7, w * 0.1, h);
+  g.closePath();
+  g.fill();
+  // The chairs' backs poking up at the corners.
+  g.fillRect(w * 0.02, h * 0.12, w * 0.02, h * 0.3);
+  g.fillRect(w * 0.96, h * 0.12, w * 0.02, h * 0.3);
+}
+
+function torch(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A torch lying on its side, its head (the wider end, right) pointing the light up and out.
+  g.fillRect(0, h * 0.25, w * 0.7, h * 0.6);
+  g.beginPath();
+  g.moveTo(w * 0.66, h * 0.25);
+  g.lineTo(w, 0);
+  g.lineTo(w, h);
+  g.lineTo(w * 0.66, h * 0.85);
+  g.fill();
+}
+
+function lump(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A first try at a rabbit: a lumpy fist with one ear bent over and a thumb sticking out the wrong way.
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
+  e(0.5, 0.7, 0.32, 0.28);
+  e(0.3, 0.55, 0.16, 0.18);
+  e(0.66, 0.5, 0.17, 0.16);
+  e(0.48, 0.32, 0.07, 0.18, 0.9);
+  e(0.86, 0.68, 0.13, 0.06, -0.3);
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -212,6 +341,13 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   staff,
   lantern,
   orb,
+  rabbit,
+  kid,
+  'kid-head': kidHead,
+  arm,
+  fort,
+  torch,
+  lump,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

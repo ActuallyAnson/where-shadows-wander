@@ -30,6 +30,11 @@ export class ScenePlayer {
   readonly world: Float32Array;
   /** Each part's parent index, or -1. */
   readonly parents: Int16Array;
+  /**
+   * Added to each part's local x and y (2 floats a part; zeros unless set): the story moves a part off its keyed place with
+   * this, e.g. to start a puppet where the player's shadow was and ease it home. Read on the next seek or update.
+   */
+  readonly offset: Float32Array;
   private readonly rest: Float32Array;
   // The tracks, flattened: for track i, its part's pose slot, and its keys at keyStart[i] .. keyStart[i + 1].
   private readonly trackSlot: Int32Array;
@@ -56,6 +61,7 @@ export class ScenePlayer {
     this.world = new Float32Array(n * POSE_STRIDE);
     this.rest = new Float32Array(n * POSE_STRIDE);
     this.parents = new Int16Array(n);
+    this.offset = new Float32Array(n * 2);
     scene.parts.forEach((p, i) => {
       this.parents[i] = p.parent === undefined ? -1 : (index.get(p.parent) as number);
       const o = i * POSE_STRIDE;
@@ -103,6 +109,11 @@ export class ScenePlayer {
     return this.active;
   }
 
+  /** The index of the part called `id`, or -1. */
+  partIndex(id: string): number {
+    return this.scene.parts.findIndex((p) => p.id === id);
+  }
+
   /** Seconds into the scene. */
   get time(): number {
     return this.clock;
@@ -142,6 +153,11 @@ export class ScenePlayer {
       const w = i * 3;
       local[this.wobbleSlot[i]] +=
         this.wobble[w] * Math.sin((2 * Math.PI * now) / this.wobble[w + 1] + this.wobble[w + 2]);
+    }
+    const offset = this.offset;
+    for (let i = 0; i < this.parents.length; i++) {
+      local[i * POSE_STRIDE] += offset[i * 2];
+      local[i * POSE_STRIDE + 1] += offset[i * 2 + 1];
     }
     const world = this.world;
     for (let i = 0; i < this.parents.length; i++) {
