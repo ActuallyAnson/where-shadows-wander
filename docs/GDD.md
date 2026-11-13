@@ -110,7 +110,7 @@ The story is told on the wall in shadow puppets. A boy has recently lost his bes
 
 ### The scenes
 
-The night is told in seven scenes: waking, four memories, a goodbye and sleep. Before each memory the friend's hand shadow appears and shows a shape, and when the player copies it their shadow becomes the memory. The scene-by-scene design is in [STORY.md](STORY.md). Each scene is a first draft, built and rewritten one at a time.
+The night is told as one continuous puppet show in seven scenes: waking, four memories, a goodbye and sleep. The memories follow the friendship through one year, in order, and each ends on the picture that leads into the next. There the friend's puppet raises his hand and the friend's hand shadow shows the next shape; when the player copies it, their shadow joins the story and carries it on. Scenes change like a shadow theatre: one place slides off the wall as the next slides in, and the wall never goes black between memories. The scene-by-scene design is in [STORY.md](STORY.md). Each scene is a first draft, built and rewritten one at a time.
 
 ### What else is settled
 
