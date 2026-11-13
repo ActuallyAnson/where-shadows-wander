@@ -44,7 +44,8 @@ function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fi
  * the paper stage hangs, is left calm so the shadows read against it. `bunting` false leaves the paper bunting out (the wall behind the stage has the real, swinging one). The pictures and shelves are not in it: they are
  * paintWallThings, held off the wall. Its edges and corners are shaded, so the wall sits in the room rather than on the screen.
  */
-export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, bunting = true): void {
+/** The room's walls: plain plaster above wooden panelling. No picture rail or bunting: the walls are bare for the story. */
+export function paintWall(g: CanvasRenderingContext2D, W: number, H: number): void {
   const r = rng(11);
   g.save();
   g.scale(W / 1024, H / 640);
@@ -74,38 +75,6 @@ export function paintWall(g: CanvasRenderingContext2D, W: number, H: number, bun
     grad.addColorStop(1, 'rgba(20, 10, 4, 0)');
     g.fillStyle = grad;
     g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
-  }
-
-  // Picture rail and bunting.
-  rect(g, 0, 58, 1024, 10, '#33241a');
-  rect(g, 0, 68, 1024, 3, 'rgba(0, 0, 0, 0.35)');
-  const flags = ['#8a4a3a', '#c79a52', '#4d6a5a', '#6a5a86', '#b36a4a'];
-  g.strokeStyle = INK;
-  g.lineWidth = 3;
-  // (The wall behind the stage has live bunting instead: bunting-view.ts.)
-  for (let seg = 0; seg < (bunting ? 2 : 0); seg++) {
-    const x0 = seg === 0 ? 70 : 590,
-      x1 = seg === 0 ? 440 : 960;
-    g.beginPath();
-    g.moveTo(x0, 72);
-    g.quadraticCurveTo((x0 + x1) / 2, 128, x1, 72);
-    g.stroke();
-    const n = 9;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      const x = x0 + (x1 - x0) * t;
-      const y = 72 + 56 * 2 * t * (1 - t) * 0.98;
-      g.fillStyle = flags[(i + seg * 2) % flags.length];
-      g.beginPath();
-      g.moveTo(x - 14, y);
-      g.lineTo(x + 14, y);
-      g.lineTo(x, y + 30);
-      g.closePath();
-      g.fill();
-      g.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-      g.lineWidth = 2;
-      g.stroke();
-    }
   }
 
   // Panelling below the chair rail.

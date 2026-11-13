@@ -79,7 +79,7 @@ describe('room art painters', () => {
 describe('RoomDressingView', () => {
   it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(24);
+    expect(v.group.children).toHaveLength(23); // (no bunting since 13 Nov);
     v.dispose();
   });
 
@@ -329,20 +329,6 @@ describe('RoomDressingView', () => {
   it('disposes cleanly', () => {
     const v = new RoomDressingView();
     expect(() => v.dispose()).not.toThrow();
-  });
-
-  it('has live bunting that sways, can be blown by the wind, and rippled when the spark lands', () => {
-    const v = new RoomDressingView();
-    const motion = () => (v as unknown as { bunting: { motion: number } }).bunting.motion;
-    for (let i = 0; i < 240; i++) v.tick(1 / 60);
-    expect(motion()).toBeGreaterThan(0);
-    v.setWind(0);
-    for (let i = 0; i < 60 * 25; i++) v.tick(1 / 60);
-    const quiet = motion();
-    v.rippleBunting();
-    for (let i = 0; i < 20; i++) v.tick(1 / 60);
-    expect(motion()).toBeGreaterThan(quiet);
-    v.dispose();
   });
 });
 

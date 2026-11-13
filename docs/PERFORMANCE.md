@@ -38,7 +38,7 @@ the opening reel, the finale hall, the cinematic scenes, rewind) no longer exist
 | Sound rendering on a worker | All 26 sounds are made off the main thread, room loops first. | About 290 ms of work for all sounds (music about 130 ms), now off the main thread. Not measured on a headset. |
 | Cinematic scenes built on entry | The dusk and hall scenes no longer keep about 35 textures on the GPU while idle. | Expected about 10 MB less texture memory in the room; not yet re-measured. |
 | Texture size cuts | Paper scenery layers 640x360, side walls 800x400. | Texture memory 66.5 to 56.7 MB. |
-| Verlet bunting | Live flags that flutter in the fan's wind and ripple when a spark lands. | 3.3 microseconds per frame for a rope; about 0 bytes allocated. |
+| Verlet bunting (removed 13 Nov 2026) | Live flags that flutter in the fan's wind and ripple when a spark lands. | 3.3 microseconds per frame for a rope; about 0 bytes allocated. |
 | Rewind by replay | Turns the night back 3 s by replaying recorded input into a fresh game. | Exact against the original run in tests. |
 
 ## Before and after (same laptop, one browser at a time, median of 2 runs, software renderer 1000x700)

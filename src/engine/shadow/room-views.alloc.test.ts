@@ -3,7 +3,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHandShadow } from '../hands/hand-shadow';
 import { bytesPerFrame, gc } from '../testing/alloc-measure';
-import { BuntingView } from './bunting-view';
 import { HandTrailView } from './hand-trail-view';
 import { createStagePlane } from './pure/stage-plane';
 
@@ -42,19 +41,6 @@ describe.skipIf(!gc)('hand trail and bunting allocation', () => {
       frame++;
     }, options);
     console.info(`HandTrailView.update allocates ${bytes.toFixed(1)} B a frame`);
-    expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
-  }, 60_000);
-
-  it('BuntingView.update() allocates nothing in a fan wind with ripples', () => {
-    const view = new BuntingView();
-    view.setWind(34);
-    let frame = 0;
-    const bytes = bytesPerFrame(() => {
-      if (frame % 120 === 0) view.ripple(0.2, 1.5);
-      view.update(DT);
-      frame++;
-    }, options);
-    console.info(`BuntingView.update allocates ${bytes.toFixed(1)} B a frame`);
     expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
   }, 60_000);
 });

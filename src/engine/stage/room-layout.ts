@@ -14,7 +14,7 @@
 // id is free (`chair-2`) and need not be one the code knows. The built-in pieces never take a model.
 //
 // Anything missing from the file falls back to the code's own default, so a missing or broken file never breaks the room.
-// Things placed at run time (the room's root, the wall ahead, the bunting on it) are not in the layout.
+// Things placed at run time (the room's root, the wall ahead) are not in the layout.
 //
 // Plain TypeScript: no IWSDK, no three.js, no browser globals. Reads untrusted JSON as `unknown` and never throws.
 

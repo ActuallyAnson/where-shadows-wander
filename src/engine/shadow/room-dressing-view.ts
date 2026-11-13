@@ -25,7 +25,6 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { Material, Object3D } from '@iwsdk/core';
-import { BuntingView } from './bunting-view';
 import { mergeBoxes } from './merge-boxes';
 import type { LanternLight } from './pure/lantern-light';
 import {
@@ -150,15 +149,13 @@ interface GlowSpec {
 }
 
 /**
- * What lights up, in order: the lamp on the shelf, the bunting along the rail, the two pictures (the moon and the hill of stars),
- * the globe on the bookcase, then the window (the sill's candle, and the night outside brightening). The shelf and the pictures
- * hang on the side walls (HUNG); only the bunting is on the wall behind the stage. `wall` is (x, y, lift in metres off the paper).
+ * What lights up, in order: the lamp on the shelf, (nothing: the bunting that was here is gone), the two pictures (the moon and
+ * the hill of stars), the globe on the bookcase, then the window (the sill's candle, and the night outside brightening). The shelf
+ * and the pictures hang on the side walls (HUNG); the wall behind the stage is bare, for the story. `wall` is (x, y, lift in metres off the paper).
  */
 const GLOWS: readonly GlowSpec[] = [
   // The lamp on the shelf (left wall, HUNG[2]), the moon and the hill (right wall, HUNG[0] and HUNG[1]).
   { wonder: 0, follows: 'shelf', at: [-1.875, 1.45, 0.55], size: [0.5, 0.5], facing: '+x', colour: [1, 0.72, 0.36] },
-  { wonder: 1, wall: [255, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
-  { wonder: 1, wall: [775, 122, 0.03], size: [1.45, 0.28], facing: 'z', colour: [0.9, 0.5, 0.42] },
   {
     wonder: 2,
     follows: 'picture-moon',
@@ -271,8 +268,6 @@ export class RoomDressingView implements EditableSource {
   private readonly levels = new Float32Array(WONDERS);
   private awakeCount = 0;
   private wondersWereOn = false;
-  /** The swinging bunting along the picture rail on the wall behind the stage. */
-  private readonly bunting = new BuntingView();
   /** How far in front of the player the wall behind the stage is (z in the room's space), set by `place`. */
   private wallZ = -2.35;
   private warmNow = 0;
@@ -289,7 +284,7 @@ export class RoomDressingView implements EditableSource {
     // the gap between them and the wall shows when the head moves, and the shadows move with the flame.
     // The wall behind the stage (same size as Damon's front wall, a hair in front of it).
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
-      paintWall(g, w, h, false); // the bunting here is alive (bunting-view.ts)
+      paintWall(g, w, h);
     });
     this.wall = this.quad(4, 2.5, this.texture(wallCanvas), false, true, undefined, [16, 10]);
     this.wall.position.set(0, 1.25, -2.4);
@@ -521,9 +516,7 @@ export class RoomDressingView implements EditableSource {
     this.wonders.frustumCulled = false; // its glows are spread over the whole room
     this.wonders.matrixAutoUpdate = false;
     this.group.add(this.wonders);
-    this.group.add(this.bunting.mesh);
-    this.materials.push(this.bunting.material);
-    this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed, this.bunting.mesh);
+    this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed);
     // The walls are plaster: the candle catches its lumps (one tile about every PLASTER_TILE_M).
     this.bumps.set(this.wall.material as MeshBasicMaterial, {
       map: this.plaster,
@@ -533,7 +526,7 @@ export class RoomDressingView implements EditableSource {
       map: this.plaster,
       repeat: [5 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
     });
-    // The props that stand in the candle's light and stay still (the bunting swings, so it casts none).
+    // The props that stand in the candle's light.
     this.casters.push(...this.things, caseBox, ...bed);
     this.place();
 
@@ -638,7 +631,6 @@ export class RoomDressingView implements EditableSource {
     this.wallZ = z;
     this.wall.position.set(0, 1.25, z);
     this.wall.updateMatrix();
-    this.bunting.place(z + 0.05);
     this.buildWonders(z);
     this.candle?.rebake(); // the props moved with the wall
   }
@@ -742,16 +734,6 @@ export class RoomDressingView implements EditableSource {
     return this.group.localToWorld(out);
   }
 
-  /** The wind along the wall, for the bunting (the fan puzzle blows it hard; see bunting-view.ts). */
-  setWind(wind: number): void {
-    this.bunting.setWind(wind);
-  }
-
-  /** Sets the bunting swinging from where the spark lands on it. */
-  rippleBunting(): void {
-    this.bunting.ripple(-1.0, 2.02, 3.5, 0.7);
-  }
-
   /** Lights the room's wonders up to `count` of them, in order (each eases on over a couple of seconds; fewer than before puts the later ones out). */
   setAwake(count: number): void {
     this.awakeCount = Math.max(0, Math.min(WONDERS, Math.floor(count) || 0));
@@ -808,7 +790,6 @@ export class RoomDressingView implements EditableSource {
     if (!(dt > 0)) return;
     this.time += Math.min(dt, 0.1);
     this.easeWonders(Math.min(dt, 0.1));
-    this.bunting.update(Math.min(dt, 0.1));
     for (let i = 0; i < this.rain.length; i++) {
       // Down and along the streaks' lean, kept in 0..1 so the offsets never grow large enough to lose precision.
       const t = this.rain[i];
@@ -855,7 +836,6 @@ export class RoomDressingView implements EditableSource {
   dispose(): void {
     this.wonders.geometry.dispose();
     this.wonderMat.dispose();
-    this.bunting.dispose();
     for (const t of this.textures) t.dispose();
     this.plaster.dispose();
     for (const g of this.geometries) g.dispose();
