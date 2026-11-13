@@ -38,22 +38,22 @@ export const WAKE_SCRIPT: WakeScript = {
     { t: 0, v: 0 },
     { t: 0.6, v: 0 },
     { t: 2.6, v: 1 },
-    { t: 2.9, v: 1 },
-    { t: 3.4, v: 0 },
+    { t: 4.9, v: 1 },
+    { t: 5.4, v: 0 },
   ],
-  thunderAt: 2.9,
+  thunderAt: 4.9,
   lidKeys: [
     { t: 0, v: 0 },
-    { t: 3.6, v: 0 }, // the dream, then a moment of plain black
-    { t: 4.4, v: 0.25 }, // first blink: a slit, slow and heavy
-    { t: 4.7, v: 0.25 },
-    { t: 5.0, v: 0 },
-    { t: 5.5, v: 0 },
-    { t: 5.85, v: 0.55 }, // second: wider and quicker
-    { t: 6.0, v: 0.55 },
-    { t: 6.15, v: 0.05 },
-    { t: 6.4, v: 0.05 },
-    { t: 8.0, v: 1 }, // open
+    { t: 5.6, v: 0 }, // the dream, then a moment of plain black
+    { t: 6.4, v: 0.25 }, // first blink: a slit, slow and heavy
+    { t: 6.7, v: 0.25 },
+    { t: 7.0, v: 0 },
+    { t: 7.5, v: 0 },
+    { t: 7.85, v: 0.55 }, // second: wider and quicker
+    { t: 8.0, v: 0.55 },
+    { t: 8.15, v: 0.05 },
+    { t: 8.4, v: 0.05 },
+    { t: 10.0, v: 1 }, // open
   ],
 };
 

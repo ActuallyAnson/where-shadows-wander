@@ -127,3 +127,4 @@ So that every step leaves a game we could submit:
 - 13 Nov 2026: before the thunder, lightning flashes through the shut lids with the friend's silhouette in it, waving; the thunder follows the flash.
 - 13 Nov 2026: the flash becomes a slow glow, and the friend fades in over it gradually and faintly (he appeared too quickly and too plainly); the thunder breaks the dream, and the blinks start 1.6 s later.
 - 13 Nov 2026: the glow behind him is dropped (too bright); the friend is now himself a faint pale glow in the black, not a shadow on a light.
+- 13 Nov 2026: the friend stays 2 s longer at his clearest before the thunder (held 2.3 s); the thunder and the blinks move 2 s later.
