@@ -2,8 +2,7 @@
 // shape, the way the old shadow-puppet plates draw one, rather than a posed skeleton cast like the player's (whose shadow is
 // a hand's bones and reads as a hand, not a rabbit). It forms the shape from a loose hand, holds it, and now and then eases half
 // out of it and back, as if showing it again. One small puppet scene per shape, played by time (scene time loops after forming).
-import type { Shape } from '../../hands/shapes';
-import type { PuppetScene } from '../puppet/puppet-scene';
+import { swingKeys, type PuppetScene } from '../puppet/puppet-scene';
 
 /** Seconds to form the shape, then the length of each showing-again cycle: held, eased half out over LOOSEN_S, back over REFORM_S. */
 export const FORM_S = 1.4;
@@ -37,6 +36,22 @@ function earTrack(id: string, up: number): PuppetScene['tracks'][number] {
     prop: 'angle',
     keys: [
       [0, EAR_FOLDED],
+      [FORM_S, up, 'smooth'],
+      [c, up],
+      [c + LOOSEN_S, droop, 'smooth'],
+      [c + LOOSEN_S + REFORM_S, up, 'smooth'],
+    ],
+  };
+}
+/** Like earTrack, for a finger that forms from `from` (not folded over the head) to `up`. */
+function earTrackFrom(id: string, from: number, up: number): PuppetScene['tracks'][number] {
+  const droop = up + (from - up) * EAR_DROOP;
+  const c = FORM_S + HOLD_S;
+  return {
+    part: id,
+    prop: 'angle',
+    keys: [
+      [0, from],
       [FORM_S, up, 'smooth'],
       [c, up],
       [c + LOOSEN_S, droop, 'smooth'],
@@ -79,5 +94,75 @@ export const FRIEND_FOX: PuppetScene = {
   tracks: [earTrack('ear-back', FOX_BACK_EAR_UP), earTrack('ear-front', FOX_FRONT_EAR_UP)],
 };
 
-/** Each shape's friend puppet, as it is built; a shape without one shows no hand yet. */
-export const FRIEND_PUPPETS: Partial<Record<Shape, PuppetScene>> = { rabbit: FRIEND_RABBIT, fox: FRIEND_FOX };
+/** The cup: a hand held palm up, the thumb standing at one side and the fingers curling up at the other to make a hollow. */
+const CUP_W = 0.26;
+const CUP_H = 0.2;
+/** The fingers' angle: laid out flat forward (an open hand), and curled up into the cup's far wall. */
+const CUP_FINGERS_FLAT = -1.5;
+const CUP_FINGERS_UP = -0.25;
+
+export const FRIEND_CUP: PuppetScene = {
+  id: 'friend-cup',
+  length: FORM_S + CYCLE_S,
+  parts: [
+    { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+    { id: 'palm', art: 'friend-cup', parent: 'hand', w: CUP_W, h: CUP_H, pivot: [0.5, 0.5], x: 0, y: 0 },
+    ear('fingers', 0.075, -0.003, CUP_FINGERS_UP, 0.075, 0.05),
+  ],
+  tracks: [earTrackFrom('fingers', CUP_FINGERS_FLAT, CUP_FINGERS_UP)],
+};
+
+/** The flat hand held up: the palm and fingers together, the thumb easing out from its side as it opens. */
+const PALM_W = 0.2;
+const PALM_H = 0.3;
+const THUMB_IN = 0.15;
+const THUMB_OUT = 0.85;
+const palmParts = (): PuppetScene['parts'] => [
+  // Placed by its wrist: the hand rises above the story's x, y.
+  { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+  { id: 'palm', art: 'friend-palm', parent: 'hand', w: PALM_W, h: PALM_H, pivot: [0.5, 0], x: 0, y: -0.1 },
+  ear('thumb', -0.045, 0.045, THUMB_OUT, 0.075, 0.045),
+];
+
+/** The flat hand, held up still: it opens, and now and then the fingers ease a little and straighten again. */
+export const FRIEND_FLAT: PuppetScene = {
+  id: 'friend-flat',
+  length: FORM_S + CYCLE_S,
+  parts: palmParts().map((p) => (p.id === 'thumb' ? { ...p, parent: 'palm', y: 0.12 } : p)),
+  tracks: [
+    earTrackFrom('thumb', THUMB_IN, THUMB_OUT),
+    {
+      part: 'palm',
+      prop: 'angle',
+      keys: [
+        [0, 0.12],
+        [FORM_S, 0, 'smooth'],
+        [FORM_S + HOLD_S, 0],
+        [FORM_S + HOLD_S + LOOSEN_S, 0.04, 'smooth'],
+        [FORM_S + CYCLE_S, 0, 'smooth'],
+      ],
+    },
+  ],
+};
+
+/** The flat hand waving: it opens, waves side to side from the wrist a few times, rests, and waves again. */
+const WAVE_SWING = 0.28;
+const WAVE_PERIOD_S = 1.1;
+export const FRIEND_WAVE: PuppetScene = {
+  id: 'friend-wave',
+  length: FORM_S + CYCLE_S,
+  parts: palmParts().map((p) => (p.id === 'thumb' ? { ...p, parent: 'palm', y: 0.12 } : p)),
+  tracks: [
+    earTrackFrom('thumb', THUMB_IN, THUMB_OUT),
+    { part: 'palm', prop: 'angle', keys: swingKeys(FORM_S, FORM_S + 3 * WAVE_PERIOD_S, WAVE_PERIOD_S, WAVE_SWING) },
+  ],
+};
+
+/** Each friend puppet by name (FriendBeat.puppet, or the shape's own name); a shape without one shows no hand yet. */
+export const FRIEND_PUPPETS: Readonly<Record<string, PuppetScene>> = {
+  rabbit: FRIEND_RABBIT,
+  fox: FRIEND_FOX,
+  cup: FRIEND_CUP,
+  flat: FRIEND_FLAT,
+  wave: FRIEND_WAVE,
+};

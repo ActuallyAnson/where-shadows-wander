@@ -476,6 +476,257 @@ function friendFox(g: CanvasRenderingContext2D, w: number, h: number): void {
   });
 }
 
+// Scenes 3 to 5: the kids standing (running in the park, walking to school), the park's trees and grass, the hill of fireflies
+// and its jar, the school gate and the autumn leaves.
+
+/** Fills an ellipse given in fractions of w, h. */
+function blob(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  rot = 0,
+) {
+  g.beginPath();
+  g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+  g.fill();
+}
+
+function kidTorso(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A small kid's body standing, side on, facing right: round shoulders, a jumper to the hips, and shorts at the bottom.
+  g.beginPath();
+  g.moveTo(w * 0.22, h);
+  g.lineTo(w * 0.16, h * 0.4);
+  g.quadraticCurveTo(w * 0.14, h * 0.04, w * 0.46, h * 0.02);
+  g.quadraticCurveTo(w * 0.84, h * 0.02, w * 0.84, h * 0.36);
+  g.quadraticCurveTo(w * 0.9, h * 0.6, w * 0.82, h);
+  g.closePath();
+  g.fill();
+}
+
+function leafyTree(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A park tree in leaf: a trunk that forks, and a round crown of clumps over it, with a few gaps for the light.
+  g.beginPath();
+  g.moveTo(w * 0.44, h);
+  g.quadraticCurveTo(w * 0.47, h * 0.7, w * 0.4, h * 0.45);
+  g.lineTo(w * 0.47, h * 0.47);
+  g.lineTo(w * 0.52, h * 0.38);
+  g.lineTo(w * 0.56, h * 0.48);
+  g.lineTo(w * 0.62, h * 0.44);
+  g.quadraticCurveTo(w * 0.54, h * 0.7, w * 0.57, h);
+  g.closePath();
+  g.fill();
+  const clumps: readonly (readonly [number, number, number, number])[] = [
+    [0.5, 0.26, 0.3, 0.2],
+    [0.28, 0.36, 0.2, 0.14],
+    [0.72, 0.36, 0.22, 0.14],
+    [0.38, 0.16, 0.18, 0.13],
+    [0.64, 0.15, 0.18, 0.13],
+    [0.5, 0.08, 0.16, 0.08],
+    [0.18, 0.42, 0.12, 0.08],
+    [0.84, 0.43, 0.12, 0.08],
+  ];
+  for (const [x, y, rx, ry] of clumps) blob(g, w, h, x, y, rx, ry);
+  cut(g, () => {
+    blob(g, w, h, 0.36, 0.3, 0.035, 0.025);
+    blob(g, w, h, 0.66, 0.24, 0.03, 0.02);
+    blob(g, w, h, 0.56, 0.4, 0.025, 0.02);
+  });
+}
+
+function grass(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A strip of ground with tufts of long grass along its top edge (the top third is the grass).
+  const ground = h * 0.3;
+  g.fillRect(0, ground, w, h - ground);
+  for (let i = 0; i < 90; i++) {
+    const u = (i + 0.5) / 90 + 0.004 * Math.sin(i * 7.3);
+    const tall = 0.5 + 0.5 * Math.abs(Math.sin(i * 2.17));
+    g.beginPath();
+    g.moveTo(u * w - w * 0.004, ground + 1);
+    g.lineTo(u * w + w * 0.003 * Math.sin(i), ground * (1 - tall));
+    g.lineTo(u * w + w * 0.004, ground + 1);
+    g.fill();
+  }
+}
+
+function hill(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A long low hill: its round top in the middle (a seat for two), falling away gently to both sides, grass along the crest.
+  const top = (u: number) => 0.06 + 0.86 * Math.exp(-(((u - 0.5) / 0.3) ** 2));
+  g.beginPath();
+  g.moveTo(0, h);
+  for (let i = 0; i <= 120; i++) {
+    const u = i / 120;
+    g.lineTo(u * w, (1 - top(u)) * h);
+  }
+  g.lineTo(w, h);
+  g.closePath();
+  g.fill();
+  for (let i = 0; i < 70; i++) {
+    const u = (i + 0.5) / 70;
+    const y = (1 - top(u)) * h;
+    const tall = h * (0.04 + 0.03 * Math.abs(Math.sin(i * 3.1)));
+    g.beginPath();
+    g.moveTo(u * w - 2, y + 2);
+    g.lineTo(u * w + 1.5 * Math.sin(i * 1.7), y - tall);
+    g.lineTo(u * w + 2, y + 2);
+    g.fill();
+  }
+}
+
+function jar(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A glass jar: a rim, a neck and a round-shouldered body. The glass lets most of the light through, so only its edges and its
+  // rim cast a full shadow.
+  g.beginPath();
+  g.moveTo(w * 0.2, h * 0.24);
+  g.quadraticCurveTo(w * 0.04, h * 0.3, w * 0.06, h * 0.5);
+  g.lineTo(w * 0.08, h * 0.92);
+  g.quadraticCurveTo(w * 0.1, h, w * 0.24, h);
+  g.lineTo(w * 0.76, h);
+  g.quadraticCurveTo(w * 0.9, h, w * 0.92, h * 0.92);
+  g.lineTo(w * 0.94, h * 0.5);
+  g.quadraticCurveTo(w * 0.96, h * 0.3, w * 0.8, h * 0.24);
+  g.lineTo(w * 0.8, h * 0.1);
+  g.lineTo(w * 0.2, h * 0.1);
+  g.closePath();
+  g.fill();
+  g.fillRect(w * 0.14, 0, w * 0.72, h * 0.1);
+  g.save();
+  g.globalCompositeOperation = 'destination-out';
+  g.globalAlpha = 0.72;
+  g.beginPath();
+  g.moveTo(w * 0.24, h * 0.32);
+  g.quadraticCurveTo(w * 0.14, h * 0.38, w * 0.15, h * 0.52);
+  g.lineTo(w * 0.17, h * 0.88);
+  g.lineTo(w * 0.83, h * 0.88);
+  g.lineTo(w * 0.85, h * 0.52);
+  g.quadraticCurveTo(w * 0.86, h * 0.38, w * 0.76, h * 0.32);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+function schoolGate(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A school's gate: two brick pillars with caps and lamps, railings between them running off to the sides, and the gate
+  // itself standing open in the middle under an arch of iron with a plain plate hanging from it.
+  const X = (f: number) => f * w,
+    Y = (f: number) => (1 - f) * h; // f up from the bottom
+  const pillar = (cx: number) => {
+    g.fillRect(X(cx - 0.035), Y(0.62), X(0.07), Y(0) - Y(0.62));
+    g.fillRect(X(cx - 0.045), Y(0.66), X(0.09), Y(0.62) - Y(0.66));
+    blob(g, w, h, cx, 1 - 0.7, 0.025, 0.04);
+  };
+  // Railings, low, out to both sides: a rail top and bottom and spiked bars between.
+  const rails = (x0: number, x1: number) => {
+    g.fillRect(X(x0), Y(0.36), X(x1 - x0), Y(0.34) - Y(0.36));
+    g.fillRect(X(x0), Y(0.06), X(x1 - x0), Y(0.04) - Y(0.06));
+    for (let x = x0 + 0.012; x < x1; x += 0.028) {
+      g.fillRect(X(x), Y(0.4), Math.max(1, X(0.007)), Y(0) - Y(0.4));
+      g.beginPath();
+      g.moveTo(X(x - 0.006), Y(0.4));
+      g.lineTo(X(x + 0.0035), Y(0.44));
+      g.lineTo(X(x + 0.013), Y(0.4));
+      g.fill();
+    }
+  };
+  rails(0, 0.31);
+  rails(0.69, 1);
+  pillar(0.31);
+  pillar(0.69);
+  g.save();
+  g.strokeStyle = '#fff';
+  g.lineWidth = X(0.012);
+  g.beginPath();
+  g.moveTo(X(0.345), Y(0.6));
+  g.quadraticCurveTo(X(0.5), Y(0.9), X(0.655), Y(0.6));
+  g.stroke();
+  g.lineWidth = X(0.006);
+  g.beginPath();
+  g.moveTo(X(0.345), Y(0.56));
+  g.quadraticCurveTo(X(0.5), Y(0.82), X(0.655), Y(0.56));
+  g.stroke();
+  g.restore();
+  g.fillRect(X(0.44), Y(0.76), X(0.12), Y(0.7) - Y(0.76));
+  // The two gates, swung open, seen edge on as narrow panels of bars by the pillars.
+  for (const x0 of [0.35, 0.6]) {
+    g.fillRect(X(x0), Y(0.5), X(0.05), Y(0.48) - Y(0.5));
+    g.fillRect(X(x0), Y(0.06), X(0.05), Y(0.04) - Y(0.06));
+    for (let k = 0; k < 4; k++) g.fillRect(X(x0 + 0.004 + k * 0.014), Y(0.5), Math.max(1, X(0.005)), Y(0.04) - Y(0.5));
+  }
+}
+
+function leaf(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // An autumn leaf: a pointed oval with a stalk.
+  g.beginPath();
+  g.moveTo(w * 0.5, 0);
+  g.quadraticCurveTo(w * 1.0, h * 0.4, w * 0.5, h * 0.86);
+  g.quadraticCurveTo(0, h * 0.4, w * 0.5, 0);
+  g.fill();
+  g.fillRect(w * 0.46, h * 0.8, w * 0.08, h * 0.2);
+}
+
+function autumnTree(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A tree losing its leaves: the bare tree with a few clumps still on its branches.
+  tree(g, w, h);
+  for (const [x, y, r] of [
+    [0.3, 0.3, 0.09],
+    [0.62, 0.22, 0.1],
+    [0.45, 0.14, 0.08],
+    [0.75, 0.38, 0.07],
+    [0.22, 0.45, 0.06],
+  ] as const)
+    blob(g, w, h, x, y, r, (r * w) / h);
+}
+
+// The friend's hands for scenes 4 to 6: a cupped hand, and a flat hand held up (to wave, and to meet the player's).
+
+function friendCup(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A hand held palm up and cupped, side on, the forearm rising into it from the lower left: the heel of the hand and the thumb
+  // standing up at the left, the hollow of the palm, and the base of the fingers at the right (the fingers that curl up are a
+  // part of their own: 'friend-ear').
+  g.beginPath();
+  g.moveTo(0.0 * w, h);
+  g.quadraticCurveTo(0.16 * w, 0.82 * h, 0.26 * w, 0.66 * h);
+  g.lineTo(0.42 * w, 0.76 * h);
+  g.quadraticCurveTo(0.3 * w, 0.88 * h, 0.3 * w, h);
+  g.closePath();
+  g.fill();
+  // The palm: a bowl, its top hollowed.
+  g.beginPath();
+  g.moveTo(0.22 * w, 0.5 * h);
+  g.quadraticCurveTo(0.44 * w, 0.66 * h, 0.72 * w, 0.52 * h);
+  g.lineTo(0.8 * w, 0.56 * h);
+  g.quadraticCurveTo(0.74 * w, 0.78 * h, 0.46 * w, 0.8 * h);
+  g.quadraticCurveTo(0.24 * w, 0.78 * h, 0.2 * w, 0.62 * h);
+  g.closePath();
+  g.fill();
+  // The thumb, standing up at the near side: the hollow's other wall.
+  finger(g, w, h, [0.24, 0.58, 0.22, 0.44, 0.26, 0.34], 0.085);
+}
+
+function friendPalm(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A small hand held up flat, its palm to the light: the wrist and forearm below, the palm, and four fingers together standing
+  // up from it. The thumb is a part of its own ('friend-ear').
+  g.beginPath();
+  g.moveTo(0.3 * w, h);
+  g.lineTo(0.32 * w, 0.66 * h);
+  g.quadraticCurveTo(0.22 * w, 0.56 * h, 0.24 * w, 0.42 * h);
+  g.lineTo(0.76 * w, 0.42 * h);
+  g.quadraticCurveTo(0.8 * w, 0.58 * h, 0.68 * w, 0.66 * h);
+  g.lineTo(0.7 * w, h);
+  g.closePath();
+  g.fill();
+  const fingers: readonly (readonly [number, number])[] = [
+    [0.3, 0.17],
+    [0.43, 0.06],
+    [0.56, 0.05],
+    [0.69, 0.13],
+  ];
+  for (const [x, top] of fingers) finger(g, w, h, [x, 0.46, x + (x - 0.5) * 0.08, top + 0.04], 0.125);
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -497,6 +748,16 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   'friend-rabbit': friendRabbit,
   'friend-ear': friendEar,
   'friend-fox': friendFox,
+  'kid-torso': kidTorso,
+  'leafy-tree': leafyTree,
+  grass,
+  hill,
+  jar,
+  'school-gate': schoolGate,
+  leaf,
+  'autumn-tree': autumnTree,
+  'friend-cup': friendCup,
+  'friend-palm': friendPalm,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

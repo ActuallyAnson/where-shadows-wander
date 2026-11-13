@@ -5,24 +5,15 @@
 // the rabbit hops down onto the blanket, and the friend raises his hand again for the next shape: the chapter ends on that, and
 // the story holds the picture while the friend's hand shows the fox. Every time is in seconds from the chapter's start.
 import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
-import {
-  bobKeys,
-  swingKeys,
-  type Cue,
-  type Key,
-  type PuppetPart,
-  type Track,
-  type Wobble,
-} from '../puppet/puppet-scene';
+import { bobKeys, swingKeys, type Cue, type PuppetPart, type Track, type Wobble } from '../puppet/puppet-scene';
 import { ROOM_WALL_HEIGHT_M, ROOM_WALL_WIDTH_M, STORY_SCALE } from '../stage-frame';
+import { ARM_DOWN, ARM_UP, FLOOR_Y, KID_SCALE, handAt, hops, sittingKid } from './story-kit';
 
-/** The floor of the fort, metres up the wall from its centre (above the panelling's rail, as the prologue's path was). */
-export const FLOOR_Y = -0.12;
+export { FLOOR_Y };
+
 /** Where each kid sits: the friend on the left facing right, the boy on the right facing left. */
 export const FRIEND_X = -0.3;
 const BOY_X = 0.3;
-/** The kids' size: their parts are drawn at 1 and scaled up together by this (1 is about 23 cm sitting). */
-const KID_SCALE = 1.4;
 
 /** The puppet rabbit: from the player's shadow (the handoff) to its first place, then hopping to the friend's raised hand. */
 export const RABBIT_FROM: readonly [number, number] = [0.04, 0.06];
@@ -50,22 +41,6 @@ export const HOW_THEY_MET_LENGTH_S = 22.6;
 export const RABBIT_REST: readonly [number, number] = [0.02, FLOOR_Y];
 export const RABBIT_REST_SCALE = 0.85;
 
-/** The kids' arms rest down along their sides at this angle, and are raised to the other. */
-const ARM_DOWN = 2.7;
-const ARM_UP = 0.62;
-/** An arm's shoulder on the kid's body (unscaled; x towards where the kid faces), its length, and its hand along it. */
-const SHOULDER: readonly [number, number] = [0.016, 0.112];
-const ARM_LEN = 0.085;
-const HAND_ALONG = 0.86;
-
-/** Where a kid's raised hand is on the wall: what a rabbit sits on. */
-function handAt(x: number, facing: 1 | -1): [number, number] {
-  const reach = ARM_LEN * (HAND_ALONG - 0.06);
-  return [
-    x + KID_SCALE * facing * (SHOULDER[0] + Math.sin(ARM_UP) * reach),
-    FLOOR_Y + KID_SCALE * (SHOULDER[1] + Math.cos(ARM_UP) * reach),
-  ];
-}
 const RABBIT_AT_HAND = handAt(FRIEND_X, 1);
 const BOY_HAND = handAt(BOY_X, -1);
 /** How far the friend leans over to help, and his hand with him. */
@@ -83,34 +58,6 @@ const FORT_BASE_Y = FLOOR_Y - 0.01;
 const FORT_H = (WALL_HALF_H - FORT_BASE_Y) / 0.94;
 /** How far the fort slides to be off the wall: it is wider than the other places, so it starts and ends further out. */
 export const FORT_OFF_X = WALL_HALF_W + FORT_W / 2 + 0.02;
-
-const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[] => [
-  { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE },
-  { id: `${id}-body`, art: 'kid', parent: id, w: 0.13, h: 0.15, pivot: [0.5, 0], mirror: facing < 0 },
-  {
-    id: `${id}-head`,
-    art: 'kid-head',
-    parent: `${id}-body`,
-    w: 0.08,
-    h: 0.08,
-    pivot: [0.5, 0.12],
-    x: 0.012 * facing,
-    y: 0.135,
-    mirror: facing < 0,
-  },
-  {
-    id: `${id}-arm`,
-    art: 'arm',
-    parent: `${id}-body`,
-    w: 0.02,
-    h: ARM_LEN,
-    pivot: [0.5, 0.06],
-    x: SHOULDER[0] * facing,
-    y: SHOULDER[1],
-    angle: (armUp ? -ARM_UP : -ARM_DOWN) * facing,
-    mirror: facing < 0,
-  },
-];
 
 const parts: PuppetPart[] = [
   // The fort, standing back and filling the wall, and in front of it the torch and the two kids (the scenery), sliding in together.
@@ -146,8 +93,8 @@ const parts: PuppetPart[] = [
     y: FLOOR_Y,
     angle: 0.15,
   },
-  ...kid('friend', FRIEND_X, 1, true),
-  ...kid('boy', BOY_X, -1, false),
+  ...sittingKid('friend', FRIEND_X, 1, { parent: 'scenery', y: FLOOR_Y, armUp: true }),
+  ...sittingKid('boy', BOY_X, -1, { parent: 'scenery', y: FLOOR_Y }),
   // The boy's first try: a lump on his hand, which comes right as his rabbit.
   {
     id: 'lump',
@@ -175,28 +122,6 @@ const parts: PuppetPart[] = [
   // The player's rabbit: the first puppet, over everything.
   { id: 'rabbit', art: 'rabbit', w: 0.16, h: 0.14, pivot: [0.5, 0], x: RABBIT_FROM[0], y: RABBIT_FROM[1], opacity: 0 },
 ];
-
-/** Hops from `from` to `to`, `n` of them, starting at `t0`: the x keys and the y keys (a lift at each). */
-function hops(
-  t0: number,
-  n: number,
-  hop: number,
-  from: readonly [number, number],
-  to: readonly [number, number],
-  lift: number,
-) {
-  const x: Key[] = [[t0, from[0]]];
-  const y: Key[] = [[t0, from[1]]];
-  for (let i = 1; i <= n; i++) {
-    const t = t0 + i * hop;
-    const k = i / n;
-    x.push([t, from[0] + (to[0] - from[0]) * k, 'smooth']);
-    const base = from[1] + (to[1] - from[1]) * k;
-    y.push([t - hop / 2, base + lift, 'out']);
-    y.push([t, base, 'in']);
-  }
-  return { x, y };
-}
 
 const rabbitHops = hops(RABBIT_HOPS_S, 3, RABBIT_HOP_S, RABBIT_FROM, RABBIT_AT_HAND, 0.05);
 const hopsEnd = RABBIT_HOPS_S + 3 * RABBIT_HOP_S;

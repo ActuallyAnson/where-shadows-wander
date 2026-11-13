@@ -55,7 +55,7 @@ import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
-import { CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
+import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
 import { FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -279,7 +279,8 @@ async function start(): Promise<void> {
     bedroomLayout.layout,
   );
   void placedModels.load(candleLight);
-  type SessionState = 'title_vr' | 'playing' | 'paused';
+  /** asleep: the story's end (scene 7): the flame covered, the candle out, the view gone to black. */
+  type SessionState = 'title_vr' | 'playing' | 'paused' | 'asleep';
   let sessionState: SessionState = 'title_vr';
   let ignitionHoldTimer = 0;
   /**
@@ -311,7 +312,9 @@ async function start(): Promise<void> {
   let storyStarted = false;
   const onStoryCue = (cue: Cue) => {
     if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
-    else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
+    else if (cue.kind === 'mood') {
+      if (cue.mood in CANDLE_MOODS) candleMood.to(cue.mood as CandleMoodName, cue.seconds);
+    } else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
   // The friend's hand: a painted shadow of a hand making the shape (friend-puppet.ts), drawn as a puppet of its own and played
@@ -323,12 +326,18 @@ async function start(): Promise<void> {
   // The candle's mood (candle-mood.ts): the story opens rainy and gloomy, the candle's light blue-grey; a scene can ask for
   // another (StoryScene.candle) and the light eases into it.
   const candleMood = new CandleMoodBlend();
+  /** The scene whose mood (StoryScene.candle) was last asked for: a scene's mood is eased into once, as it starts. */
+  let moodScene = -1;
   const startStory = (scene = 0) => {
     storyWait = -1;
     storyStarted = true;
     storyTitle.clear();
     storyLine.clear();
     story.start(scene);
+    // Started part-way (a checkpoint), the light is already the scene's.
+    const mood = STORY_SCRIPT[scene]?.candle;
+    if (scene > 0 && mood) candleMood.snap(mood);
+    moodScene = story.sceneIndex;
   };
   const stopStory = () => {
     storyWait = -1;
@@ -1063,6 +1072,44 @@ async function start(): Promise<void> {
     gameAudio.candleIgnited(candleView.flamePosition);
     if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
   };
+  /** Scene 7's end (docs/STORY.md, "Sleep"): the flame covered for good. The candle goes out, the rain eases, and it fades to black. */
+  const SLEEP_FADE_S = 7;
+  const fallAsleep = () => {
+    sessionState = 'asleep';
+    candleView.lit = false;
+    candleView.resetCover();
+    audio.mixer.setLift(Bus.Ambience, 0.35);
+    audio.mixer.setLift(Bus.Music, 0);
+    fade.fadeTo(1, SLEEP_FADE_S);
+  };
+  /**
+   * Dev (the Hand Lab's Story tab, `__wsw.jumpTo`): plays the story from scene `index` of story-script.ts, the picture before it
+   * on the wall and its light already set; the candle is lit first if it was not (the waking skipped), and a pause or the end
+   * is left. With `play`, as if the player had copied the friend's shape at once, so its memory plays. Returns what it did.
+   */
+  const jumpToScene = (index: number, play = false): string => {
+    const scene = STORY_SCRIPT[index];
+    if (!scene) return `no scene ${index}`;
+    if (sessionState === 'title_vr') {
+      wake.finish();
+      wakeView.hide();
+      fade.setBlack(false);
+      igniteCandle();
+    } else if (sessionState !== 'playing') {
+      wallPauseView.hide();
+      fade.setBlack(false);
+      sessionState = 'playing';
+      candleView.resetCover();
+      candleView.lit = true;
+      candleView.setLocked(true);
+      audio.mixer.setLift(Bus.Ambience, 1.0);
+      audio.mixer.setLift(Bus.Music, 1.0);
+    }
+    startStory(index);
+    const b = story.beat;
+    if (play && b?.kind === 'friend') story.commit(b.shape, b.x + 0.12, b.y - 0.04);
+    return `${scene.title ?? scene.id}${play ? ', playing' : ''}`;
+  };
 
   // The only IWSDK system we register. Priority 10 runs after IWSDK's input (-4)
   // and scene understanding (-1) systems and before render.
@@ -1238,7 +1285,8 @@ async function start(): Promise<void> {
         } else {
           titleLighter.visible = false;
           if (sessionState === 'playing') {
-            if (candleView.isCovered) {
+            if (candleView.isCovered && story.sleep()) fallAsleep();
+            else if (candleView.isCovered) {
               sessionState = 'paused';
               candleView.lit = false;
               candleView.resetCover();
@@ -1302,7 +1350,7 @@ async function start(): Promise<void> {
             }
           story.update(storyStep);
           // The friend's hand, while it shows its shape and while it fades.
-          const friendScene = story.friendShape !== null ? FRIEND_PUPPETS[story.friendShape] : undefined;
+          const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
@@ -1405,8 +1453,11 @@ async function start(): Promise<void> {
           moonLift = moonLift > 1 ? Math.max(1, moonLift - settle) : Math.min(1, moonLift + settle);
         }
         candleLight.setMoon(moonLift);
-        const askedMood = story.candleMood;
-        if (askedMood) candleMood.to(askedMood);
+        if (story.sceneIndex !== moodScene) {
+          moodScene = story.sceneIndex;
+          const askedMood = story.candleMood;
+          if (askedMood) candleMood.to(askedMood);
+        }
         candleMood.update(step);
         candleLight.setColour(candleMood.light[0], candleMood.light[1], candleMood.light[2]);
         stageView.setTint(candleMood.wall[0], candleMood.wall[1], candleMood.wall[2]);
@@ -1537,6 +1588,8 @@ async function start(): Promise<void> {
         friendView,
         /** Plays the story from scene `scene` of story-script.ts (0, scene 2, by default; the candle must be lit to see it). */
         playStory: (scene = 0) => startStory(scene),
+        /** Jumps to scene `index` of story-script.ts (0 is scene 2), lighting the candle if need be; `play` copies its shape. */
+        jumpTo: (index: number, play = false) => jumpToScene(index, play),
         /** Eases the candle's light into a mood ('rainy', 'warm'; candle-mood.ts), to try one. */
         candleMood: (mood: CandleMoodName, seconds?: number) => candleMood.to(mood, seconds),
         /** As if the player's hand had committed `shape` (e.g. 'rabbit') with its shadow at x, y on the wall. */

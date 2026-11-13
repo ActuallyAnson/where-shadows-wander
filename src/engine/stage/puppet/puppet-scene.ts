@@ -92,9 +92,11 @@ export interface Wobble {
   readonly phase?: number;
 }
 
-/** Something that happens at a moment: a note of the lullaby, or a line written on the wall. */
+/** Something that happens at a moment: a note of the lullaby, a line written on the wall, or the candle's light changing mood. */
 export type Cue =
   | { readonly t: number; readonly kind: 'note'; readonly note: number }
+  /** The candle's light eases into `mood` (a name from story/candle-mood.ts) over `seconds` (its default if unset). */
+  | { readonly t: number; readonly kind: 'mood'; readonly mood: string; readonly seconds?: number }
   | {
       readonly t: number;
       readonly kind: 'line';

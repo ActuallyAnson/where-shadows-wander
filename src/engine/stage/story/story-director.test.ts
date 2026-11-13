@@ -240,3 +240,109 @@ describe('the story script', () => {
       }
   });
 });
+
+describe('StoryDirector: waits, sleep and checkpoints', () => {
+  const chapterOne: PuppetScene = {
+    id: 'one',
+    length: 2,
+    parts: [{ id: 'kid', art: 'kid', w: 0.1, h: 0.1 }],
+    tracks: [
+      {
+        part: 'kid',
+        prop: 'x',
+        keys: [
+          [0, 0],
+          [2, 0.5],
+        ],
+      },
+    ],
+  };
+  const ending: StoryScene[] = [
+    {
+      id: 'memory',
+      beats: [
+        { kind: 'friend', shape: 'rabbit', x: 0, y: 0 },
+        { kind: 'memory', scene: chapterOne },
+      ],
+    },
+    {
+      id: 'goodbye',
+      candle: 'low',
+      beats: [
+        { kind: 'friend', shape: 'flat', puppet: 'flat-still', x: 0, y: 0, out: 5 },
+        { kind: 'wait', seconds: 2 },
+      ],
+    },
+    { id: 'sleep', beats: [{ kind: 'sleep' }] },
+  ];
+
+  it('names the friend’s painted hand by its puppet, or by its shape', () => {
+    const d = new StoryDirector(ending);
+    d.start();
+    expect(d.friendPuppet).toBe('rabbit');
+    d.start(1);
+    expect(d.friendPuppet).toBe('flat-still');
+    expect(d.friendShape).toBe('flat');
+  });
+
+  it('fades the hand over the beat’s own time, waits, and then waits for sleep for as long as it takes', () => {
+    const d = new StoryDirector(ending);
+    d.start(1);
+    run(d, 4);
+    expect(d.commit('flat')).toBe(true);
+    run(d, 1.5);
+    expect(d.friendLevel).toBeGreaterThan(0.6);
+    expect(d.waitingForSleep).toBe(false);
+    run(d, 1);
+    expect(d.waitingForSleep).toBe(true);
+    run(d, 600);
+    expect(d.waitingForSleep).toBe(true);
+    expect(d.sleep()).toBe(true);
+    expect(d.asleep).toBe(true);
+    expect(d.playing).toBe(false);
+    expect(d.sleep()).toBe(false);
+  });
+
+  it('only sleeps at a sleep beat', () => {
+    const d = new StoryDirector(ending);
+    d.start();
+    expect(d.sleep()).toBe(false);
+    expect(d.asleep).toBe(false);
+  });
+
+  it('starts part-way on the picture the memory before it ended on, holding there', () => {
+    const d = new StoryDirector(ending);
+    d.start(1);
+    expect(d.memory?.scene).toBe(chapterOne);
+    expect(d.memory?.playing).toBe(false);
+    expect(d.memory?.world[0]).toBeCloseTo(0.5);
+    expect(d.waitingForShape).toBe(true);
+    expect(d.candleMood).toBe('low');
+    d.start(0);
+    expect(d.memory).toBeNull();
+  });
+
+  it('starts every scene of the real story, each waiting on its first beat', () => {
+    const d = new StoryDirector(STORY_SCRIPT);
+    STORY_SCRIPT.forEach((s, i) => {
+      d.start(i);
+      expect(d.sceneIndex, s.id).toBe(i);
+      if (i > 0) expect(d.memory, s.id).not.toBeNull();
+    });
+  });
+
+  it('plays the whole story, a shape at a time, to sleep', () => {
+    const d = new StoryDirector(STORY_SCRIPT);
+    d.start();
+    for (let guard = 0; guard < 40 && !d.waitingForSleep; guard++) {
+      const b = d.beat;
+      if (b?.kind === 'friend') {
+        run(d, FRIEND_DELAY_S + 0.5, 0.1);
+        expect(d.commit(b.shape, 0, 0)).toBe(true);
+      }
+      run(d, 70, 0.1);
+    }
+    expect(d.waitingForSleep).toBe(true);
+    expect(d.sleep()).toBe(true);
+  });
+});

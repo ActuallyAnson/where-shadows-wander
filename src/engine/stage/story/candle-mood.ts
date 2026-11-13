@@ -17,6 +17,14 @@ export const CANDLE_MOODS = {
   rainy: { light: [0.5, 0.78, 2.0], wall: [0.66, 0.86, 1.4] },
   /** A candle's own warm amber light (the room as it was before the moods). */
   warm: { light: [1.0, 0.82, 0.6], wall: [0.91, 0.92, 0.94] },
+  /** A summer dusk: gold and a little lower (the park as the sky goes, the hill of fireflies). */
+  dusk: { light: [1.05, 0.66, 0.38], wall: [1.0, 0.86, 0.72] },
+  /** A pale autumn morning (the school gate). */
+  morning: { light: [0.86, 0.88, 0.95], wall: [0.94, 0.95, 1.0] },
+  /** The candle burned low, the night cooling again: dimmer and blue (the hill with one boy, the goodbye). */
+  low: { light: [0.42, 0.5, 0.95], wall: [0.62, 0.72, 1.0] },
+  /** The last of the candle: a small warm ember of light (sleep). */
+  ember: { light: [0.5, 0.34, 0.24], wall: [0.72, 0.66, 0.66] },
 } as const satisfies Record<string, CandleMood>;
 
 export type CandleMoodName = keyof typeof CANDLE_MOODS;

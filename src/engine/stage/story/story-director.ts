@@ -18,6 +18,10 @@ export interface FriendBeat {
   readonly y: number;
   /** Stage metres it rises as it appears (and sinks as it goes): the friend lifting his hand. Default 0. */
   readonly rise?: number;
+  /** Which of the friend's painted hands (friend-puppet.ts) shows the shape, e.g. 'wave'. Default the shape's own. */
+  readonly puppet?: string;
+  /** Seconds the hand takes to fade once copied. Default FRIEND_OUT_S. */
+  readonly out?: number;
 }
 
 /** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
@@ -28,14 +32,32 @@ export interface MemoryBeat {
   readonly from?: string;
   readonly start?: number;
   readonly end?: number;
+  /** Seconds the `from` puppet takes to reach its place. Default HANDOFF_S. */
+  readonly handoff?: number;
 }
 
-export type Beat = FriendBeat | MemoryBeat;
+/** Nothing new for `seconds`: the wall holds what it has (a hand fading, an empty wall) before the next beat. */
+export interface WaitBeat {
+  readonly kind: 'wait';
+  readonly seconds: number;
+}
+
+/** The end: it waits, for as long as it takes, for the player to cover the flame and sleep (scene 7). */
+export interface SleepBeat {
+  readonly kind: 'sleep';
+}
+
+export type Beat = FriendBeat | MemoryBeat | WaitBeat | SleepBeat;
 
 export interface StoryScene {
   readonly id: string;
+  /** Its name for the developer tools (the Hand Lab's checkpoints), e.g. "2 · How they met". */
+  readonly title?: string;
   readonly beats: readonly Beat[];
-  /** The candle's mood for this scene (candle-mood.ts), eased into as it starts; without one the light stays as it was. */
+  /**
+   * The candle's mood for this scene (candle-mood.ts), eased into as it starts; without one the light stays as it was. A memory's
+   * mood cues can change it on the way; a scene's mood is the one its wait opens in, so a jump to the scene can snap to it.
+   */
   readonly candle?: CandleMoodName;
 }
 
@@ -55,6 +77,7 @@ export function validateStory(scenes: readonly StoryScene[]): string[] {
   for (const s of scenes) {
     if (s.beats.length === 0) problems.push(`${s.id} has no beats`);
     for (const b of s.beats) {
+      if (b.kind === 'wait' && !(b.seconds >= 0)) problems.push(`${s.id} waits for ${b.seconds} s`);
       if (b.kind !== 'memory') continue;
       const start = b.start ?? 0,
         end = b.end ?? b.scene.length;
@@ -72,6 +95,10 @@ export function validateStory(scenes: readonly StoryScene[]): string[] {
 
 export class StoryDirector {
   readonly scenes: readonly StoryScene[];
+  /** The name of the friend's painted hand showing (FriendBeat.puppet, or its shape), while friendShape is set. */
+  friendPuppet: string | null = null;
+  /** Set once the player has covered the flame at the end (a sleep beat): the story is over. */
+  asleep = false;
   /** The scene playing, by index, or -1. */
   sceneIndex = -1;
   /** The beat playing in it, by index. */
@@ -88,6 +115,10 @@ export class StoryDirector {
   private waiting = false;
   private friendWait = 0;
   private friendRise = 0;
+  private friendOut = FRIEND_OUT_S;
+  private waitLeft = -1;
+  private sleepWaiting = false;
+  private handoffS = HANDOFF_S;
   private handoffPart = -1;
   private handoffT = 0;
   private handoffX = 0;
@@ -119,6 +150,11 @@ export class StoryDirector {
     return this.waiting;
   }
 
+  /** Whether the story is at its end, waiting for the player to cover the flame (a sleep beat). */
+  get waitingForSleep(): boolean {
+    return this.sleepWaiting;
+  }
+
   /** The candle's mood the scene playing asks for, or null (none playing, or it names none). */
   get candleMood(): CandleMoodName | null {
     return this.sceneIndex < 0 ? null : (this.scenes[this.sceneIndex].candle ?? null);
@@ -129,12 +165,43 @@ export class StoryDirector {
     return this.sceneIndex < 0 ? null : (this.scenes[this.sceneIndex].beats[this.beatIndex] ?? null);
   }
 
-  /** Starts the story at scene `index` (0, the first in the script, by default), dropping whatever was playing. */
+  /**
+   * Starts the story at scene `index` (0, the first in the script, by default), dropping whatever was playing. A scene after the
+   * first opens on the picture the memory before it ended on, idling, as if the story had played up to it (a checkpoint).
+   */
   start(index = 0): void {
     this.stop();
     if (index < 0 || index >= this.scenes.length) return;
+    const before = this.memoryBefore(index);
+    if (before) {
+      const player = this.players.get(before.scene) as ScenePlayer;
+      player.offset.fill(0);
+      player.seek(before.end ?? before.scene.length);
+      this.memory = player;
+    }
     this.sceneIndex = index;
     this.enter(0);
+  }
+
+  /** The last memory beat before scene `index`, or null. */
+  private memoryBefore(index: number): MemoryBeat | null {
+    for (let s = index - 1; s >= 0; s--) {
+      const beats = this.scenes[s].beats;
+      for (let i = beats.length - 1; i >= 0; i--) {
+        const b = beats[i];
+        if (b.kind === 'memory') return b;
+      }
+    }
+    return null;
+  }
+
+  /** The player covered the flame. At the end (a sleep beat) that is sleep, and the story is over; returns whether it was. */
+  sleep(): boolean {
+    if (!this.sleepWaiting) return false;
+    this.sleepWaiting = false;
+    this.asleep = true;
+    this.next();
+    return true;
   }
 
   /** Stops it: no hand, no memory. */
@@ -146,8 +213,12 @@ export class StoryDirector {
     this.beatIndex = 0;
     this.waiting = false;
     this.friendShape = null;
+    this.friendPuppet = null;
     this.friendLevel = 0;
     this.handoffPart = -1;
+    this.waitLeft = -1;
+    this.sleepWaiting = false;
+    this.asleep = false;
   }
 
   /**
@@ -182,9 +253,13 @@ export class StoryDirector {
         }
       } else {
         this.friendT += dt;
-        this.friendLevel = Math.max(0, this.friendLevel - dt / FRIEND_OUT_S);
-        if (this.friendLevel === 0) this.friendShape = null;
+        this.friendLevel = Math.max(0, this.friendLevel - dt / this.friendOut);
+        if (this.friendLevel === 0) this.friendShape = this.friendPuppet = null;
       }
+    }
+    if (this.waitLeft >= 0) {
+      this.waitLeft -= dt;
+      if (this.waitLeft < 0) this.next();
     }
     const m = this.memory;
     if (!m) return;
@@ -194,7 +269,7 @@ export class StoryDirector {
     }
     if (this.handoffPart >= 0) {
       this.handoffT += dt;
-      const k = 1 - smooth(this.handoffT / HANDOFF_S);
+      const k = 1 - smooth(this.handoffT / this.handoffS);
       m.offset[this.handoffPart * 2] = this.handoffX * k;
       m.offset[this.handoffPart * 2 + 1] = this.handoffY * k;
       if (k === 0) this.handoffPart = -1;
@@ -229,11 +304,22 @@ export class StoryDirector {
   private enter(index: number): void {
     this.beatIndex = index;
     this.handoffPart = -1;
+    this.waitLeft = -1;
     const b = this.scenes[this.sceneIndex].beats[index];
+    if (b.kind === 'wait') {
+      this.waitLeft = b.seconds;
+      return;
+    }
+    if (b.kind === 'sleep') {
+      this.sleepWaiting = true;
+      return;
+    }
     if (b.kind === 'friend') {
       // The memory before it, if any, stays on the wall while the hand waits.
       this.waiting = true;
       this.friendShape = b.shape;
+      this.friendPuppet = b.puppet ?? b.shape;
+      this.friendOut = b.out ?? FRIEND_OUT_S;
       this.friendX = b.x;
       this.friendY = b.y;
       this.friendRise = b.rise ?? 0;
@@ -251,6 +337,7 @@ export class StoryDirector {
     const part = b.from === undefined ? -1 : player.partIndex(b.from);
     if (part >= 0 && Number.isFinite(this.commitX) && Number.isFinite(this.commitY)) {
       this.handoffPart = part;
+      this.handoffS = b.handoff ?? HANDOFF_S;
       this.handoffT = 0;
       this.handoffX = this.commitX - player.world[part * POSE_STRIDE];
       this.handoffY = this.commitY - player.world[part * POSE_STRIDE + 1];
