@@ -52,6 +52,8 @@ Like a shadow theatre with rod puppets on a track:
 
 **The continuous stage (built 13 Nov):** the memories are chapters of one puppet scene (`src/engine/stage/puppet/chapters.ts` joins them; `story-stage.ts` lists them), so a puppet in several memories is one part that carries over. A `memory` beat plays one chapter (`start`, `end`); when it ends, its last picture stays on the wall with its wobbles still moving (`ScenePlayer.idle`) through the next `friend` beat, and the next chapter goes on from there. `slideKeys` writes a place's slide on or off, slower the further back it stands, and the puppets are cut off at the room wall's edges (`PuppetView.clipToWall`). A `friend` beat's `rise` lifts the friend's hand into place as it appears. `node scripts/story-probe.mjs <url> <prefix> [1,4] [0.3,3] '[["fox",[0.6,3,7]]]'` follows the story into later scenes (`PROBE_WIDE=1` for the whole view).
 
+**All the scenes (first pass, 13 Nov):** scenes 3 to 5 are chapters too (`the-park.ts`, `fireflies.ts`, `last-ordinary-day.ts`); the kids, sitting or standing, and their walk and run come from `story-kit.ts`. A beat can also be a `wait` (seconds of nothing new) or `sleep` (scene 7: covering the flame ends the game instead of pausing it; the candle goes out and the view fades to black). A friend beat can name which painted hand shows its shape (`puppet`, e.g. `wave`) and how slowly it fades (`out`). A memory can change the candle's mood on the way with a `mood` cue; each scene's `candle` is the mood its wait opens in. Starting the story at a later scene puts the picture the memory before it ended on on the wall, so any scene is a checkpoint: the Hand Lab's **Story** tab has one per scene (Wait shows the friend's hand, Play copies its shape at once), with Copy shape and Skip memory; in dev, `__wsw.jumpTo(3, true)` does the same. `node scripts/scene-probe.mjs <url> <dir> '[[1,[2,8,14]]]'` jumps to scenes and takes screenshots.
+
 ## The scenes
 
 | # | Scene | Season | Shape | Leads into the next with |
@@ -99,6 +101,8 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Must make the player feel:** play, speed, laughter.
 - **Puppets:** the fox, trees, the boys running and lying down (reused from scene 2), one firefly.
 - **Built (opening only, 13 Nov):** the friend's painted fox hand; the player's fox landing in the fort, crouching and pouncing; the rabbit bolting; the two running on the spot while the fort and the kids slide off to the left; then both running off the right edge, leaving the wall empty (about 10.7 s, `src/engine/stage/story/the-park.ts`). Next: the trees sliding in as the fort goes, the rabbit and fox becoming the boys, and the rest of the scene ending on the firefly.
+- **Built (first pass, 13 Nov):** the fort slides off as the trees and grass slide in from the right (the candle warming); mid-run the rabbit and the fox fade into the two boys running, the friend chasing; he catches him and they tumble backwards into the grass, the friend rolling over, and lie on their backs laughing; the light goes to dusk and a firefly drifts in to hover between them; the friend reaches up, and his cup hand rises (about 23 s).
+- **To try:** the rabbit and fox becoming the boys is a cross-fade; the two lie in a row, not head to head.
 - **Sound:** laughter. Keep it in mind: it is missing from later scenes.
 
 ### 4. Fireflies
@@ -109,6 +113,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Ends on (the wait for scene 5):** as they walk, the hill slides off to the left and a school gate slides in from the right; it is morning, and autumn leaves fall. At the gate the friend's puppet turns to go his own way, lifts his hand, and the friend's hand shadow rises flat, waving.
 - **Must make the player feel:** stillness, closeness, a summer that seemed endless.
 - **Puppets:** the boys sitting (one shot, to reuse in scene 5), a jar, fireflies (small lights on the wall), the school gate (arriving).
+- **Built (first pass, 13 Nov):** the firefly comes off the player's cup glowing brighter and goes back over the boys; they get up and walk on the spot as the park slides off and the hill slides in, eight fireflies rising from its grass; they sit (standing kids cross-fade to sitting ones), the friend sets the jar down, they fill it one firefly at a time (the jar glows brighter with each), let them go in threes over the top of the wall, and the friend puts the empty jar in the boy's lap; they stand and walk on, the boy carrying it, as the hill slides off and the school gate and an autumn tree slide in (the light turning to a pale morning), five leaves falling; the friend turns to face the other way and raises his hand, and his waving hand rises beside him (about 40 s).
 - **To try:** the firefly light comes from the wall, not the candle, so this is the only scene with a second light. Check that it reads as magic, not as a bug. Whether the jar being handed over reads at this size.
 
 ### 5. The last ordinary day
@@ -119,6 +124,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Ends on (the wait for scene 6):** the hill slides away, slowly, until the wall is empty for the first time since the candle was lit.
 - **Must make the player feel:** that something is ending, before they can say what.
 - **Puppets:** the school gate, the boys walking and waving, the single boy on the hill (from scene 4).
+- **Built (first pass, 13 Nov):** the boy waves back with his free hand and walks off the right edge with the jar; the friend walks left, turns back near the edge and waves at nobody, holds his hand up, lowers it, and walks off; the gate slides away to the right as the hill slides back in from the left, the light cooling to `low`, with only the boy on it and the jar on the grass where the friend sat; he bows his head, and the hill slides slowly off to the right, leaving the wall empty (about 37 s). The tune drops to single notes.
 - **How it lands without words:** the wave that isn't seen, the hill coming back the wrong way with one boy missing, the laughter from scene 3 gone, the music-box tune dropping to a single note, and the candle dimming. This is the scene to test hardest with someone who doesn't know the premise.
 
 ### 6. Goodbye
@@ -128,7 +134,8 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **The player:** Flat, held against the friend's hand.
 - **Must make the player feel:** grief, and some peace.
 - **Puppets:** none; the friend's hand only.
-- **To try:** how long the friend's hand takes to fade, and whether it lingers if the player pulls away early.
+- **Built (first pass, 13 Nov):** the friend's painted flat hand (`flat`, its thumb easing out as it opens) alone in the middle of the empty wall; any flat commit answers it (not yet checked to be palm to palm), and it fades over 6 s; then 4 s of empty wall.
+- **To try:** how long the friend's hand takes to fade, and whether it lingers if the player pulls away early; making the commit need the hands to meet.
 
 ### 7. Sleep
 
@@ -136,7 +143,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **What happens:** the candle has burned low. The wall is dim and the room quiet; the rain is easing. The last of the candle's light finds the jar on the shelf, the one the friend gave him. The player covers the flame, and it goes out. Darkness, the boy's breathing slows, and the game fades to black.
 - **The player:** covers the flame. In every other scene this pauses the game; here it puts the candle out. The player chooses when he sleeps.
 - **Must make the player feel:** calm and finished.
-- **Change needed:** the session's states (title, playing, paused) need an ending that covering the flame leads to here instead of the pause menu.
+- **Built (first pass, 13 Nov):** the light eases to `ember`, and after 3 s covering the flame ends the game (the `asleep` state): the candle goes out, the rain and music drop, and the view fades to black over 7 s and stays there. Not yet: the jar on the shelf, the breathing, the rain easing before the end, the candle burning visibly lower.
 - **To try:** whether one firefly glows in the jar after the candle goes out (magic, and maybe too much); whether the jar is enough without it.
 
 ## Throughout the night
@@ -174,3 +181,4 @@ So that every step leaves a game we could submit:
 - 13 Nov 2026: the candle's light opens blue-grey, rainy and gloomy (the `rainy` mood); scenes can ask for another mood and the light eases into it.
 - 13 Nov 2026: one continuous story instead of seven separate ones. The memories follow one year in order (winter, spring, summer, autumn), each ending on the picture that leads into the next; the friend's hand comes out of the memory, not onto an empty wall. Scenes change like a puppet stage: places slide off one side as the next slides in from the other, the kids walking through, and the wall never goes black between memories. Threads that recur: the dream's wave, unseen at the gate and answered in scene 6; the rabbit and fox as the two boys; the jar, given to the boy in scene 4 and on his shelf in the room; the storm, the same as the night they met.
 - 13 Nov 2026: the continuous stage is built. The memories are chapters of one puppet show; each chapter's last picture stays on the wall, still breathing, while the friend's hand waits; places slide on and off and are cut off at the wall's edges. Scene 2's fort slides in, and the scene ends with the rabbit on the blanket and the friend raising his hand; the friend's fox hand rises between the kids. The opening of scene 3 is built: the fox pounces, the rabbit bolts, and the fort slides away behind them as they run.
+- 13 Nov 2026: a first pass of every scene (3 to 7) is built, so the whole story plays from the candle to sleep: the park, the fireflies and the jar, the walk to school, the unanswered wave and the hill with one boy, the friend's hand alone, and covering the flame to sleep. New candle moods mark the memories (dusk, morning, low, ember). The Hand Lab's Story tab jumps to any scene.
