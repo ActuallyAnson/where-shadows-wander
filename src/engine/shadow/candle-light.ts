@@ -325,6 +325,11 @@ export class CandleLight {
     this.uniforms.uFullBright.value = on ? 1 : 0;
   }
 
+  /** Sets the colour of the candle's light (linear RGB; CANDLE_COLOUR is its own warm amber; the story's moods: candle-mood.ts). */
+  setColour(r: number, g: number, b: number): void {
+    this.uniforms.uCandleColour.value.setRGB(r, g, b);
+  }
+
   /** Sets the moon's light as a multiple of its night level (MOON_LIGHT): 1 is the night, more is a brighter moon. */
   setMoon(scale: number): void {
     this.uniforms.uMoonLight.value.copy(MOON_LIGHT).multiplyScalar(scale);

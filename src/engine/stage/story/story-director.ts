@@ -6,6 +6,7 @@
 import type { Shape } from '../../hands/shapes';
 import { POSE_STRIDE, type Cue, type PuppetScene } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
+import type { CandleMoodName } from './candle-mood';
 
 /** The friend's hand shows `shape`, its shadow at `x`, `y` (metres right and up from the wall's centre), and waits. */
 export interface FriendBeat {
@@ -28,6 +29,8 @@ export type Beat = FriendBeat | MemoryBeat;
 export interface StoryScene {
   readonly id: string;
   readonly beats: readonly Beat[];
+  /** The candle's mood for this scene (candle-mood.ts), eased into as it starts; without one the light stays as it was. */
+  readonly candle?: CandleMoodName;
 }
 
 /** Seconds before the friend's hand starts to appear (the wall settles first), then seconds it takes to fade in. */
@@ -102,6 +105,11 @@ export class StoryDirector {
   /** Whether the friend's hand is waiting for the player to copy its shape. */
   get waitingForShape(): boolean {
     return this.waiting;
+  }
+
+  /** The candle's mood the scene playing asks for, or null (none playing, or it names none). */
+  get candleMood(): CandleMoodName | null {
+    return this.sceneIndex < 0 ? null : (this.scenes[this.sceneIndex].candle ?? null);
   }
 
   /** The beat playing, or null. */

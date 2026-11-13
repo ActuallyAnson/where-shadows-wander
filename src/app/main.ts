@@ -55,6 +55,7 @@ import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
+import { CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
 import { FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
@@ -317,6 +318,9 @@ async function start(): Promise<void> {
   const friendView = new PuppetView();
   friendView.scale = STORY_SCALE;
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
+  // The candle's mood (candle-mood.ts): the story opens rainy and gloomy, the candle's light blue-grey; a scene can ask for
+  // another (StoryScene.candle) and the light eases into it.
+  const candleMood = new CandleMoodBlend();
   const startStory = (scene = 0) => {
     storyWait = -1;
     storyStarted = true;
@@ -1399,6 +1403,11 @@ async function start(): Promise<void> {
           moonLift = moonLift > 1 ? Math.max(1, moonLift - settle) : Math.min(1, moonLift + settle);
         }
         candleLight.setMoon(moonLift);
+        const askedMood = story.candleMood;
+        if (askedMood) candleMood.to(askedMood);
+        candleMood.update(step);
+        candleLight.setColour(candleMood.light[0], candleMood.light[1], candleMood.light[2]);
+        stageView.setTint(candleMood.wall[0], candleMood.wall[1], candleMood.wall[2]);
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the rain holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
@@ -1526,6 +1535,8 @@ async function start(): Promise<void> {
         friendView,
         /** Plays the story from scene `scene` of story-script.ts (0, scene 2, by default; the candle must be lit to see it). */
         playStory: (scene = 0) => startStory(scene),
+        /** Eases the candle's light into a mood ('rainy', 'warm'; candle-mood.ts), to try one. */
+        candleMood: (mood: CandleMoodName, seconds?: number) => candleMood.to(mood, seconds),
         /** As if the player's hand had committed `shape` (e.g. 'rabbit') with its shadow at x, y on the wall. */
         commitShape: (shape: Parameters<StoryDirector['commit']>[0], x = 0.1, y = 0.05) => story.commit(shape, x, y),
         /** Plays scene 1's waking (the blinks) again. */

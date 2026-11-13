@@ -49,13 +49,19 @@ const vertex = /* glsl */ `
 // the flame (so a far wall still reads), a floor so the edges never go black, fine fibres and soft mottling that the light
 // rakes across. On the room's wall the quad covers most of the wall and the paper is the middle of the candle's round pool of
 // light, fading into the wallpaper; elsewhere it is a sheet whose rim darkens. One quad, one draw call, nothing per pixel but arithmetic.
+/** The paper's tint for a mood, 0 (cold and bluish) to 1 (warm). */
+function moodTint(mood: number, out: Vector3): Vector3 {
+  return out.set(0.8 + 0.28 * mood, 0.9 + 0.05 * mood, 1.06 - 0.3 * mood);
+}
+
 const fragment = /* glsl */ `
   uniform vec3 uPaper;
   uniform vec3 uFlame;     // the flame on the wall: x, y metres from the centre, z metres in front of it
   uniform vec2 uSize;      // the wall's width and height, metres
   uniform float uBright;   // 0..1 flame brightness (flicker and cover-the-flame included)
   uniform float uOpacity;
-  uniform float uMood;     // 0 cold and bluish .. 1 warm
+  uniform float uMood;     // 0 cold and bluish .. 1 warm (the painted scenery's tint)
+  uniform vec3 uTint;      // the candle's pool's tint (from the mood, or the candle's mood: setTint)
   uniform float uTime;
   uniform float uHigh;     // 1 for high contrast: plain white, no texture
   uniform sampler2D uSky;
@@ -113,8 +119,7 @@ ${stageEdgeGlsl}
     float tooth = clamp(dot(n, l) / l.z, 0.94, 1.05);
 
     float light = uBright * (0.42 + 0.58 * pool) * 1.12;
-    vec3 tint = mix(vec3(0.8, 0.9, 1.06), vec3(1.08, 0.95, 0.76), uMood);
-    vec3 col = uPaper * tint * light * tooth * (0.965 + 0.02 * fine + 0.015 * fibre) * (0.97 + 0.03 * blot);
+    vec3 col = uPaper * uTint * light * tooth * (0.965 + 0.02 * fine + 0.015 * fibre) * (0.97 + 0.03 * blot);
 
     // The painted scenery behind the shadows: sky and moon, far hills, drifting clouds, near hills with a cottage, a fringe of
     // grass, and a few fireflies. Each layer is shifted a little by where the head is (the far ones with it, the near ones against
@@ -207,6 +212,7 @@ export class TestStageView {
         uBright: { value: 0.04 },
         uOpacity: { value: PAPER_OPACITY },
         uMood: { value: this._mood },
+        uTint: { value: moodTint(this._mood, new Vector3()) },
         uTime: { value: 0 },
         uHigh: { value: 0 },
         uSky: { value: this.layerTexture('sky') },
@@ -428,6 +434,12 @@ export class TestStageView {
   set mood(v: number) {
     this._mood = v >= 1 ? 1 : v > 0 ? v : 0;
     this.paperMaterial.uniforms.uMood.value = this._mood;
+    moodTint(this._mood, this.paperMaterial.uniforms.uTint.value as Vector3);
+  }
+
+  /** Tints the candle's pool of light on the wall (about 1 each is neutral; the candle's mood, candle-mood.ts). */
+  setTint(r: number, g: number, b: number): void {
+    (this.paperMaterial.uniforms.uTint.value as Vector3).set(r, g, b);
   }
 
   get mood(): number {
