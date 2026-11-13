@@ -108,6 +108,7 @@ export class BedroomView implements EditableSource {
   readonly frontWallMesh: Mesh;
   private readonly leftWallMesh: Mesh;
   private readonly rightWallMesh: Mesh;
+  private readonly backWallMesh: Mesh;
   private readonly skyMesh: Mesh;
 
   private readonly floorTexture: CanvasTexture;
@@ -189,7 +190,7 @@ export class BedroomView implements EditableSource {
     // Back Wall (Z = +1.85m behind the player)
     const backWallGeo = new PlaneGeometry(4.0, 2.5);
     backWallGeo.rotateY(Math.PI);
-    const backWall = new Mesh(backWallGeo, this.wallMat);
+    const backWall = (this.backWallMesh = new Mesh(backWallGeo, this.wallMat));
     backWall.position.set(0, 1.25, 1.85);
     this.register(backWallGeo);
 
@@ -350,12 +351,13 @@ export class BedroomView implements EditableSource {
   }
 
   /**
-   * Hides the plain left, right and front walls and the sky quad behind the window, for when something painted covers them (the
+   * Hides the plain left, right, back and front walls and the sky quad behind the window, for when something painted covers them (the
    * room dressing's own walls sit just in front of them and are drawn first): they would be drawn only to fail the depth test.
    */
   setWallsCovered(covered: boolean): void {
     this.leftWallMesh.visible = !covered;
     this.rightWallMesh.visible = !covered;
+    this.backWallMesh.visible = !covered;
     this.frontWallMesh.visible = !covered;
     this.skyMesh.visible = !covered;
   }

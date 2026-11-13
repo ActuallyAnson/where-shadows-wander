@@ -286,7 +286,8 @@ export class RoomDressingView implements EditableSource {
     const wallCanvas = paintedCanvas(1024, 640, (g, w, h) => {
       paintWall(g, w, h);
     });
-    this.wall = this.quad(4, 2.5, this.texture(wallCanvas), false, true, undefined, [16, 10]);
+    const wallTexture = this.texture(wallCanvas);
+    this.wall = this.quad(4, 2.5, wallTexture, false, true, undefined, [16, 10]);
     this.wall.position.set(0, 1.25, -2.4);
     this.wall.renderOrder = WALL_ORDER;
     WALL_THINGS.forEach((spec, i) => {
@@ -313,9 +314,15 @@ export class RoomDressingView implements EditableSource {
     right.rotation.y = -Math.PI / 2;
     right.position.set(1.995, 1.25, -0.4);
     right.renderOrder = WALL_ORDER;
+    // The wall behind the player: the same paper as the wall behind the stage (same size), facing into the room, a hair in front
+    // of Damon's plain back wall (z 1.85).
+    const back = this.quad(4, 2.5, wallTexture, false, true, undefined, [16, 10]);
+    back.rotation.y = Math.PI;
+    back.position.set(0, 1.25, 1.845);
+    back.renderOrder = WALL_ORDER;
     // The walls all face into the room, so they are one-sided: from inside nothing changes, and from outside (the room editor's
     // views) the near walls drop away and the room can be seen into, like Damon's own walls, floor and ceiling.
-    for (const m of [this.wall, left]) (m.material as MeshBasicMaterial).side = FrontSide;
+    for (const m of [this.wall, left, back]) (m.material as MeshBasicMaterial).side = FrontSide;
 
     // The night in the left window, in five layers that slide against each other as the head moves, so the outside has depth: sky,
     // hills, village, near ground, then the curtains (which belong to the window and do not slide). They sit in front of the paper,
@@ -464,6 +471,7 @@ export class RoomDressingView implements EditableSource {
       this.wall,
       left,
       right,
+      back,
       ...nightMeshes,
       ...rainLayers,
       sill,
@@ -481,6 +489,7 @@ export class RoomDressingView implements EditableSource {
       this.wall,
       left,
       right,
+      back,
       ...nightMeshes,
       ...rainLayers,
       sill,
@@ -516,9 +525,13 @@ export class RoomDressingView implements EditableSource {
     this.wonders.frustumCulled = false; // its glows are spread over the whole room
     this.wonders.matrixAutoUpdate = false;
     this.group.add(this.wonders);
-    this.lit.push(this.wall, left, right, sill, bookcase, caseBox, rug, ...this.things, ...bed);
+    this.lit.push(this.wall, left, right, back, sill, bookcase, caseBox, rug, ...this.things, ...bed);
     // The walls are plaster: the candle catches its lumps (one tile about every PLASTER_TILE_M).
     this.bumps.set(this.wall.material as MeshBasicMaterial, {
+      map: this.plaster,
+      repeat: [4 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
+    });
+    this.bumps.set(back.material as MeshBasicMaterial, {
       map: this.plaster,
       repeat: [4 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
     });

@@ -77,9 +77,9 @@ describe('room art painters', () => {
 });
 
 describe('RoomDressingView', () => {
-  it('has the wall, two side walls, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
+  it('has the wall, two side walls, the back wall, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(23); // (no bunting since 13 Nov);
+    expect(v.group.children).toHaveLength(24); // (no bunting since 13 Nov; the back wall since 13 Nov)
     v.dispose();
   });
 
@@ -87,7 +87,7 @@ describe('RoomDressingView', () => {
     const v = new RoomDressingView();
     v.group.updateMatrixWorld(true);
     const walls = v.group.children.filter((o): o is Mesh => o instanceof Mesh && o.renderOrder === v.wall.renderOrder);
-    expect(walls).toHaveLength(3); // the wall behind the stage and the two side walls
+    expect(walls).toHaveLength(4); // the wall behind the stage, the two side walls and the back wall
     const normal = new Vector3();
     const inward = new Vector3();
     for (const w of walls) {
