@@ -46,11 +46,22 @@ const FADE_OUT_FROM_S = 19.6;
 const wispOut = (i: number) => WISP_OUT_FROM_S + WISP_OUT_EVERY_S * (4 - i);
 
 const parts: PuppetPart[] = [
-  // The scenery, fading up first. The castle stands behind its hill, so the hill is drawn over its foot.
+  // The scenery, fading up first. The castle stands behind its hill, so the hill is drawn over its foot. Each stands further
+  // back than the traveller, so it casts a paler, softer shadow: the castle furthest, then the tree, then the near hill.
   { id: 'scenery', art: '', w: 1, h: 1, opacity: 0 },
-  { id: 'castle', art: 'castle', parent: 'scenery', w: 0.38, h: 0.4, pivot: [0.5, 0], x: CASTLE_X, y: CASTLE_Y },
-  { id: 'tree', art: 'tree', parent: 'scenery', w: 0.18, h: 0.26, pivot: [0.5, 0], x: 0.82, y: -0.13 },
-  { id: 'hills', art: 'hills', parent: 'scenery', w: 2.2, h: 0.12, pivot: [0.5, 0], x: 0, y: -0.192 },
+  {
+    id: 'castle',
+    art: 'castle',
+    parent: 'scenery',
+    w: 0.38,
+    h: 0.4,
+    pivot: [0.5, 0],
+    x: CASTLE_X,
+    y: CASTLE_Y,
+    depth: 0.85,
+  },
+  { id: 'tree', art: 'tree', parent: 'scenery', w: 0.18, h: 0.26, pivot: [0.5, 0], x: 0.82, y: -0.13, depth: 0.5 },
+  { id: 'hills', art: 'hills', parent: 'scenery', w: 2.2, h: 0.12, pivot: [0.5, 0], x: 0, y: -0.192, depth: 0.3 },
   // The five lights over the castle.
   ...WISP_COLOURS.map((tint, i): PuppetPart => ({
     id: `wisp-${i}`,

@@ -1,7 +1,8 @@
 // Draws a puppet scene's parts on the stage, posed by a ScenePlayer: each part is a quad with its cut-out (puppet-art.ts, or an
 // image) lying on the wall. Shadow parts darken the lit wall the way the hands' shadows do, but where two parts overlap (a leg
 // over the cloak) they never darken twice: they blend by taking the darker of the wall and the shadow (a min blend), as one
-// shadow would. Glow parts add their light. Built when a scene loads; a frame only sets matrices and one opacity each.
+// shadow would. A part's depth (PuppetPart.depth) makes its shadow paler and softer, so the scenery stands back from the near
+// puppets. Glow parts add their light. Built when a scene loads; a frame only sets matrices and one opacity each.
 import {
   AdditiveBlending,
   CanvasTexture,
@@ -18,7 +19,7 @@ import {
   SRGBColorSpace,
   type Material,
 } from '@iwsdk/core';
-import { POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
+import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
 import type { ScenePlayer } from '../stage/puppet/scene-player';
 import { isImageArt, PUPPET_ART } from './puppet-art';
 import { RenderOrder } from './pure/render-order';
@@ -59,6 +60,8 @@ interface Piece {
   readonly py: number;
   readonly mirror: number;
   readonly glow: boolean;
+  /** Its opacity is multiplied by this: 1 against the wall, less the further back it stands. */
+  readonly strength: number;
   readonly material: ShaderMaterial | MeshBasicMaterial;
   readonly texture: CanvasTexture;
 }
@@ -80,19 +83,25 @@ export class PuppetView {
     if (this.scene === scene) return;
     this.unload();
     this.scene = scene;
+    const depths = partDepths(scene);
     scene.parts.forEach((part, i) => {
       if (!part.art) return;
+      const glow = part.look === 'glow';
+      const depth = glow ? 0 : depths[i];
       const canvas = document.createElement('canvas');
       canvas.width = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.w * PX_PER_M * this.scale)));
       canvas.height = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.h * PX_PER_M * this.scale)));
       const texture = new CanvasTexture(canvas);
       texture.colorSpace = SRGBColorSpace;
       const g = canvas.getContext('2d');
+      // A far part's shadow is soft: its cut-out is blurred once, here, by its depth's blur in this canvas's pixels.
+      const blurPx = (depthBlur(depth) * canvas.width) / part.w;
       if (isImageArt(part.art)) {
         const img = new Image();
         img.onload = () => {
-          g?.clearRect(0, 0, canvas.width, canvas.height);
-          g?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          if (!g) return;
+          g.clearRect(0, 0, canvas.width, canvas.height);
+          drawSoft(g, img, canvas.width, canvas.height, blurPx);
           texture.needsUpdate = true;
         };
         img.onerror = () => console.warn(`puppet ${part.id}: could not load ${part.art}`);
@@ -100,9 +109,16 @@ export class PuppetView {
       } else {
         const paint = PUPPET_ART[part.art];
         if (!paint) console.warn(`puppet ${part.id}: no art called ${part.art}`);
-        else if (g) paint(g, canvas.width, canvas.height);
+        else if (g && blurPx < 0.5) paint(g, canvas.width, canvas.height);
+        else if (g) {
+          const sharp = document.createElement('canvas');
+          sharp.width = canvas.width;
+          sharp.height = canvas.height;
+          const sg = sharp.getContext('2d');
+          if (sg) paint(sg, sharp.width, sharp.height);
+          drawSoft(g, sharp, canvas.width, canvas.height, blurPx);
+        }
       }
-      const glow = part.look === 'glow';
       let material: ShaderMaterial | MeshBasicMaterial;
       if (glow) {
         const tint = part.tint ?? [1, 1, 1];
@@ -149,6 +165,7 @@ export class PuppetView {
         py: pivot[1],
         mirror: part.mirror ? -1 : 1,
         glow,
+        strength: depthStrength(depth),
         material,
         texture,
       });
@@ -170,7 +187,7 @@ export class PuppetView {
     for (let k = 0; k < this.pieces.length; k++) {
       const p = this.pieces[k];
       const b = p.part * POSE_STRIDE;
-      const opacity = world[b + 4] * light;
+      const opacity = world[b + 4] * light * p.strength;
       p.mesh.visible = opacity > 0.003;
       if (!p.mesh.visible) continue;
       if (p.glow) (p.material as MeshBasicMaterial).opacity = opacity;
@@ -217,4 +234,11 @@ export class PuppetView {
     this.pieces = [];
     this.scene = null;
   }
+}
+
+/** Draws `src` over the whole of `g`'s canvas, blurred by `blurPx` (none below half a pixel). */
+function drawSoft(g: CanvasRenderingContext2D, src: CanvasImageSource, w: number, h: number, blurPx: number): void {
+  if (blurPx >= 0.5) g.filter = `blur(${blurPx.toFixed(1)}px)`;
+  g.drawImage(src, 0, 0, w, h);
+  g.filter = 'none';
 }

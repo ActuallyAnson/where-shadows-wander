@@ -41,6 +41,39 @@ export interface PuppetPart {
   readonly opacity?: number;
   /** Drawn mirrored left to right (it faces the other way). */
   readonly mirror?: boolean;
+  /**
+   * How far back it stands, 0..1: 0 is held against the wall (the darkest, sharpest shadow, like the player's hands), 1 the far
+   * scenery (a pale, soft shadow, as a cut-out held near the candle casts). Default its parent's, or 0. Glows ignore it.
+   */
+  readonly depth?: number;
+}
+
+/** A shadow at depth 1 keeps this much of its darkness; between, it fades linearly. */
+export const FAR_SHADOW_STRENGTH = 0.38;
+/** A shadow at depth 1 is blurred by this much, in stage metres (scaled linearly between). */
+export const FAR_SHADOW_BLUR = 0.009;
+
+/** How dark a shadow at `depth` is, as a factor on its opacity. */
+export function depthStrength(depth: number): number {
+  const d = Math.min(1, Math.max(0, depth));
+  return 1 - (1 - FAR_SHADOW_STRENGTH) * d;
+}
+
+/** How soft a shadow at `depth` is: its blur radius in stage metres. */
+export function depthBlur(depth: number): number {
+  return FAR_SHADOW_BLUR * Math.min(1, Math.max(0, depth));
+}
+
+/** Each part's depth, its parent's when it sets none (parts are listed parents first). Run on load. */
+export function partDepths(scene: PuppetScene): Float32Array {
+  const out = new Float32Array(scene.parts.length);
+  const index = new Map<string, number>();
+  scene.parts.forEach((p, i) => {
+    const parent = p.parent === undefined ? undefined : index.get(p.parent);
+    out[i] = p.depth ?? (parent === undefined ? 0 : out[parent]);
+    index.set(p.id, i);
+  });
+  return out;
 }
 
 export interface Track {
@@ -94,6 +127,7 @@ export function validateScene(scene: PuppetScene): string[] {
     if (p.parent !== undefined && !seen.has(p.parent))
       problems.push(`${p.id} hangs from ${p.parent}, which is not listed before it`);
     if (!(p.w > 0 && p.h > 0)) problems.push(`${p.id} has no size`);
+    if (p.depth !== undefined && !(p.depth >= 0 && p.depth <= 1)) problems.push(`${p.id}'s depth must be 0..1`);
     seen.add(p.id);
   }
   for (const tr of scene.tracks) {

@@ -68,8 +68,12 @@ const fadeOut = (from: number): Key[] => [
   [HOW_THEY_MET_LENGTH_S - 0.4, 0, 'smooth'],
 ];
 
+/** How far back each layer stands (PuppetPart.depth): the fort behind, the kids and torch inside it, the rabbits nearest. */
+const FORT_DEPTH = 0.6;
+const KIDS_DEPTH = 0.2;
+
 const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[] => [
-  { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE },
+  { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE, depth: KIDS_DEPTH },
   { id: `${id}-body`, art: 'kid', parent: id, w: 0.13, h: 0.15, pivot: [0.5, 0], mirror: facing < 0 },
   {
     id: `${id}-head`,
@@ -99,7 +103,16 @@ const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[
 const parts: PuppetPart[] = [
   // The fort, the torch and the two kids, fading up together.
   { id: 'scenery', art: '', w: 1, h: 1, opacity: 0 },
-  { id: 'fort', art: 'fort', parent: 'scenery', w: 1.12, h: 0.62, pivot: [0.5, 0], y: FLOOR_Y - 0.01 },
+  {
+    id: 'fort',
+    art: 'fort',
+    parent: 'scenery',
+    w: 1.12,
+    h: 0.62,
+    pivot: [0.5, 0],
+    y: FLOOR_Y - 0.01,
+    depth: FORT_DEPTH,
+  },
   {
     id: 'torch-light',
     art: 'orb',
@@ -111,7 +124,17 @@ const parts: PuppetPart[] = [
     y: FLOOR_Y + 0.05,
     opacity: 0.55,
   },
-  { id: 'torch', art: 'torch', parent: 'scenery', w: 0.06, h: 0.025, pivot: [0.5, 0], y: FLOOR_Y, angle: 0.15 },
+  {
+    id: 'torch',
+    art: 'torch',
+    parent: 'scenery',
+    w: 0.06,
+    h: 0.025,
+    pivot: [0.5, 0],
+    y: FLOOR_Y,
+    angle: 0.15,
+    depth: KIDS_DEPTH,
+  },
   ...kid('friend', FRIEND_X, 1, true),
   ...kid('boy', BOY_X, -1, false),
   // The boy's first try: a lump on his hand, which comes right as his rabbit.
