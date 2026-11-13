@@ -64,6 +64,8 @@ export interface LabStory {
   advance(): string;
   /** Skips the memory playing to its last picture. Says what it did. */
   skip(): string;
+  /** The shape the friend's hand is waiting for now, or null. */
+  waitingFor(): PresetName | null;
   /** Where the story is now, for the panel. */
   status(): string;
 }
@@ -362,7 +364,8 @@ export class HandLab {
       } else if (act === 'tab') this.setTab(TABS.find((t) => t === arg) ?? 'lab');
       else if (act === 'story' || act === 'story-play') {
         if (this.view.story && arg) this.storyMessage = this.view.story.jump(arg, act === 'story-play');
-      } else if (act === 'story-advance') this.storyMessage = this.view.story?.advance() ?? '';
+      } else if (act === 'story-make') void this.makeStoryShape();
+      else if (act === 'story-advance') this.storyMessage = this.view.story?.advance() ?? '';
       else if (act === 'story-skip') this.storyMessage = this.view.story?.skip() ?? '';
       else if (act === 'step') void this.runStep(arg ?? '');
       else if (act === 'glove') this.view.gloves?.choose(arg ?? '');
@@ -436,12 +439,38 @@ export class HandLab {
       `<div class="checkpoint"><span>${c.label}${c.shape ? ` <em>${c.shape}</em>` : ''}</span><button type="button" data-act="story" data-arg="${c.id}" title="${c.shape ? `Jump here: the friend's hand waits for the ${c.shape}` : 'Jump here'}">${c.shape ? 'Wait' : 'Go'}</button>${c.shape ? `<button type="button" data-act="story-play" data-arg="${c.id}" title="Jump here and copy the ${c.shape} at once: the memory plays">Play</button>` : ''}</div>`;
     el.innerHTML = `<h2>Story <span>checkpoints</span></h2>
       <p class="keys">Jumps to a scene, its picture on the wall and its light already set; the candle is lit first if it was not.
-      Wait shows the friend's hand; Play copies its shape at once. Press BEGIN first.</p>
+      Wait shows the friend's hand; Play copies its shape at once. Press BEGIN first. While the hand waits, Make shape forms it
+      with the Lab's synthetic hand (switching to it from the device's), so the real gesture recognition moves the story on;
+      Copy shape skips the recognition.</p>
       ${story.checkpoints.map(row).join('')}
-      <div class="row"><button type="button" data-act="story-advance" data-arg="" title="Copy the shape the friend's hand shows (at the end: cover the flame)">Copy shape</button
+      <div class="row"><button type="button" data-act="story-make" data-arg="" title="Form the shape the friend's hand shows with the synthetic hand, recognised as a player's would be">Make shape</button
+      ><button type="button" data-act="story-advance" data-arg="" title="Copy the shape the friend's hand shows (at the end: cover the flame)">Copy shape</button
       ><button type="button" data-act="story-skip" data-arg="" title="Skip the memory playing to its last picture">Skip memory</button></div>
       <p class="msg" id="lab-story-message"></p>
       <p class="keys" id="lab-story-status"></p>`;
+    this.renderStoryStatus();
+  }
+
+  /**
+   * The Story tab's Make shape: the synthetic hand (switched to from any other source) forms the shape the friend's hand waits
+   * for, through the classifier like a player's hand. It relaxes first, so a shape already held commits again.
+   */
+  private async makeStoryShape(): Promise<void> {
+    const shape = this.view.story?.waitingFor() ?? null;
+    if (!shape) {
+      this.storyMessage = 'Nothing is waiting for a shape.';
+      return this.renderStoryStatus();
+    }
+    if (!this.synthetic) await this.switchSource('synthetic');
+    const s = this.synthetic;
+    if (!s) {
+      this.storyMessage = "Couldn't start the synthetic hands.";
+      return this.renderStoryStatus();
+    }
+    s.setShape(this.selected, 'relaxed');
+    await new Promise((r) => setTimeout(r, 400));
+    s.setShape(this.selected, shape);
+    this.storyMessage = `The synthetic ${this.selected} hand makes the ${shape}; it moves the story on once it is recognised.`;
     this.renderStoryStatus();
   }
 

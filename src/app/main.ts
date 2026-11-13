@@ -711,6 +711,10 @@ async function start(): Promise<void> {
       }
       return 'Nothing is waiting for a shape.';
     },
+    waitingFor: () => {
+      const b = story.beat;
+      return b?.kind === 'friend' && story.waitingForShape ? b.shape : null;
+    },
     skip: () => {
       if (!story.memory?.playing) return 'No memory is playing.';
       story.skipMemory();
