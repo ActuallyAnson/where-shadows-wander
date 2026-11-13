@@ -7,8 +7,8 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
   {
     id: 'how-they-met',
     beats: [
-      // The friend's hand makes a rabbit on the left of the wall, ears leaning back, and waits for the player to copy it.
-      { kind: 'friend', shape: 'rabbit', x: -0.28, y: 0.04, tilt: 0.35 },
+      // The friend's hand makes a rabbit on the left of the wall and waits for the player to copy it.
+      { kind: 'friend', shape: 'rabbit', x: -0.28, y: 0.04 },
       // The player's rabbit becomes the puppet rabbit, and the memory plays.
       { kind: 'memory', scene: HOW_THEY_MET_SCENE, from: 'rabbit' },
     ],

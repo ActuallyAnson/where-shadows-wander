@@ -13,8 +13,6 @@ export interface FriendBeat {
   readonly shape: Shape;
   readonly x: number;
   readonly y: number;
-  /** Leans the fingers off straight up, radians (counter-clockwise as seen). */
-  readonly tilt?: number;
 }
 
 /** A memory plays: `scene` from its start to its end. */
@@ -70,7 +68,6 @@ export class StoryDirector {
   friendT = 0;
   friendX = 0;
   friendY = 0;
-  friendTilt = 0;
   /** The memory playing, or null. */
   memory: ScenePlayer | null = null;
   private readonly players = new Map<PuppetScene, ScenePlayer>();
@@ -210,7 +207,6 @@ export class StoryDirector {
       this.friendShape = b.shape;
       this.friendX = b.x;
       this.friendY = b.y;
-      this.friendTilt = b.tilt ?? 0;
       this.friendT = 0;
       this.friendLevel = 0;
       this.friendWait = FRIEND_DELAY_S;

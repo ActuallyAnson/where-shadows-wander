@@ -23,7 +23,7 @@ Each memory (scenes 2 to 6) starts the same way:
 
 This is the tutorial, the help for a stuck player, and the friend's presence in one. Making a shape the friend shows you is how the boy remembers.
 
-**How it is built:** the story director (`src/engine/stage/story/story-director.ts`) plays each scene as a list of beats in `story-script.ts`: a `friend` beat shows the friend's hand and waits for the player's commit of its shape; a `memory` beat plays a puppet scene (keyframed tracks, `src/engine/stage/puppet/`) and can start one of its puppets where the player's shadow was. The friend's hand is a synthetic posed hand (`friend-hand.ts`) cast from the candle by a shadow renderer of its own, at half the darkness and with softer edges; it forms the shape, holds it, and every few seconds eases half out of it and back. A recorded hand (`hand-recording.ts`) could replace the pose later if it should feel more alive. In dev, `__wsw.playStory()` starts the story and `__wsw.commitShape('rabbit')` copies the shape without a hand; `node scripts/story-probe.mjs` takes screenshots.
+**How it is built:** the story director (`src/engine/stage/story/story-director.ts`) plays each scene as a list of beats in `story-script.ts`: a `friend` beat shows the friend's hand and waits for the player's commit of its shape; a `memory` beat plays a puppet scene (keyframed tracks, `src/engine/stage/puppet/`) and can start one of its puppets where the player's shadow was. The friend's hand is a painted shadow of a hand making the shape, drawn the way the old shadow-puppet plates draw one (`friend-puppet.ts`, its art in `puppet-art.ts`), as a small puppet with the moving fingers (a rabbit's ears) as parts of their own; it forms the shape, holds it, and every few seconds eases half out of it and back. (A posed hand cast like the player's was tried first: a shadow made of a hand's bones reads as a hand, not as a rabbit.) Each shape needs its own painted hand; a shape without one shows nothing yet. In dev, `__wsw.playStory()` starts the story and `__wsw.commitShape('rabbit')` copies the shape without a hand; `node scripts/story-probe.mjs` takes screenshots.
 
 ## The scenes
 
@@ -57,7 +57,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Puppets:** the boy, the friend, the blanket fort, a rabbit.
 - **Note:** the rabbit is slow to commit and the classifier is weakest on it, so accept it generously here. It is the first shape, and it must not frustrate.
 - **Built (first pass, 13 Nov):** the friend's rabbit on the left of the wall, waiting; the player's rabbit becoming a puppet rabbit that hops to the friend's raised hand; the fort, the torch and the two kids fading up around it; the boy's lumpy try, the friend leaning over to help, the boy's rabbit coming right, the rabbits nodding to each other, and both laughing; then it fades (about 23 s). Its timing and places are in `src/engine/stage/story/how-they-met.ts`, the cut-outs in `src/engine/shadow/puppet-art.ts`.
-- **To try:** whether the friend's hand reads as a rabbit in a headset (it is turned 45° side-on so the pinched thumb shows as a snout; seen square it was a peace sign); the sizes on the wall in a headset; laughter in the sound, which the memory has only notes for so far.
+- **To try:** whether the friend's painted rabbit hand reads in a headset, and whether players copy it with one hand; the sizes on the wall in a headset; laughter in the sound, which the memory has only notes for so far.
 
 ### 3. The park
 
@@ -132,3 +132,4 @@ So that every step leaves a game we could submit:
 - 13 Nov 2026: the friend stays 2 s longer at his clearest before the thunder (held 2.3 s); the thunder and the blinks move 2 s later.
 - 13 Nov 2026: the story graph, the friend's hand and scene 2 are built (first pass); the old prologue no longer plays after the candle is lit.
 - 13 Nov 2026: the friend's rabbit hand is turned 45° side-on with its ears spread, and held nearer the candle (shadow about twice the hand, crisper); square to the wall it read as a peace sign.
+- 13 Nov 2026: the friend's hand is now a painted hand-shadow puppet, drawn like the old shadow-puppet plates (a hand side on: forearm, the back of the hand as the head, the thumb meeting the curled fingers as the muzzle with the eye between, two fingers as ears that rise as it forms). The posed hand, even turned side on, cast a shadow of bones that read as a hand.

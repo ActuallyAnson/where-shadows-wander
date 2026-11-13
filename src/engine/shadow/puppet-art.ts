@@ -331,6 +331,68 @@ function lump(g: CanvasRenderingContext2D, w: number, h: number): void {
   e(0.86, 0.68, 0.13, 0.06, -0.3);
 }
 
+// The friend's hands (docs/STORY.md, "How a memory starts"): the shadow a child's hand casts making each shape, painted the way
+// the old shadow-puppet plates draw them, so it reads at once. The fingers that move (a rabbit's ears) are parts of their own.
+
+/** Strokes a finger: a round-ended band through the points (fractions of w, h), `width` a fraction of w. */
+function finger(g: CanvasRenderingContext2D, w: number, h: number, pts: readonly number[], width: number): void {
+  g.save();
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.lineWidth = width * w;
+  g.strokeStyle = g.fillStyle;
+  g.beginPath();
+  g.moveTo(pts[0] * w, pts[1] * h);
+  for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i] * w, pts[i + 1] * h);
+  g.stroke();
+  g.restore();
+}
+
+function friendRabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A hand side on, facing right, the forearm rising into it from the lower left: the back of the hand is the back of the
+  // rabbit's head, the ring and little fingers curled under it are its cheek and jaw, and the thumb laid along them to their
+  // tips is the top of its muzzle; the gap the thumb leaves above the curled fingers is its eye. (The ears, the index and
+  // middle fingers, are parts of their own: 'friend-ear'.)
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
+  // The forearm, a child's: wrist narrower than the arm below it.
+  g.beginPath();
+  g.moveTo(0.02 * w, h);
+  g.quadraticCurveTo(0.14 * w, 0.78 * h, 0.22 * w, 0.52 * h);
+  g.lineTo(0.47 * w, 0.6 * h);
+  g.quadraticCurveTo(0.36 * w, 0.8 * h, 0.34 * w, h);
+  g.closePath();
+  g.fill();
+  // The back of the hand: the head, round.
+  e(0.42, 0.42, 0.22, 0.19, -0.2);
+  // The knuckles along its top, under the ears.
+  e(0.46, 0.27, 0.1, 0.07, -0.3);
+  // The curled ring and little fingers: two knuckled bands from the palm forward, the cheek and jaw.
+  finger(g, w, h, [0.44, 0.5, 0.58, 0.53, 0.68, 0.5, 0.72, 0.45], 0.11);
+  finger(g, w, h, [0.42, 0.57, 0.54, 0.61, 0.63, 0.59, 0.66, 0.54], 0.1);
+  // The thumb, from its root at the back of the head along the top of the muzzle to meet the fingertips: the nose.
+  finger(g, w, h, [0.34, 0.36, 0.52, 0.31, 0.68, 0.35, 0.76, 0.41], 0.095);
+  e(0.76, 0.44, 0.055, 0.05);
+  cut(g, () => {
+    // The eye: the gap the thumb leaves above the curled fingers, round.
+    e(0.58, 0.41, 0.036, 0.033);
+  });
+}
+
+function friendEar(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A finger standing up from its knuckle (the bottom) as a rabbit's ear: a little wider in the middle, a round tip.
+  g.beginPath();
+  g.moveTo(0.18 * w, h);
+  g.quadraticCurveTo(0.02 * w, 0.5 * h, 0.14 * w, 0.12 * h);
+  g.quadraticCurveTo(0.5 * w, -0.06 * h, 0.86 * w, 0.12 * h);
+  g.quadraticCurveTo(0.98 * w, 0.5 * h, 0.82 * w, h);
+  g.closePath();
+  g.fill();
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -348,6 +410,8 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   fort,
   torch,
   lump,
+  'friend-rabbit': friendRabbit,
+  'friend-ear': friendEar,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

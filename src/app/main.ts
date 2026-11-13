@@ -51,10 +51,11 @@ import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { PuppetView } from '../engine/shadow/puppet-view';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
-import type { Cue } from '../engine/stage/puppet/puppet-scene';
+import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
+import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
-import { FriendHand } from '../engine/stage/story/friend-hand';
+import { FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
@@ -306,12 +307,11 @@ async function start(): Promise<void> {
     else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
-  // The friend's hand: a posed hand (friend-hand.ts) cast from the candle by a projector and renderer of its own, so it is never
-  // read as the player's: fainter, and softer at the edges.
-  const FRIEND_SHADOW_OPACITY = 0.5;
-  const friendHand = new FriendHand('left');
-  const friendProjector = new ShadowProjector({ ...REAL_WALL_SHADOW_SETTINGS, blurPerM: 0.02, maxBlurM: 0.012 });
-  const friendShadow = new ShadowRenderer(FRIEND_SHADOW_OPACITY);
+  // The friend's hand: a painted shadow of a hand making the shape (friend-puppet.ts), drawn as a puppet of its own and played
+  // by time. As dark as the memories' puppets: a puppet darkens the wall down to 1 - opacity (a min blend), so a fainter one
+  // vanishes on the dim wall.
+  const friendView = new PuppetView();
+  const friendPlayers = new Map<PuppetScene, ScenePlayer>();
   const startStory = (scene = 0) => {
     storyWait = -1;
     storyStarted = true;
@@ -325,8 +325,7 @@ async function start(): Promise<void> {
     storyTitle.clear();
     storyLine.clear();
     puppets.hide();
-    friendHand.clear();
-    friendShadow.mesh.visible = false;
+    friendView.hide();
   };
   const skipTips = new Float32Array(6);
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
@@ -349,7 +348,7 @@ async function start(): Promise<void> {
     wallPauseView.group,
     bedroomView.group,
     shadowRenderer.mesh,
-    friendShadow.mesh,
+    friendView.group,
     puppets.group,
     storyTitle.group,
     storyLine.group,
@@ -1291,21 +1290,20 @@ async function start(): Promise<void> {
             }
           story.update(storyStep);
           // The friend's hand, while it shows its shape and while it fades.
-          if (story.friendShape !== null && story.friendOpacity > 0.001) {
-            friendHand.update(
-              story.friendShape,
-              story.friendT,
+          const friendScene = story.friendShape !== null ? FRIEND_PUPPETS[story.friendShape] : undefined;
+          if (friendScene && story.friendOpacity > 0.001) {
+            let fp = friendPlayers.get(friendScene);
+            if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
+            fp.offset[0] = story.friendX;
+            fp.offset[1] = story.friendY;
+            fp.seek(friendSceneTime(story.friendT));
+            friendView.load(friendScene);
+            friendView.update(
+              fp,
               stage,
-              candleView.flamePosition,
-              story.friendX,
-              story.friendY,
-              story.friendTilt,
+              shadowsVisible ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion : 0,
             );
-            friendProjector.update(friendHand.hands, stage, candleView.flamePosition);
-            friendShadow.baseOpacity = FRIEND_SHADOW_OPACITY * story.friendOpacity;
-            friendShadow.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
-            friendShadow.update(friendProjector.shadows, stage, null, shadowsVisible ? candleView.occlusion : 0);
-          } else friendShadow.mesh.visible = false;
+          } else friendView.hide();
           const memory = story.memory;
           if (memory) {
             puppets.load(memory.scene);
@@ -1519,7 +1517,7 @@ async function start(): Promise<void> {
         },
         story,
         puppets,
-        friendHand,
+        friendView,
         /** Plays the story from scene `scene` of story-script.ts (0, scene 2, by default; the candle must be lit to see it). */
         playStory: (scene = 0) => startStory(scene),
         /** As if the player's hand had committed `shape` (e.g. 'rabbit') with its shadow at x, y on the wall. */
