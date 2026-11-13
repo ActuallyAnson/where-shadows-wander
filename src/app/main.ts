@@ -90,7 +90,7 @@ import { clearFor } from '../engine/xr/session-mode';
 import { SessionVisibility } from '../engine/xr/session-visibility';
 import { XRHandReader } from '../engine/xr/xr-hands';
 import { DeskFrame } from '../input-mock/desk-frame';
-import { HandLab, type LabSteps } from '../input-mock/hand-lab';
+import { HandLab, type LabSteps, type LabStory } from '../input-mock/hand-lab';
 import { MockMode } from '../input-mock/mock-mode';
 import { SyntheticSource } from '../input-mock/synthetic-source';
 import { createSettingsPage } from '../ui/settings-panel/settings-page';
@@ -680,6 +680,61 @@ async function start(): Promise<void> {
           status: () => stepStatus || candleStep.status,
         }
       : undefined;
+  // The Story tab: a checkpoint for the waking and for each scene of story-script.ts.
+  const labStory: LabStory = {
+    checkpoints: [
+      { id: 'wake', label: '1 · Waking', shape: null },
+      ...STORY_SCRIPT.map((sc, i) => {
+        const first = sc.beats[0];
+        return { id: String(i), label: sc.title ?? sc.id, shape: first?.kind === 'friend' ? first.shape : null };
+      }),
+    ],
+    jump: (id, play) => {
+      if (!world.renderer.xr.isPresenting) return 'Press BEGIN first.';
+      if (id === 'wake') {
+        if (sessionState !== 'title_vr') return 'The candle is lit: reload to see the waking and light it again.';
+        wake.finish();
+        startWake();
+        return 'Waking again.';
+      }
+      return jumpToScene(Number(id), play);
+    },
+    advance: () => {
+      const b = story.beat;
+      if (story.waitingForSleep) {
+        if (story.sleep()) fallAsleep();
+        return 'Covered the flame: asleep.';
+      }
+      if (b?.kind === 'friend' && story.waitingForShape) {
+        story.commit(b.shape, b.x + 0.12, b.y - 0.04);
+        return `Copied the ${b.shape}.`;
+      }
+      return 'Nothing is waiting for a shape.';
+    },
+    skip: () => {
+      if (!story.memory?.playing) return 'No memory is playing.';
+      story.skipMemory();
+      return 'Skipped to the end of the memory.';
+    },
+    status: () => {
+      if (sessionState === 'asleep') return 'Asleep: the end.';
+      if (sessionState === 'title_vr') return 'Not started: the candle is not lit.';
+      if (!story.playing) return storyWait >= 0 ? 'The story starts in a moment.' : 'The story is not playing.';
+      const sc = story.scenes[story.sceneIndex];
+      const b = story.beat;
+      const doing =
+        b?.kind === 'friend'
+          ? story.waitingForShape
+            ? `waiting for the ${b.shape}`
+            : 'the hand fading'
+          : b?.kind === 'memory'
+            ? `memory ${(story.memory?.time ?? 0).toFixed(1)} s`
+            : b?.kind === 'sleep'
+              ? 'waiting for the flame to be covered'
+              : 'a pause';
+      return `${sc.title ?? sc.id}: ${doing}${sessionState === 'paused' ? ' (paused)' : ''}`;
+    },
+  };
   const openLab = (): HandLab => {
     if (lab) return lab;
     mock = new MockMode(new SyntheticSource());
@@ -699,6 +754,7 @@ async function start(): Promise<void> {
       onSourceKind: (kind) => updateLaunch({ hands: kind }, DEBUG_TOOLS),
       hide: () => showLab(false),
       steps: labSteps,
+      story: labStory,
       gloves: {
         options: GLOVES,
         current: () => gloveId,

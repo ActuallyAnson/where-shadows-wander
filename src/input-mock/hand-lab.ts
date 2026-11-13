@@ -43,6 +43,29 @@ export interface LabView {
   steps?: LabSteps;
   /** The gloves the hands can be drawn with (the Glove row): which there are, which is drawn, and picking one. */
   gloves?: LabGloves;
+  /** The Story tab's checkpoints: jumps to any scene of the story (absent where there is no story). */
+  story?: LabStory;
+}
+
+/** A place in the story to jump to (the Story tab): a scene, waiting on its friend's hand. */
+export interface LabCheckpoint {
+  readonly id: string;
+  readonly label: string;
+  /** The shape the friend's hand shows there, or null (no shape: the waking, the sleep). */
+  readonly shape: string | null;
+}
+
+/** The Story tab: checkpoints to jump to, and moving the story on by hand. */
+export interface LabStory {
+  readonly checkpoints: readonly LabCheckpoint[];
+  /** Jumps to checkpoint `id`; with `play`, as if its shape were copied at once, so its memory plays. Says what it did. */
+  jump(id: string, play: boolean): string;
+  /** Copies the shape the friend's hand is waiting for (or covers the flame, at the end). Says what it did. */
+  advance(): string;
+  /** Skips the memory playing to its last picture. Says what it did. */
+  skip(): string;
+  /** Where the story is now, for the panel. */
+  status(): string;
 }
 
 export interface LabGloves {
@@ -61,7 +84,8 @@ export interface LabSteps {
   status(): string;
 }
 
-type LabTab = 'lab' | 'steps';
+type LabTab = 'lab' | 'steps' | 'story';
+const TABS: readonly LabTab[] = ['lab', 'steps', 'story'];
 const TAB_KEY = 'wsw.lab.tab';
 
 export class HandLab {
@@ -84,6 +108,8 @@ export class HandLab {
   /** The device's own hands play (the Device source): the mock source is kept but not used. */
   private device = true;
   private tab: LabTab = readTab();
+  /** What the Story tab's last button did. */
+  private storyMessage = '';
 
   constructor(
     private readonly mode: MockMode,
@@ -271,8 +297,10 @@ export class HandLab {
       <header><h1>Hand Lab</h1><p>Whose hands play the game, in its own session. Press BEGIN, and move the head with the
         emulator's controls.</p><button type="button" data-act="hide-panel" data-arg="">Hide panel</button></header>
       <nav class="tabs" role="tablist"><button type="button" role="tab" data-act="tab" data-arg="lab">Lab</button
-      ><button type="button" role="tab" data-act="tab" data-arg="steps">Steps</button></nav>
+      ><button type="button" role="tab" data-act="tab" data-arg="steps">Steps</button
+      ><button type="button" role="tab" data-act="tab" data-arg="story">Story</button></nav>
       <section class="tab-steps" id="lab-steps"></section>
+      <section class="tab-story" id="lab-story"></section>
       <section class="tab-lab" id="lab-controls"></section>
       <details class="guide tab-lab" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
@@ -331,7 +359,11 @@ export class HandLab {
       } else if (act === 'guided') {
         if (this.guided) this.finishGuided();
         else this.startGuided();
-      } else if (act === 'tab') this.setTab(arg === 'steps' ? 'steps' : 'lab');
+      } else if (act === 'tab') this.setTab(TABS.find((t) => t === arg) ?? 'lab');
+      else if (act === 'story' || act === 'story-play') {
+        if (this.view.story && arg) this.storyMessage = this.view.story.jump(arg, act === 'story-play');
+      } else if (act === 'story-advance') this.storyMessage = this.view.story?.advance() ?? '';
+      else if (act === 'story-skip') this.storyMessage = this.view.story?.skip() ?? '';
       else if (act === 'step') void this.runStep(arg ?? '');
       else if (act === 'glove') this.view.gloves?.choose(arg ?? '');
       this.renderControls();
@@ -391,6 +423,36 @@ export class HandLab {
     this.renderStepStatus();
   }
 
+  /** The Story tab: every scene as a checkpoint, waiting on its friend's hand or playing its memory at once. */
+  private renderStory(): void {
+    const el = this.root.querySelector('#lab-story');
+    if (!el) return;
+    const story = this.view.story;
+    if (!story) {
+      el.innerHTML = '<h2>Story</h2><p class="msg">No story in this page.</p>';
+      return;
+    }
+    const row = (c: LabCheckpoint) =>
+      `<div class="checkpoint"><span>${c.label}${c.shape ? ` <em>${c.shape}</em>` : ''}</span><button type="button" data-act="story" data-arg="${c.id}" title="${c.shape ? `Jump here: the friend's hand waits for the ${c.shape}` : 'Jump here'}">${c.shape ? 'Wait' : 'Go'}</button>${c.shape ? `<button type="button" data-act="story-play" data-arg="${c.id}" title="Jump here and copy the ${c.shape} at once: the memory plays">Play</button>` : ''}</div>`;
+    el.innerHTML = `<h2>Story <span>checkpoints</span></h2>
+      <p class="keys">Jumps to a scene, its picture on the wall and its light already set; the candle is lit first if it was not.
+      Wait shows the friend's hand; Play copies its shape at once. Press BEGIN first.</p>
+      ${story.checkpoints.map(row).join('')}
+      <div class="row"><button type="button" data-act="story-advance" data-arg="" title="Copy the shape the friend's hand shows (at the end: cover the flame)">Copy shape</button
+      ><button type="button" data-act="story-skip" data-arg="" title="Skip the memory playing to its last picture">Skip memory</button></div>
+      <p class="msg" id="lab-story-message"></p>
+      <p class="keys" id="lab-story-status"></p>`;
+    this.renderStoryStatus();
+  }
+
+  private renderStoryStatus(): void {
+    const msg = this.root.querySelector('#lab-story-message');
+    if (msg && msg.textContent !== this.storyMessage) msg.textContent = this.storyMessage;
+    const el = this.root.querySelector('#lab-story-status');
+    const status = this.view.story?.status() ?? '';
+    if (el && el.textContent !== status) el.textContent = status;
+  }
+
   private renderStepStatus(): void {
     const el = this.root.querySelector('#lab-step-status');
     const status = this.view.steps?.status() ?? '';
@@ -405,6 +467,7 @@ export class HandLab {
       b.setAttribute('aria-selected', String(on));
     }
     this.renderSteps();
+    this.renderStory();
     const s = this.synthetic;
     const kind = this.kind;
     // While a guided recording runs, its clock must keep moving forward: no source changes or pausing. A recording keeps its
@@ -471,6 +534,7 @@ export class HandLab {
 
   private renderLive(): void {
     this.renderStepStatus();
+    this.renderStoryStatus();
     // The default view is from the player's eyes, looking down -Z.
     for (const side of ['right', 'left'] as const) {
       const el = this.root.querySelector(`#lab-hand-${side}`);
@@ -586,7 +650,8 @@ export class HandLab {
 /** The tab last open in this browser (Lab by default). */
 function readTab(): LabTab {
   try {
-    return localStorage.getItem(TAB_KEY) === 'steps' ? 'steps' : 'lab';
+    const saved = localStorage.getItem(TAB_KEY);
+    return TABS.find((t) => t === saved) ?? 'lab';
   } catch {
     return 'lab';
   }
@@ -610,8 +675,11 @@ const CSS = `
 .lab .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
 .lab .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 14px; color: var(--muted); }
 .lab .tabs button.on { background: none; color: var(--ink); border-bottom-color: var(--accent); }
-.lab[data-tab="steps"] .tab-lab, .lab[data-tab="lab"] .tab-steps { display: none; }
-.lab .tab-steps { display: grid; gap: 10px; }
+.lab:not([data-tab="lab"]) .tab-lab, .lab:not([data-tab="steps"]) .tab-steps, .lab:not([data-tab="story"]) .tab-story { display: none; }
+.lab .tab-steps, .lab .tab-story { display: grid; gap: 10px; }
+.lab .tab-story h2 { margin: 0; }
+.lab .checkpoint { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.lab .checkpoint em { font-style: normal; color: var(--muted); margin-left: 4px; }
 .lab .step { display: grid; gap: 4px; justify-items: start; }
 .lab .tab-steps h2 { margin: 0; }
 .lab header p, .lab .foot, .lab .keys { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
