@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { POSE_STRIDE, validateScene, type Cue, type PuppetScene } from '../puppet/puppet-scene';
+import { ScenePlayer } from '../puppet/scene-player';
 import {
   FRIEND_DELAY_S,
   FRIEND_IN_S,
@@ -9,8 +10,8 @@ import {
   validateStory,
   type StoryScene,
 } from './story-director';
-import { HOW_THEY_MET_SCENE } from './how-they-met';
 import { STORY_SCRIPT } from './story-script';
+import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
 const memory: PuppetScene = {
   id: 'memory',
@@ -89,6 +90,91 @@ describe('StoryDirector', () => {
     expect(d.playing).toBe(false);
   });
 
+  it('keeps the last memory on the wall, idling, while the next hand waits', () => {
+    const swaying: PuppetScene = {
+      ...memory,
+      wobbles: [{ part: 'rabbit', prop: 'angle', amp: 0.1, period: 2 }],
+    };
+    const d = new StoryDirector([
+      { id: 'a', beats: [{ kind: 'memory', scene: swaying }] },
+      { id: 'b', beats: [{ kind: 'friend', shape: 'fox', x: 0, y: 0 }] },
+    ]);
+    d.start();
+    run(d, swaying.length + 0.2);
+    expect(d.waitingForShape).toBe(true);
+    const held = d.memory!;
+    expect(held.playing).toBe(false);
+    expect(held.time).toBeCloseTo(swaying.length);
+    const angle = held.world[2];
+    run(d, 0.5);
+    expect(d.memory).toBe(held);
+    expect(held.time).toBeCloseTo(swaying.length);
+    expect(held.world[0]).toBeCloseTo(0.1);
+    expect(held.world[2]).not.toBeCloseTo(angle, 3);
+  });
+
+  it('plays a scene a chapter at a time, going on from where the last chapter stopped', () => {
+    const long: PuppetScene = {
+      id: 'long',
+      length: 4,
+      parts: [{ id: 'rabbit', art: 'rabbit', w: 0.1, h: 0.1 }],
+      tracks: [
+        {
+          part: 'rabbit',
+          prop: 'x',
+          keys: [
+            [0, 0],
+            [4, 0.4],
+          ],
+        },
+      ],
+      cues: [
+        { t: 1, kind: 'note', note: 1 },
+        { t: 3, kind: 'note', note: 3 },
+      ],
+    };
+    const heard: number[] = [];
+    const d = new StoryDirector(
+      [
+        { id: 'a', beats: [{ kind: 'memory', scene: long, end: 2 }] },
+        {
+          id: 'b',
+          beats: [
+            { kind: 'friend', shape: 'fox', x: 0, y: 0 },
+            { kind: 'memory', scene: long, start: 2 },
+          ],
+        },
+      ],
+      (c) => c.kind === 'note' && heard.push(c.note),
+    );
+    d.start();
+    run(d, 2.3);
+    expect(d.waitingForShape).toBe(true);
+    expect(d.memory!.world[0]).toBeCloseTo(0.2);
+    expect(heard).toEqual([1]);
+    d.commit('fox');
+    expect(d.memory!.world[0]).toBeCloseTo(0.2);
+    run(d, 1.5);
+    expect(d.memory!.world[0]).toBeCloseTo(0.35);
+    expect(heard).toEqual([1, 3]);
+  });
+
+  it('raises the friend’s hand into place as it appears', () => {
+    const d = new StoryDirector([{ id: 'a', beats: [{ kind: 'friend', shape: 'fox', x: 0, y: 0.2, rise: 0.1 }] }]);
+    d.start();
+    expect(d.friendDrop).toBeCloseTo(0.1);
+    run(d, FRIEND_DELAY_S + FRIEND_IN_S / 2);
+    expect(d.friendDrop).toBeGreaterThan(0);
+    expect(d.friendDrop).toBeLessThan(0.1);
+    run(d, FRIEND_IN_S);
+    expect(d.friendDrop).toBe(0);
+  });
+
+  it('refuses a memory that plays outside its scene', () => {
+    const bad: StoryScene[] = [{ id: 'x', beats: [{ kind: 'memory', scene: memory, start: 2, end: 5 }] }];
+    expect(validateStory(bad).join()).toMatch(/outside/);
+  });
+
   it('holds still while paused', () => {
     const d = new StoryDirector(story);
     d.start();
@@ -108,13 +194,37 @@ describe('StoryDirector', () => {
 describe('the story script', () => {
   it('is sound, and so is every memory in it', () => {
     expect(validateStory(STORY_SCRIPT)).toEqual([]);
-    expect(validateScene(HOW_THEY_MET_SCENE)).toEqual([]);
+    expect(validateScene(STORY_STAGE)).toEqual([]);
   });
 
   it('scene 2 opens with the friend’s rabbit, and its memory starts from the player’s rabbit', () => {
     const [first, second] = STORY_SCRIPT[0].beats;
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });
     expect(second).toMatchObject({ kind: 'memory', from: 'rabbit' });
+  });
+
+  it('plays the memories as one show: each chapter starts where the one before it ended', () => {
+    const memories = STORY_SCRIPT.flatMap((s) => s.beats).filter((b) => b.kind === 'memory');
+    expect(memories.length).toBeGreaterThan(1);
+    let at = 0;
+    for (const m of memories) {
+      expect(m.scene).toBe(STORY_STAGE);
+      expect(m.start).toBeCloseTo(at);
+      at = m.end!;
+    }
+    expect(at).toBeCloseTo(STORY_STAGE.length);
+  });
+
+  it('never fades the fort out: it slides on from the right and off to the left', () => {
+    const fort = STORY_STAGE.tracks.filter((t) => t.part === 'fort');
+    expect(fort.map((t) => t.prop)).toEqual(['x']);
+    const keys = fort[0].keys;
+    expect(keys[0][1]).toBeGreaterThan(1);
+    expect(keys[keys.length - 1][1]).toBeLessThan(-1);
+    // Still on the wall, in place, while the friend's fox waits.
+    const p = new ScenePlayer(STORY_STAGE);
+    p.seek(STORY_CHAPTER['how-they-met'].end);
+    expect(p.world[p.partIndex('fort') * POSE_STRIDE]).toBeCloseTo(0);
   });
 
   it('gives each part of a memory at most one track per prop', () => {

@@ -26,8 +26,8 @@ const RABBIT_H = 0.26;
 /** Ear angles: folded forward over the head (a loose hand), standing and leaning back, and the droop when showing again. */
 const EAR_FOLDED = -1.5;
 const EAR_DROOP = 0.45;
-function ear(id: string, x: number, y: number, up: number, len: number): PuppetScene['parts'][number] {
-  return { id, art: 'friend-ear', parent: 'hand', w: 0.042, h: len, pivot: [0.5, 0.05], x, y, angle: up };
+function ear(id: string, x: number, y: number, up: number, len: number, w = 0.042): PuppetScene['parts'][number] {
+  return { id, art: 'friend-ear', parent: 'hand', w, h: len, pivot: [0.5, 0.05], x, y, angle: up };
 }
 function earTrack(id: string, up: number): PuppetScene['tracks'][number] {
   const droop = up + (EAR_FOLDED - up) * EAR_DROOP;
@@ -61,5 +61,23 @@ export const FRIEND_RABBIT: PuppetScene = {
   tracks: [earTrack('ear-back', BACK_EAR_UP), earTrack('ear-front', FRONT_EAR_UP)],
 };
 
+/** The fox: the hand (head, the long snout of two fingers and the thumb, forearm) and two short pointed finger ears. */
+const FOX_W = 0.28;
+const FOX_H = 0.24;
+const FOX_BACK_EAR_UP = 0.32;
+const FOX_FRONT_EAR_UP = 0.08;
+
+export const FRIEND_FOX: PuppetScene = {
+  id: 'friend-fox',
+  length: FORM_S + CYCLE_S,
+  parts: [
+    { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+    ear('ear-back', -0.05, 0.05, FOX_BACK_EAR_UP, 0.085, 0.036),
+    { id: 'head', art: 'friend-fox', parent: 'hand', w: FOX_W, h: FOX_H, pivot: [0.5, 0.5], x: 0, y: 0 },
+    ear('ear-front', -0.02, 0.06, FOX_FRONT_EAR_UP, 0.09, 0.036),
+  ],
+  tracks: [earTrack('ear-back', FOX_BACK_EAR_UP), earTrack('ear-front', FOX_FRONT_EAR_UP)],
+};
+
 /** Each shape's friend puppet, as it is built; a shape without one shows no hand yet. */
-export const FRIEND_PUPPETS: Partial<Record<Shape, PuppetScene>> = { rabbit: FRIEND_RABBIT };
+export const FRIEND_PUPPETS: Partial<Record<Shape, PuppetScene>> = { rabbit: FRIEND_RABBIT, fox: FRIEND_FOX };

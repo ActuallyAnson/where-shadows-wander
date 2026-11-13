@@ -32,6 +32,9 @@ export const ROOM_WALL_BEHIND_STAGE_M = 0.02;
  * 1.6 by 1 m stage and drawn 2.375 times that (3.8 by 2.375 m), 95% of the room's 4 by 2.5 m wall each way. The hands' shadows keep the stage.
  */
 export const STORY_SCALE = 2.375;
+/** The room's wall the story plays on, metres (the story's area is centred on it): its edges cut the puppets off. */
+export const ROOM_WALL_WIDTH_M = 4;
+export const ROOM_WALL_HEIGHT_M = 2.5;
 
 export class StageFrame {
   /** The wall's centre, scene space, metres. */

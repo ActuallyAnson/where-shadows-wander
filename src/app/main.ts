@@ -69,7 +69,7 @@ import { AudioEngine, type SessionEvents } from '../engine/services/audio/web-au
 import { attachSaveHooks } from '../engine/services/saves/save-hooks';
 import { SaveManager } from '../engine/services/saves/save-manager';
 import { browserStore, MemoryStore } from '../engine/services/saves/storage';
-import { STORY_SCALE, StageFrame } from '../engine/stage/stage-frame';
+import { ROOM_WALL_HEIGHT_M, ROOM_WALL_WIDTH_M, STORY_SCALE, StageFrame } from '../engine/stage/stage-frame';
 import { lightArea } from '../engine/shadow/stage-edge-glsl';
 import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
@@ -300,6 +300,8 @@ async function start(): Promise<void> {
   // waits, the player copies it, and a memory plays in puppets. Words, if a memory has any, are written in ink by two lines.
   const puppets = new PuppetView();
   puppets.scale = STORY_SCALE;
+  // The wall's edges are the theatre's screen: a place sliding on or off is cut there, not drawn into the room.
+  puppets.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
   const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
   const storySkip = new SkipTouch();
@@ -1305,7 +1307,7 @@ async function start(): Promise<void> {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
             fp.offset[0] = story.friendX;
-            fp.offset[1] = story.friendY;
+            fp.offset[1] = story.friendY - story.friendDrop;
             fp.seek(friendSceneTime(story.friendT));
             friendView.load(friendScene);
             friendView.update(

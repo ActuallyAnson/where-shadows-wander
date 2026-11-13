@@ -1,8 +1,10 @@
 // The story's running order (docs/STORY.md): each scene is a list of beats played one after another. A `friend` beat shows the
 // friend's hand making a shape and waits, for as long as it takes, until the player's hand commits that shape; a `memory` beat
-// plays a puppet scene (puppet-scene.ts) to its end. A memory can start one of its puppets where the player's shadow was and
-// ease it to its keyed place, so the player's rabbit becomes the puppet rabbit. Plain data in story-script.ts; plain TypeScript
-// here, and a frame allocates nothing.
+// plays a puppet scene (puppet-scene.ts), or one chapter of it (chapters.ts), to its end. A memory can start one of its puppets
+// where the player's shadow was and ease it to its keyed place, so the player's rabbit becomes the puppet rabbit. The wall never
+// goes blank between memories: when one ends, its last picture stays on the wall, idling, through the wait for the next shape,
+// and a memory that continues the same scene goes on from there. Plain data in story-script.ts; plain TypeScript here, and a
+// frame allocates nothing.
 import type { Shape } from '../../hands/shapes';
 import { POSE_STRIDE, type Cue, type PuppetScene } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
@@ -14,14 +16,18 @@ export interface FriendBeat {
   readonly shape: Shape;
   readonly x: number;
   readonly y: number;
+  /** Stage metres it rises as it appears (and sinks as it goes): the friend lifting his hand. Default 0. */
+  readonly rise?: number;
 }
 
-/** A memory plays: `scene` from its start to its end. */
+/** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
 export interface MemoryBeat {
   readonly kind: 'memory';
   readonly scene: PuppetScene;
   /** A root part that starts where the player's committed shadow was, and eases to its keyed place over the handoff. */
   readonly from?: string;
+  readonly start?: number;
+  readonly end?: number;
 }
 
 export type Beat = FriendBeat | MemoryBeat;
@@ -49,7 +55,12 @@ export function validateStory(scenes: readonly StoryScene[]): string[] {
   for (const s of scenes) {
     if (s.beats.length === 0) problems.push(`${s.id} has no beats`);
     for (const b of s.beats) {
-      if (b.kind !== 'memory' || b.from === undefined) continue;
+      if (b.kind !== 'memory') continue;
+      const start = b.start ?? 0,
+        end = b.end ?? b.scene.length;
+      if (!(start >= 0 && start < end && end <= b.scene.length))
+        problems.push(`${s.id}: ${b.scene.id} plays from ${start} to ${end} s, outside its ${b.scene.length} s`);
+      if (b.from === undefined) continue;
       const part = b.scene.parts.find((p) => p.id === b.from);
       if (!part) problems.push(`${s.id}: ${b.scene.id} starts from ${b.from}, which is not one of its parts`);
       else if (part.parent !== undefined)
@@ -71,11 +82,12 @@ export class StoryDirector {
   friendT = 0;
   friendX = 0;
   friendY = 0;
-  /** The memory playing, or null. */
+  /** The memory on the wall, or null: playing, or (once it has ended) holding its last picture until the next one. */
   memory: ScenePlayer | null = null;
   private readonly players = new Map<PuppetScene, ScenePlayer>();
   private waiting = false;
   private friendWait = 0;
+  private friendRise = 0;
   private handoffPart = -1;
   private handoffT = 0;
   private handoffX = 0;
@@ -127,9 +139,10 @@ export class StoryDirector {
 
   /** Stops it: no hand, no memory. */
   stop(): void {
-    this.memory?.skip();
+    const m = this.memory;
     this.memory = null;
     this.sceneIndex = -1;
+    m?.skip();
     this.beatIndex = 0;
     this.waiting = false;
     this.friendShape = null;
@@ -151,7 +164,7 @@ export class StoryDirector {
     return true;
   }
 
-  /** Skips the memory playing, if any, to the beat after it. */
+  /** Skips the memory playing, if any, to its last picture and the beat after it. */
   skipMemory(): void {
     this.memory?.skip();
   }
@@ -175,6 +188,10 @@ export class StoryDirector {
     }
     const m = this.memory;
     if (!m) return;
+    if (!m.playing) {
+      m.idle(dt);
+      return;
+    }
     if (this.handoffPart >= 0) {
       this.handoffT += dt;
       const k = 1 - smooth(this.handoffT / HANDOFF_S);
@@ -190,6 +207,11 @@ export class StoryDirector {
     return smooth(this.friendLevel);
   }
 
+  /** Stage metres the friend's hand is below its place: all of its rise while hidden, none once it is fully shown. */
+  get friendDrop(): number {
+    return this.friendRise * (1 - this.friendOpacity);
+  }
+
   private next(): void {
     if (this.sceneIndex < 0) return;
     const beats = this.scenes[this.sceneIndex].beats;
@@ -198,8 +220,7 @@ export class StoryDirector {
       this.sceneIndex++;
       this.enter(0);
     } else {
-      // The end of the script: whatever is still fading finishes on its own.
-      this.memory = null;
+      // The end of the script: whatever is still fading finishes on its own, and the last picture stays.
       this.sceneIndex = -1;
       this.waiting = false;
     }
@@ -207,14 +228,15 @@ export class StoryDirector {
 
   private enter(index: number): void {
     this.beatIndex = index;
-    this.memory = null;
     this.handoffPart = -1;
     const b = this.scenes[this.sceneIndex].beats[index];
     if (b.kind === 'friend') {
+      // The memory before it, if any, stays on the wall while the hand waits.
       this.waiting = true;
       this.friendShape = b.shape;
       this.friendX = b.x;
       this.friendY = b.y;
+      this.friendRise = b.rise ?? 0;
       this.friendT = 0;
       this.friendLevel = 0;
       this.friendWait = FRIEND_DELAY_S;
@@ -222,9 +244,10 @@ export class StoryDirector {
       return;
     }
     const player = this.players.get(b.scene) as ScenePlayer;
+    const start = b.start ?? 0;
     player.offset.fill(0);
     this.memory = player;
-    player.start(this.onCue, this.onMemoryDone);
+    player.startAt(start, b.end ?? b.scene.length, this.onCue, this.onMemoryDone);
     const part = b.from === undefined ? -1 : player.partIndex(b.from);
     if (part >= 0 && Number.isFinite(this.commitX) && Number.isFinite(this.commitY)) {
       this.handoffPart = part;
@@ -233,7 +256,7 @@ export class StoryDirector {
       this.handoffY = this.commitY - player.world[part * POSE_STRIDE + 1];
       player.offset[part * 2] = this.handoffX;
       player.offset[part * 2 + 1] = this.handoffY;
-      player.seek(0);
+      player.seek(start);
     }
     this.commitX = this.commitY = NaN;
   }

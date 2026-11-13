@@ -222,6 +222,57 @@ function rabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
   cut(g, () => e(0.74, 0.42, 0.022, 0.026));
 }
 
+function fox(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A little fox in profile, facing right, mid-bound: a deep chest and a long body, a pointed snout, two tall pointed ears, a big
+  // bushy tail out behind with a fine tip, and four sturdy legs; the eye cut out.
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
+  const poly = (...pts: number[]) => {
+    g.beginPath();
+    g.moveTo(pts[0] * w, pts[1] * h);
+    for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i] * w, pts[i + 1] * h);
+    g.closePath();
+    g.fill();
+  };
+  // The body, haunches and the deep chest rising to the neck.
+  e(0.47, 0.55, 0.22, 0.17, -0.04);
+  e(0.32, 0.55, 0.1, 0.17);
+  e(0.64, 0.47, 0.11, 0.18, -0.5);
+  // The head, and its snout tapering to the nose.
+  e(0.77, 0.32, 0.1, 0.12);
+  poly(0.8, 0.22, 0.99, 0.36, 0.97, 0.42, 0.8, 0.44);
+  // The ears, tall and pointed.
+  poly(0.69, 0.3, 0.71, 0.0, 0.79, 0.24);
+  poly(0.76, 0.24, 0.83, 0.0, 0.86, 0.28);
+  // The tail: a big plume out behind, lifted, thick at the root and fine at the tip.
+  g.beginPath();
+  g.moveTo(0.3 * w, 0.42 * h);
+  g.quadraticCurveTo(0.14 * w, 0.18 * h, 0.0 * w, 0.3 * h);
+  g.quadraticCurveTo(0.04 * w, 0.66 * h, 0.3 * w, 0.68 * h);
+  g.closePath();
+  g.fill();
+  // The legs, mid-bound: the front pair reaching, the back pair pushing off.
+  g.save();
+  g.lineCap = 'round';
+  g.strokeStyle = g.fillStyle;
+  g.lineWidth = 0.06 * w;
+  const leg = (x0: number, y0: number, x1: number, y1: number) => {
+    g.beginPath();
+    g.moveTo(x0 * w, y0 * h);
+    g.lineTo(x1 * w, y1 * h);
+    g.stroke();
+  };
+  leg(0.64, 0.6, 0.76, 0.95);
+  leg(0.58, 0.64, 0.63, 0.96);
+  leg(0.34, 0.66, 0.24, 0.95);
+  leg(0.28, 0.62, 0.13, 0.9);
+  g.restore();
+  cut(g, () => e(0.8, 0.3, 0.02, 0.025));
+}
+
 function kid(g: CanvasRenderingContext2D, w: number, h: number): void {
   // A small kid sitting with knees up, side on, facing right: back, shoulders, the thigh out to a knee, the shin down to a foot.
   g.beginPath();
@@ -393,6 +444,38 @@ function friendEar(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.fill();
 }
 
+function friendFox(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A hand side on, facing right, the forearm rising into it from the lower left: the back of the hand is the fox's head, the
+  // middle and ring fingers laid straight forward to meet the thumb's tip are its long pointed snout, and the thumb under them its
+  // jaw; the gap the thumb leaves under the fingers' root is its eye. (The ears, the index and little fingers standing up, are
+  // parts of their own: 'friend-ear'.)
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
+  // The forearm, a child's: wrist narrower than the arm below it.
+  g.beginPath();
+  g.moveTo(0.02 * w, h);
+  g.quadraticCurveTo(0.12 * w, 0.78 * h, 0.2 * w, 0.54 * h);
+  g.lineTo(0.42 * w, 0.62 * h);
+  g.quadraticCurveTo(0.33 * w, 0.8 * h, 0.32 * w, h);
+  g.closePath();
+  g.fill();
+  // The back of the hand: the head.
+  e(0.36, 0.44, 0.19, 0.17, -0.2);
+  e(0.4, 0.3, 0.09, 0.06, -0.3);
+  // The two fingers straight forward, tapering to the snout's tip.
+  finger(g, w, h, [0.42, 0.36, 0.66, 0.39, 0.92, 0.45], 0.1);
+  finger(g, w, h, [0.42, 0.43, 0.68, 0.45, 0.9, 0.48], 0.08);
+  // The thumb under them, the jaw, its tip meeting theirs.
+  finger(g, w, h, [0.38, 0.55, 0.6, 0.56, 0.86, 0.51], 0.085);
+  cut(g, () => {
+    // The eye: the gap the thumb leaves under the fingers' root, round.
+    e(0.5, 0.47, 0.03, 0.026);
+  });
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -404,6 +487,7 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   lantern,
   orb,
   rabbit,
+  fox,
   kid,
   'kid-head': kidHead,
   arm,
@@ -412,6 +496,7 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   lump,
   'friend-rabbit': friendRabbit,
   'friend-ear': friendEar,
+  'friend-fox': friendFox,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

@@ -1,45 +1,53 @@
-// Scene 2, "How they met" (docs/STORY.md): the memory that plays once the player has copied the friend's rabbit. The player's
-// rabbit becomes a puppet rabbit and hops off; the scene widens to two small kids under a blanket fort with a torch between them.
-// The friend's hand is the rabbit; the new kid tries, makes a lumpy shape, the friend leans over to help, and his rabbit comes
-// right; the two rabbits nod at each other, and the kids laugh. Every time is in seconds from the memory's start; tune here.
+// Scene 2, "How they met" (docs/STORY.md): the first chapter of the story's puppet show (story-stage.ts), played once the player
+// has copied the friend's rabbit. The player's rabbit becomes a puppet rabbit, and the fort slides in around it: two small kids
+// under a blanket fort with a torch between them. The rabbit hops onto the friend's raised hand; the new kid tries, makes a lumpy
+// shape, the friend leans over to help, and his rabbit comes right; the two rabbits nod at each other, and the kids laugh. Then
+// the rabbit hops down onto the blanket, and the friend raises his hand again for the next shape: the chapter ends on that, and
+// the story holds the picture while the friend's hand shows the fox. Every time is in seconds from the chapter's start.
+import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
 import {
   bobKeys,
   swingKeys,
   type Cue,
   type Key,
   type PuppetPart,
-  type PuppetScene,
   type Track,
   type Wobble,
 } from '../puppet/puppet-scene';
 
 /** The floor of the fort, metres up the wall from its centre (above the panelling's rail, as the prologue's path was). */
-const FLOOR_Y = -0.12;
+export const FLOOR_Y = -0.12;
 /** Where each kid sits: the friend on the left facing right, the boy on the right facing left. */
-const FRIEND_X = -0.3;
+export const FRIEND_X = -0.3;
 const BOY_X = 0.3;
 /** The kids' size: their parts are drawn at 1 and scaled up together by this (1 is about 23 cm sitting). */
 const KID_SCALE = 1.4;
 
 /** The puppet rabbit: from the player's shadow (the handoff) to its first place, then hopping to the friend's raised hand. */
 export const RABBIT_FROM: readonly [number, number] = [0.04, 0.06];
-const RABBIT_HOPS_S = 1.8;
+const RABBIT_HOPS_S = 5.0;
 const RABBIT_HOP_S = 0.55;
 const RABBIT_SMALL = 0.7;
 
-/** The fort and the kids appear around the rabbit. */
-const WIDEN_FROM_S = 3.4;
-const WIDEN_S = 2.2;
+/** The fort and the kids slide in from the right around the sitting rabbit (the fort, further back, a little behind them). */
+const SLIDE_IN_S = 1.6;
+const SLIDE_S = 2.6;
 /** The boy raises his hand and makes a lump, the friend leans over to help, and the boy's rabbit comes right. */
-const BOY_ARM_UP_S = 7.2;
-const LUMP_S = 8.4;
-const HELP_S = 10.6;
-const RIGHT_S = 12.2;
+const BOY_ARM_UP_S = 7.6;
+const LUMP_S = 8.8;
+const HELP_S = 11.0;
+const RIGHT_S = 12.6;
 /** They laugh. */
-const LAUGH_S = 14.6;
+const LAUGH_S = 15.0;
 const LAUGH_LEN_S = 3.2;
-export const HOW_THEY_MET_LENGTH_S = 23;
-const FADE_OUT_FROM_S = 19.6;
+/** The boy lowers his hand (his rabbit gone), the rabbit hops down to the blanket, and the friend's arm goes down... */
+const SETTLE_S = 19.4;
+/** ...and comes up again: the next shape. The chapter ends with it raised. */
+const ASK_S = 21.4;
+export const HOW_THEY_MET_LENGTH_S = 22.6;
+/** Where the rabbit sits on the blanket at the end, between the kids: where the fox finds it. */
+export const RABBIT_REST: readonly [number, number] = [0.02, FLOOR_Y];
+export const RABBIT_REST_SCALE = 0.85;
 
 /** The kids' arms rest down along their sides at this angle, and are raised to the other. */
 const ARM_DOWN = 2.7;
@@ -63,13 +71,8 @@ const BOY_HAND = handAt(BOY_X, -1);
 const LEAN_X = 0.04 * KID_SCALE;
 const LEAN_HAND_X = 0.07 * KID_SCALE;
 
-const fadeOut = (from: number): Key[] => [
-  [FADE_OUT_FROM_S, from],
-  [HOW_THEY_MET_LENGTH_S - 0.4, 0, 'smooth'],
-];
-
 /** How far back the fort stands (PuppetPart.depth): a paler, softer shadow behind the kids, the torch and the rabbits. */
-const FORT_DEPTH = 0.6;
+export const FORT_DEPTH = 0.6;
 
 const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[] => [
   { id, art: '', parent: 'scenery', w: 1, h: 1, x, y: FLOOR_Y, scale: KID_SCALE },
@@ -100,18 +103,18 @@ const kid = (id: string, x: number, facing: 1 | -1, armUp: boolean): PuppetPart[
 ];
 
 const parts: PuppetPart[] = [
-  // The fort, the torch and the two kids, fading up together.
-  { id: 'scenery', art: '', w: 1, h: 1, opacity: 0 },
+  // The fort, standing back, and in front of it the torch and the two kids (the scenery), sliding in together.
   {
     id: 'fort',
     art: 'fort',
-    parent: 'scenery',
     w: 1.12,
     h: 0.62,
     pivot: [0.5, 0],
+    x: OFF_WALL_X,
     y: FLOOR_Y - 0.01,
     depth: FORT_DEPTH,
   },
+  { id: 'scenery', art: '', w: 1, h: 1, x: OFF_WALL_X },
   {
     id: 'torch-light',
     art: 'orb',
@@ -187,11 +190,24 @@ function hops(
 
 const rabbitHops = hops(RABBIT_HOPS_S, 3, RABBIT_HOP_S, RABBIT_FROM, RABBIT_AT_HAND, 0.05);
 const hopsEnd = RABBIT_HOPS_S + 3 * RABBIT_HOP_S;
+/** At the end, it hops down off the friend's hand to sit on the blanket between them. */
+const DOWN_HOPS_S = SETTLE_S + 0.4;
+const DOWN_HOP_S = 0.5;
+const downHops = hops(DOWN_HOPS_S, 2, DOWN_HOP_S, RABBIT_AT_HAND, RABBIT_REST, 0.06);
+const downEnd = DOWN_HOPS_S + 2 * DOWN_HOP_S;
 
 const tracks: Track[] = [
-  { part: 'scenery', prop: 'opacity', keys: [[WIDEN_FROM_S, 0], [WIDEN_FROM_S + WIDEN_S, 1, 'smooth'], ...fadeOut(1)] },
+  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, OFF_WALL_X, 0, FORT_DEPTH) },
+  { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, OFF_WALL_X, 0) },
   // The rabbit comes off the player's shadow, sits, hops to the friend's hand and shrinks to sit on it.
-  { part: 'rabbit', prop: 'opacity', keys: [[0, 0], [0.5, 1, 'out'], ...fadeOut(1)] },
+  {
+    part: 'rabbit',
+    prop: 'opacity',
+    keys: [
+      [0, 0],
+      [0.5, 1, 'out'],
+    ],
+  },
   {
     part: 'rabbit',
     prop: 'y',
@@ -201,6 +217,7 @@ const tracks: Track[] = [
       [RIGHT_S + 0.6, RABBIT_AT_HAND[1]],
       [RIGHT_S + 0.85, RABBIT_AT_HAND[1] + 0.012, 'out'],
       [RIGHT_S + 1.1, RABBIT_AT_HAND[1], 'in'],
+      ...downHops.y,
     ],
   },
   {
@@ -209,6 +226,8 @@ const tracks: Track[] = [
     keys: [
       [hopsEnd - 0.8, 1],
       [hopsEnd + 0.4, RABBIT_SMALL, 'smooth'],
+      [DOWN_HOPS_S, RABBIT_SMALL],
+      [downEnd, RABBIT_REST_SCALE, 'smooth'],
     ],
   },
   // Its ears twitch now and then.
@@ -222,15 +241,32 @@ const tracks: Track[] = [
       [hopsEnd + 1.6, 0],
       [hopsEnd + 1.75, 0.14, 'out'],
       [hopsEnd + 2.0, 0, 'smooth'],
+      // And once on the blanket, looking up at the friend's hand rising.
+      [ASK_S + 0.3, 0],
+      [ASK_S + 0.5, 0.16, 'out'],
+      [ASK_S + 0.9, 0.1, 'smooth'],
     ],
   },
-  // The boy raises his hand; a lump wobbles on it while he tilts his head at it.
+  // The boy raises his hand; a lump wobbles on it while he tilts his head at it. He lowers it at the end.
   {
     part: 'boy-arm',
     prop: 'angle',
     keys: [
       [BOY_ARM_UP_S, ARM_DOWN],
       [BOY_ARM_UP_S + 1.0, ARM_UP, 'smooth'],
+      [SETTLE_S, ARM_UP],
+      [SETTLE_S + 0.9, ARM_DOWN, 'smooth'],
+    ],
+  },
+  // The friend's hand, the rabbit's perch: down once the rabbit has hopped off, and up again for the next shape.
+  {
+    part: 'friend-arm',
+    prop: 'angle',
+    keys: [
+      [downEnd - 0.2, -ARM_UP],
+      [downEnd + 0.5, -ARM_DOWN + 0.5, 'smooth'],
+      [ASK_S, -ARM_DOWN + 0.5],
+      [ASK_S + 0.8, -ARM_UP - 0.15, 'smooth'],
     ],
   },
   {
@@ -290,10 +326,20 @@ const tracks: Track[] = [
       [HELP_S + 0.7, RABBIT_AT_HAND[0] + LEAN_HAND_X, 'smooth'],
       [RIGHT_S + 0.4, RABBIT_AT_HAND[0] + LEAN_HAND_X],
       [RIGHT_S + 1.2, RABBIT_AT_HAND[0], 'smooth'],
+      ...downHops.x,
     ],
   },
-  // The boy's rabbit comes right, and nods back.
-  { part: 'boy-rabbit', prop: 'opacity', keys: [[RIGHT_S, 0], [RIGHT_S + 0.4, 1, 'out'], ...fadeOut(1)] },
+  // The boy's rabbit comes right, and nods back; his hand opens as he lowers it.
+  {
+    part: 'boy-rabbit',
+    prop: 'opacity',
+    keys: [
+      [RIGHT_S, 0],
+      [RIGHT_S + 0.4, 1, 'out'],
+      [SETTLE_S, 1],
+      [SETTLE_S + 0.4, 0, 'in'],
+    ],
+  },
   {
     part: 'boy-rabbit',
     prop: 'scale',
@@ -324,6 +370,9 @@ const tracks: Track[] = [
       [LAUGH_S + 0.55, 0.3, 'out'],
       [LAUGH_S + LAUGH_LEN_S, 0.3],
       [LAUGH_S + LAUGH_LEN_S + 0.8, 0, 'smooth'],
+      // He looks up at his raised hand: now this one.
+      [ASK_S + 0.2, 0],
+      [ASK_S + 0.9, 0.18, 'smooth'],
     ],
   },
   // Laughing shakes them: small quick bobs.
@@ -339,15 +388,19 @@ const wobbles: Wobble[] = [
   { part: 'boy-body', prop: 'angle', amp: 0.012, period: 3.9, phase: 2 },
 ];
 
-/** The lullaby's first note as the rabbit comes off the player's hand, and as the boy's rabbit comes right; two as they laugh. */
+/**
+ * The lullaby's first note as the rabbit comes off the player's hand, and as the boy's rabbit comes right; two as they laugh;
+ * one as the friend's hand goes up again.
+ */
 const cues: Cue[] = [
   { t: 0.1, kind: 'note', note: 0 },
   { t: RIGHT_S + 0.1, kind: 'note', note: 2 },
   { t: LAUGH_S, kind: 'note', note: 3 },
   { t: LAUGH_S + 0.6, kind: 'note', note: 4 },
+  { t: ASK_S + 0.6, kind: 'note', note: 1 },
 ];
 
-export const HOW_THEY_MET_SCENE: PuppetScene = {
+export const HOW_THEY_MET: Chapter = {
   id: 'how-they-met',
   length: HOW_THEY_MET_LENGTH_S,
   parts,

@@ -4,7 +4,9 @@
 // shadow would. A part's depth (PuppetPart.depth) makes its shadow paler and softer, so the scenery stands back from the near
 // puppets; a pale shadow can't be a min blend (the candle-lit wall is darker than its floor, so it would vanish), so a part
 // standing back darkens the wall in proportion instead, over black as the hands' shadows do (overlaps there do darken twice,
-// which reads as one layer in front of another). Glow parts add their light. Built when a scene loads; a frame only sets matrices and one opacity each.
+// which reads as one layer in front of another). Glow parts add their light. Everything can be cut off at the wall's edges
+// (clipToWall), as a shadow theatre's screen cuts off a piece of scenery sliding into the wings. Built when a scene loads; a frame
+// only sets matrices, a few uniforms and one opacity each.
 import {
   AddEquation,
   AdditiveBlending,
@@ -14,13 +16,14 @@ import {
   Group,
   MaxEquation,
   Mesh,
-  MeshBasicMaterial,
   MinEquation,
   OneFactor,
   OneMinusSrcAlphaFactor,
   PlaneGeometry,
   ShaderMaterial,
   SRGBColorSpace,
+  Vector2,
+  Vector3,
   ZeroFactor,
   type Material,
 } from '@iwsdk/core';
@@ -38,19 +41,33 @@ const PX_MAX = 2048;
 const LIFT_M = 0.003;
 const LIFT_STEP_M = 0.0002;
 
+// vWall: where the fragment is on the wall, metres from the story's centre (the quad's centre plus its two axes), for the clip.
 const VERTEX = /* glsl */ `
+uniform vec2 centre;
+uniform vec2 axisA;
+uniform vec2 axisB;
 varying vec2 vUv;
+varying vec2 vWall;
 void main() {
   vUv = uv;
+  vWall = centre + position.x * axisA + position.y * axisB;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
+
+/** Discards what lies past the wall's edges. */
+const CLIP = /* glsl */ `
+uniform vec2 clip;
+varying vec2 vWall;`;
+const CLIP_TEST = /* glsl */ `if (abs(vWall.x) > clip.x || abs(vWall.y) > clip.y) discard;`;
 
 // The shadow as a brightness the wall is clamped down to (min blend): 1 - alpha, so an opacity of 0.88 leaves 12 % of the light.
 const SHADOW_FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float opacity;
 varying vec2 vUv;
+${CLIP}
 void main() {
+  ${CLIP_TEST}
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
   gl_FragColor = vec4(vec3(1.0 - a), 1.0);
@@ -61,10 +78,27 @@ const FAR_SHADOW_FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float opacity;
 varying vec2 vUv;
+${CLIP}
 void main() {
+  ${CLIP_TEST}
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
   gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+}`;
+
+// A glow: its tint added onto the wall at its alpha (additive), as the torch's light is.
+const GLOW_FRAGMENT = /* glsl */ `
+uniform sampler2D map;
+uniform float opacity;
+uniform vec3 tint;
+varying vec2 vUv;
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  float a = texture2D(map, vUv).a * opacity;
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(tint, a);
+  #include <colorspace_fragment>
 }`;
 
 interface Piece {
@@ -78,9 +112,15 @@ interface Piece {
   readonly glow: boolean;
   /** Its opacity is multiplied by this: 1 against the wall, less the further back it stands. */
   readonly strength: number;
-  readonly material: ShaderMaterial | MeshBasicMaterial;
+  readonly material: ShaderMaterial;
   readonly texture: CanvasTexture;
+  readonly centre: Vector2;
+  readonly axisA: Vector2;
+  readonly axisB: Vector2;
 }
+
+/** How far the wall reaches from the story's centre when nothing has been set: everywhere. */
+const NO_CLIP = 1e6;
 
 export class PuppetView {
   readonly group = new Group();
@@ -89,6 +129,13 @@ export class PuppetView {
   private static readonly quad = new PlaneGeometry(1, 1);
   /** How many wall metres one scene metre is: scenes are written for the 1.6 by 1 m stage and drawn bigger (STORY_SCALE). */
   scale = 1;
+  /** Half the wall's width and height, metres from the story's centre: nothing is drawn past them. Shared by every piece. */
+  private readonly clip = new Vector2(NO_CLIP, NO_CLIP);
+
+  /** Cuts the puppets off at the wall's edges: `halfWidth` and `halfHeight` metres from the story's centre. */
+  clipToWall(halfWidth: number, halfHeight: number): void {
+    this.clip.set(halfWidth, halfHeight);
+  }
 
   constructor() {
     this.group.visible = false;
@@ -135,22 +182,33 @@ export class PuppetView {
           drawSoft(g, sharp, canvas.width, canvas.height, blurPx);
         }
       }
-      let material: ShaderMaterial | MeshBasicMaterial;
+      const centre = new Vector2(),
+        axisA = new Vector2(),
+        axisB = new Vector2();
+      const uniforms = {
+        map: { value: texture },
+        opacity: { value: 0 },
+        centre: { value: centre },
+        axisA: { value: axisA },
+        axisB: { value: axisB },
+        clip: { value: this.clip },
+      };
+      let material: ShaderMaterial;
       if (glow) {
         const tint = part.tint ?? [1, 1, 1];
-        material = new MeshBasicMaterial({
-          map: texture,
-          color: 0xffffff,
+        material = new ShaderMaterial({
+          uniforms: { ...uniforms, tint: { value: new Vector3(tint[0], tint[1], tint[2]) } },
+          vertexShader: VERTEX,
+          fragmentShader: GLOW_FRAGMENT,
           transparent: true,
           blending: AdditiveBlending,
           depthWrite: false,
           side: DoubleSide,
           toneMapped: false,
         });
-        material.color.setRGB(tint[0], tint[1], tint[2]);
       } else if (depth > 0) {
         material = new ShaderMaterial({
-          uniforms: { map: { value: texture }, opacity: { value: 0 } },
+          uniforms,
           vertexShader: VERTEX,
           fragmentShader: FAR_SHADOW_FRAGMENT,
           transparent: true,
@@ -166,7 +224,7 @@ export class PuppetView {
         });
       } else {
         material = new ShaderMaterial({
-          uniforms: { map: { value: texture }, opacity: { value: 0 } },
+          uniforms,
           vertexShader: VERTEX,
           fragmentShader: SHADOW_FRAGMENT,
           transparent: true,
@@ -200,6 +258,9 @@ export class PuppetView {
         strength: depthStrength(depth),
         material,
         texture,
+        centre,
+        axisA,
+        axisB,
       });
     });
   }
@@ -222,8 +283,7 @@ export class PuppetView {
       const opacity = world[b + 4] * light * p.strength;
       p.mesh.visible = opacity > 0.003;
       if (!p.mesh.visible) continue;
-      if (p.glow) (p.material as MeshBasicMaterial).opacity = opacity;
-      else (p.material as ShaderMaterial).uniforms.opacity.value = opacity;
+      p.material.uniforms.opacity.value = opacity;
       const c = Math.cos(world[b + 2]),
         s = Math.sin(world[b + 2]),
         sc = world[b + 3] * this.scale;
@@ -239,6 +299,9 @@ export class PuppetView {
         ay = s * w * p.mirror,
         bx = -s * h,
         by = c * h;
+      p.centre.set(x, y);
+      p.axisA.set(ax, ay);
+      p.axisB.set(bx, by);
       const lift = LIFT_M + k * LIFT_STEP_M;
       // prettier-ignore
       p.mesh.matrix.set(

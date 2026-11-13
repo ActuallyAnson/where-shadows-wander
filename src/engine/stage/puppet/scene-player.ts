@@ -47,6 +47,10 @@ export class ScenePlayer {
   private readonly cues: readonly Cue[];
   private nextCue = 0;
   private clock = 0;
+  /** Where the stretch playing ends (the scene's length unless startAt said otherwise). */
+  private end = 0;
+  /** Seconds the wobbles have run on past the clock while it held still (idle), so they never jump back. */
+  private wobbleExtra = 0;
   private active = false;
   private onCue: ((cue: Cue) => void) | null = null;
   private onDone: (() => void) | null = null;
@@ -102,6 +106,7 @@ export class ScenePlayer {
       this.wobble[i * 3 + 2] = w.phase ?? 0;
     });
     this.cues = scene.cues ?? [];
+    this.end = scene.length;
     this.seek(0);
   }
 
@@ -121,25 +126,48 @@ export class ScenePlayer {
 
   /** Plays it from the start (one already playing starts over). `onCue` hears each cue as the clock passes it. */
   start(onCue?: (cue: Cue) => void, onDone?: () => void): void {
+    this.wobbleExtra = 0;
+    this.startAt(0, this.scene.length, onCue, onDone);
+  }
+
+  /**
+   * Plays the stretch from `from` to `to` seconds (a chapter of a longer scene), firing the cues in it. The wobbles carry on
+   * from where they were, so a stretch that starts where the last one ended goes on without a jump.
+   */
+  startAt(from: number, to: number, onCue?: (cue: Cue) => void, onDone?: () => void): void {
     this.onCue = onCue ?? null;
     this.onDone = onDone ?? null;
     this.active = true;
+    this.end = Math.min(to, this.scene.length);
     this.nextCue = 0;
-    this.seek(0);
+    while (this.nextCue < this.cues.length && this.cues[this.nextCue].t < from) this.nextCue++;
+    this.seek(from);
     this.fireCues();
   }
 
   /** Once per frame (0 while paused: the scene holds still). */
   update(dt: number): void {
     if (!this.active) return;
-    if (dt > 0) this.seek(this.clock + Math.min(dt, MAX_DT_S));
+    if (dt > 0) this.seek(Math.min(this.clock + Math.min(dt, MAX_DT_S), this.end));
     this.fireCues();
-    if (this.clock >= this.scene.length) this.finish();
+    if (this.clock >= this.end) this.finish();
   }
 
-  /** Ends it now, without the cues still to come. */
+  /**
+   * Once per frame while it is not playing but still on the wall: the picture holds where it stopped, and only its wobbles
+   * (a torch's light, the kids breathing) go on, so it is paused, not frozen.
+   */
+  idle(dt: number): void {
+    if (this.active || dt <= 0) return;
+    this.wobbleExtra += Math.min(dt, MAX_DT_S);
+    this.seek(this.clock);
+  }
+
+  /** Ends it now, posed at the end of its stretch, without the cues still to come. */
   skip(): void {
-    if (this.active) this.finish();
+    if (!this.active) return;
+    this.seek(this.end);
+    this.finish();
   }
 
   /** Poses every part for `t` seconds in, firing nothing. */
@@ -149,10 +177,11 @@ export class ScenePlayer {
     const local = this.local;
     local.set(this.rest);
     for (let i = 0; i < this.trackSlot.length; i++) local[this.trackSlot[i]] = this.sample(i, now);
+    const wobbleT = now + this.wobbleExtra;
     for (let i = 0; i < this.wobbleSlot.length; i++) {
       const w = i * 3;
       local[this.wobbleSlot[i]] +=
-        this.wobble[w] * Math.sin((2 * Math.PI * now) / this.wobble[w + 1] + this.wobble[w + 2]);
+        this.wobble[w] * Math.sin((2 * Math.PI * wobbleT) / this.wobble[w + 1] + this.wobble[w + 2]);
     }
     const offset = this.offset;
     for (let i = 0; i < this.parents.length; i++) {
