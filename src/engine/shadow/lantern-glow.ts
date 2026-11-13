@@ -23,6 +23,7 @@ const vertex = /* glsl */ `
 const fragment = /* glsl */ `
   uniform vec3 uColor;
   uniform float uIntensity;
+  uniform vec3 uTint;
   varying vec2 vUv;
   void main() {
     float r = length(vUv - 0.5) * 2.0;
@@ -31,7 +32,7 @@ const fragment = /* glsl */ `
     float halo = exp(-r * r * 5.0) * (1.0 - r);
     float core = exp(-r * r * 60.0);
     float alpha = clamp((0.45 * halo + core) * uIntensity, 0.0, 1.0);
-    vec3 color = mix(uColor, vec3(1.0, 0.92, 0.7), core);
+    vec3 color = mix(uColor, vec3(1.0, 0.92, 0.7), core) * uTint;
     gl_FragColor = vec4(color, alpha);
     #include <colorspace_fragment>
   }
@@ -44,7 +45,11 @@ export class LanternGlow {
   /** @param sizeM the quad's width and height, metres */
   constructor(sizeM = 0.14) {
     this.material = new ShaderMaterial({
-      uniforms: { uColor: { value: new Color(1, 0.56, 0.24) }, uIntensity: { value: 1 } },
+      uniforms: {
+        uColor: { value: new Color(1, 0.56, 0.24) },
+        uIntensity: { value: 1 },
+        uTint: { value: new Color(1, 1, 1) },
+      },
       vertexShader: vertex,
       fragmentShader: fragment,
       transparent: true,
@@ -63,5 +68,10 @@ export class LanternGlow {
     u.uIntensity.value = light.intensity;
     (u.uColor.value as Color).setRGB(light.color[0], light.color[1], light.color[2]);
     this.mesh.quaternion.copy(cameraQuaternion as Quaternion);
+  }
+
+  /** Multiplies the glow's colour, core included (1, 1, 1 leaves it a flame's own colour). */
+  setTint(r: number, g: number, b: number): void {
+    (this.material.uniforms.uTint.value as Color).setRGB(r, g, b);
   }
 }

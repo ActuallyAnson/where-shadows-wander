@@ -38,4 +38,14 @@ describe('CandleMoodBlend', () => {
     b.to('warm', 0);
     expect(Array.from(b.light)).toEqual([...CANDLE_MOODS.warm.light]);
   });
+
+  it("tints the candle's own flame by the mood: none when warm, blue when rainy, following the light as it eases", () => {
+    const b = new CandleMoodBlend('warm');
+    for (const v of b.flame) expect(v).toBeCloseTo(1);
+    b.snap('rainy');
+    expect(b.flame[2]).toBeGreaterThan(b.flame[0]);
+    b.to('warm', 2);
+    b.update(1);
+    for (let i = 0; i < 3; i++) expect(b.flame[i]).toBeCloseTo(b.light[i] / CANDLE_MOODS.warm.light[i]);
+  });
 });

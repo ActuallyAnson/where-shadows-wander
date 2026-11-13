@@ -1,7 +1,9 @@
 // The candle's mood: the colour of its light on the room and the tint of its pool on the wall. The story opens rainy and gloomy
 // (a cold, blue-grey light), and a scene can name a mood of its own (StoryScene.candle) for the light to ease into, so the
-// candle's colour can mark the story's moments. The flame itself stays a flame's colour; only the light it throws changes.
-// Plain TypeScript: main.ts copies `light` into CandleLight's colour and `wall` into the wall's tint each frame.
+// candle's colour can mark the story's moments. The candle itself follows too: its flame and the light on its wax are tinted
+// by `flame`, the mood's light compared with `warm` (a candle's own colour), so a blue night gives a cold, bluish flame.
+// Plain TypeScript: main.ts copies `light` into CandleLight's colour, `wall` into the wall's tint and `flame` into
+// CandleView's tint each frame.
 
 type RGB = readonly [number, number, number];
 
@@ -29,6 +31,9 @@ export const CANDLE_MOODS = {
 
 export type CandleMoodName = keyof typeof CANDLE_MOODS;
 
+/** The mood whose light is a candle's own: the flame is untinted in it. */
+const FLAME_NEUTRAL = CANDLE_MOODS.warm.light;
+
 /** The mood the story opens in. */
 export const START_MOOD: CandleMoodName = 'rainy';
 /** Seconds a change of mood takes, unless a scene says otherwise. */
@@ -38,6 +43,8 @@ export const MOOD_EASE_S = 4;
 export class CandleMoodBlend {
   readonly light = new Float64Array(3);
   readonly wall = new Float64Array(3);
+  /** The tint on the candle's own flame and wax: `light` over the `warm` mood's (1, 1, 1 in `warm`). */
+  readonly flame = new Float64Array(3);
   /** The mood it is going to (or is at). */
   mood: CandleMoodName;
   private readonly fromLight = new Float64Array(3);
@@ -57,6 +64,7 @@ export class CandleMoodBlend {
     for (let i = 0; i < 3; i++) {
       this.light[i] = m.light[i];
       this.wall[i] = m.wall[i];
+      this.flame[i] = m.light[i] / FLAME_NEUTRAL[i];
     }
     this.t = 1;
   }
@@ -81,6 +89,7 @@ export class CandleMoodBlend {
     for (let i = 0; i < 3; i++) {
       this.light[i] = this.fromLight[i] + (m.light[i] - this.fromLight[i]) * k;
       this.wall[i] = this.fromWall[i] + (m.wall[i] - this.fromWall[i]) * k;
+      this.flame[i] = this.light[i] / FLAME_NEUTRAL[i];
     }
   }
 }

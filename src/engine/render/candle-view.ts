@@ -126,6 +126,8 @@ export class CandleView {
   private cooldownTimer = 0;
   private pickupDwellTimer = 0;
   private lightOcclusion = 1.0;
+  /** The story's mood on the candle itself (setMoodTint): multiplies the flame's colour and the light on the wax. */
+  private readonly moodTint = new Float64Array([1, 1, 1]);
 
   // Scratch arrays for zero-allocation interaction tracking
   private readonly leftPalm = new Float64Array(3);
@@ -313,6 +315,17 @@ export class CandleView {
 
   set ignitionProgress(value: number) {
     this._ignitionProgress = Math.max(0, Math.min(1, value));
+  }
+
+  /**
+   * Tints the flame and the light it throws on the candle (1, 1, 1 is a flame's own colour), so the candle itself follows the
+   * story's mood (candle-mood.ts, moodTint) along with the room.
+   */
+  setMoodTint(r: number, g: number, b: number): void {
+    this.moodTint[0] = r;
+    this.moodTint[1] = g;
+    this.moodTint[2] = b;
+    this.flame.setTint(r, g, b);
   }
 
   /** Current intensity of the dynamic point light. */
@@ -628,7 +641,7 @@ export class CandleView {
         this.coverProgressMesh.visible = this._ignitionProgress > 0.01;
 
         // Dynamic light grows warmly as fire grows
-        this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
+        this.setPointLightColour(light);
         this.pointLight.intensity = Math.pow(this._ignitionProgress, 2) * (light.intensity * 1.5);
 
         // Wick indicator fades as flame grows
@@ -650,12 +663,17 @@ export class CandleView {
     this.flame.mesh.visible = true;
     this.flame.update(light, cameraQuaternion);
     this.coverProgressMesh.quaternion.copy(cameraQuaternion);
-    this.pointLight.color.setRGB(light.color[0], light.color[1], light.color[2]);
+    this.setPointLightColour(light);
     const coverFactor = this._isCovered ? 0.15 : 1.0;
     this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion * coverFactor;
     if (this._isCovered) {
       this.flame.mesh.scale.setScalar(0.4);
     }
+  }
+
+  private setPointLightColour(light: Readonly<LanternLight>): void {
+    const t = this.moodTint;
+    this.pointLight.color.setRGB(light.color[0] * t[0], light.color[1] * t[1], light.color[2] * t[2]);
   }
 
   /** Frees allocated geometries and materials. */

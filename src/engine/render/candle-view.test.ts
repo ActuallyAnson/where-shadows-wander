@@ -80,6 +80,22 @@ describe('CandleView', () => {
     expect(candle.flamePosition[2]).toBeCloseTo(-0.4, 4);
   });
 
+  it("tints the light on the wax by the story's mood", () => {
+    const candle = new CandleView();
+    const light: LanternLight = {
+      position: new Float64Array([0, 1, 0]),
+      lit: true,
+      intensity: 1,
+      color: new Float32Array([1.0, 0.6, 0.2]),
+      flicker: 0,
+    };
+    candle.setMoodTint(0.5, 1, 2);
+    candle.update(light, new Quaternion(0, 0, 0, 1));
+    expect(candle.pointLight.color.r).toBeCloseTo(0.5, 4);
+    expect(candle.pointLight.color.g).toBeCloseTo(0.6, 4);
+    expect(candle.pointLight.color.b).toBeCloseTo(0.4, 4);
+  });
+
   it('updates flame, point light color, and flicker intensity', () => {
     const candle = new CandleView();
     const cameraQuat = new Quaternion(0, 0, 0, 1);

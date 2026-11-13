@@ -1528,6 +1528,7 @@ async function start(): Promise<void> {
         candleMood.update(step);
         candleLight.setColour(candleMood.light[0], candleMood.light[1], candleMood.light[2]);
         stageView.setTint(candleMood.wall[0], candleMood.wall[1], candleMood.wall[2]);
+        candleView.setMoodTint(candleMood.flame[0], candleMood.flame[1], candleMood.flame[2]);
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the rain holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
