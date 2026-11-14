@@ -47,12 +47,12 @@ const CHANGE_S = 7.4;
 const CHANGE_LEN_S = 0.7;
 /** While the stage still turns, they drift back a little: the park going by faster than they run. */
 const DRIFT_TO_S = 9.6;
-const BOY_DRIFT_X = 0.24;
-const FRIEND_DRIFT_X = 0.0;
+const BOY_DRIFT_X = -0.06;
+const FRIEND_DRIFT_X = -0.3;
 /** The friend puts on speed and catches him: she tags him... */
 const CATCH_S = 10.6;
-const FRIEND_CATCH_X = 0.17;
-const BOY_CAUGHT_X = 0.28;
+const FRIEND_CATCH_X = -0.13;
+const BOY_CAUGHT_X = -0.02;
 /**
  * ...slows to a stop and sits down hard in the grass, legs shooting out in front, and rolls back onto her back; he stumbles on
  * a few steps, laughing, and does the same just beyond her. Nobody slides, and nobody tips over stiff as a plank.
@@ -65,8 +65,8 @@ const SAT_BEAT_S = 0.1;
 const ROLL_LEN_S = 0.45;
 const FALL_LEN_S = SIT_LEN_S + SAT_BEAT_S + ROLL_LEN_S;
 /** Where each lies (the feet: each lies on their back with the head to the left, the boy's head just past her feet). */
-export const BOY_LIES_X = 0.72;
-export const FRIEND_LIES_X = 0.32;
+export const BOY_LIES_X = 0.42;
+export const FRIEND_LIES_X = 0.02;
 /** A kid's root (the point under the hips) lying: this far left of the feet, and this high, so the back rests on the grass. */
 const HIPS_FROM_FEET = 0.14;
 const LIE_Y = FLOOR_Y - 0.075;
@@ -81,7 +81,7 @@ const LAUGH_LEN_S = 3.4;
 const DUSK_S = LAUGH_S + 1.2;
 const FIREFLY_S = LAUGH_S + LAUGH_LEN_S + 0.8;
 const FIREFLY_LEN_S = 4.2;
-export const FIREFLY_HOVER: readonly [number, number] = [0.05, 0.15];
+export const FIREFLY_HOVER: readonly [number, number] = [-0.25, 0.15];
 /** The friend reaches up towards it: the chapter ends with her arm up. */
 const REACH_S = FIREFLY_S + FIREFLY_LEN_S + 0.4;
 export const THE_PARK_LENGTH_S = REACH_S + 1.4;

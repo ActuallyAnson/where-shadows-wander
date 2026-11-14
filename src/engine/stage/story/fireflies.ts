@@ -80,8 +80,8 @@ export const FIREFLIES_LENGTH_S = RAISE_S + 1.6;
  * Where their raised hands are on the wall while the fireflies come to them (the tips of their front arms, lying on their backs;
  * fireflies.test.ts checks these against the puppets).
  */
-export const FRIEND_HAND: readonly [number, number] = [0.045, 0.031];
-export const BOY_HAND: readonly [number, number] = [0.458, 0.047];
+export const FRIEND_HAND: readonly [number, number] = [-0.255, 0.031];
+export const BOY_HAND: readonly [number, number] = [0.158, 0.047];
 /** The fireflies' light on a lying kid's hand, along the arm from the shoulder (unscaled). */
 const LYING_HAND_ALONG = 0.07;
 

@@ -41,8 +41,8 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '4 · Fireflies',
     candle: 'dusk',
     beats: [
-      // Lying in the grass, the friend reaches up; her hand rises at the wall's left, cupped.
-      { kind: 'friend', shape: 'cup', x: -0.34, y: 0.24 },
+      // Lying in the grass, the friend reaches up; her hand rises at the wall's left (clear of her, lying), cupped.
+      { kind: 'friend', shape: 'cup', x: -0.62, y: 0.22 },
       // The firefly sits in the player's cup, then the fireflies on their hands, the jar, and the walk to school.
       { kind: 'memory', from: 'firefly', handoff: CUP_HOLD_S, ...chapter('fireflies') },
     ],
@@ -64,11 +64,12 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     candle: 'low',
     beats: [
       // The empty wall, and the friend's hand held up flat, alone: the wave from the gate and from the dream. When the player's
-      // hand meets it, it fades under the touch...
-      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 1.2, leave: 'fade' },
-      // ...which turns clockwise to show the two hands side on, the boy's and the girl's, pressed palm to palm; hers fades,
-      // and his lowers away. The player's own shadow fades out meanwhile, so the two puppet hands are all there is.
-      { kind: 'memory', from: 'goodbye', handoff: 0.8, hideHand: true, ...chapter('goodbye') },
+      // hand meets it, the touch takes its place at once...
+      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 0.5, leave: 'fade' },
+      // ...which turns clockwise as the view draws back: two hands, side on, palm to palm, the boy's and the girl's, the two
+      // kids from the waist up. Their palms part, she fades, and he bows his head and fades. The player's own shadow fades
+      // out meanwhile, so the puppets are all there is.
+      { kind: 'memory', hideHand: true, ...chapter('goodbye') },
       { kind: 'wait', seconds: 2 },
     ],
   },
