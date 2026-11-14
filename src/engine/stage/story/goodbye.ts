@@ -106,6 +106,9 @@ const parts: PuppetPart[] = [
     parent: 'goodbye-pair',
     w: ((FRIEND_PALM_H / ZOOM_FROM) * 2) / 3,
     h: FRIEND_PALM_H / ZOOM_FROM,
+    // Turned against the pair's starting turn, so it starts upright, exactly as the friend's hand is, and turns clockwise
+    // with the pair as it fades.
+    angle: -TURN_FROM,
   },
   hand('boy'),
   hand('girl'),
