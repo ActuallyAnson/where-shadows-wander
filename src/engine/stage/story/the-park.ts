@@ -63,7 +63,7 @@ const FRIEND_DRIFT_X = 0.0;
 const CATCH_S = 10.6;
 const FRIEND_CATCH_X = 0.17;
 const BOY_CAUGHT_X = 0.28;
-/** ...and they tumble over backwards into the grass: the boy where he was, the friend rolling back past him. */
+/** ...and they tumble over backwards into the grass: the boy where he was, the friend skidding back past him. */
 const FALL_S = CATCH_S + 0.25;
 const FALL_LEN_S = 0.7;
 const ROLL_LEN_S = 1.2;
@@ -236,8 +236,8 @@ const tracks: Track[] = [
       [CHANGE_S, FOX_RUN_X],
       [DRIFT_TO_S, FRIEND_DRIFT_X, 'smooth'],
       [CATCH_S, FRIEND_CATCH_X, 'in'],
-      // She tumbles back over herself, rolling past the boy's head, and comes to rest on her back.
-      [FALL_S + ROLL_LEN_S, FRIEND_LIES_X, 'out'],
+      // She topples back and skids along the grass past the boy's head, coming to rest on her back.
+      [FALL_S + ROLL_LEN_S, FRIEND_LIES_X, 'smooth'],
     ],
   },
   // Catching him, the friend's arms go forward.
@@ -254,7 +254,7 @@ const tracks: Track[] = [
       [REACH_S + 1.0, -1.45, 'smooth'],
     ],
   },
-  // Over they go, backwards; the friend rolls right over and back onto her back.
+  // Over they go, backwards, onto their backs: one gentle quarter turn each, no spinning.
   {
     part: 'run-boy',
     prop: 'angle',
@@ -268,7 +268,7 @@ const tracks: Track[] = [
     prop: 'angle',
     keys: [
       [FALL_S, 0],
-      [FALL_S + ROLL_LEN_S, ROLL_BACK + 2 * Math.PI, 'out'],
+      [FALL_S + ROLL_LEN_S * 0.75, ROLL_BACK, 'smooth'],
     ],
   },
   // On their backs, they laugh: small quick shakes, heads tipped back.
@@ -285,7 +285,7 @@ const tracks: Track[] = [
     prop: 'y',
     keys: [
       [FALL_S, FLOOR_Y],
-      [FALL_S + ROLL_LEN_S / 2, FLOOR_Y + 0.08, 'out'],
+      [FALL_S + ROLL_LEN_S / 2, FLOOR_Y + 0.04, 'out'],
       [FALL_S + ROLL_LEN_S, FLOOR_Y + LYING_LIFT, 'in'],
       ...bobKeys(LAUGH_S + 0.15, LAUGH_S + LAUGH_LEN_S, 0.36, FLOOR_Y + LYING_LIFT, 0.008).slice(1),
     ],

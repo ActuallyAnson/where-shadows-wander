@@ -280,7 +280,7 @@ const tracks: Track[] = [
   {
     part: 'run-friend',
     prop: 'angle',
-    keys: move(GETUP_S, Math.PI / 2 + 2 * Math.PI, GETUP_S + GETUP_LEN_S, 2 * Math.PI),
+    keys: move(GETUP_S, Math.PI / 2, GETUP_S + GETUP_LEN_S, 0),
   },
   { part: 'run-boy', prop: 'y', keys: move(GETUP_S, FLOOR_Y + LYING_LIFT, GETUP_S + GETUP_LEN_S, FLOOR_Y) },
   { part: 'run-friend', prop: 'y', keys: move(GETUP_S, FLOOR_Y + LYING_LIFT, GETUP_S + GETUP_LEN_S, FLOOR_Y) },
