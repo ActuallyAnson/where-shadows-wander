@@ -15,9 +15,12 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '2 · How they met',
     candle: 'rainy',
     beats: [
-      // The friend's hand makes a rabbit on the left of the empty wall, in the candle's first light, and waits.
-      { kind: 'friend', shape: 'rabbit', x: -0.28, y: 0.04 },
-      // The player's rabbit becomes the puppet rabbit, and the fort slides in around it. It ends on the friend's raised hand.
+      // The night they met: alone in his new room in the storm, he hides under his blanket; the girl from down the street comes
+      // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
+      { kind: 'memory', ...chapter('the-storm') },
+      // Over her raised hand, the friend's hand rises making a rabbit, and waits.
+      { kind: 'friend', shape: 'rabbit', x: -0.1, y: 0.17, rise: 0.08 },
+      // The player's rabbit becomes the puppet rabbit and hops onto her hand. It ends on her hand raised again.
       { kind: 'memory', from: 'rabbit', ...chapter('how-they-met') },
     ],
   },

@@ -58,6 +58,20 @@ describe('Storm', () => {
     expect(s.flash).toBeGreaterThan(0);
   });
 
+  it('strikes now with the thunder and the brightness asked for, then goes back to its own', () => {
+    const s = new Storm(9);
+    s.update(1);
+    s.strikeNow(1.5, 1);
+    s.update(1 / 72);
+    expect(s.lastStrength).toBe(1);
+    let after = 0;
+    while (!s.thunder && after < 10) {
+      s.update(1 / 72);
+      after += 1 / 72;
+    }
+    expect(after).toBeCloseTo(1.5, 1);
+  });
+
   it('reports thunder on one update only', () => {
     const s = new Storm(5);
     let count = 0;

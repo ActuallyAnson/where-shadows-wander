@@ -425,6 +425,139 @@ function lump(g: CanvasRenderingContext2D, w: number, h: number): void {
   e(0.86, 0.68, 0.13, 0.06, -0.3);
 }
 
+// Scene 2's opening, the night they met: his new room in the storm (a window with rain on the glass, a moving box), the blanket
+// he hides under, and the beam of her torch. All face right; a part is mirrored to face left.
+
+function window_(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A window seen from inside: the frame with a cross of glazing bars, its four panes cut out, a sill under it, and a curtain
+  // hanging at each side, gathered at a tie-back.
+  const X = (f: number) => f * w,
+    Y = (f: number) => (1 - f) * h; // f up from the bottom
+  g.fillRect(X(0.12), Y(1), X(0.76), Y(0.06) - Y(1));
+  g.fillRect(0, Y(0.08), w, Y(0) - Y(0.08));
+  cut(g, () => {
+    const x0 = 0.2,
+      x1 = 0.8,
+      y0 = 0.14,
+      y1 = 0.94,
+      bar = 0.03;
+    const xm = (x0 + x1) / 2,
+      ym = (y0 + y1) / 2;
+    g.fillRect(X(x0), Y(y1), X(xm - bar / 2 - x0), Y(ym + bar / 2) - Y(y1));
+    g.fillRect(X(xm + bar / 2), Y(y1), X(x1 - xm - bar / 2), Y(ym + bar / 2) - Y(y1));
+    g.fillRect(X(x0), Y(ym - bar / 2), X(xm - bar / 2 - x0), Y(y0) - Y(ym - bar / 2));
+    g.fillRect(X(xm + bar / 2), Y(ym - bar / 2), X(x1 - xm - bar / 2), Y(y0) - Y(ym - bar / 2));
+  });
+  const curtain = (side: 1 | -1) => {
+    const C = (f: number) => X(side > 0 ? f : 1 - f);
+    g.beginPath();
+    g.moveTo(C(0.04), Y(1));
+    g.lineTo(C(0.3), Y(1));
+    g.quadraticCurveTo(C(0.26), Y(0.6), C(0.15), Y(0.42));
+    g.quadraticCurveTo(C(0.2), Y(0.25), C(0.24), Y(0.08));
+    g.lineTo(C(0.02), Y(0.08));
+    g.quadraticCurveTo(C(0.1), Y(0.3), C(0.08), Y(0.42));
+    g.quadraticCurveTo(C(0.02), Y(0.7), C(0.04), Y(1));
+    g.fill();
+  };
+  curtain(1);
+  curtain(-1);
+}
+
+function pane(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The light through the window's glass, brighter at the top, with rain running down it as darker streaks.
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.6)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, w, h);
+  g.save();
+  g.globalCompositeOperation = 'destination-out';
+  g.strokeStyle = 'rgba(0,0,0,0.55)';
+  g.lineCap = 'round';
+  g.lineWidth = Math.max(1, w * 0.012);
+  // Fixed streaks (no randomness: the same every load), each a short slanted run with a drop at its foot.
+  for (let i = 0; i < 26; i++) {
+    const u = (i * 0.618034) % 1,
+      v = (i * 0.381966 + 0.13 * (i % 3)) % 1;
+    const len = 0.08 + 0.1 * ((i * 0.7548) % 1);
+    g.beginPath();
+    g.moveTo(u * w, v * h);
+    g.lineTo((u - 0.015) * w, (v + len) * h);
+    g.stroke();
+  }
+  g.restore();
+}
+
+function box(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A moving box, its top flaps open, the tape down its front cut as a thin line.
+  g.fillRect(0, h * 0.16, w, h * 0.84);
+  g.beginPath();
+  g.moveTo(w * 0.02, h * 0.17);
+  g.lineTo(w * 0.47, h * 0.17);
+  g.lineTo(w * 0.36, h * 0.02);
+  g.lineTo(-w * 0.02, h * 0.1);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.moveTo(w * 0.53, h * 0.17);
+  g.lineTo(w * 0.98, h * 0.17);
+  g.lineTo(w * 1.0, h * 0.06);
+  g.lineTo(w * 0.66, 0);
+  g.closePath();
+  g.fill();
+  cut(g, () => {
+    g.fillRect(w * 0.49, h * 0.22, Math.max(1, w * 0.025), h * 0.3);
+    g.fillRect(w * 0.08, h * 0.2, w * 0.84, Math.max(1, h * 0.02));
+  });
+}
+
+function blanket(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A blanket pulled over a small kid sitting with his knees up: a heap, its peak over his head (a little forward of the
+  // middle), sloping to his back and down over his knees to the floor, its hem rippling, and a fold cut in.
+  g.beginPath();
+  g.moveTo(0, h);
+  g.bezierCurveTo(w * 0.02, h * 0.55, w * 0.18, h * 0.1, w * 0.52, h * 0.02);
+  g.bezierCurveTo(w * 0.78, -h * 0.02, w * 0.86, h * 0.3, w * 0.84, h * 0.45);
+  g.bezierCurveTo(w * 0.98, h * 0.55, w * 1.0, h * 0.8, w * 0.99, h);
+  // The hem, rippling back from front to back along the floor.
+  for (let i = 1; i <= 6; i++) {
+    const u0 = 0.99 - ((i - 1) * 0.99) / 6,
+      u1 = 0.99 - (i * 0.99) / 6;
+    g.quadraticCurveTo(((u0 + u1) / 2) * w, h * (i % 2 ? 0.95 : 1.02), u1 * w, h);
+  }
+  g.closePath();
+  g.fill();
+  cut(g, () => {
+    g.lineWidth = Math.max(1, w * 0.018);
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(w * 0.4, h * 0.22);
+    g.quadraticCurveTo(w * 0.3, h * 0.55, w * 0.36, h * 0.86);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(w * 0.72, h * 0.5);
+    g.quadraticCurveTo(w * 0.66, h * 0.7, w * 0.72, h * 0.9);
+    g.stroke();
+  });
+}
+
+function beam(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A torch's beam: from its lens (the left, in the middle) spreading out to the right, brightest near the torch and fading.
+  const grad = g.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.moveTo(0, h * 0.44);
+  g.quadraticCurveTo(w * 0.6, h * 0.12, w, 0);
+  g.lineTo(w, h);
+  g.quadraticCurveTo(w * 0.6, h * 0.88, 0, h * 0.56);
+  g.closePath();
+  g.fill();
+}
+
 // The friend's hands (docs/STORY.md, "How a memory starts"): the shadow a child's hand casts making each shape, painted the way
 // the old shadow-puppet plates draw them, so it reads at once. The fingers that move (a rabbit's ears) are parts of their own.
 
@@ -826,6 +959,11 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   'autumn-tree': autumnTree,
   'friend-cup': friendCup,
   'friend-palm': friendPalm,
+  window: window_,
+  pane,
+  box,
+  blanket,
+  beam,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

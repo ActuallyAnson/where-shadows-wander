@@ -318,7 +318,8 @@ async function start(): Promise<void> {
     if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
     else if (cue.kind === 'mood') {
       if (cue.mood in CANDLE_MOODS) candleMood.to(cue.mood as CandleMoodName, cue.seconds);
-    } else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
+    } else if (cue.kind === 'storm') storm.strikeNow(cue.thunderAfter, 1);
+    else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
   // The friend's hand: a painted shadow of a hand making the shape (friend-puppet.ts), drawn as a puppet of its own and played
@@ -700,7 +701,7 @@ async function start(): Promise<void> {
     checkpoints: [
       { id: 'wake', label: '1 · Waking', shape: null },
       ...STORY_SCRIPT.map((sc, i) => {
-        const first = sc.beats[0];
+        const first = sc.beats.find((b) => b.kind === 'friend');
         return { id: String(i), label: sc.title ?? sc.id, shape: first?.kind === 'friend' ? first.shape : null };
       }),
     ],

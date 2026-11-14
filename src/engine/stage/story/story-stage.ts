@@ -7,8 +7,9 @@ import { FIREFLIES } from './fireflies';
 import { HOW_THEY_MET } from './how-they-met';
 import { LAST_ORDINARY_DAY } from './last-ordinary-day';
 import { THE_PARK } from './the-park';
+import { THE_STORM } from './the-storm';
 
-const joined = joinChapters('story', [HOW_THEY_MET, THE_PARK, FIREFLIES, LAST_ORDINARY_DAY]);
+const joined = joinChapters('story', [THE_STORM, HOW_THEY_MET, THE_PARK, FIREFLIES, LAST_ORDINARY_DAY]);
 
 export const STORY_STAGE = joined.scene;
 /** Each chapter's stretch of STORY_STAGE, by chapter id: where it starts and ends, seconds. */

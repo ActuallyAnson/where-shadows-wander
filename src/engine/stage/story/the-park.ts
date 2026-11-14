@@ -15,6 +15,7 @@ import {
   type Wobble,
 } from '../puppet/puppet-scene';
 import { FORT_DEPTH, FORT_OFF_X, RABBIT_REST } from './how-they-met';
+import { ROOM_DEPTH, ROOM_OFF_X } from './the-storm';
 import {
   FLOOR_Y,
   LYING_LIFT,
@@ -210,6 +211,8 @@ const tracks: Track[] = [
   // The fort and the kids slide away to the left behind them (the fort, standing back, a little behind).
   { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -FORT_OFF_X, FORT_DEPTH, true) },
   { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -OFF_WALL_X, 0, true) },
+  // His room (the window and the boxes) goes with the fort.
+  { part: 'room', prop: 'x', keys: slideKeys(SLIDE_OUT_S, SLIDE_S, 0, -ROOM_OFF_X, ROOM_DEPTH, true) },
   // The kids come in where the animals were, running.
   { part: 'run-boy', prop: 'opacity', keys: fadeKeys(CHANGE_S, CHANGE_LEN_S, 0, 1) },
   { part: 'run-friend', prop: 'opacity', keys: fadeKeys(CHANGE_S, CHANGE_LEN_S, 0, 1) },

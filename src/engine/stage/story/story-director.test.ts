@@ -197,10 +197,18 @@ describe('the story script', () => {
     expect(validateScene(STORY_STAGE)).toEqual([]);
   });
 
-  it('scene 2 opens with the friend’s rabbit, and its memory starts from the player’s rabbit', () => {
-    const [first, second] = STORY_SCRIPT[0].beats;
+  it('scene 2 opens on the night they met, then the friend’s rabbit, and its memory starts from the player’s rabbit', () => {
+    const [prologue, first, second] = STORY_SCRIPT[0].beats;
+    expect(prologue).toMatchObject({ kind: 'memory', start: STORY_CHAPTER['the-storm'].start });
+    expect(prologue).not.toHaveProperty('from');
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });
     expect(second).toMatchObject({ kind: 'memory', from: 'rabbit' });
+  });
+
+  it('lights the room’s window with the night they met’s lightning', () => {
+    const storm = (STORY_STAGE.cues ?? []).filter((c) => c.kind === 'storm');
+    expect(storm.length).toBe(1);
+    expect(storm[0].t).toBeLessThan(STORY_CHAPTER['the-storm'].end);
   });
 
   it('plays the memories as one show: each chapter starts where the one before it ended', () => {
@@ -215,15 +223,23 @@ describe('the story script', () => {
     expect(at).toBeCloseTo(STORY_STAGE.length);
   });
 
-  it('never fades the fort out: it slides on from the right and off to the left', () => {
+  it('never fades the fort: it comes down from above the wall on the night they met, and slides off to the left', () => {
     const fort = STORY_STAGE.tracks.filter((t) => t.part === 'fort');
-    expect(fort.map((t) => t.prop)).toEqual(['x']);
-    const keys = fort[0].keys;
-    expect(keys[0][1]).toBeGreaterThan(1);
-    expect(keys[keys.length - 1][1]).toBeLessThan(-1);
-    // Still on the wall, in place, while the friend's fox waits.
+    expect(fort.map((t) => t.prop).sort()).toEqual(['x', 'y']);
+    const x = fort.find((t) => t.prop === 'x')!.keys;
+    expect(x[0][1]).toBeCloseTo(0);
+    expect(x[x.length - 1][1]).toBeLessThan(-1);
     const p = new ScenePlayer(STORY_STAGE);
-    p.seek(STORY_CHAPTER['how-they-met'].end);
+    const fortY = (t: number) => {
+      p.seek(t);
+      return p.world[p.partIndex('fort') * POSE_STRIDE + 1];
+    };
+    // Hung above the wall (its base past the top) when the story starts...
+    expect(fortY(0)).toBeGreaterThan(0.53);
+    // ...and down, in place, while the friend's rabbit waits, and still while her fox waits.
+    const down = fortY(STORY_CHAPTER['the-storm'].end);
+    expect(down).toBeLessThan(0);
+    expect(fortY(STORY_CHAPTER['how-they-met'].end)).toBeCloseTo(down);
     expect(p.world[p.partIndex('fort') * POSE_STRIDE]).toBeCloseTo(0);
   });
 

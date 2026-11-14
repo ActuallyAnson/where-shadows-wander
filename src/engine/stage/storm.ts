@@ -48,6 +48,9 @@ export class Storm {
   /** When the waiting thunder is due; Infinity when none is. */
   private thunderAt = Infinity;
   private thunderFired = false;
+  /** The next strike's thunder delay and strength when strikeNow set them, else NaN (drawn at random). */
+  private nextDelay = NaN;
+  private nextStrength = NaN;
   private seed: number;
 
   constructor(
@@ -67,8 +70,11 @@ export class Storm {
     if (this.t >= this.nextStrike) {
       // Timed from when it was due, not from this frame, so a frame's length does not shift the flash.
       this.strikeAt = this.nextStrike;
-      this.strength = s.flashMin + (s.flashMax - s.flashMin) * this.random();
-      this.thunderAt = this.strikeAt + s.delayMinS + (s.delayMaxS - s.delayMinS) * this.random();
+      const strength = s.flashMin + (s.flashMax - s.flashMin) * this.random();
+      const delay = s.delayMinS + (s.delayMaxS - s.delayMinS) * this.random();
+      this.strength = Number.isNaN(this.nextStrength) ? strength : this.nextStrength;
+      this.thunderAt = this.strikeAt + (Number.isNaN(this.nextDelay) ? delay : this.nextDelay);
+      this.nextDelay = this.nextStrength = NaN;
       this.nextStrike = Math.max(this.t, this.strikeAt + s.gapMinS + (s.gapMaxS - s.gapMinS) * this.random());
     }
     if (this.t >= this.thunderAt) {
@@ -77,9 +83,14 @@ export class Storm {
     }
   }
 
-  /** Makes the next update strike (for trying it out); the strikes after it keep their usual gaps. */
-  strikeNow(): void {
+  /**
+   * Makes the next update strike (a memory's storm, or trying it out), its thunder `thunderAfterS` seconds later and as bright as
+   * `strength` when given; the strikes after it keep their usual gaps.
+   */
+  strikeNow(thunderAfterS = NaN, strength = NaN): void {
     this.nextStrike = this.t;
+    this.nextDelay = thunderAfterS;
+    this.nextStrength = strength;
   }
 
   /** How bright the window's flash is now (0..1). */

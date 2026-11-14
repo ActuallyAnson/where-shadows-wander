@@ -1,42 +1,39 @@
-// Scene 2, "How they met" (docs/STORY.md): the first chapter of the story's puppet show (story-stage.ts), played once the player
-// has copied the friend's rabbit. The player's rabbit becomes a puppet rabbit, and the fort slides in around it: two small kids
-// under a blanket fort with a torch between them. The rabbit hops onto the friend's raised hand; the new kid tries, makes a lumpy
+// Scene 2, "How they met" (docs/STORY.md): the story's second chapter (story-stage.ts), played once the player has copied the
+// friend's rabbit. The night they met (the-storm.ts) has put the two small kids under the blanket fort with a torch between
+// them; the player's rabbit becomes a puppet rabbit in it. The rabbit hops onto the friend's raised hand; the new kid tries, makes a lumpy
 // shape, the friend leans over to help, and his rabbit comes right; the two rabbits nod at each other, and the kids laugh. Then
 // the rabbit hops down onto the blanket, and the friend raises her hand again for the next shape: the chapter ends on that, and
 // the story holds the picture while the friend's hand shows the fox. Every time is in seconds from the chapter's start.
-import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
-import { bobKeys, swingKeys, type Cue, type PuppetPart, type Track, type Wobble } from '../puppet/puppet-scene';
+import type { Chapter } from '../puppet/chapters';
+import { bobKeys, swingKeys, type Cue, type PuppetPart, type Track } from '../puppet/puppet-scene';
 import { ROOM_WALL_HEIGHT_M, ROOM_WALL_WIDTH_M, STORY_SCALE } from '../stage-frame';
-import { ARM_DOWN, ARM_UP, FLOOR_Y, KID_SCALE, handAt, hops, sittingKid } from './story-kit';
+import { ARM_DOWN, ARM_UP, FLOOR_Y, KID_SCALE, handAt, hops } from './story-kit';
 
 export { FLOOR_Y };
 
 /** Where each kid sits: the friend on the left facing right, the boy on the right facing left. */
 export const FRIEND_X = -0.3;
-const BOY_X = 0.3;
+export const BOY_X = 0.3;
 
 /** The puppet rabbit: from the player's shadow (the handoff) to its first place, then hopping to the friend's raised hand. */
 export const RABBIT_FROM: readonly [number, number] = [0.04, 0.06];
-const RABBIT_HOPS_S = 5.0;
+const RABBIT_HOPS_S = 2.4;
 const RABBIT_HOP_S = 0.55;
 const RABBIT_SMALL = 0.7;
 
-/** The fort and the kids slide in from the right around the sitting rabbit (the fort, further back, a little behind them). */
-const SLIDE_IN_S = 1.6;
-const SLIDE_S = 2.6;
 /** The boy raises his hand and makes a lump, the friend leans over to help, and the boy's rabbit comes right. */
-const BOY_ARM_UP_S = 7.6;
-const LUMP_S = 8.8;
-const HELP_S = 11.0;
-const RIGHT_S = 12.6;
+const BOY_ARM_UP_S = 5.0;
+const LUMP_S = 6.2;
+const HELP_S = 8.4;
+const RIGHT_S = 10.0;
 /** They laugh. */
-const LAUGH_S = 15.0;
+const LAUGH_S = 12.4;
 const LAUGH_LEN_S = 3.2;
 /** The boy lowers his hand (his rabbit gone), the rabbit hops down to the blanket, and the friend's arm goes down... */
-const SETTLE_S = 19.4;
+const SETTLE_S = 16.8;
 /** ...and comes up again: the next shape. The chapter ends with it raised. */
-const ASK_S = 21.4;
-export const HOW_THEY_MET_LENGTH_S = 22.6;
+const ASK_S = 18.8;
+export const HOW_THEY_MET_LENGTH_S = 20.0;
 /** Where the rabbit sits on the blanket at the end, between the kids: where the fox finds it. */
 export const RABBIT_REST: readonly [number, number] = [0.02, FLOOR_Y];
 export const RABBIT_REST_SCALE = 0.85;
@@ -51,50 +48,15 @@ const LEAN_HAND_X = 0.07 * KID_SCALE;
 export const FORT_DEPTH = 0.6;
 /** Half the wall's width and height in stage metres: the fort fills the wall, so the kids are inside it with the player. */
 const WALL_HALF_W = ROOM_WALL_WIDTH_M / 2 / STORY_SCALE;
-const WALL_HALF_H = ROOM_WALL_HEIGHT_M / 2 / STORY_SCALE;
+export const WALL_HALF_H = ROOM_WALL_HEIGHT_M / 2 / STORY_SCALE;
 /** The fort's size: its chair backs just past the wall's sides, and its blanket's peak just past the wall's top. */
-const FORT_W = 2 * WALL_HALF_W + 0.12;
-const FORT_BASE_Y = FLOOR_Y - 0.01;
-const FORT_H = (WALL_HALF_H - FORT_BASE_Y) / 0.94;
+export const FORT_W = 2 * WALL_HALF_W + 0.12;
+export const FORT_BASE_Y = FLOOR_Y - 0.01;
+export const FORT_H = (WALL_HALF_H - FORT_BASE_Y) / 0.94;
 /** How far the fort slides to be off the wall: it is wider than the other places, so it starts and ends further out. */
 export const FORT_OFF_X = WALL_HALF_W + FORT_W / 2 + 0.02;
 
 const parts: PuppetPart[] = [
-  // The fort, standing back and filling the wall, and in front of it the torch and the two kids (the scenery), sliding in together.
-  {
-    id: 'fort',
-    art: 'fort',
-    w: FORT_W,
-    h: FORT_H,
-    pivot: [0.5, 0],
-    x: FORT_OFF_X,
-    y: FORT_BASE_Y,
-    depth: FORT_DEPTH,
-  },
-  { id: 'scenery', art: '', w: 1, h: 1, x: OFF_WALL_X },
-  {
-    id: 'torch-light',
-    art: 'orb',
-    look: 'glow',
-    tint: [1, 0.8, 0.5],
-    parent: 'scenery',
-    w: 0.46,
-    h: 0.46,
-    y: FLOOR_Y + 0.05,
-    opacity: 0.55,
-  },
-  {
-    id: 'torch',
-    art: 'torch',
-    parent: 'scenery',
-    w: 0.06,
-    h: 0.025,
-    pivot: [0.5, 0],
-    y: FLOOR_Y,
-    angle: 0.15,
-  },
-  ...sittingKid('friend', FRIEND_X, 1, { parent: 'scenery', y: FLOOR_Y, armUp: true, girl: true }),
-  ...sittingKid('boy', BOY_X, -1, { parent: 'scenery', y: FLOOR_Y }),
   // The boy's first try: a lump on his hand, which comes right as his rabbit.
   {
     id: 'lump',
@@ -132,8 +94,6 @@ const downHops = hops(DOWN_HOPS_S, 2, DOWN_HOP_S, RABBIT_AT_HAND, RABBIT_REST, 0
 const downEnd = DOWN_HOPS_S + 2 * DOWN_HOP_S;
 
 const tracks: Track[] = [
-  { part: 'fort', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, FORT_OFF_X, 0, FORT_DEPTH) },
-  { part: 'scenery', prop: 'x', keys: slideKeys(SLIDE_IN_S, SLIDE_S, OFF_WALL_X, 0) },
   // The rabbit comes off the player's shadow, sits, hops to the friend's hand and shrinks to sit on it.
   {
     part: 'rabbit',
@@ -315,14 +275,6 @@ const tracks: Track[] = [
   { part: 'boy-body', prop: 'scale', keys: bobKeys(LAUGH_S, LAUGH_S + LAUGH_LEN_S - 0.2, 0.4, 1, 0.025) },
 ];
 
-const wobbles: Wobble[] = [
-  // The torch's light breathes; the kids breathe.
-  { part: 'torch-light', prop: 'scale', amp: 0.025, period: 2.3 },
-  { part: 'torch-light', prop: 'opacity', amp: 0.04, period: 1.7, phase: 1 },
-  { part: 'friend-body', prop: 'angle', amp: 0.012, period: 3.6 },
-  { part: 'boy-body', prop: 'angle', amp: 0.012, period: 3.9, phase: 2 },
-];
-
 /**
  * The lullaby's first note as the rabbit comes off the player's hand, and as the boy's rabbit comes right; two as they laugh;
  * one as the friend's hand goes up again.
@@ -340,6 +292,5 @@ export const HOW_THEY_MET: Chapter = {
   length: HOW_THEY_MET_LENGTH_S,
   parts,
   tracks,
-  wobbles,
   cues,
 };
