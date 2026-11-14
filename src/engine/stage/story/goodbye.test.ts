@@ -36,6 +36,8 @@ describe('the goodbye', () => {
     expect(face.y).toBeCloseTo(GOODBYE_AT[1], 3);
     expect(part.h * face.scale).toBeCloseTo(0.405, 3);
     expect(face.opacity).toBeGreaterThan(0.99);
+    // Upright, as the friend's hand is: tilted, it would read as a second hand appearing.
+    expect(Math.abs(face.angle)).toBeLessThan(0.01);
   });
 
   it('keeps each hand at the end of its kid’s arm, palms touching, through the hold and as they part', () => {
