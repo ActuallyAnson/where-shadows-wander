@@ -1,4 +1,4 @@
-// The story's stock puppets and moves (docs/STORY.md): the two kids sitting (scene 2's fort, scene 4's hill) and standing (running
+// The story's stock puppets and moves (docs/STORY.md): the two kids sitting (scene 2's fort, scene 4's park) and standing (running
 // in the park, walking to school), and the keys that make them walk, run and hop. Every memory builds its kids from here, so the
 // boy and the friend look the same in all of them. The friend is a girl (`girl`): a bow and a ponytail, and a dress when she
 // stands, so the two read apart at a glance. Plain data, built on load.

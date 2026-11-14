@@ -79,7 +79,7 @@ const LAUGH_LEN_S = 3.4;
 const DUSK_S = LAUGH_S + 1.2;
 const FIREFLY_S = LAUGH_S + LAUGH_LEN_S + 0.8;
 const FIREFLY_LEN_S = 4.2;
-export const FIREFLY_HOVER: readonly [number, number] = [0.08, 0.14];
+export const FIREFLY_HOVER: readonly [number, number] = [-0.02, 0.15];
 /** The friend reaches up towards it: the chapter ends with her arm up. */
 const REACH_S = FIREFLY_S + FIREFLY_LEN_S + 0.4;
 export const THE_PARK_LENGTH_S = REACH_S + 1.4;

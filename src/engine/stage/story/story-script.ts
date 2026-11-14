@@ -43,7 +43,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     beats: [
       // Lying in the grass, the friend reaches up; her hand rises at the wall's left, cupped.
       { kind: 'friend', shape: 'cup', x: -0.34, y: 0.24 },
-      // The firefly sits in the player's cup, then the hill, the jar, and the walk to school.
+      // The firefly sits in the player's cup, then the fireflies on their hands, the jar, and the walk to school.
       { kind: 'memory', from: 'firefly', handoff: CUP_HOLD_S, ...chapter('fireflies') },
     ],
   },
@@ -54,7 +54,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     beats: [
       // At the gate the friend raises her hand, and her hand's shadow rises beside her, waving.
       { kind: 'friend', shape: 'flat', puppet: 'wave', x: -0.32, y: 0.16 },
-      // The boy waves back; they go opposite ways; the friend's second wave goes unseen; the hill comes back with one boy.
+      // The boy waves back; they go opposite ways; the friend's second wave goes unseen; the park comes back with one boy.
       { kind: 'memory', ...chapter('last-ordinary-day') },
     ],
   },

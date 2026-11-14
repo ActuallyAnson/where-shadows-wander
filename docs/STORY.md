@@ -14,7 +14,7 @@ The friend is a girl, so the two kids read apart at a glance: her puppet has a b
 2.  **The friend teaches every shape.** The friend taught the boy his first shadow rabbit, and every shape after it is the friend saying "now try this one". The friend's hand that shows each shape comes out of the memory itself: the friend's puppet raises her hand, and the big shadow of her hand is lifted up onto the wall from below, her arm trailing off its bottom edge. Making the shapes she taught is how the boy remembers her.
 3.  **Threads that come back.** A few things recur so the ending pays off what came before:
     - **The wave.** The friend waves in the dream that wakes the boy (scene 1). At the school gate she turns back and waves once more, and the boy, already walking away, doesn't see it (scene 5). In scene 6 the same hand is raised alone on the wall, and this time the boy answers it, palm to palm. The night has been about returning that wave.
-    - **The rabbit and the fox.** The rabbit is the boy's shape, the fox is the friend's. They meet in the fort, chase each other into the park, and sit together on the hill. In scene 5, the rabbit goes one way and the fox the other.
+    - **The rabbit and the fox.** The rabbit is the boy's shape, the fox is the friend's. They meet in the fort, chase each other into the park, and lie together in its grass under the fireflies. In scene 5, the rabbit goes one way and the fox the other.
     - **The jar.** The jar from the firefly night was the friend's, and she gives it to the boy. It is on the boy's shelf in the room from the start, unlit, and the last of the candle finds it in scene 7.
     - **The storm.** They met on a stormy night, and the storm that wakes the boy is like that one. Thunder outside connects the room and the memory.
 4.  **A puppet stage, not a slideshow.** After the candle is lit, the wall never goes black and the story never fades out and in again. Scenes change the way a shadow theatre changes them: the cut-outs of one place slide off one side of the wall while the next place slides in from the other, and the kids walk through the change from one into the next (see [Scene changes](#scene-changes)).
@@ -44,8 +44,8 @@ This is the tutorial, the help for a stuck player, and the friend's presence in 
 
 Like a shadow theatre with rod puppets on a track:
 
-- **Places slide, they don't fade.** A place (the fort, the trees, the hill, the school gate) is a group of cut-outs. When the story moves on, the old place slides off one side of the wall, eased, as the new one slides in from the other, a little behind it, so the wall is never bare for long. Pieces at different depths slide at slightly different speeds (near ones faster), so it reads as the stage turning and not as a picture being swapped.
-- **Time moves left to right.** Moving forward in the friendship, places leave to the left and arrive from the right, and the kids walk or run rightwards through the change. Once, in scene 5, the hill slides back in from the left, the wrong way, because the story has stopped going forward.
+- **Places slide, they don't fade.** A place (the fort, the park, the school gate) is a group of cut-outs. When the story moves on, the old place slides off one side of the wall, eased, as the new one slides in from the other, a little behind it, so the wall is never bare for long. Pieces at different depths slide at slightly different speeds (near ones faster), so it reads as the stage turning and not as a picture being swapped.
+- **Time moves left to right.** Moving forward in the friendship, places leave to the left and arrive from the right, and the kids walk or run rightwards through the change. Once, in scene 5, the park slides back in from the left, the wrong way, because the story has stopped going forward.
 - **Characters carry over.** The two kids (and the rabbit and fox) stay on the wall through a change and walk into the next place, so the player follows them, not a cut.
 - **The light changes with the place.** During a change the candle's mood eases to the next memory's (`StoryScene.candle`), and the candle burns a little lower.
 - **The only fades** are the dream in scene 1, the friend's hand leaving in scene 6, and the final dark in scene 7.
@@ -63,8 +63,8 @@ Like a shadow theatre with rod puppets on a track:
 | 1 | Waking | the stormy night now | none (light the candle) | The candle's light on the wall, like the torch in the fort |
 | 2 | How they met | winter, a stormy night | Rabbit | The friend makes a fox with the torch: "now this one" |
 | 3 | The park | spring | Fox | Running into the evening; the first firefly |
-| 4 | Fireflies | summer | Cup | The friend gives him the jar; they walk down the hill towards school |
-| 5 | The last ordinary day | autumn | Flat (a wave) | The friend's wave the boy didn't see; the hill comes back with one boy on it |
+| 4 | Fireflies | summer | Cup | The friend gives him the jar; they walk on towards school |
+| 5 | The last ordinary day | autumn | Flat (a wave) | The friend's wave the boy didn't see; the park comes back with one boy in it |
 | 6 | Goodbye | the night now | Flat, palm to palm | The friend's hand fades; the candle is low |
 | 7 | Sleep | the night now | Cover the flame | — |
 
@@ -112,12 +112,12 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ### 4. Fireflies
 
 - **Purpose:** a quiet, close moment. The most tender memory.
-- **What happens:** when the player copies the cup, the firefly settles into their cupped shadow and glows there. The trees slide away and the ground rises into a hill as more fireflies come up out of the grass. The two kids sit side by side on the hill with a jar between them, fill it, and then let the fireflies go, a few at a time, until the jar is empty. The friend puts the empty jar in the boy's hands to keep. They stand and walk down the far side of the hill together, to the right.
+- **What happens:** when the player copies the cup, the firefly settles into their cupped shadow and glows there, then goes back to hover over the two kids, still lying in the grass. More fireflies come up out of the grass; the boy reaches up beside her, and the fireflies come down one at a time to settle on their two raised hands, which glow with them. They open their hands and let the fireflies go, a few at a time, up into the sky. Then they sit up in the grass and the friend gives the boy an empty jar, to catch them next time (a next time that never comes). They stand and walk on together, to the right.
 - **The player:** Cup.
-- **Ends on (the wait for scene 5):** as they walk, the hill slides off to the left and a school gate slides in from the right; it is morning, and autumn leaves fall. At the gate the boy turns round to face her; the friend's puppet, facing him, lifts her hand, and the friend's hand shadow rises flat, waving.
+- **Ends on (the wait for scene 5):** as they walk, the park slides off to the left and a school gate slides in from the right; it is morning, and autumn leaves fall. At the gate the boy turns round to face her; the friend's puppet, facing him, lifts her hand, and the friend's hand shadow rises flat, waving.
 - **Must make the player feel:** stillness, closeness, a summer that seemed endless.
 - **Puppets:** the kids sitting (one shot, to reuse in scene 5), a jar, fireflies (small lights on the wall), the school gate (arriving).
-- **Built (first pass, 13 Nov):** the firefly comes off the player's cup glowing brighter and goes back over the kids; they get up and walk on the spot as the park slides off and the hill slides in, eight fireflies rising from its grass; they sit (standing kids cross-fade to sitting ones), the friend sets the jar down, they fill it one firefly at a time (the jar glows brighter with each), let them go in threes over the top of the wall, and the friend puts the empty jar in the boy's lap; they stand and walk on, the boy carrying it, as the hill slides off and the school gate and an autumn tree slide in (the light turning to a pale morning), five leaves falling; the boy turns round at the gateway to face the friend, she raises her hand, and her waving hand rises beside her (about 40 s).
+- **Built (first pass, 13 Nov; reworked 14 Nov):** the firefly comes off the player's cup glowing brighter and goes back over the kids, lying in the park; eight fireflies rise from its grass and the boy reaches up beside her; the fireflies come down one at a time, turn and turn about, to their raised hands, each hand's glow brightening with each; they let them go in threes over the top of the wall, and their arms come down; they sit up in the grass (lying kids cross-fade to sitting ones), the friend sets the jar down beside her and then puts it, empty, in the boy's lap; they stand and walk on, the boy carrying it, as the park slides off and the school gate and an autumn tree slide in (the light turning to a pale morning), five leaves falling; the boy turns round at the gateway to face the friend, she raises her hand, and her waving hand rises beside her (about 38 s). The walk to the hill and filling the jar are gone (14 Nov): walking off to sit somewhere else read as unmotivated.
 - **To try:** the firefly light comes from the wall, not the candle, so this is the only scene with a second light. Check that it reads as magic, not as a bug. Whether the jar being handed over reads at this size.
 
 ### 5. The last ordinary day
@@ -125,11 +125,11 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Purpose:** the turn. Without saying it, show that this was the last time.
 - **What happens:** when the player waves, the boy waves back at the gate, face to face, as on any day, and they turn and go opposite ways: the boy off the right edge of the wall, the friend off the left. Just before the edge, the friend turns back once and waves again, but the boy's puppet is already gone. The wave hangs there, unanswered, and then the friend walks off too. The gate slides away, and the hill slides back in, from the left, the wrong way: the hill and the jar from scene 4, with only the boy sitting there.
 - **The player:** Flat (a wave).
-- **Ends on (the wait for scene 6):** the hill slides away, slowly, until the wall is empty for the first time since the candle was lit.
+- **Ends on (the wait for scene 6):** the park slides away, slowly, until the wall is empty for the first time since the candle was lit.
 - **Must make the player feel:** that something is ending, before they can say what.
-- **Puppets:** the school gate, the kids walking and waving, the single boy on the hill (from scene 4).
-- **Built (first pass, 13 Nov):** the boy waves back with his free hand and walks off the right edge with the jar; the friend walks left, turns back near the edge and waves at nobody, holds his hand up, lowers it, and walks off; the gate slides away to the right as the hill slides back in from the left, the light cooling to `low`, with only the boy on it and the jar on the grass where the friend sat; he bows his head, and the hill slides slowly off to the right, leaving the wall empty (about 37 s). The tune drops to single notes.
-- **How it lands without words:** the wave that isn't seen, the hill coming back the wrong way with the girl missing, the laughter from scene 3 gone, the music-box tune dropping to a single note, and the candle dimming. This is the scene to test hardest with someone who doesn't know the premise.
+- **Puppets:** the school gate, the kids walking and waving, the single boy sitting in the park's grass (from scene 4).
+- **Built (first pass, 13 Nov):** the boy waves back with his free hand and walks off the right edge with the jar; the friend walks left, turns back near the edge and waves at nobody, holds his hand up, lowers it, and walks off; the gate slides away to the right as the park slides back in from the left, the light cooling to `low`, with only the boy sitting in its grass and the jar beside him, towards where the friend sat; he bows his head, and the park slides slowly off to the right, leaving the wall empty (about 37 s). The tune drops to single notes.
+- **How it lands without words:** the wave that isn't seen, the park coming back the wrong way with the girl missing, the laughter from scene 3 gone, the music-box tune dropping to a single note, and the candle dimming. This is the scene to test hardest with someone who doesn't know the premise.
 
 ### 6. Goodbye
 
@@ -152,10 +152,10 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 
 ## Throughout the night
 
-- **The candle burns lower** at each scene change, so the player can see the night moving towards sleep. Its mood follows the memories (winter blue in the fort, warm in the park, dusk gold on the hill, pale morning at the gate) and cools again towards the end.
+- **The candle burns lower** at each scene change, so the player can see the night moving towards sleep. Its mood follows the memories (winter blue in the fort, warm in the park, dusk gold under the fireflies, pale morning at the gate) and cools again towards the end.
 - **The rain** falls all night outside the window, and its sound is a steady bed from the window's side. Now and then the window flickers pale and, a few seconds later, thunder rolls far off, low and muffled: safe inside on a wet night, never a threat (`src/engine/stage/storm.ts` times it; `__wsw.thunder()` brings a flash now). It is the same weather as the night they met, and it eases off in scene 7 as he nears sleep.
 - **The music** is the music-box tune, one melody that runs on through the scene changes, fuller in scenes 2 to 4, thinning in 5, a single note in 6, silent in 7.
-- **Puppets in total:** about eight (the boy and the girl, a rabbit, a fox, a blanket fort, trees, a hill, a school gate, a jar and fireflies), each with simple rod-puppet motion: slides, bobs and turns on one pivot; and one real jar in the room.
+- **Puppets in total:** about eight (the boy and the girl, a rabbit, a fox, a blanket fort, the park's trees and grass, a school gate, a jar and fireflies), each with simple rod-puppet motion: slides, bobs and turns on one pivot; and one real jar in the room.
 
 ## Build order
 
@@ -194,3 +194,4 @@ So that every step leaves a game we could submit:
 - 14 Nov 2026: the friend's rabbit hand rises at the wall's left, beyond the girl, instead of between the kids, where it hid them. Her fox hand moves there too (`x -0.5`).
 - 14 Nov 2026: in the park, the friend no longer somersaults (a fast 450-degree spin about her feet) as they fall; she topples back onto her back in one smooth quarter turn and skids past the boy.
 - 14 Nov 2026: in the park, nobody slides after falling: she tags him and drops back where she stops, he stumbles on and drops back just beyond her, and the laughing shake is two slow heaves. At the school gate the boy turns round so they face each other for the wave (scene 5: they wave face to face, then each turns away).
+- 14 Nov 2026: scene 4 stays in the park. Lying in the grass, the fireflies come down to both kids' raised hands and are let go from there; they sit up and she gives him the empty jar. The walk to the hill and filling the jar are gone, and in scene 5 the park, not the hill, comes back the wrong way with the boy alone in its grass.
