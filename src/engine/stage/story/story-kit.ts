@@ -19,12 +19,19 @@ const HAND_ALONG = 0.86;
 
 /** Where a sitting kid's raised hand is on the wall: what a rabbit sits on. */
 export function handAt(x: number, facing: 1 | -1, floor = FLOOR_Y): [number, number] {
-  const reach = ARM_LEN * (HAND_ALONG - 0.06);
+  return handAtArm(x, facing, ARM_UP, floor);
+}
+
+/** Where a sitting kid's hand is with its arm at `arm` radians from straight up, forward (its angle is -arm * facing). */
+export function handAtArm(x: number, facing: 1 | -1, arm: number, floor = FLOOR_Y): [number, number] {
   return [
-    x + KID_SCALE * facing * (SHOULDER[0] + Math.sin(ARM_UP) * reach),
-    floor + KID_SCALE * (SHOULDER[1] + Math.cos(ARM_UP) * reach),
+    x + KID_SCALE * facing * (SHOULDER[0] + Math.sin(arm) * SIT_REACH),
+    floor + KID_SCALE * (SHOULDER[1] + Math.cos(arm) * SIT_REACH),
   ];
 }
+
+/** How far along a sitting kid's arm its hand is, from the shoulder (unscaled): where a thing it holds hangs. */
+export const SIT_REACH = ARM_LEN * (HAND_ALONG - 0.06);
 
 export interface KidOptions {
   /** The part it hangs from (it slides with it). */
@@ -129,8 +136,6 @@ export const STANDING_H = KID_SCALE * (LEG_H + TORSO_H + 0.075);
 /** A standing kid's arm down along its side, and raised up and forward, clear of the head (both times -facing, like the sitting kid's). */
 export const STAND_ARM_DOWN = 2.95;
 export const STAND_ARM_UP = 0.8;
-/** How far a lying kid's root (its feet) is lifted so its back rests on the ground and does not sink into it. */
-export const LYING_LIFT = 0.045;
 
 /**
  * A kid standing, side on, facing right (1) or left (-1): `id` (an invisible root at its feet, which it turns about to lie down),

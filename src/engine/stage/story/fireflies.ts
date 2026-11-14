@@ -1,28 +1,33 @@
 // Scene 4, "Fireflies" (docs/STORY.md): the chapter after the friend's cup. The firefly settles into the player's cupped shadow
 // and glows there, then goes back to hover over the kids, still lying in the park's grass at dusk. More fireflies come up out
 // of the grass; the boy reaches up too, and the fireflies come down, one at a time, to settle on their two raised hands, which
-// glow with them. They open their hands and let them go, a few at a time, up and away over the top of the wall. Then they sit
-// up in the grass, and the friend gives the boy an empty jar, to catch them next time. They stand and walk on; the park slides
-// off to the left and a school gate slides in from the right in a pale autumn morning, leaves falling. At the gate the boy
-// turns round to face the friend, and she raises her hand: the chapter ends on that, and the story holds the picture while
-// the friend's hand waves. Every time is in seconds from the chapter's start.
+// glow with them. They open their hands and let them go, a few at a time, up and away over the top of the wall; all but the
+// first, the player's, which lingers over them. They sit up in the grass, turned to each other; the friend takes out a jar,
+// the lingering firefly comes down into it, and she holds it out to the boy, glowing, and he takes it into his lap. They stand
+// and walk on; the park slides off to the left and a school gate slides in from the right in a pale autumn morning (the jar's
+// light lost in the daylight), leaves falling. At the gate the boy turns round to face the friend, and she raises her hand:
+// the chapter ends on that, and the story holds the picture while the friend's hand waves. Every time is in seconds from the
+// chapter's start.
 import { slideKeys, type Chapter } from '../puppet/chapters';
 import type { Cue, Key, PuppetPart, Track, Wobble } from '../puppet/puppet-scene';
 import {
   ARM_DOWN,
   FIREFLY_TINT,
   FLOOR_Y,
+  KID_SCALE,
+  SIT_REACH,
   STAND_ARM_DOWN,
   STAND_ARM_UP,
   WALK,
   fadeKeys,
   firefly,
   fireflyWobbles,
+  handAtArm,
   sittingKid,
   standingKid,
   stepTracks,
 } from './story-kit';
-import { BOY_LIES_X, FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, PARK_FROM_DX, PARK_TREES } from './the-park';
+import { FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, LYING_ARM, PARK_FROM_DX, PARK_TREES } from './the-park';
 
 /** The firefly sits in the player's cup this long (the handoff), glowing brighter, then goes back to hover over the kids. */
 export const CUP_HOLD_S = 2.6;
@@ -44,16 +49,21 @@ const RELEASE_LEN_S = 3.4;
 /** Their arms come down... */
 const ARMS_DOWN_S = RELEASE_S + 2 * RELEASE_GROUP_S + 1.4;
 const ARMS_DOWN_LEN_S = 1.2;
-/** ...and they sit up in the grass (the lying kids give way to sitting ones). */
+/** ...and they sit up in the grass, turned to each other (the lying kids give way to sitting ones). */
 const SIT_S = ARMS_DOWN_S + ARMS_DOWN_LEN_S + 0.4;
 const CROSS_S = 0.6;
-/** The friend sets a jar down beside her... */
+/** The friend takes out a jar and holds it in her lap... */
 const JAR_S = SIT_S + 0.9;
-/** ...and gives it to the boy, empty. */
-const GIVE_S = JAR_S + 2.0;
-const GIVE_LEN_S = 1.4;
+/** ...and the first firefly, the one that would not go, comes down into it. */
+const INTO_JAR_S = JAR_S + 0.9;
+const INTO_JAR_LEN_S = 1.4;
+/** She holds it out, he reaches for it, takes it, and brings it in to his lap. */
+const GIVE_S = INTO_JAR_S + INTO_JAR_LEN_S + 0.8;
+const OFFER_LEN_S = 0.9;
+export const HANDOVER_S = GIVE_S + OFFER_LEN_S + 0.3;
+const TAKE_LEN_S = 0.9;
 /** They stand and walk on; the park slides away and the school gate slides in, in a pale morning. */
-const STAND_S = GIVE_S + GIVE_LEN_S + 1.4;
+const STAND_S = HANDOVER_S + TAKE_LEN_S + 1.4;
 const WALK_S = STAND_S + 0.6;
 const PARK_OUT_S = WALK_S + 0.4;
 const PARK_OUT_LEN_S = 4.0;
@@ -70,21 +80,32 @@ export const FIREFLIES_LENGTH_S = RAISE_S + 1.6;
  * Where their raised hands are on the wall while the fireflies come to them (the tips of their front arms, lying on their backs;
  * fireflies.test.ts checks these against the puppets).
  */
-export const FRIEND_HAND: readonly [number, number] = [-0.048, 0.028];
-export const BOY_HAND: readonly [number, number] = [0.375, 0.043];
-/** A firefly's light on a hand, along the arm from the shoulder (unscaled). */
-const HAND_ALONG = 0.07;
+export const FRIEND_HAND: readonly [number, number] = [0.045, 0.031];
+export const BOY_HAND: readonly [number, number] = [0.458, 0.047];
+/** The fireflies' light on a lying kid's hand, along the arm from the shoulder (unscaled). */
+const LYING_HAND_ALONG = 0.07;
 
+/** The sitting kids' arms, radians from straight up, forward: the jar in her lap, held out between them, and in his lap. */
+const LAP_ARM = 2.4;
+const OFFER_ARM = 1.75;
+export const BOY_HOLD_ARM = 2.3;
 /**
- * Where they sit up, on the grass (it is at 0 when the park is there, so these are on the wall too): a little closer than
- * they lay, the friend on the left, the boy on the right, both looking right.
+ * Where they sit up, on the grass (it is at 0 when the park is there, so these are on the wall too), turned to each other:
+ * the friend on the left looking right, the boy on the right looking left, just so far apart that their hands meet when both
+ * reach out (the jar passes from hers to his there).
  */
 export const FRIEND_SIT_X = FRIEND_LIES_X - 0.08;
-export const BOY_SIT_X = BOY_LIES_X - 0.17;
-/** The jar's place on the grass: beside the friend, then in the boy's lap. */
-const JAR_X = FRIEND_SIT_X + 0.15;
-export const JAR_LAP_X = BOY_SIT_X + 0.05;
-export const JAR_LAP_DY = 0.055;
+export const BOY_SIT_X = FRIEND_SIT_X + 2 * handAtArm(0, 1, OFFER_ARM)[0];
+/** Where the jar is held: in her lap, and where their hands meet (on the wall). */
+export const JAR_IN_LAP = handAtArm(FRIEND_SIT_X, 1, LAP_ARM);
+export const JAR_HANDED = handAtArm(FRIEND_SIT_X, 1, OFFER_ARM);
+/** The jar, as the kids hold it (its middle at the hand). */
+const JAR_W = 0.04;
+const JAR_H = 0.054;
+/** The jar's mouth in her lap, where the firefly goes in (the jar is scaled with the kid). */
+const JAR_MOUTH: readonly [number, number] = [JAR_IN_LAP[0], JAR_IN_LAP[1] + 0.4 * JAR_H * KID_SCALE];
+/** Where the first firefly lingers when the others go: just over her. */
+const LINGER: readonly [number, number] = [FIREFLY_HOVER[0] + 0.1, FIREFLY_HOVER[1] - 0.02];
 
 /** The school gate: its middle and size. The kids stop at it, the boy at its gateway, the friend on the near side. */
 export const GATE_X = 0.24;
@@ -137,9 +158,36 @@ const handGlow = (kid: string): PuppetPart => ({
   parent: `${kid}-arm-front`,
   w: 0.075,
   h: 0.075,
-  y: HAND_ALONG,
+  y: LYING_HAND_ALONG,
   opacity: 0,
 });
+
+/** A firefly's light in a jar. */
+const jarGlow = (jar: string): PuppetPart => ({
+  id: `${jar}-glow`,
+  art: 'orb',
+  look: 'glow',
+  tint: FIREFLY_TINT,
+  parent: jar,
+  w: 0.1,
+  h: 0.1,
+  opacity: 0,
+});
+
+/** The jar in a sitting kid's hand: hung from the arm at the hand, its middle there (it is turned against the arm, below). */
+const heldJar = (kid: string): PuppetPart[] => [
+  {
+    id: `${kid}-jar`,
+    art: 'jar',
+    parent: `${kid}-arm`,
+    w: JAR_W,
+    h: JAR_H,
+    pivot: [0.5, 0.5],
+    y: SIT_REACH,
+    opacity: 0,
+  },
+  jarGlow(`${kid}-jar`),
+];
 
 const parts: PuppetPart[] = [
   // The gate and its tree stand back.
@@ -166,9 +214,12 @@ const parts: PuppetPart[] = [
   // The light on their hands.
   handGlow('run-friend'),
   handGlow('run-boy'),
-  // Sitting up in the grass (they go with it when the park slides), and the jar.
+  // Sitting up in the grass, turned to each other (they go with it when the park slides), and the jar in their hands; and
+  // the jar set down in the grass, for scene 5.
   ...sittingKid('park-friend', FRIEND_SIT_X, 1, { parent: 'grass', opacity: 0, girl: true }),
-  ...sittingKid('park-boy', BOY_SIT_X, 1, { parent: 'grass', opacity: 0 }),
+  ...heldJar('park-friend'),
+  ...sittingKid('park-boy', BOY_SIT_X, -1, { parent: 'grass', opacity: 0 }),
+  ...heldJar('park-boy'),
   {
     id: 'park-jar',
     art: 'jar',
@@ -176,7 +227,7 @@ const parts: PuppetPart[] = [
     w: 0.055,
     h: 0.075,
     pivot: [0.5, 0],
-    x: JAR_X,
+    x: BOY_SIT_X,
     y: 0,
     opacity: 0,
     depth: 0,
@@ -187,6 +238,7 @@ const parts: PuppetPart[] = [
   ...standingKid('walk-friend', FRIEND_SIT_X, 1, { opacity: 0, girl: true }),
   ...standingKid('walk-boy', BOY_SIT_X, 1, { opacity: 0 }),
   { id: 'walk-jar', art: 'jar', parent: 'walk-boy', w: 0.04, h: 0.054, pivot: [0.5, 0], x: 0.05, y: 0.11 },
+  jarGlow('walk-jar'),
   // At the gate, each turned the other way about: the boy to face her (the jar still in his arm), then her to go her own way.
   ...standingKid('walk-boy-back', BOY_GATE_X, -1, { opacity: 0 }),
   {
@@ -218,6 +270,24 @@ const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smo
   [t1, to, ease],
 ];
 
+const step = (t: number, to: number): Key => [t, to, 'step'];
+
+/** How bright the firefly in the jar is. */
+const JAR_GLOW = 0.8;
+
+/**
+ * A sitting kid's arm moving through `keys` (radians from straight up, forward), and the jar in its hand turned the other way
+ * by just as much, with the same eases, so it stays upright however the arm swings.
+ */
+function armWithJar(kid: string, facing: 1 | -1, keys: readonly Key[]): Track[] {
+  const at = (sign: number): Key[] =>
+    keys.map(([t, v, e]): Key => (e === undefined ? [t, sign * -v * facing] : [t, sign * -v * facing, e]));
+  return [
+    { part: `${kid}-arm`, prop: 'angle', keys: at(1) },
+    { part: `${kid}-jar`, prop: 'angle', keys: at(-1) },
+  ];
+}
+
 const flyTracks: Track[] = ALL_FLIES.flatMap((id, i): Track[] => {
   const inAt = gatherAt(i);
   const outAt = releaseAt(i);
@@ -245,10 +315,18 @@ const flyTracks: Track[] = ALL_FLIES.flatMap((id, i): Track[] => {
   x.push([inAt, hover[0]], [inAt + INTO_HAND_S, hx, 'smooth']);
   y.push([inAt, hover[1]], [inAt + INTO_HAND_S, hy, 'smooth']);
   opacity.push([inAt + INTO_HAND_S - 0.2, 1], [inAt + INTO_HAND_S, 0, 'in']);
-  // Let go: off the open hand, up and away over the top of the wall.
-  x.push([outAt, hx], [outAt + RELEASE_LEN_S, ax, 'smooth']);
-  y.push([outAt, hy], [outAt + RELEASE_LEN_S, ay, 'in']);
-  opacity.push([outAt, 0], [outAt + 0.3, 1, 'out'], [outAt + RELEASE_LEN_S - 0.6, 1], [outAt + RELEASE_LEN_S, 0]);
+  if (i === 0) {
+    // The first, the player's, will not go: off the open hand it lingers over her, and then comes down into her jar.
+    const inJar = INTO_JAR_S + INTO_JAR_LEN_S;
+    x.push([outAt, hx], [outAt + 2, LINGER[0], 'smooth'], [INTO_JAR_S, LINGER[0]], [inJar, JAR_MOUTH[0], 'smooth']);
+    y.push([outAt, hy], [outAt + 2, LINGER[1], 'smooth'], [INTO_JAR_S, LINGER[1]], [inJar, JAR_MOUTH[1], 'smooth']);
+    opacity.push([outAt, 0], [outAt + 0.3, 1, 'out'], [inJar - 0.2, 1], [inJar, 0, 'in']);
+  } else {
+    // Let go: off the open hand, up and away over the top of the wall.
+    x.push([outAt, hx], [outAt + RELEASE_LEN_S, ax, 'smooth']);
+    y.push([outAt, hy], [outAt + RELEASE_LEN_S, ay, 'in']);
+    opacity.push([outAt, 0], [outAt + 0.3, 1, 'out'], [outAt + RELEASE_LEN_S - 0.6, 1], [outAt + RELEASE_LEN_S, 0]);
+  }
   return [
     { part: id, prop: 'x', keys: x },
     { part: id, prop: 'y', keys: y },
@@ -292,14 +370,14 @@ const tracks: Track[] = [
     part: 'run-boy-arm-front',
     prop: 'angle',
     keys: [
-      ...move(BOY_REACH_S, -STAND_ARM_DOWN, BOY_REACH_S + REACH_LEN_S, -1.45),
-      ...move(ARMS_DOWN_S + 0.2, -1.45, ARMS_DOWN_S + 0.2 + ARMS_DOWN_LEN_S, -STAND_ARM_DOWN),
+      ...move(BOY_REACH_S, LYING_ARM, BOY_REACH_S + REACH_LEN_S, -1.45),
+      ...move(ARMS_DOWN_S + 0.2, -1.45, ARMS_DOWN_S + 0.2 + ARMS_DOWN_LEN_S, LYING_ARM),
     ],
   },
   {
     part: 'run-friend-arm-front',
     prop: 'angle',
-    keys: move(ARMS_DOWN_S, -1.45, ARMS_DOWN_S + ARMS_DOWN_LEN_S, -STAND_ARM_DOWN),
+    keys: move(ARMS_DOWN_S, -1.45, ARMS_DOWN_S + ARMS_DOWN_LEN_S, LYING_ARM),
   },
   { part: 'run-friend-hand-glow', prop: 'opacity', keys: handGlowKeys(true) },
   { part: 'run-boy-hand-glow', prop: 'opacity', keys: handGlowKeys(false) },
@@ -311,38 +389,50 @@ const tracks: Track[] = [
   { part: 'run-friend', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 1, 0) },
   { part: 'park-boy', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 0, 1) },
   { part: 'park-friend', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 0, 1) },
-  // The friend reaches down and sets the jar beside her; then she takes it up and puts it in the boy's lap.
+  // The friend takes out the jar and holds it in her lap; the firefly comes down into it, and it glows. She holds it out,
+  // and the boy reaches for it, takes it from her hand (it passes from her jar to his, in the same place), and brings it in
+  // to his lap. Each jar hangs from its kid's hand, turned against the arm so it stays upright.
+  ...armWithJar('park-friend', 1, [
+    [JAR_S - 0.4, ARM_DOWN],
+    [JAR_S, LAP_ARM, 'smooth'],
+    [GIVE_S, LAP_ARM],
+    [GIVE_S + OFFER_LEN_S, OFFER_ARM, 'smooth'],
+    [HANDOVER_S + 0.3, OFFER_ARM],
+    [HANDOVER_S + 1.0, ARM_DOWN, 'smooth'],
+  ]),
+  ...armWithJar('park-boy', -1, [
+    [GIVE_S + 0.2, ARM_DOWN],
+    [GIVE_S + 0.2 + OFFER_LEN_S, OFFER_ARM, 'smooth'],
+    [HANDOVER_S, OFFER_ARM],
+    [HANDOVER_S + TAKE_LEN_S, BOY_HOLD_ARM, 'smooth'],
+  ]),
   {
-    part: 'park-friend-arm',
-    prop: 'angle',
+    part: 'park-friend-jar',
+    prop: 'opacity',
+    keys: [[JAR_S - 0.3, 0], [JAR_S + 0.2, 1, 'smooth'], step(HANDOVER_S, 0)],
+  },
+  { part: 'park-boy-jar', prop: 'opacity', keys: [[0, 0], step(HANDOVER_S, 1)] },
+  {
+    part: 'park-friend-jar-glow',
+    prop: 'opacity',
     keys: [
-      [JAR_S - 0.3, -ARM_DOWN],
-      [JAR_S + 0.3, -1.9, 'smooth'],
-      [JAR_S + 1.0, -1.9],
-      [JAR_S + 1.5, -ARM_DOWN, 'smooth'],
-      [GIVE_S - 0.4, -ARM_DOWN],
-      [GIVE_S, -1.8, 'smooth'],
-      [GIVE_S + GIVE_LEN_S, -1.5, 'smooth'],
-      [GIVE_S + GIVE_LEN_S + 0.5, -ARM_DOWN, 'smooth'],
+      [INTO_JAR_S + INTO_JAR_LEN_S - 0.1, 0],
+      [INTO_JAR_S + INTO_JAR_LEN_S + 0.4, JAR_GLOW, 'out'],
     ],
   },
-  { part: 'park-jar', prop: 'opacity', keys: fadeKeys(JAR_S, 0.5, 0, 1) },
-  { part: 'park-jar', prop: 'x', keys: move(GIVE_S, JAR_X, GIVE_S + GIVE_LEN_S, JAR_LAP_X) },
-  {
-    part: 'park-jar',
-    prop: 'y',
-    keys: [
-      [GIVE_S, 0],
-      [GIVE_S + GIVE_LEN_S / 2, JAR_LAP_DY + 0.04, 'out'],
-      [GIVE_S + GIVE_LEN_S, JAR_LAP_DY, 'in'],
-    ],
-  },
-  // The boy's hands come up to take it.
-  { part: 'park-boy-arm', prop: 'angle', keys: move(GIVE_S + 0.6, -ARM_DOWN, GIVE_S + GIVE_LEN_S, -1.75) },
-  // They stand and walk on, the boy with the jar, as the park slides away under them.
+  { part: 'park-boy-jar-glow', prop: 'opacity', keys: [[0, JAR_GLOW]] },
+  // They stand and walk on, the boy with the jar, as the park slides away under them; in the morning light the jar's glow
+  // can no longer be seen.
   { part: 'park-boy', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 1, 0) },
   { part: 'park-friend', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 1, 0) },
-  { part: 'park-jar', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 1, 0) },
+  {
+    part: 'walk-jar-glow',
+    prop: 'opacity',
+    keys: [
+      [PARK_OUT_S, JAR_GLOW],
+      [PARK_OUT_S + 5, 0, 'smooth'],
+    ],
+  },
   { part: 'walk-boy', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 0, 1) },
   { part: 'walk-friend', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 0, 1) },
   { part: 'walk-boy-arm-front', prop: 'angle', keys: [[0, -1.7]] },
@@ -426,7 +516,7 @@ const cues: Cue[] = [
   { t: GATHER_S + 4 * GATHER_EVERY_S, kind: 'note', note: 2 },
   { t: RELEASE_S, kind: 'note', note: 3 },
   { t: RELEASE_S + RELEASE_GROUP_S, kind: 'note', note: 4 },
-  { t: GIVE_S + GIVE_LEN_S, kind: 'note', note: 1 },
+  { t: HANDOVER_S, kind: 'note', note: 1 },
   { t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 },
   { t: RAISE_S, kind: 'note', note: 2 },
 ];

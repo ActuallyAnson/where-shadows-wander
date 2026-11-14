@@ -9,13 +9,12 @@ import { swingKeys, type Cue, type Key, type Track, type Wobble } from '../puppe
 import {
   AUTUMN_TREE_X,
   BOY_GATE_X,
+  BOY_HOLD_ARM,
   BOY_SIT_X,
   FRIEND_GATE_X,
   GATE_DEPTH,
   GATE_OFF_DX,
   GATE_X,
-  JAR_LAP_DY,
-  JAR_LAP_X,
   LEAVES,
 } from './fireflies';
 import { GRASS_W, PARK_FROM_DX, PARK_TREES } from './the-park';
@@ -49,8 +48,8 @@ const PARK_AWAY_S = BOW_S + 4.5;
 const PARK_AWAY_LEN_S = 7.0;
 export const LAST_ORDINARY_DAY_LENGTH_S = PARK_AWAY_S + PARK_AWAY_LEN_S * 1.1 + 1.2;
 
-/** The jar on the grass beside him, towards where the friend sat. */
-const JAR_BESIDE_X = BOY_SIT_X - 0.13;
+/** The jar in the grass in front of him (he faces left), towards where the friend sat. */
+const JAR_BESIDE_X = BOY_SIT_X - 0.12;
 
 const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smooth'): Key[] => [
   [t0, v],
@@ -151,20 +150,26 @@ const tracks: Track[] = [
     prop: 'x',
     keys: slideKeys(GATE_OUT_S, GATE_OUT_LEN_S, x, x + GATE_OFF_DX, 0, true),
   })),
-  // The park comes back from the left: the boy alone in its grass, the jar beside him, towards where the friend sat.
+  // The park comes back from the left: the boy alone in its grass, turned to where the friend sat, the jar (dark now) set
+  // down in the grass in front of him.
   { part: 'park-boy', prop: 'opacity', keys: [step(PARK_BACK_S - 0.2, 1)] },
   { part: 'park-friend', prop: 'opacity', keys: [step(PARK_BACK_S - 0.2, 0)] },
+  { part: 'park-boy-jar', prop: 'opacity', keys: [[PARK_BACK_S - 0.3, 1], step(PARK_BACK_S - 0.2, 0)] },
   { part: 'park-jar', prop: 'opacity', keys: [step(PARK_BACK_S - 0.2, 1)] },
-  { part: 'park-jar', prop: 'x', keys: [[PARK_BACK_S - 0.3, JAR_LAP_X], step(PARK_BACK_S - 0.2, JAR_BESIDE_X)] },
-  { part: 'park-jar', prop: 'y', keys: [[PARK_BACK_S - 0.3, JAR_LAP_DY], step(PARK_BACK_S - 0.2, 0)] },
-  { part: 'park-boy-arm', prop: 'angle', keys: [[PARK_BACK_S - 0.3, -1.75], step(PARK_BACK_S - 0.2, -ARM_DOWN)] },
+  { part: 'park-jar', prop: 'x', keys: [step(PARK_BACK_S - 0.2, JAR_BESIDE_X)] },
+  // (He faces left, so his arm's angles are the other way about.)
+  {
+    part: 'park-boy-arm',
+    prop: 'angle',
+    keys: [[PARK_BACK_S - 0.3, BOY_HOLD_ARM], step(PARK_BACK_S - 0.2, ARM_DOWN)],
+  },
   {
     part: 'park-boy-head',
     prop: 'angle',
     keys: [
       [PARK_BACK_S - 0.3, 0],
       [BOW_S, 0],
-      [BOW_S + 1.6, -0.2, 'smooth'],
+      [BOW_S + 1.6, 0.2, 'smooth'],
     ],
   },
   // The trees and the grass (the boy and the jar in it), each piece at its own depth.

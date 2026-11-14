@@ -16,17 +16,7 @@ import {
 } from '../puppet/puppet-scene';
 import { FORT_DEPTH, FORT_OFF_X, RABBIT_REST } from './how-they-met';
 import { ROOM_DEPTH, ROOM_OFF_X } from './the-storm';
-import {
-  FLOOR_Y,
-  LYING_LIFT,
-  RUN,
-  STAND_ARM_DOWN,
-  fadeKeys,
-  firefly,
-  fireflyWobbles,
-  standingKid,
-  stepTracks,
-} from './story-kit';
+import { FLOOR_Y, RUN, STAND_ARM_DOWN, fadeKeys, firefly, fireflyWobbles, standingKid, stepTracks } from './story-kit';
 
 /** The puppet fox: from the player's shadow (the handoff) to where it lands, behind the rabbit on the blanket. */
 export const FOX_LANDS: readonly [number, number] = [-0.16, FLOOR_Y];
@@ -63,15 +53,27 @@ const FRIEND_DRIFT_X = 0.0;
 const CATCH_S = 10.6;
 const FRIEND_CATCH_X = 0.17;
 const BOY_CAUGHT_X = 0.28;
-/** ...slows to a stop and drops back onto the grass where she stands; he stumbles on a few steps, laughing, and drops back
- * too, just beyond her. Each falls where they stop, a quarter turn backwards about the feet: nobody slides along the grass.
+/**
+ * ...slows to a stop and sits down hard in the grass, legs shooting out in front, and rolls back onto her back; he stumbles on
+ * a few steps, laughing, and does the same just beyond her. Nobody slides, and nobody tips over stiff as a plank.
  */
 const FRIEND_FALL_S = CATCH_S + 0.35;
 const BOY_FALL_S = CATCH_S + 0.8;
-const FALL_LEN_S = 0.6;
+/** Down onto the bottom (gathering speed), a beat, then back onto the back, the legs kicking up and flopping down. */
+const SIT_LEN_S = 0.3;
+const SAT_BEAT_S = 0.1;
+const ROLL_LEN_S = 0.45;
+const FALL_LEN_S = SIT_LEN_S + SAT_BEAT_S + ROLL_LEN_S;
 /** Where each lies (the feet: each lies on their back with the head to the left, the boy's head just past her feet). */
-export const BOY_LIES_X = 0.62;
-export const FRIEND_LIES_X = 0.21;
+export const BOY_LIES_X = 0.72;
+export const FRIEND_LIES_X = 0.32;
+/** A kid's root (the point under the hips) lying: this far left of the feet, and this high, so the back rests on the grass. */
+const HIPS_FROM_FEET = 0.14;
+const LIE_Y = FLOOR_Y - 0.075;
+/** Sitting on the grass before rolling back: the root that far down puts the bottom on the grass. */
+const SIT_Y = FLOOR_Y - 0.12;
+/** Where each stops running: the hips drop a little back as they sit. */
+const STOP_FROM_FEET = HIPS_FROM_FEET - 0.03;
 /** They laugh, lying there. */
 const LAUGH_S = BOY_FALL_S + FALL_LEN_S + 0.2;
 const LAUGH_LEN_S = 3.4;
@@ -79,7 +81,7 @@ const LAUGH_LEN_S = 3.4;
 const DUSK_S = LAUGH_S + 1.2;
 const FIREFLY_S = LAUGH_S + LAUGH_LEN_S + 0.8;
 const FIREFLY_LEN_S = 4.2;
-export const FIREFLY_HOVER: readonly [number, number] = [-0.02, 0.15];
+export const FIREFLY_HOVER: readonly [number, number] = [0.05, 0.15];
 /** The friend reaches up towards it: the chapter ends with her arm up. */
 const REACH_S = FIREFLY_S + FIREFLY_LEN_S + 0.4;
 export const THE_PARK_LENGTH_S = REACH_S + 1.4;
@@ -131,7 +133,10 @@ const parts: PuppetPart[] = [
   ...firefly('firefly', 0.5, 0.32),
 ];
 
+/** Lying back: the torso a quarter turn back from upright, the legs a quarter turn forward from hanging down. */
 const ROLL_BACK = Math.PI / 2;
+/** A lying kid's arm resting by its side (a little off the body). */
+export const LYING_ARM = -STAND_ARM_DOWN + 0.4;
 
 const tracks: Track[] = [
   // The park slides in from the right, the near pieces ahead of the far ones.
@@ -228,8 +233,9 @@ const tracks: Track[] = [
       [CHANGE_S, RABBIT_RUN_X],
       [DRIFT_TO_S, BOY_DRIFT_X, 'smooth'],
       [CATCH_S, BOY_CAUGHT_X, 'smooth'],
-      // Tagged, he stumbles on, slowing, and stops where he falls.
-      [BOY_FALL_S, BOY_LIES_X, 'smooth'],
+      // Tagged, he stumbles on, slowing, and stops where he sits down.
+      [BOY_FALL_S, BOY_LIES_X - STOP_FROM_FEET, 'smooth'],
+      [BOY_FALL_S + SIT_LEN_S, BOY_LIES_X - HIPS_FROM_FEET, 'out'],
     ],
   },
   {
@@ -239,8 +245,9 @@ const tracks: Track[] = [
       [CHANGE_S, FOX_RUN_X],
       [DRIFT_TO_S, FRIEND_DRIFT_X, 'smooth'],
       [CATCH_S, FRIEND_CATCH_X, 'in'],
-      // She slows to a stop and falls where she stands.
-      [FRIEND_FALL_S, FRIEND_LIES_X, 'out'],
+      // She slows to a stop and sits down where she stands.
+      [FRIEND_FALL_S, FRIEND_LIES_X - STOP_FROM_FEET, 'out'],
+      [FRIEND_FALL_S + SIT_LEN_S, FRIEND_LIES_X - HIPS_FROM_FEET, 'out'],
     ],
   },
   // Catching him, the friend's arms go forward.
@@ -251,22 +258,26 @@ const tracks: Track[] = [
       ...swingKeys(CHANGE_S - 0.2, CATCH_S, RUN.stride, RUN.arms, -STAND_ARM_DOWN, -STAND_ARM_DOWN, 1),
       [CATCH_S + 0.25, -1.45, 'out'],
       [FRIEND_FALL_S + FALL_LEN_S, -1.2],
-      [LAUGH_S, -STAND_ARM_DOWN + 0.4, 'smooth'],
+      [LAUGH_S, LYING_ARM, 'smooth'],
       // Lying on her back, she reaches up to the firefly (her body turned a quarter, so straight up is a quarter clockwise).
-      [REACH_S, -STAND_ARM_DOWN + 0.4],
+      [REACH_S, LYING_ARM],
       [REACH_S + 1.0, -1.45, 'smooth'],
     ],
   },
-  // Over they go, backwards, onto their backs: a quarter turn each, gathering speed as they go down, as a fall does.
-  { part: 'run-boy', prop: 'angle', keys: fallKeys(BOY_FALL_S, 0, ROLL_BACK) },
-  { part: 'run-friend', prop: 'angle', keys: fallKeys(FRIEND_FALL_S, 0, ROLL_BACK) },
-  // On their backs, they laugh: heads tipped back, and a couple of slow, small heaves, not a shake.
-  { part: 'run-boy', prop: 'y', keys: [...fallKeys(BOY_FALL_S, FLOOR_Y, FLOOR_Y + LYING_LIFT), ...laughKeys(LAUGH_S)] },
-  {
-    part: 'run-friend',
-    prop: 'y',
-    keys: [...fallKeys(FRIEND_FALL_S, FLOOR_Y, FLOOR_Y + LYING_LIFT), ...laughKeys(LAUGH_S + 0.25)],
-  },
+  // Down they go: onto their bottoms, then back onto their backs. On their backs they laugh: heads tipped back, and a couple
+  // of slow, small heaves, not a shake.
+  ...fallTracks('run-friend', FRIEND_FALL_S, LAUGH_S + 0.25),
+  ...fallTracks('run-boy', BOY_FALL_S, LAUGH_S),
+  // He flings his arms up as he goes down, and they flop back by his sides.
+  ...(['front', 'back'] as const).map((side): Track => ({
+    part: `run-boy-arm-${side}`,
+    prop: 'angle',
+    keys: [
+      [BOY_FALL_S, -STAND_ARM_DOWN],
+      [BOY_FALL_S + SIT_LEN_S, side === 'front' ? -1.3 : -1.6, 'out'],
+      [BOY_FALL_S + FALL_LEN_S + 0.3, LYING_ARM, 'smooth'],
+    ],
+  })),
   { part: 'run-boy-head', prop: 'angle', keys: laughHead(LAUGH_S) },
   { part: 'run-friend-head', prop: 'angle', keys: laughHead(LAUGH_S + 0.15) },
   // The firefly drifts in from the right, wandering, and comes to hover over them.
@@ -303,23 +314,60 @@ const tracks: Track[] = [
     part: 'run-boy-torso',
     prop: 'angle',
     keys: [
-      [FIREFLY_S + 1.5, 0],
-      [FIREFLY_S + 2.5, -0.12, 'smooth'],
+      [FIREFLY_S + 1.5, ROLL_BACK],
+      [FIREFLY_S + 2.5, ROLL_BACK - 0.12, 'smooth'],
     ],
   },
 ];
 
-/** A fall: holding `from` until `t0`, then down to `to` over FALL_LEN_S, speeding up. */
-function fallKeys(t0: number, from: number, to: number): Key[] {
+/**
+ * A running kid falling over backwards from `t0` and lying there laughing from `laughAt`: down onto the bottom, the legs
+ * shooting out in front (the root drops), a beat, then the torso rolls back onto the grass (gathering speed, with a small
+ * bounce as it lands) while the legs kick up and flop down. The root's x is in the kid's own x track.
+ */
+function fallTracks(id: string, t0: number, laughAt: number): Track[] {
+  const sat = t0 + SIT_LEN_S;
+  const rolls = sat + SAT_BEAT_S;
+  const down = rolls + ROLL_LEN_S;
+  const legs = (side: 'front' | 'back', kick: number): Track => ({
+    part: `${id}-leg-${side}`,
+    prop: 'angle',
+    keys: [
+      [t0, 0],
+      [sat, ROLL_BACK - 0.12, 'in'],
+      [rolls, ROLL_BACK - 0.12],
+      [rolls + ROLL_LEN_S * 0.7, ROLL_BACK + kick, 'out'],
+      [down + 0.35, ROLL_BACK, 'in'],
+    ],
+  });
   return [
-    [t0, from],
-    [t0 + FALL_LEN_S, to, 'in'],
+    legs('back', 0.25),
+    legs('front', 0.4),
+    {
+      part: `${id}-torso`,
+      prop: 'angle',
+      keys: [
+        [t0, 0],
+        // Sitting down hard, the body pitches a little forward...
+        [sat, -0.12, 'in'],
+        [rolls, -0.12],
+        // ...then over it goes onto its back, bouncing a touch as it lands.
+        [down, ROLL_BACK, 'in'],
+        [down + 0.12, ROLL_BACK - 0.06, 'out'],
+        [down + 0.3, ROLL_BACK, 'smooth'],
+      ],
+    },
+    {
+      part: id,
+      prop: 'y',
+      keys: [[t0, FLOOR_Y], [sat, SIT_Y, 'in'], [rolls, SIT_Y], [down, LIE_Y, 'smooth'], ...laughKeys(laughAt)],
+    },
   ];
 }
 
 /** A lying kid laughing: two slow heaves up off the grass, settling back. */
 function laughKeys(t0: number): Key[] {
-  return bobKeys(t0, t0 + 1.8, 0.9, FLOOR_Y + LYING_LIFT, 0.005).slice(1);
+  return bobKeys(t0, t0 + 1.8, 0.9, LIE_Y, 0.005);
 }
 
 /** A lying kid's head tipping back as it laughs (it faces right in its own frame, so back is counter-clockwise), and forward again. */
