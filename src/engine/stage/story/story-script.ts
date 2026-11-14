@@ -19,7 +19,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
       // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
       { kind: 'memory', ...chapter('the-storm') },
       // Beside the girl, in the empty wall at her left (not between the kids), the friend's hand rises making a rabbit, and waits.
-      { kind: 'friend', shape: 'rabbit', x: -0.58, y: 0.17 },
+      { kind: 'friend', shape: 'rabbit', x: -0.5, y: 0.17 },
       // The player's rabbit becomes the puppet rabbit and hops onto her hand. It ends on her hand raised again.
       { kind: 'memory', from: 'rabbit', ...chapter('how-they-met') },
     ],
@@ -29,8 +29,8 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '3 · The park',
     candle: 'rainy',
     beats: [
-      // In the fort, between the kids, the friend's hand rises beyond her puppet's raised one, making a fox: now this one.
-      { kind: 'friend', shape: 'fox', x: -0.08, y: 0.17 },
+      // In the fort, at the wall's left (clear of the kids and the rabbit on the blanket), the friend's hand rises beyond her puppet's raised one, making a fox: now this one.
+      { kind: 'friend', shape: 'fox', x: -0.5, y: 0.17 },
       // The player's fox pounces at the rabbit on the blanket, and the chase carries them out of the fort into the park, where
       // they become the two kids, tumble into the grass, and lie there at dusk under a firefly.
       { kind: 'memory', from: 'fox', ...chapter('the-park') },
