@@ -3,8 +3,8 @@
 // long hill slides in under them from the right, more fireflies rising out of its grass. They sit on its top side by side, a jar
 // between them; they fill it, a firefly at a time, and then let them go, a few at a time, until it is empty. The friend puts the
 // empty jar in the boy's hands. They stand and walk on, the boy carrying the jar; the hill slides off to the left and a school
-// gate slides in from the right in a pale autumn morning, leaves falling. At the gate the friend turns to go her own way and
-// raises her hand: the chapter ends on that, and the story holds the picture while the friend's hand waves.
+// gate slides in from the right in a pale autumn morning, leaves falling. At the gate the boy turns round to face the friend, and
+// she raises her hand: the chapter ends on that, and the story holds the picture while the friend's hand waves.
 // Every time is in seconds from the chapter's start.
 import { slideKeys, type Chapter } from '../puppet/chapters';
 import type { Cue, Key, PuppetPart, Track, Wobble } from '../puppet/puppet-scene';
@@ -189,6 +189,18 @@ const parts: PuppetPart[] = [
   ...standingKid('walk-friend', FRIEND_SIT_X, 1, { opacity: 0, girl: true }),
   ...standingKid('walk-boy', BOY_SIT_X, 1, { opacity: 0 }),
   { id: 'walk-jar', art: 'jar', parent: 'walk-boy', w: 0.04, h: 0.054, pivot: [0.5, 0], x: 0.05, y: 0.11 },
+  // At the gate, each turned the other way about: the boy to face her (the jar still in his arm), then her to go her own way.
+  ...standingKid('walk-boy-back', BOY_GATE_X, -1, { opacity: 0 }),
+  {
+    id: 'walk-boy-back-jar',
+    art: 'jar',
+    parent: 'walk-boy-back',
+    w: 0.04,
+    h: 0.054,
+    pivot: [0.5, 0],
+    x: -0.05,
+    y: 0.11,
+  },
   ...standingKid('walk-friend-back', FRIEND_GATE_X, -1, { opacity: 0, girl: true }),
   // The leaves.
   ...LEAVES.map((l, i): PuppetPart => ({
@@ -388,9 +400,9 @@ const tracks: Track[] = [
       },
     ];
   }),
-  // At the gate, the friend turns to go her own way (she is the other way about now)...
+  // At the gate the boy turns round to face her (he is the other way about now, the jar still in his arm)...
   {
-    part: 'walk-friend',
+    part: 'walk-boy',
     prop: 'opacity',
     keys: [
       [TURN_S, 1],
@@ -398,21 +410,20 @@ const tracks: Track[] = [
     ],
   },
   {
-    part: 'walk-friend-back',
+    part: 'walk-boy-back',
     prop: 'opacity',
     keys: [
       [TURN_S, 0],
       [TURN_S + TURN_LEN_S, 1],
     ],
   },
-  // ...and raises his hand.
+  { part: 'walk-boy-back-arm-front', prop: 'angle', keys: [[0, 1.7]] },
+  // ...and she, facing him, raises her hand.
   {
-    part: 'walk-friend-back-arm-front',
+    part: 'walk-friend-arm-front',
     prop: 'angle',
-    keys: move(RAISE_S, STAND_ARM_DOWN, RAISE_S + 0.9, STAND_ARM_UP),
+    keys: move(RAISE_S, -STAND_ARM_DOWN, RAISE_S + 0.9, -STAND_ARM_UP),
   },
-  // The boy, at the gateway, looks back at her.
-  { part: 'walk-boy-head', prop: 'angle', keys: move(TURN_S, 0, TURN_S + 0.6, 0.12) },
 ];
 
 /** A sitting kid's head turning up to the sky (it faces right: up is counter-clockwise), and back down. */
@@ -432,7 +443,7 @@ const wobbles: Wobble[] = [
   { part: 'hill-friend-body', prop: 'angle', amp: 0.01, period: 3.6 },
   { part: 'hill-boy-body', prop: 'angle', amp: 0.01, period: 3.9, phase: 2 },
   { part: 'autumn-tree', prop: 'angle', amp: 0.008, period: 4.6 },
-  { part: 'walk-friend-back-torso', prop: 'angle', amp: 0.01, period: 3.4 },
+  { part: 'walk-friend-torso', prop: 'angle', amp: 0.01, period: 3.4 },
 ];
 
 const cues: Cue[] = [

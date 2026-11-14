@@ -21,7 +21,7 @@ import {
   LEAVES,
   SIT_BOY_DX,
 } from './fireflies';
-import { ARM_DOWN, STAND_ARM_DOWN, STAND_ARM_UP, WALK, stepTracks } from './story-kit';
+import { ARM_DOWN, STAND_ARM_DOWN, STAND_ARM_UP, WALK, fadeKeys, stepTracks } from './story-kit';
 
 /** The boy waves back at the gate. */
 const WAVE_S = 0.4;
@@ -61,24 +61,29 @@ const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smo
 const step = (t: number, to: number): Key => [t, to, 'step'];
 
 const tracks: Track[] = [
-  // The boy waves back with his free hand, and the friend's raised hand waves too.
+  // Facing each other at the gate, the boy waves back with his free hand, and the friend's raised hand waves too.
   {
-    part: 'walk-boy-arm-back',
+    part: 'walk-boy-back-arm-back',
     prop: 'angle',
     keys: [
-      [WAVE_S, -STAND_ARM_DOWN],
-      ...swingKeys(WAVE_S + 0.4, WAVE_S + WAVE_LEN_S - 0.4, 0.8, 0.3, -0.35, -0.35),
-      [WAVE_S + WAVE_LEN_S, -STAND_ARM_DOWN, 'smooth'],
+      [WAVE_S, STAND_ARM_DOWN],
+      ...swingKeys(WAVE_S + 0.4, WAVE_S + WAVE_LEN_S - 0.4, 0.8, 0.3, 0.35, 0.35),
+      [WAVE_S + WAVE_LEN_S, STAND_ARM_DOWN, 'smooth'],
     ],
   },
   {
-    part: 'walk-friend-back-arm-front',
+    part: 'walk-friend-arm-front',
     prop: 'angle',
     keys: [
-      ...swingKeys(WAVE_S, WAVE_S + WAVE_LEN_S - 0.3, 0.9, 0.28, STAND_ARM_UP, STAND_ARM_UP),
-      [PART_S, STAND_ARM_DOWN, 'smooth'],
+      ...swingKeys(WAVE_S, WAVE_S + WAVE_LEN_S - 0.3, 0.9, 0.28, -STAND_ARM_UP, -STAND_ARM_UP),
+      [PART_S, -STAND_ARM_DOWN, 'smooth'],
     ],
   },
+  // Then each turns away, to go their own way: the boy through the gate, the friend back the way they came.
+  { part: 'walk-boy-back', prop: 'opacity', keys: fadeKeys(PART_S - 0.2, TURN_LEN_S, 1, 0) },
+  { part: 'walk-boy', prop: 'opacity', keys: fadeKeys(PART_S - 0.2, TURN_LEN_S, 0, 1) },
+  { part: 'walk-friend', prop: 'opacity', keys: fadeKeys(PART_S - 0.1, TURN_LEN_S, 1, 0) },
+  { part: 'walk-friend-back', prop: 'opacity', keys: fadeKeys(PART_S - 0.1, TURN_LEN_S, 0, 1) },
   // They go their ways.
   ...stepTracks('walk-boy', 1, PART_S + 0.1, BOY_GONE_S, WALK, { armsBusy: 'front' }),
   { part: 'walk-boy', prop: 'x', keys: move(PART_S + 0.1, BOY_GATE_X, BOY_GONE_S, 1.25, 'linear') },
