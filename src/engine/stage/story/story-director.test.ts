@@ -388,6 +388,27 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     });
   });
 
+  it('hides the player’s hand only while a memory that asks for it plays', () => {
+    const d = new StoryDirector([
+      {
+        id: 'goodbye',
+        beats: [
+          { kind: 'friend', shape: 'flat', x: 0, y: 0 },
+          { kind: 'memory', scene: memory, hideHand: true },
+          { kind: 'memory', scene: memory },
+        ],
+      },
+    ]);
+    d.start();
+    expect(d.handHidden).toBe(false);
+    run(d, FRIEND_DELAY_S + 0.5, 0.1);
+    expect(d.commit('flat', 0, 0)).toBe(true);
+    run(d, 1, 0.1);
+    expect(d.handHidden).toBe(true);
+    run(d, memory.length + 0.5, 0.1);
+    expect(d.handHidden).toBe(false);
+  });
+
   it('plays the whole story, a shape at a time, to sleep', () => {
     const d = new StoryDirector(STORY_SCRIPT);
     d.start();

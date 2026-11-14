@@ -1401,7 +1401,7 @@ async function start(): Promise<void> {
             !story.playing ||
             (story.waitingForShape && story.friendOpacity > 0) ||
             story.waitingForSleep;
-          const handLevel = settings.value.highContrast ? 1 : handPresence.update(step, handCalled);
+          const handLevel = settings.value.highContrast ? 1 : handPresence.update(step, handCalled, story.handHidden);
           shadowRenderer.update(
             projector.shadows,
             stage,

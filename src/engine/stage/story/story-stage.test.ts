@@ -28,7 +28,7 @@ describe('the story stage', () => {
     expect(drifts).toEqual([]);
   });
 
-  it('ends scene 5 on an empty wall, and every chapter plays without a part going out of bounds', () => {
+  it('ends the goodbye on an empty wall, and every chapter plays without a part going out of bounds', () => {
     const p = new ScenePlayer(STORY_STAGE);
     p.seek(STORY_STAGE.length);
     const wallHalfW = 0.84;

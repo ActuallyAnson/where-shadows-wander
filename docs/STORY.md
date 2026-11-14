@@ -134,11 +134,11 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 ### 6. Goodbye
 
 - **Purpose:** let the boy, and the player, say goodbye: answer the wave.
-- **What happens:** no memory this time, and no stage. The wall is empty except for the friend's hand, held up flat, alone: the wave from the gate, and from the dream. It waits. When the player raises their own flat hand to meet it, palm to palm, the two shadows touch, and the friend's hand slowly fades away.
+- **What happens:** no stage. The wall is empty except for the friend's hand, held up flat, alone: the wave from the gate, and from the dream. It waits. When the player raises their own flat hand to meet it, palm to palm, the two shadows touch; the joined hands turn clockwise, face on to side on, and show what they are: two hands pressed palm to palm, the boy's from the left and the girl's from the right. They stay together a while. Then hers slowly fades, and his, alone, lowers away.
 - **The player:** Flat, held against the friend's hand.
 - **Must make the player feel:** grief, and some peace.
-- **Puppets:** none; the friend's hand only.
-- **Built (first pass, 13 Nov):** the friend's painted flat hand (`flat`, its thumb easing out as it opens) alone in the middle of the empty wall; any flat commit answers it (not yet checked to be palm to palm), and it fades over 6 s; then 4 s of empty wall.
+- **Puppets:** the friend's hand; then two side-on hands (the boy's and the girl's), each on a forearm up from below the wall.
+- **Built (first pass, 13 Nov):** the friend's painted flat hand (`flat`, its thumb easing out as it opens) alone in the middle of the empty wall; any flat commit answers it (not yet checked to be palm to palm), and it fades over 6 s; then 4 s of empty wall. **Reworked 14 Nov:** at the commit the friend's hand fades in 1.2 s under a puppet touch (`src/engine/stage/story/goodbye.ts`) that starts where the player's hand was: one flat hand, face on, that turns clockwise to upright as it parts into two side-on hands (`side-hand` art) pressed palm to palm; about 4 s together, hers fades over 4 s, his lowers off the bottom of the wall; then 2 s of empty wall (about 15 s). The player's own shadow fades right out while it plays (`MemoryBeat.hideHand`) and comes back for scene 7.
 - **To try:** how long the friend's hand takes to fade, and whether it lingers if the player pulls away early; making the commit need the hands to meet.
 
 ### 7. Sleep
@@ -196,3 +196,4 @@ So that every step leaves a game we could submit:
 - 14 Nov 2026: in the park, nobody slides after falling: she tags him and drops back where she stops, he stumbles on and drops back just beyond her, and the laughing shake is two slow heaves. At the school gate the boy turns round so they face each other for the wave (scene 5: they wave face to face, then each turns away).
 - 14 Nov 2026: scene 4 stays in the park. Lying in the grass, the fireflies come down to both kids' raised hands and are let go from there; they sit up and she gives him the empty jar. The walk to the hill and filling the jar are gone, and in scene 5 the park, not the hill, comes back the wrong way with the boy alone in its grass.
 - 14 Nov 2026: the kids fall like kids: down onto their bottoms, legs out, then back onto their backs, not tipping over stiff about the feet. Sitting up, they face each other and the jar passes hand to hand (it hangs from their hands, so it stays in them). It is no longer empty: the player's firefly stays behind and goes into it, so the friend gives him a glowing jar; it is dark by scene 5.
+- 14 Nov 2026: scene 6's touch turns. Once the palms meet, the joined hands turn clockwise from face on to side on, showing the boy's and the girl's hands pressed palm to palm; hers fades, his lowers away. The player's own shadow fades out for it.

@@ -34,6 +34,8 @@ export interface MemoryBeat {
   readonly end?: number;
   /** Seconds the `from` puppet takes to reach its place. Default HANDOFF_S. */
   readonly handoff?: number;
+  /** The player's own hand shadow fades right out while it plays (the goodbye, where puppet hands take over the touch). */
+  readonly hideHand?: boolean;
 }
 
 /** Nothing new for `seconds`: the wall holds what it has (a hand fading, an empty wall) before the next beat. */
@@ -165,6 +167,12 @@ export class StoryDirector {
   /** The candle's mood the scene playing asks for, or null (none playing, or it names none). */
   get candleMood(): CandleMoodName | null {
     return this.sceneIndex < 0 ? null : (this.scenes[this.sceneIndex].candle ?? null);
+  }
+
+  /** Whether the player's own hand shadow should be gone: a memory beat that hides it (MemoryBeat.hideHand) is playing. */
+  get handHidden(): boolean {
+    const b = this.beat;
+    return b !== null && b.kind === 'memory' && b.hideHand === true && this.memory?.playing === true;
   }
 
   /** The beat playing, or null. */

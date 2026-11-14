@@ -64,9 +64,12 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     candle: 'low',
     beats: [
       // The empty wall, and the friend's hand held up flat, alone: the wave from the gate and from the dream. When the player's
-      // hand meets it, it fades slowly away.
-      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 6, leave: 'fade' },
-      { kind: 'wait', seconds: 4 },
+      // hand meets it, it fades under the touch...
+      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 1.2, leave: 'fade' },
+      // ...which turns clockwise to show the two hands side on, the boy's and the girl's, pressed palm to palm; hers fades,
+      // and his lowers away. The player's own shadow fades out meanwhile, so the two puppet hands are all there is.
+      { kind: 'memory', from: 'goodbye', handoff: 0.8, hideHand: true, ...chapter('goodbye') },
+      { kind: 'wait', seconds: 2 },
     ],
   },
   {

@@ -17,6 +17,14 @@ describe('HandPresence', () => {
     expect(p.value).toBe(1);
   });
 
+  it('goes right out while the story hides it, and comes back after', () => {
+    const p = new HandPresence();
+    for (let i = 0; i < 40; i++) p.update(0.05, false, true);
+    expect(p.value).toBe(0);
+    for (let i = 0; i < 60; i++) p.update(0.05, true);
+    expect(p.value).toBe(1);
+  });
+
   it('holds still with no time passing and ignores bad steps', () => {
     const p = new HandPresence();
     p.update(1, false);

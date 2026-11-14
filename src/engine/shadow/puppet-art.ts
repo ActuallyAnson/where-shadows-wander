@@ -937,6 +937,25 @@ function friendPalm(g: CanvasRenderingContext2D, w: number, h: number): void {
   for (const [x, top] of fingers) finger(g, w, h, [x, 0.46, x + (x - 0.5) * 0.08, top + 0.04], 0.125);
 }
 
+function sideHand(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A small flat hand held up, seen side on, its palm to the right (the goodbye: two of these pressed palm to palm). The wrist
+  // and forearm below, the narrow edge of the palm, the fingers together standing up from it, their tips leaning a little
+  // forward, and the thumb lying along the palm's face.
+  g.beginPath();
+  g.moveTo(0.22 * w, h);
+  g.quadraticCurveTo(0.2 * w, 0.75 * h, 0.24 * w, 0.6 * h);
+  g.quadraticCurveTo(0.26 * w, 0.48 * h, 0.3 * w, 0.4 * h);
+  g.lineTo(0.84 * w, 0.4 * h);
+  g.quadraticCurveTo(0.9 * w, 0.55 * h, 0.82 * w, 0.66 * h);
+  g.quadraticCurveTo(0.76 * w, 0.8 * h, 0.78 * w, h);
+  g.closePath();
+  g.fill();
+  // The fingers, together: one band, rounded at the top.
+  finger(g, w, h, [0.56, 0.44, 0.58, 0.2, 0.62, 0.07], 0.5);
+  // The thumb, along the palm's face, its tip up.
+  finger(g, w, h, [0.74, 0.62, 0.84, 0.47, 0.86, 0.4], 0.2);
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -972,6 +991,7 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   'friend-cup': friendCup,
   'friend-palm': friendPalm,
   'friend-arm': friendArm,
+  'side-hand': sideHand,
   window: window_,
   pane,
   box,
