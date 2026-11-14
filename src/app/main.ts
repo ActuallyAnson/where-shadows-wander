@@ -73,6 +73,7 @@ import { ROOM_WALL_HEIGHT_M, ROOM_WALL_WIDTH_M, STORY_SCALE, StageFrame } from '
 import { lightArea } from '../engine/shadow/stage-edge-glsl';
 import { CandleLight } from '../engine/shadow/candle-light';
 import { SettingsStore } from '../engine/services/settings/settings-store';
+import { HandPresence } from '../engine/stage/story/hand-presence';
 import { shortenAssetTimeout } from '../engine/services/assets/iwsdk-assets';
 import { RoomModels } from '../engine/shadow/room-models';
 import { PlacedModels, type ModelLoader } from '../engine/shadow/placed-models';
@@ -311,6 +312,8 @@ async function start(): Promise<void> {
   const STORY_AFTER_LIGHT_S = 1.8;
   let storyWait = -1;
   let storyStarted = false;
+  /** The player's hand shadow: faint while a memory plays, full when the story waits for a hand shape. */
+  const handPresence = new HandPresence();
   const onStoryCue = (cue: Cue) => {
     if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
     else if (cue.kind === 'mood') {
@@ -1388,14 +1391,29 @@ async function start(): Promise<void> {
             handTrail.onShapeEvents(shapes.events, projector.shadows);
           }
           shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
-          shadowRenderer.update(projector.shadows, stage, sharpen.look, shadowsVisible ? candleView.occlusion : 0);
+          // Full when the story calls for a hand (or none is playing, or a menu needs it); faint while a memory plays.
+          // High contrast keeps it fully solid throughout.
+          const handCalled =
+            sessionState !== 'playing' ||
+            !story.playing ||
+            (story.waitingForShape && story.friendOpacity > 0) ||
+            story.waitingForSleep;
+          const handLevel = settings.value.highContrast ? 1 : handPresence.update(step, handCalled);
+          shadowRenderer.update(
+            projector.shadows,
+            stage,
+            sharpen.look,
+            shadowsVisible ? candleView.occlusion * handLevel : 0,
+          );
           // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
           if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;
           handTrail.update(
             paused ? 0 : step,
             stage,
             projector.shadows,
-            shadowsVisible && governor.isOn('trail') ? shadowRenderer.baseOpacity * candleView.occlusion : 0,
+            shadowsVisible && governor.isOn('trail')
+              ? shadowRenderer.baseOpacity * candleView.occlusion * handLevel
+              : 0,
           );
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
           const lineOpacity =
