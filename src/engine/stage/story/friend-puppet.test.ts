@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { POSE_STRIDE, validateScene } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
 import { CYCLE_S, FORM_S, FRIEND_PUPPETS, FRIEND_RABBIT, friendSceneTime } from './friend-puppet';
+import { WALL_HALF_H } from './how-they-met';
+import { FRIEND_FROM_Y } from './story-director';
+import { STORY_SCRIPT } from './story-script';
 
 describe('friendSceneTime', () => {
   it('forms once, then loops the showing-again cycle', () => {
@@ -47,5 +50,36 @@ describe('friend puppets', () => {
     player.offset[0] = -0.28;
     player.seek(2);
     expect(player.world[head]).toBeCloseTo(x0 - 0.28);
+  });
+
+  it('each hand the story shows is held up on an arm that runs off the bottom of the wall, and hides below it to rise', () => {
+    for (const scene of STORY_SCRIPT)
+      for (const b of scene.beats) {
+        if (b.kind !== 'friend') continue;
+        const puppet = FRIEND_PUPPETS[b.puppet ?? b.shape];
+        const player = new ScenePlayer(puppet);
+        const arm = player.partIndex('arm');
+        expect(arm, `${scene.id} has an arm`).toBeGreaterThanOrEqual(0);
+        // Waiting in its place, at any moment of its showing: the arm's foot is below the wall's bottom edge.
+        player.offset[0] = b.x;
+        player.offset[1] = b.y;
+        for (const t of [0, FORM_S, FORM_S + 3, FORM_S + 4.5]) {
+          player.seek(t);
+          const o = arm * POSE_STRIDE;
+          const length = puppet.parts[arm].h * player.world[o + 3];
+          const footY = player.world[o + 1] - Math.cos(player.world[o + 2]) * length;
+          expect(footY, `${scene.id} at ${t} s`).toBeLessThan(-WALL_HALF_H - 0.05);
+        }
+        // Dropped to where it rises from: no part reaches up onto the wall.
+        player.offset[1] = FRIEND_FROM_Y;
+        player.seek(0);
+        puppet.parts.forEach((part, i) => {
+          if (!part.art) return;
+          const o = i * POSE_STRIDE;
+          // Its top, at most the part's height above its pivot.
+          const above = (1 - (part.pivot?.[1] ?? 0.5)) * part.h * player.world[o + 3];
+          expect(player.world[o + 1] + above, `${scene.id} ${part.id}`).toBeLessThan(-WALL_HALF_H);
+        });
+      }
   });
 });

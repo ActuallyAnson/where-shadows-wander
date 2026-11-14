@@ -19,6 +19,18 @@ export function friendSceneTime(t: number): number {
 /** How big the friend's hands are drawn: a little bigger than the player's hand's shadow, so they read from the bed. */
 const FRIEND_SCALE = 1.35;
 
+/**
+ * The rest of her arm: a child's forearm going on down from the painted one, long enough to run off the bottom of the wall
+ * wherever the hand waits, so the hand is always held up from below, like a real hand's shadow, and never floats. `x`, `y` is
+ * where it joins the painted forearm (a little up inside it, so the join does not show) and `tilt` the radians it leans,
+ * its foot to the left. Drawn first, under the hand.
+ */
+export const ARM_LENGTH = 0.8;
+const ARM_W = 0.09;
+function arm(x: number, y: number, tilt: number): PuppetScene['parts'][number] {
+  return { id: 'arm', art: 'friend-arm', parent: 'hand', w: ARM_W, h: ARM_LENGTH, pivot: [0.5, 1], x, y, angle: -tilt };
+}
+
 /** The rabbit: the hand (head, muzzle, forearm) and two finger ears that rise from folded as it forms, and droop a little. */
 const RABBIT_W = 0.24;
 const RABBIT_H = 0.26;
@@ -68,6 +80,7 @@ export const FRIEND_RABBIT: PuppetScene = {
   parts: [
     // Placed by the middle of the head: the story's x, y (moved there through the player's offset on this part).
     { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+    arm(-0.067, -0.102, 0.33),
     // The back ear first, so the front one draws over it.
     ear('ear-back', -0.03, 0.07, BACK_EAR_UP, 0.13),
     { id: 'head', art: 'friend-rabbit', parent: 'hand', w: RABBIT_W, h: RABBIT_H, pivot: [0.5, 0.5], x: 0, y: 0 },
@@ -87,6 +100,7 @@ export const FRIEND_FOX: PuppetScene = {
   length: FORM_S + CYCLE_S,
   parts: [
     { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+    arm(-0.081, -0.092, 0.37),
     ear('ear-back', -0.05, 0.05, FOX_BACK_EAR_UP, 0.085, 0.036),
     { id: 'head', art: 'friend-fox', parent: 'hand', w: FOX_W, h: FOX_H, pivot: [0.5, 0.5], x: 0, y: 0 },
     ear('ear-front', -0.02, 0.06, FOX_FRONT_EAR_UP, 0.09, 0.036),
@@ -106,6 +120,7 @@ export const FRIEND_CUP: PuppetScene = {
   length: FORM_S + CYCLE_S,
   parts: [
     { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+    arm(-0.074, -0.08, 0.6),
     { id: 'palm', art: 'friend-cup', parent: 'hand', w: CUP_W, h: CUP_H, pivot: [0.5, 0.5], x: 0, y: 0 },
     ear('fingers', 0.075, -0.003, CUP_FINGERS_UP, 0.075, 0.05),
   ],
@@ -120,6 +135,7 @@ const THUMB_OUT = 0.85;
 const palmParts = (): PuppetScene['parts'] => [
   // Placed by its wrist: the hand rises above the story's x, y.
   { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+  arm(0, -0.075, 0.1),
   { id: 'palm', art: 'friend-palm', parent: 'hand', w: PALM_W, h: PALM_H, pivot: [0.5, 0], x: 0, y: -0.1 },
   ear('thumb', -0.045, 0.045, THUMB_OUT, 0.075, 0.045),
 ];

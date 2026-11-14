@@ -327,6 +327,8 @@ async function start(): Promise<void> {
   // vanishes on the dim wall.
   const friendView = new PuppetView();
   friendView.scale = STORY_SCALE;
+  // The friend's hand rises from below the wall, its arm running off the bottom: the wall's edge cuts it off, as it does the puppets.
+  friendView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
   // The candle's mood (candle-mood.ts): the story opens rainy and gloomy, the candle's light blue-grey; a scene can ask for
   // another (StoryScene.candle) and the light eases into it.
@@ -1443,7 +1445,7 @@ async function start(): Promise<void> {
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
             fp.offset[0] = story.friendX;
             fp.offset[1] = story.friendY - story.friendDrop;
-            fp.seek(friendSceneTime(story.friendT));
+            fp.seek(friendSceneTime(story.friendShapeT));
             friendView.load(friendScene);
             friendView.update(
               fp,

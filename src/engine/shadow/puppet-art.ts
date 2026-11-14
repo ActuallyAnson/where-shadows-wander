@@ -904,6 +904,18 @@ function friendCup(g: CanvasRenderingContext2D, w: number, h: number): void {
   finger(g, w, h, [0.24, 0.58, 0.22, 0.44, 0.26, 0.34], 0.085);
 }
 
+function friendArm(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The rest of the friend's arm below the painted hands' forearms: a child's forearm, narrow at the top where it joins the
+  // wrist's end and filling out a little towards the elbow, which is off the bottom of the wall.
+  g.beginPath();
+  g.moveTo(0.12 * w, 0);
+  g.quadraticCurveTo(0.0 * w, 0.55 * h, 0.03 * w, h);
+  g.lineTo(0.97 * w, h);
+  g.quadraticCurveTo(w, 0.55 * h, 0.88 * w, 0);
+  g.closePath();
+  g.fill();
+}
+
 function friendPalm(g: CanvasRenderingContext2D, w: number, h: number): void {
   // A small hand held up flat, its palm to the light: the wrist and forearm below, the palm, and four fingers together standing
   // up from it. The thumb is a part of its own ('friend-ear').
@@ -959,6 +971,7 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   'autumn-tree': autumnTree,
   'friend-cup': friendCup,
   'friend-palm': friendPalm,
+  'friend-arm': friendArm,
   window: window_,
   pane,
   box,

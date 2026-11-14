@@ -16,12 +16,12 @@ export interface FriendBeat {
   readonly shape: Shape;
   readonly x: number;
   readonly y: number;
-  /** Stage metres it rises as it appears (and sinks as it goes): the friend lifting her hand. Default 0. */
-  readonly rise?: number;
   /** Which of the friend's painted hands (friend-puppet.ts) shows the shape, e.g. 'wave'. Default the shape's own. */
   readonly puppet?: string;
-  /** Seconds the hand takes to fade once copied. Default FRIEND_OUT_S. */
+  /** Seconds the hand takes to go once copied. Default FRIEND_OUT_S. */
   readonly out?: number;
+  /** How it goes once copied: lowered out of sight below the wall (the default), or fading where it is (scene 6's goodbye). */
+  readonly leave?: 'lower' | 'fade';
 }
 
 /** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
@@ -61,11 +61,18 @@ export interface StoryScene {
   readonly candle?: CandleMoodName;
 }
 
-/** Seconds before the friend's hand starts to appear (the wall settles first), then seconds it takes to fade in. */
+/**
+ * Seconds before the friend's hand starts to appear (the wall settles first), then seconds it takes to rise into place. It is a
+ * real hand's shadow, so it never fades in out of nothing: it is lifted up from below the wall, its arm trailing out of sight.
+ */
 export const FRIEND_DELAY_S = 1.2;
-export const FRIEND_IN_S = 2.5;
-/** Seconds the friend's hand takes to fade once the player has copied it. */
-export const FRIEND_OUT_S = 1.2;
+export const FRIEND_IN_S = 2.6;
+/** Seconds the friend's hand takes to go once the player has copied it. */
+export const FRIEND_OUT_S = 1.8;
+/** Where the friend's hand rises from: the story's metres up from the wall's centre, far enough below it to be out of sight. */
+export const FRIEND_FROM_Y = -0.95;
+/** Seconds into its rise the friend's hand starts to form its shape, so it comes up loose and makes the shape as it arrives. */
+export const FRIEND_FORM_AT_S = 1.3;
 /** Seconds a memory's `from` puppet takes to travel from the player's shadow to its own place. */
 export const HANDOFF_S = 1.6;
 
@@ -114,8 +121,8 @@ export class StoryDirector {
   private readonly players = new Map<PuppetScene, ScenePlayer>();
   private waiting = false;
   private friendWait = 0;
-  private friendRise = 0;
   private friendOut = FRIEND_OUT_S;
+  private friendFades = false;
   private waitLeft = -1;
   private sleepWaiting = false;
   private handoffS = HANDOFF_S;
@@ -243,7 +250,7 @@ export class StoryDirector {
   /** Once per frame; 0 while paused (all of it holds still). */
   update(dt: number): void {
     if (dt <= 0) return;
-    // The friend's hand: waits, fades in while it waits, fades out after.
+    // The friend's hand: waits, rises into place while it waits, lowers (or fades) after.
     if (this.friendShape !== null) {
       if (this.waiting) {
         if (this.friendWait > 0) this.friendWait -= dt;
@@ -277,14 +284,26 @@ export class StoryDirector {
     m.update(dt);
   }
 
-  /** How visible the friend's hand is, eased (0..1). */
-  get friendOpacity(): number {
-    return smooth(this.friendLevel);
+  /** Whether the friend's hand is going, once copied, by fading where it is (FriendBeat.leave). */
+  private get friendFading(): boolean {
+    return this.friendFades && !this.waiting;
   }
 
-  /** Stage metres the friend's hand is below its place: all of its rise while hidden, none once it is fully shown. */
+  /** How visible the friend's hand is (0..1): all there while it rises and lowers, eased away when it leaves by fading. */
+  get friendOpacity(): number {
+    if (this.friendShape === null || this.friendLevel <= 0) return 0;
+    return this.friendFading ? smooth(this.friendLevel) : 1;
+  }
+
+  /** Stage metres the friend's hand is below its place: all the way from below the wall while hidden, none once in place. */
   get friendDrop(): number {
-    return this.friendRise * (1 - this.friendOpacity);
+    if (this.friendFading) return 0;
+    return (this.friendY - FRIEND_FROM_Y) * (1 - smooth(this.friendLevel));
+  }
+
+  /** Seconds into the friend's hand's shape (friend-puppet.ts's scene time): it forms the shape as it arrives. */
+  get friendShapeT(): number {
+    return this.friendT - FRIEND_FORM_AT_S;
   }
 
   private next(): void {
@@ -322,7 +341,7 @@ export class StoryDirector {
       this.friendOut = b.out ?? FRIEND_OUT_S;
       this.friendX = b.x;
       this.friendY = b.y;
-      this.friendRise = b.rise ?? 0;
+      this.friendFades = b.leave === 'fade';
       this.friendT = 0;
       this.friendLevel = 0;
       this.friendWait = FRIEND_DELAY_S;

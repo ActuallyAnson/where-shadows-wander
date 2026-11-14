@@ -3,6 +3,7 @@ import { POSE_STRIDE, validateScene, type Cue, type PuppetScene } from '../puppe
 import { ScenePlayer } from '../puppet/scene-player';
 import {
   FRIEND_DELAY_S,
+  FRIEND_FROM_Y,
   FRIEND_IN_S,
   FRIEND_OUT_S,
   HANDOFF_S,
@@ -36,7 +37,7 @@ const run = (d: StoryDirector, s: number, step = 0.05) => {
 };
 
 describe('StoryDirector', () => {
-  it('shows the friend’s hand after a moment, fading in, and waits for as long as it takes', () => {
+  it('shows the friend’s hand after a moment, rising into place, and waits for as long as it takes', () => {
     const d = new StoryDirector(story);
     d.start();
     expect(d.friendShape).toBe('rabbit');
@@ -49,7 +50,7 @@ describe('StoryDirector', () => {
     expect(d.memory).toBeNull();
   });
 
-  it('moves on only for the shape it shows, then the hand fades as the memory plays', () => {
+  it('moves on only for the shape it shows, then the hand lowers away as the memory plays', () => {
     const heard: number[] = [];
     const d = new StoryDirector(story, (c: Cue) => c.kind === 'note' && heard.push(c.note));
     d.start();
@@ -159,15 +160,55 @@ describe('StoryDirector', () => {
     expect(heard).toEqual([1, 3]);
   });
 
-  it('raises the friend’s hand into place as it appears', () => {
-    const d = new StoryDirector([{ id: 'a', beats: [{ kind: 'friend', shape: 'fox', x: 0, y: 0.2, rise: 0.1 }] }]);
+  it('lifts the friend’s hand up from below the wall into place, all there, and lowers it away once copied', () => {
+    const d = new StoryDirector([
+      {
+        id: 'a',
+        beats: [
+          { kind: 'friend', shape: 'fox', x: 0, y: 0.2 },
+          { kind: 'wait', seconds: 9 },
+        ],
+      },
+    ]);
     d.start();
-    expect(d.friendDrop).toBeCloseTo(0.1);
+    expect(d.friendOpacity).toBe(0);
+    expect(d.friendDrop).toBeCloseTo(0.2 - FRIEND_FROM_Y);
     run(d, FRIEND_DELAY_S + FRIEND_IN_S / 2);
+    // Never faded in: it is a hand coming up into the light.
+    expect(d.friendOpacity).toBe(1);
     expect(d.friendDrop).toBeGreaterThan(0);
-    expect(d.friendDrop).toBeLessThan(0.1);
+    expect(d.friendDrop).toBeLessThan(0.2 - FRIEND_FROM_Y);
+    // It comes up loose, and forms its shape as it arrives.
+    expect(d.friendShapeT).toBeLessThan(0.1);
     run(d, FRIEND_IN_S);
     expect(d.friendDrop).toBe(0);
+    expect(d.friendShapeT).toBeGreaterThan(0);
+    d.commit('fox');
+    run(d, FRIEND_OUT_S / 2);
+    expect(d.friendOpacity).toBe(1);
+    expect(d.friendDrop).toBeGreaterThan(0);
+    run(d, FRIEND_OUT_S);
+    expect(d.friendShape).toBeNull();
+    expect(d.friendOpacity).toBe(0);
+  });
+
+  it('fades the friend’s hand where it is when its beat says so', () => {
+    const d = new StoryDirector([
+      {
+        id: 'a',
+        beats: [
+          { kind: 'friend', shape: 'flat', x: 0, y: 0, out: 4, leave: 'fade' },
+          { kind: 'wait', seconds: 9 },
+        ],
+      },
+    ]);
+    d.start();
+    run(d, FRIEND_DELAY_S + FRIEND_IN_S + 0.1);
+    d.commit('flat');
+    run(d, 2);
+    expect(d.friendDrop).toBe(0);
+    expect(d.friendOpacity).toBeGreaterThan(0.2);
+    expect(d.friendOpacity).toBeLessThan(0.8);
   });
 
   it('refuses a memory that plays outside its scene', () => {
