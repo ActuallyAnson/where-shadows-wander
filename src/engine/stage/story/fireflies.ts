@@ -509,6 +509,15 @@ const wobbles: Wobble[] = [
   { part: 'walk-friend-torso', prop: 'angle', amp: 0.01, period: 3.4 },
 ];
 
-const cues: Cue[] = [{ t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 }];
+/**
+ * A small clink of glass as the firefly settles in her jar. The crickets go with the night as the park slides off into morning,
+ * and as the school gate comes in a bell rings far off.
+ */
+const cues: Cue[] = [
+  { t: INTO_JAR_S + INTO_JAR_LEN_S, kind: 'sound', sound: 'jar', x: JAR_IN_LAP[0], y: JAR_IN_LAP[1] },
+  { t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 },
+  { t: PARK_OUT_S, kind: 'bed', bed: null },
+  { t: GATE_IN_S + 1.2, kind: 'sound', sound: 'bell', x: 0.6, y: 0.2 },
+];
 
 export const FIREFLIES: Chapter = { id: 'fireflies', length: FIREFLIES_LENGTH_S, parts, tracks, wobbles, cues };

@@ -6,6 +6,8 @@ import type { Handedness } from '../../hands/hand';
 import type { HandShadow } from '../../hands/hand-shadow';
 import type { ShapeEventQueue } from '../../hands/shape-events';
 import type { StagePlane } from '../../shadow/pure/stage-plane';
+import type { NightSoundKind } from '../../stage/night-sounds';
+import type { StoryBed, StorySound } from '../../stage/puppet/puppet-scene';
 import { Sound, soundForShapeEvent, type SoundId } from './sounds';
 import { stagePoint } from './stage-point';
 
@@ -15,6 +17,24 @@ export interface SoundPlayer {
   moveLoop(id: SoundId, x: number, y: number, z: number): void;
 }
 
+/** The sound each story `sound` cue plays. */
+const STORY_SOUND_IDS: Readonly<Record<StorySound, SoundId>> = {
+  laugh: Sound.Laugh,
+  click: Sound.Click,
+  rumble: Sound.Rumble,
+  giggle: Sound.Giggle,
+  hop: Sound.Hop,
+  blanket: Sound.Blanket,
+  run: Sound.Run,
+  jar: Sound.Jar,
+  bell: Sound.Bell,
+  gate: Sound.Gate,
+  gust: Sound.Gust,
+};
+
+/** The loop each story bed plays. */
+const STORY_BED_IDS: Readonly<Record<StoryBed, SoundId>> = { crickets: Sound.Crickets, wind: Sound.Wind };
+
 /** Sounds from the wall come from this far in front of it, metres, so they are not inside the paper. */
 const WALL_LIFT_M = 0.05;
 
@@ -23,6 +43,7 @@ export class GameAudio {
   private flameLit = false;
   private raining = false;
   private music = false;
+  private bed: StoryBed | null = null;
 
   constructor(private readonly player: SoundPlayer) {}
 
@@ -56,10 +77,26 @@ export class GameAudio {
   }
 
   /** A sound in a memory (a story scene's `sound` cue) from the stage point (`sx`, `sy`) on `stage`. */
-  storySound(sound: 'laugh' | 'click' | 'rumble', stage: StagePlane, sx = 0, sy = 0): void {
+  storySound(sound: StorySound, stage: StagePlane, sx = 0, sy = 0): void {
     stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
-    const id = sound === 'laugh' ? Sound.Laugh : sound === 'click' ? Sound.Click : Sound.Rumble;
-    this.player.playAt(id, this.at.x, this.at.y, this.at.z);
+    this.player.playAt(STORY_SOUND_IDS[sound], this.at.x, this.at.y, this.at.z);
+  }
+
+  /**
+   * Call every frame: `bed` (the story's, from `bedAt`; null for none) loops under the memories from the wall's middle, fading
+   * in, and the one before it fades out.
+   */
+  setStoryBed(bed: StoryBed | null, stage: StagePlane): void {
+    if (bed === this.bed) return;
+    stagePoint(stage, 0, 0, WALL_LIFT_M, this.at);
+    if (this.bed !== null) this.player.setLoop(STORY_BED_IDS[this.bed], false, this.at.x, this.at.y, this.at.z);
+    if (bed !== null) this.player.setLoop(STORY_BED_IDS[bed], true, this.at.x, this.at.y, this.at.z);
+    this.bed = bed;
+  }
+
+  /** A sound of the house at night (night-sounds.ts): a creak from the room, or a gust on the window. `at` is where. */
+  nightSound(kind: NightSoundKind, at: Readonly<{ x: number; y: number; z: number }>): void {
+    this.player.playAt(kind === 'gust' ? Sound.Gust : Sound.Creak, at.x, at.y, at.z);
   }
 
   /** A sleepy yawn as he falls asleep, from his lap (`at`, its world position). */

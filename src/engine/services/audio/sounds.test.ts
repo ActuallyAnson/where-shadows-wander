@@ -34,8 +34,14 @@ describe('SOUND_DEFS', () => {
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the rain and the music', () => {
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'rain', 'music']);
+  it('loops only the flame, the rain, the music and the two story beds', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
+      'crackle',
+      'rain',
+      'music',
+      'crickets',
+      'wind',
+    ]);
   });
 
   it('plays the music flat on the music bus, and only from its file', () => {
@@ -46,8 +52,31 @@ describe('SOUND_DEFS', () => {
     expect(SOUND_DEFS.filter((d) => d.flat).map((d) => d.name)).toEqual(['music']);
   });
 
-  it('plays the voices (the laugh, the yawn) only from their files: made in code they would sound like a machine', () => {
-    expect(SOUND_DEFS.filter((d) => d.fileOnly).map((d) => d.name)).toEqual(['music', 'laugh', 'yawn']);
+  it('plays the voices and the recorded story and night sounds only from their files, with no placeholder', () => {
+    expect(SOUND_DEFS.filter((d) => d.fileOnly).map((d) => d.name)).toEqual([
+      'music',
+      'laugh',
+      'yawn',
+      'giggle',
+      'hop',
+      'blanket',
+      'run',
+      'jar',
+      'bell',
+      'gate',
+      'creak',
+      'gust',
+      'crickets',
+      'wind',
+    ]);
+  });
+
+  it('fades the story beds (crickets, wind) in and out slowly, and keeps them on ambience', () => {
+    for (const id of [Sound.Crickets, Sound.Wind]) {
+      expect(SOUND_DEFS[id].loop).toBe(true);
+      expect(SOUND_DEFS[id].bus).toBe(Bus.Ambience);
+      expect(SOUND_DEFS[id].fadeS).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it('plays the far thunder in a memory softer than the room thunder, on ambience', () => {

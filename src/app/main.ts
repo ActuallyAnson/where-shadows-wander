@@ -45,6 +45,7 @@ import { WakeView } from '../engine/shadow/wake-view';
 import { WakeTimeline } from '../engine/stage/wake-timeline';
 import { EndingTimeline } from '../engine/stage/ending-timeline';
 import { CreditsView } from '../ui/credits/credits-view';
+import { NightSounds } from '../engine/stage/night-sounds';
 import { Storm } from '../engine/stage/storm';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
@@ -346,6 +347,8 @@ async function start(): Promise<void> {
       gameAudio.storyStep(cue.variant, storyFrame, cue.x, cue.y); // from where it is in the story
     else if (cue.kind === 'sound') gameAudio.storySound(cue.sound, storyFrame, cue.x, cue.y);
     else if (cue.kind === 'hush') lightHush.to(cue.level, cue.seconds);
+    else if (cue.kind === 'bed')
+      return; // read every frame from the story's time (story.bed), so a skip cannot lose it
     else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
@@ -532,6 +535,10 @@ async function start(): Promise<void> {
   // The rain outside: a constant loop from the window, and now and then a flash there and, after it, far thunder (storm.ts).
   const storm = new Storm();
   const windowAt = new Vector3();
+  // The house at night (night-sounds.ts): between memories, now and then a creak of the floor behind him, by the door, or a gust
+  // on the window.
+  const nightSounds = new NightSounds();
+  const creakAt = new Vector3(-1.0, 0.2, 1.0);
   const wakeView = new WakeView(wake.script.text);
   const wakeHead = new Quaternion();
   /** The wake's lids take over from the plain black (they are as black while shut). Once a session. */
@@ -1749,6 +1756,12 @@ async function start(): Promise<void> {
         gameAudio.setMusic(sessionState !== 'title_vr');
         // The storm's thunder, and the one in the black that wakes him (scene 1).
         if (storm.thunder || wake.thunder) gameAudio.thunder(windowAt);
+        // The story's bed (crickets at dusk, wind on the empty wall), from the wall.
+        gameAudio.setStoryBed(sessionState === 'playing' || sessionState === 'paused' ? story.bed : null, storyFrame);
+        // The house between memories: not while a memory plays, not on the title, not paused, not in the end.
+        nightSounds.update(step, sessionState === 'playing' && !story.memoryPlaying);
+        const night = nightSounds.fired;
+        if (night) gameAudio.nightSound(night, night === 'gust' ? windowAt : creakAt);
         if (wake.covers) gameAudio.covers(saucerPos); // he sits up: the covers slide, at his lap
         audio.update(audioPose);
       } catch (e) {

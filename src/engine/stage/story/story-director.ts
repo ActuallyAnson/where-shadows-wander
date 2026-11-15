@@ -6,7 +6,7 @@
 // and a memory that continues the same scene goes on from there. Plain data in story-script.ts; plain TypeScript here, and a
 // frame allocates nothing.
 import type { Shape } from '../../hands/shapes';
-import { POSE_STRIDE, type Cue, type PuppetScene } from '../puppet/puppet-scene';
+import { POSE_STRIDE, bedAt, type Cue, type PuppetScene, type StoryBed } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
 import type { CandleMoodName } from './candle-mood';
 import { FRIEND_PUPPETS } from './friend-puppet';
@@ -217,6 +217,20 @@ export class StoryDirector {
   get handHidden(): boolean {
     const b = this.beat;
     return b !== null && b.kind === 'memory' && b.hideHand === true && this.memory?.playing === true;
+  }
+
+  /** Whether a memory is playing (not held on its last picture while the friend's hand waits). */
+  get memoryPlaying(): boolean {
+    return this.sceneIndex >= 0 && this.memory?.playing === true;
+  }
+
+  /**
+   * The loop the story lays under itself now (puppet-scene.ts's `bedAt`: crickets at dusk, wind on the empty wall), or null.
+   * It holds through the friend's waits, as the memory's last picture does.
+   */
+  get bed(): StoryBed | null {
+    const m = this.memory;
+    return this.sceneIndex < 0 || !m ? null : bedAt(m.scene.cues, m.time);
   }
 
   /** The beat playing, or null. */

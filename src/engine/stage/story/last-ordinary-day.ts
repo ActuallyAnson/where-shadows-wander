@@ -193,8 +193,15 @@ const tracks: Track[] = [
 
 const wobbles: Wobble[] = [];
 
-/** The light lowers as they leave the gate. */
-const cues: Cue[] = [{ t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 }];
+/**
+ * The gate creaks as he goes through it, the light lowers as they leave the gate, and as the park slides away a thin wind comes
+ * up on the emptying wall, and stays through the goodbye.
+ */
+const cues: Cue[] = [
+  { t: PART_S + 0.4, kind: 'sound', sound: 'gate', x: GATE_X, y: 0 },
+  { t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 },
+  { t: PARK_AWAY_S + 2, kind: 'bed', bed: 'wind' },
+];
 
 export const LAST_ORDINARY_DAY: Chapter = {
   id: 'last-ordinary-day',

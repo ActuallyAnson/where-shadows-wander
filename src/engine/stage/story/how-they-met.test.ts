@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { POSE_STRIDE } from '../puppet/puppet-scene';
+import { POSE_STRIDE, bedAt } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
 import { H_CLAP, H_LIFT, HUSH_HAND, HUSH_LEVEL, HUSH_S, RABBIT_REST, TORCH_TOP_Y, TORCH_X } from './how-they-met';
 import { SIT_REACH } from './story-kit';
@@ -66,16 +66,38 @@ describe('the memories’ sounds', () => {
       .map((q) => (q.kind === 'sound' ? q.sound : ''));
   };
 
-  it('clicks her torch on in the prologue, rolls far thunder and laughs twice in the fort, and laughs in the park', () => {
-    expect(sounds('the-storm')).toEqual(['click']);
-    expect(sounds('how-they-met')).toEqual(['rumble', 'laugh', 'laugh']);
-    expect(sounds('the-park')).toEqual(['laugh']);
+  it('clicks her torch on and throws the blanket up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
+    expect(sounds('the-storm')).toEqual(['click', 'blanket']);
+    expect(sounds('how-they-met')).toEqual(['hop', 'rumble', 'hop', 'hop', 'laugh', 'hop', 'hop', 'giggle']);
+    expect(sounds('the-park')).toEqual(['run', 'run', 'laugh']);
   });
 
-  it('has no laughter after the park: its absence is part of the loss', () => {
+  it('clinks the jar and rings a far bell in scene 4, creaks the gate in scene 5, and gusts as she fades in scene 6', () => {
+    expect(sounds('fireflies')).toEqual(['jar', 'bell']);
+    expect(sounds('last-ordinary-day')).toEqual(['gate']);
+    expect(sounds('goodbye')).toEqual(['gust']);
+  });
+
+  it('has no laughter or giggles after the park: their absence is part of the loss', () => {
     for (const id of Object.keys(STORY_CHAPTER) as (keyof typeof STORY_CHAPTER)[]) {
       if (id === 'the-storm' || id === 'how-they-met' || id === 'the-park') continue;
       expect(sounds(id)).not.toContain('laugh');
+      expect(sounds(id)).not.toContain('giggle');
     }
+  });
+
+  it('lays crickets under the dusk until morning, and a wind under the empty wall until the goodbye ends', () => {
+    const cues = STORY_STAGE.cues;
+    const at = (id: keyof typeof STORY_CHAPTER, k: number) =>
+      STORY_CHAPTER[id].start + k * (STORY_CHAPTER[id].end - STORY_CHAPTER[id].start);
+    expect(bedAt(cues, at('how-they-met', 0.5))).toBeNull();
+    expect(bedAt(cues, at('the-park', 0.2))).toBeNull();
+    expect(bedAt(cues, STORY_CHAPTER['the-park'].end)).toBe('crickets'); // held while her cup waits
+    expect(bedAt(cues, at('fireflies', 0.3))).toBe('crickets');
+    expect(bedAt(cues, STORY_CHAPTER.fireflies.end)).toBeNull(); // morning at the gate
+    expect(bedAt(cues, at('last-ordinary-day', 0.2))).toBeNull();
+    expect(bedAt(cues, STORY_CHAPTER['last-ordinary-day'].end)).toBe('wind'); // held while her flat hand waits
+    expect(bedAt(cues, at('goodbye', 0.5))).toBe('wind');
+    expect(bedAt(cues, STORY_CHAPTER.goodbye.end)).toBeNull(); // scene 7 is the room's own quiet
   });
 });

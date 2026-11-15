@@ -143,3 +143,38 @@ describe('GameAudio weather', () => {
     expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Covers, 0, 0.7, -0.45]]);
   });
 });
+
+describe('GameAudio story beds and night sounds', () => {
+  it('maps each story sound cue to its own sound', () => {
+    const { audio, stage, rec } = setup();
+    audio.storySound('giggle', stage);
+    audio.storySound('hop', stage);
+    audio.storySound('bell', stage);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Giggle, Sound.Hop, Sound.Bell]);
+  });
+
+  it('starts a bed once, swaps one for the next, and stops it on null', () => {
+    const { audio, stage, rec } = setup();
+    audio.setStoryBed(null, stage);
+    audio.setStoryBed('crickets', stage);
+    audio.setStoryBed('crickets', stage);
+    audio.setStoryBed('wind', stage);
+    audio.setStoryBed(null, stage);
+    expect(rec.loops.map((l) => [l.id, l.on])).toEqual([
+      [Sound.Crickets, true],
+      [Sound.Crickets, false],
+      [Sound.Wind, true],
+      [Sound.Wind, false],
+    ]);
+  });
+
+  it('plays a creak or a gust where it is told', () => {
+    const { audio, rec } = setup();
+    audio.nightSound('creak', { x: -1, y: 0, z: 1 });
+    audio.nightSound('gust', { x: 2, y: 1, z: 0 });
+    expect(rec.plays.map((p) => [p.id, p.x])).toEqual([
+      [Sound.Creak, -1],
+      [Sound.Gust, 2],
+    ]);
+  });
+});

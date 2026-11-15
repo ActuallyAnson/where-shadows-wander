@@ -84,7 +84,42 @@ export interface Track {
 }
 
 /** The sounds a memory can make with a `sound` cue (each is a sound of the same name in services/audio/sounds.ts). */
-export type StorySound = 'laugh' | 'click' | 'rumble';
+export const STORY_SOUNDS = [
+  'laugh',
+  'click',
+  'rumble',
+  'giggle',
+  'hop',
+  'blanket',
+  'run',
+  'jar',
+  'bell',
+  'gate',
+  'gust',
+] as const;
+export type StorySound = (typeof STORY_SOUNDS)[number];
+
+/**
+ * The loops a memory can lay under itself with a `bed` cue (each a looping sound of the same name in sounds.ts): crickets at
+ * dusk, a thin wind on the empty wall.
+ */
+export type StoryBed = 'crickets' | 'wind';
+
+/**
+ * The bed playing `t` seconds into a scene: the last `bed` cue at or before `t`, or null (none yet, or the last turned it off).
+ * Worked out from the time, not fired, so a skipped memory or a jump to a scene never leaves a bed running or silent. No
+ * allocation: safe every frame.
+ */
+export function bedAt(cues: readonly Cue[] | undefined, t: number): StoryBed | null {
+  let bed: StoryBed | null = null;
+  if (!cues || !(t >= 0)) return bed;
+  for (let i = 0; i < cues.length; i++) {
+    const c = cues[i];
+    if (c.t > t) break;
+    if (c.kind === 'bed') bed = c.bed;
+  }
+  return bed;
+}
 
 /** A steady sway added on top of the pose: amp * sin(2π t / period + phase). */
 export interface Wobble {
@@ -104,6 +139,8 @@ export type Cue =
   | { readonly t: number; readonly kind: 'step'; readonly variant: 0 | 1; readonly x: number; readonly y: number }
   /** A sound in the memory, from the stage point (`x`, `y`): the kids laughing, her torch clicking on, far thunder. */
   | { readonly t: number; readonly kind: 'sound'; readonly sound: StorySound; readonly x: number; readonly y: number }
+  /** From here on `bed` loops under the story (null: none), until the next `bed` cue. Read with `bedAt`, not fired. */
+  | { readonly t: number; readonly kind: 'bed'; readonly bed: StoryBed | null }
   /**
    * The room's candle light eases to `level` (1 its own, less hushed) over `seconds`, as a light in the memory is covered and
    * uncovered (scene 2's torch): the memory's light reaches the room.

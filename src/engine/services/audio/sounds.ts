@@ -37,6 +37,28 @@ export const Sound = {
   Rumble: 16,
   /** A small, sleepy yawn as his eyes grow heavy (the end, after the candle goes out), from his lap. */
   Yawn: 17,
+  /** A short, stifled giggle: the kids after the hush (scene 2), having got away with it. */
+  Giggle: 18,
+  /** A tiny soft pat: the puppet rabbit landing a hop (scene 2). */
+  Hop: 19,
+  /** A soft cloth whoosh: she throws the blanket up into the fort (scene 2's prologue). */
+  Blanket: 20,
+  /** Running feet on grass: the chase in the park (scene 3). */
+  Run: 21,
+  /** A small glassy clink: the firefly goes into her jar (scene 4). */
+  Jar: 22,
+  /** A school bell far off as the gate slides in, morning (scene 4's end). */
+  Bell: 23,
+  /** The school gate's creak and clank as they part (scene 5). */
+  Gate: 24,
+  /** The house settling: a creak of the floor, now and then between memories (night-sounds.ts). */
+  Creak: 25,
+  /** A gust of wind: on the window between memories (night-sounds.ts), and on the hill as she fades (scene 6). */
+  Gust: 26,
+  /** Crickets at dusk, a loop (a story bed): from dusk in the park until morning (scenes 3 and 4). */
+  Crickets: 27,
+  /** A thin wind, a loop (a story bed): the empty wall and the goodbye (scenes 5 and 6). */
+  Wind: 28,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -58,6 +80,29 @@ export interface SoundDef {
   readonly flat?: boolean;
   /** Plays only from its file: until the file has loaded it is silent, and it has no placeholder (the music). */
   readonly fileOnly?: boolean;
+  /** A loop's fade in and out, seconds (a time constant: it is mostly there after three of these); a short default if unset. */
+  readonly fadeS?: number;
+}
+
+/** A recording that plays only from its file (no placeholder: these are all real recordings), from the wall or the room. */
+function recorded(
+  name: string,
+  gain: number,
+  opts: { loop?: boolean; priority?: number; minGapS?: number; near?: boolean; far?: boolean; fadeS?: number } = {},
+): SoundDef {
+  return {
+    name,
+    bus: opts.loop || opts.far ? Bus.Ambience : Bus.Effects,
+    gain,
+    loop: opts.loop ?? false,
+    priority: opts.priority ?? 1,
+    minGapS: opts.minGapS ?? 0.2,
+    // Near: a small sound close to where it is (a hop, a clink). Far: about as loud anywhere in the room (a bed, a far bell).
+    refDistance: opts.far ? 3 : opts.near ? 0.6 : 1,
+    maxDistance: opts.far ? 20 : opts.near ? 4 : 8,
+    fileOnly: true,
+    ...(opts.fadeS === undefined ? {} : { fadeS: opts.fadeS }),
+  };
 }
 
 export const SOUND_DEFS: readonly SoundDef[] = [
@@ -253,6 +298,19 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     // A yawn made in code would sound like a machine: until the recording loads, the end is silent here.
     fileOnly: true,
   },
+  // The memories' small sounds and the room's night sounds (all recordings; until a file loads, its moment is silent). Quiet:
+  // the rain, the candle and the music are the bed, and these sit on top. Tune by ear on a headset.
+  recorded('giggle', 0.45, { priority: 2, minGapS: 1 }),
+  recorded('hop', 0.3, { near: true, minGapS: 0.1, priority: 0 }),
+  recorded('blanket', 0.4, { minGapS: 1 }),
+  recorded('run', 0.35, { near: true, minGapS: 0.5, priority: 0 }),
+  recorded('jar', 0.2, { near: true, minGapS: 1 }),
+  recorded('bell', 0.25, { far: true, minGapS: 4 }),
+  recorded('gate', 0.3, { minGapS: 1 }),
+  recorded('creak', 0.25, { far: true, minGapS: 4, priority: 0 }),
+  recorded('gust', 0.3, { far: true, minGapS: 4, priority: 0 }),
+  recorded('crickets', 0.3, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.2 }),
+  recorded('wind', 0.25, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.5 }),
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */
 export const SOUND_COUNT = SOUND_DEFS.length;

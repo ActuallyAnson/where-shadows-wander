@@ -33,6 +33,17 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Click]: 0.8,
   [Sound.Rumble]: 0.8,
   [Sound.Yawn]: 0.8,
+  [Sound.Giggle]: 0.8,
+  [Sound.Hop]: 0.8,
+  [Sound.Blanket]: 0.8,
+  [Sound.Run]: 0.8,
+  [Sound.Jar]: 0.8,
+  [Sound.Bell]: 0.8,
+  [Sound.Gate]: 0.8,
+  [Sound.Creak]: 0.8,
+  [Sound.Gust]: 0.8,
+  [Sound.Crickets]: 0.35,
+  [Sound.Wind]: 0.35,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -78,6 +89,17 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
     case Sound.Music:
     case Sound.Laugh:
     case Sound.Yawn:
+    case Sound.Giggle:
+    case Sound.Hop:
+    case Sound.Blanket:
+    case Sound.Run:
+    case Sound.Jar:
+    case Sound.Bell:
+    case Sound.Gate:
+    case Sound.Creak:
+    case Sound.Gust:
+    case Sound.Crickets:
+    case Sound.Wind:
       // Never played (each waits for its file: SoundDef.fileOnly), so the stand-in is a moment of silence.
       return new Float32Array(Math.floor(sr * 0.05));
     default: {

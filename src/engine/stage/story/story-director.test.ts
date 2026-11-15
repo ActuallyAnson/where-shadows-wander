@@ -480,3 +480,48 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     });
   });
 });
+
+describe('StoryDirector.bed', () => {
+  const bedded: PuppetScene = {
+    id: 'bedded',
+    length: 4,
+    parts: [{ id: 'rabbit', art: 'rabbit', w: 0.1, h: 0.1 }],
+    tracks: [],
+    cues: [
+      { t: 1, kind: 'bed', bed: 'crickets' },
+      { t: 3, kind: 'bed', bed: 'wind' },
+    ],
+  };
+  const script: StoryScene[] = [
+    {
+      id: 'a',
+      beats: [
+        { kind: 'memory', scene: bedded, start: 0, end: 2 },
+        { kind: 'friend', shape: 'rabbit', x: 0, y: 0 },
+      ],
+    },
+    {
+      id: 'b',
+      beats: [
+        { kind: 'memory', scene: bedded, start: 2, end: 4 },
+        { kind: 'friend', shape: 'fox', x: 0, y: 0 },
+      ],
+    },
+  ];
+
+  it('follows the memory, holds through the friend’s wait, survives a skip, and is gone when the story stops', () => {
+    const d = new StoryDirector(script);
+    expect(d.bed).toBeNull();
+    d.start();
+    expect(d.memoryPlaying).toBe(true);
+    expect(d.bed).toBeNull();
+    d.update(0.1);
+    d.skipMemory(); // skipped: the crickets' cue at 1 s never fired, but its time has passed
+    expect(d.memoryPlaying).toBe(false);
+    expect(d.bed).toBe('crickets');
+    d.start(1); // a jump to the second scene: it opens on the first memory's last picture
+    expect(d.bed).toBe('crickets');
+    d.stop();
+    expect(d.bed).toBeNull();
+  });
+});

@@ -235,8 +235,10 @@ export class AudioEngine {
         voice.panner.disconnect();
       };
       voice.gain.gain.cancelScheduledValues(ctx.currentTime);
-      voice.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-      source.stop(ctx.currentTime + 0.5);
+      // A bed (SoundDef.fadeS) fades out as slowly as it came in; anything else goes in a moment.
+      const fade = SOUND_DEFS[id].fadeS ?? 0.08;
+      voice.gain.gain.setTargetAtTime(0, ctx.currentTime, fade);
+      source.stop(ctx.currentTime + Math.max(0.5, fade * 6));
     }
   }
 
@@ -257,7 +259,7 @@ export class AudioEngine {
     voice.source = source;
     // Fade in rather than start at full level: a loop that begins with the headset session is heard as a burst.
     voice.gain.gain.value = 0;
-    voice.gain.gain.setTargetAtTime(def.gain, ctx.currentTime, LOOP_FADE_IN_S);
+    voice.gain.gain.setTargetAtTime(def.gain, ctx.currentTime, def.fadeS ?? LOOP_FADE_IN_S);
     source.start();
   }
 

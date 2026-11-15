@@ -460,16 +460,40 @@ const RUMBLE_S = 3.2;
  * The storm going on outside, the kids laughing, and the hush: a grown-up's footsteps outside the fort, and the room's candle
  * dimmed with the torch while they pass, then giggles.
  */
-const cues: Cue[] = [
+/** A tiny soft pat as the rabbit lands each hop: to her hand, and later down onto the blanket. */
+const hopPats = (
+  t0: number,
+  n: number,
+  hop: number,
+  from: readonly [number, number],
+  to: readonly [number, number],
+): Cue[] =>
+  Array.from({ length: n }, (_, i): Cue => {
+    const k = (i + 1) / n;
+    return {
+      t: t0 + (i + 1) * hop,
+      kind: 'sound',
+      sound: 'hop',
+      x: from[0] + (to[0] - from[0]) * k,
+      y: from[1] + (to[1] - from[1]) * k,
+    };
+  });
+
+const timed: Cue[] = [
+  ...hopPats(RABBIT_HOPS_S, 3, RABBIT_HOP_S, RABBIT_FROM, RABBIT_AT_HAND),
   { t: RUMBLE_S, kind: 'sound', sound: 'rumble', x: WINDOW_X, y: WINDOW_Y },
   { t: LAUGH_S + 0.1, kind: 'sound', sound: 'laugh', x: TORCH_X, y: FLOOR_Y },
+  ...hopPats(DOWN_HOPS_S, 2, DOWN_HOP_S, RABBIT_AT_HAND, RABBIT_REST),
   // The hush: footsteps coming, the room's candle dimmed with the torch, footsteps going, the light back.
   ...STEPS_IN.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
   { t: HUSH_S + H_CLAP, kind: 'hush', level: HUSH_LEVEL, seconds: HUSH_DOWN_S },
   ...STEPS_OUT.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
   { t: HUSH_S + H_LIFT, kind: 'hush', level: 1, seconds: HUSH_UP_S },
-  { t: HUSH_S + H_GIGGLE, kind: 'sound', sound: 'laugh', x: TORCH_X, y: FLOOR_Y },
+  // Not the full laugh: a short, stifled giggle, two kids who got away with it.
+  { t: HUSH_S + H_GIGGLE, kind: 'sound', sound: 'giggle', x: TORCH_X, y: FLOOR_Y },
 ];
+/** In time order (the hops fall among the other sounds). */
+const cues = timed.sort((a, b) => a.t - b.t);
 
 export const HOW_THEY_MET: Chapter = {
   id: 'how-they-met',

@@ -235,6 +235,10 @@ const wobbles: Wobble[] = [
   { part: 'goodbye-girl-torso', prop: 'angle', amp: 0.008, period: 3.9, phase: 2 },
 ];
 
-const cues: Cue[] = [];
+/** The wind from the empty wall goes on; it lifts once, a gust, as she fades, and dies away with him. */
+const cues: Cue[] = [
+  { t: GIRL_GO_S, kind: 'sound', sound: 'gust', x: 0, y: 0 },
+  { t: BOY_GO_S + 1, kind: 'bed', bed: null },
+];
 
 export const GOODBYE: Chapter = { id: 'goodbye', length: GOODBYE_LENGTH_S, parts, tracks, wobbles, cues };
