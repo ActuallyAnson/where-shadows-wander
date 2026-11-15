@@ -242,7 +242,7 @@ export const SOUND_COUNT = SOUND_DEFS.length;
 
 /**
  * The sound a shape event makes, or null for none: a paper rustle when recognised, a thump when it commits, a soft
- * letting-go when it is released, and a low falling pair when it was released because tracking was lost.
+ * letting-go when it is released, and a soft sigh when it was released because tracking was lost.
  */
 export function soundForShapeEvent(type: ShapeEventType, reason: ReleaseReason | null = null): SoundId | null {
   if (type === 'candidate') return Sound.Rustle;

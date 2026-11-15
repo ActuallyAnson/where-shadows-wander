@@ -2,7 +2,7 @@
 
 ## Sounds
 
-Ten sounds are recordings from freesound.org (below). The game's other sounds (the falling pair of tones for lost tracking, the footsteps and the lullaby's five music-box notes) are made in code by `src/engine/services/audio/placeholder-sounds.ts`, which also makes a stand-in for each recorded sound, played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
+Thirteen sounds are recordings from freesound.org (below). The game's other sounds (the lullaby's five music-box notes) are made in code by `src/engine/services/audio/placeholder-sounds.ts`, which also makes a stand-in for each recorded sound, played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
 
 | Sound | Made by | Source | Licence |
 |---|---|---|---|
@@ -17,6 +17,8 @@ Ten sounds are recordings from freesound.org (below). The game's other sounds (t
 | `src/assets/audio/sfx/release.ogg`, a shape let go ("Slide release (PSX Horror SFX Free)"; changes: cut to 0.3 s, mixed to mono, high end softened, faded, level adjusted) | heyheytheree on freesound.org | https://freesound.org/s/872586/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | `src/assets/audio/sfx/tick.ogg`, a fingertip reaching a menu item ("Button hover.wav"; changes: mixed to mono, faded, level adjusted) | Fachii on freesound.org | https://freesound.org/s/338229/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/press.ogg`, a menu item pressed ("UI Button Press"; changes: cut to 0.18 s, mixed to mono, faded, level adjusted) | el_boss on freesound.org | https://freesound.org/s/788611/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `src/assets/audio/sfx/step0.ogg` and `step1.ogg`, a grown-up's footsteps outside the fort in scene 2's hush ("Footsteps - Stone, Rock, Concrete, Cement"; changes: two of its steps cut out, 0.58 s each, low-passed to sound beyond a door, faded, level adjusted) | SecureSubset on freesound.org | https://freesound.org/s/813622/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `src/assets/audio/sfx/lost.ogg`, a soft sigh when hand tracking is lost ("ManSighMovement.aif"; changes: converted from AIFF, cut to 1.4 s, mixed to mono, low end cut, faded, level adjusted) | bennychico11 on freesound.org | https://freesound.org/s/44423/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 When a recording replaces a sound made in code, add a row for each file here: what it is, who made it, where it came from (a link), and its licence (CC0 or another that allows use in a game). Do not add a file whose licence is not recorded here.
 
