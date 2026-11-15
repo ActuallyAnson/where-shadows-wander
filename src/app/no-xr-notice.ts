@@ -1,25 +1,24 @@
 // On a browser that can't start the session the game asks for (a laptop, a phone), the game
 // page is otherwise blank and IWSDK shows no Enter XR button. This explains what the page is
-// and where to go. It checks the session the page will really request: VR by default, AR for
-// ?xr=ar (ADR 0005). The emulator in `npm run dev` supports both, so it never shows there.
-
-import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
+// and where to go. It checks the session the page really requests, immersive-vr (ADR 0005). The emulator in
+// `npm run dev` supports it, so it never shows there. The Hand Lab is not offered: it is a testing tool in the game's own
+// session (ADR 0018), so without one there is nothing for it to run in.
 
 /** The part of `navigator.xr` this reads. */
 export interface XrSupport {
   isSessionSupported(mode: 'immersive-vr' | 'immersive-ar'): Promise<boolean>;
 }
 
-/** Whether the browser can start the session `search` asks for. False when WebXR is missing or the check throws. */
-export async function xrSessionSupported(xr: XrSupport | undefined, search: string): Promise<boolean> {
+/** Whether the browser can start a VR session. False when WebXR is missing or the check throws. */
+export async function xrSessionSupported(xr: XrSupport | undefined): Promise<boolean> {
   try {
-    return (await xr?.isSessionSupported(sessionModeOf(xrModeFromUrl(search)))) ?? false;
+    return (await xr?.isSessionSupported('immersive-vr')) ?? false;
   } catch {
     return false;
   }
 }
 
-/** The page a visitor without a headset sees: what the game is, how to get in on a headset, and the Hand Lab to try without one. */
+/** The page a visitor without a headset sees: what the game is and how to get in on a headset. */
 export function landingHtml(link: string): string {
   const safe = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   return `
@@ -45,9 +44,9 @@ export function landingHtml(link: string): string {
         background:var(--gold);color:#1a1008;font-weight:700;text-align:center;line-height:26px}
       #wsw-landing code{display:block;margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.4);
         font:13px ui-monospace,monospace;word-break:break-all}
-      #wsw-landing button,#wsw-landing a.cta{font:inherit;cursor:pointer;border-radius:10px;padding:8px 14px;text-decoration:none;
+      #wsw-landing button{font:inherit;cursor:pointer;border-radius:10px;padding:8px 14px;text-decoration:none;
         border:1px solid var(--gold);background:transparent;color:var(--gold)}
-      #wsw-landing button:hover,#wsw-landing a.cta:hover{background:var(--gold);color:#1a1008}
+      #wsw-landing button:hover{background:var(--gold);color:#1a1008}
       #wsw-landing .small{font-size:14px;color:#b9b3a4;margin:0}
     </style>
     <div class="moon"></div><div class="snow"></div>
@@ -62,13 +61,12 @@ export function landingHtml(link: string): string {
         <li>Press <b>BEGIN</b> and sit down with your hands in front of you.</li>
         <li>Light the candle with your hand, then shape rabbits, birds and foxes in its light.</li>
       </ol>
-      <p style="margin:0">No headset? <a class="cta" href="./?mock=1">Try the Hand Lab</a></p>
-      <p class="small">The Hand Lab shows the hand shapes the game reads, with mock or webcam hands. It is a test bench, not the game.</p>
+      <p class="small">The game is played in the headset with your own hands; there is nothing to play in this browser.</p>
     </main>`;
 }
 
-export async function showNoXrNoticeIfNeeded(search: string = location.search): Promise<void> {
-  if (await xrSessionSupported(navigator.xr, search)) return;
+export async function showNoXrNoticeIfNeeded(): Promise<void> {
+  if (await xrSessionSupported(navigator.xr)) return;
 
   const box = document.createElement('section');
   box.id = 'wsw-landing';

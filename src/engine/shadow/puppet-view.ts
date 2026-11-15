@@ -1,0 +1,451 @@
+// Draws a puppet scene's parts on the stage, posed by a ScenePlayer: each part is a quad with its cut-out (puppet-art.ts, or an
+// image) lying on the wall. Shadow parts darken the lit wall in proportion, as the hands' shadows do, and they do it in the
+// frame's alpha (unused on the wall), as scratch: the prime sets the wall's alpha to 1 (the light let through); a part standing
+// back (PuppetPart.depth: paler and softer, so the scenery stands back) multiplies it by the light it lets through, so overlapping
+// scenery darkens twice, which reads as one layer in front of another; a near part covers it with its own light let through, by
+// how much of the part is there (its cut-out's alpha, times how far it has faded in): alpha = alpha * (1 - cover) + cover * light,
+// its light coming in as the blend's constant alpha. So where two near parts overlap (a leg over the cloak) they never darken
+// twice, and a near puppet hides the scenery behind it, smoothly at its soft edges, with no outline: in front of a tree, even one
+// darker than it, its shadow is its own darkness, not the tree's showing through (a min blend let a darker tree through her
+// hand); and the resolve darkens the wall's colour by what is left and sets the alpha back to 1
+// (RenderOrder.puppetPrime .. puppetResolve, before the hands' shadows). Glow parts add their light. Everything can be cut off at
+// the wall's edges (clipToWall), as a shadow theatre's screen cuts off a piece of scenery sliding into the wings. Built when a
+// scene loads; a frame only sets matrices, a few uniforms and one opacity each.
+import {
+  AddEquation,
+  AdditiveBlending,
+  CanvasTexture,
+  ConstantAlphaFactor,
+  CustomBlending,
+  DoubleSide,
+  DstAlphaFactor,
+  Group,
+  Mesh,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
+  PlaneGeometry,
+  ShaderMaterial,
+  SrcAlphaFactor,
+  SRGBColorSpace,
+  Vector2,
+  Vector3,
+  ZeroFactor,
+  type Material,
+} from '@iwsdk/core';
+import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
+import type { ScenePlayer } from '../stage/puppet/scene-player';
+import { isImageArt, PUPPET_ART, type PuppetPainter } from './puppet-art';
+import { puppetPartOrder, RenderOrder } from './pure/render-order';
+import type { StagePlane } from './pure/stage-plane';
+
+/** Pixels painted per metre of cut-out as drawn on the wall (scene metres times `scale`), within these bounds. */
+const PX_PER_M = 1100;
+const PX_MIN = 32;
+const PX_MAX = 2048;
+/** Lifted off the wall toward the player, metres, and a little more for each later part so they keep their order. */
+const LIFT_M = 0.003;
+const LIFT_STEP_M = 0.0002;
+/** The prime and the resolve lie over the whole wall this far off it: in front of the wall, behind every part. */
+const WASH_LIFT_M = 0.0015;
+/**
+ * A near puppet's shadow keeps this much of its opacity (the light's, DEFAULT_SHADOW_OPACITY's 0.88 at full): 0.65 leaves about 43 %
+ * of the wall's light in it, so the kids read as shadows on the paper, not holes in it.
+ */
+const NEAR_SHADOW_STRENGTH = 0.65;
+
+// vWall: where the fragment is on the wall, metres from the story's centre (the quad's centre plus its two axes), for the clip.
+const VERTEX = /* glsl */ `
+uniform vec2 centre;
+uniform vec2 axisA;
+uniform vec2 axisB;
+varying vec2 vUv;
+varying vec2 vWall;
+void main() {
+  vUv = uv;
+  vWall = centre + position.x * axisA + position.y * axisB;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+/** Discards what lies past the wall's edges. */
+const CLIP = /* glsl */ `
+uniform vec2 clip;
+varying vec2 vWall;`;
+const CLIP_TEST = /* glsl */ `if (abs(vWall.x) > clip.x || abs(vWall.y) > clip.y) discard;`;
+
+// A near shadow: how much of it is here (its `opacity` here is that cover, 0..1); its blend lays its light (the material's
+// blendAlpha) over the frame's alpha by that much.
+const SHADOW_FRAGMENT = /* glsl */ `
+uniform sampler2D map;
+uniform float opacity;
+varying vec2 vUv;
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  float a = texture2D(map, vUv).a * opacity;
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+}`;
+
+// A shadow standing back: takes its share (its alpha) of the light however dim the wall is. Its blend multiplies the frame's
+// alpha by 1 - alpha and leaves the colour; the resolve applies it.
+const FAR_SHADOW_FRAGMENT = /* glsl */ `
+uniform sampler2D map;
+uniform float opacity;
+varying vec2 vUv;
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  float a = texture2D(map, vUv).a * opacity;
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+}`;
+
+// The prime and the resolve: the whole wall, alpha 1 (their blends do the rest).
+const WASH_FRAGMENT = /* glsl */ `
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+}`;
+
+// A glow: its tint added onto the wall at its alpha (additive), as the torch's light is.
+const GLOW_FRAGMENT = /* glsl */ `
+uniform sampler2D map;
+uniform float opacity;
+uniform vec3 tint;
+varying vec2 vUv;
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  float a = texture2D(map, vUv).a * opacity;
+  if (a < 0.003) discard;
+  gl_FragColor = vec4(tint, a);
+  #include <colorspace_fragment>
+}`;
+
+interface Piece {
+  readonly mesh: Mesh;
+  readonly part: number;
+  readonly w: number;
+  readonly h: number;
+  readonly px: number;
+  readonly py: number;
+  readonly mirror: number;
+  readonly glow: boolean;
+  /** A near shadow: it covers what is under it (its cover in `opacity`, its light in the material's blendAlpha). */
+  readonly near: boolean;
+  /** Its opacity is multiplied by this: 1 against the wall, less the further back it stands. */
+  readonly strength: number;
+  readonly material: ShaderMaterial;
+  readonly texture: CanvasTexture;
+  readonly centre: Vector2;
+  readonly axisA: Vector2;
+  readonly axisB: Vector2;
+}
+
+/** How far the wall reaches from the story's centre when nothing has been set: everywhere. */
+const NO_CLIP = 1e6;
+
+export class PuppetView {
+  readonly group = new Group();
+  private pieces: Piece[] = [];
+  private scene: PuppetScene | null = null;
+  private static readonly quad = new PlaneGeometry(1, 1);
+  /** How many wall metres one scene metre is: scenes are written for the 1.6 by 1 m stage and drawn bigger (STORY_SCALE). */
+  scale = 1;
+  /** Art painted in code elsewhere (ghost-outline.ts's baked outlines), looked up by name before PUPPET_ART. */
+  extraArt: Readonly<Record<string, PuppetPainter>> = {};
+  /** Half the wall's width and height, metres from the story's centre: nothing is drawn past them. Shared by every piece. */
+  private readonly clip = new Vector2(NO_CLIP, NO_CLIP);
+  /** The prime and the resolve (see the top of the file), while a scene is loaded; their axes. */
+  private prime: Mesh | null = null;
+  private resolve: Mesh | null = null;
+  private readonly washA = new Vector2();
+  private readonly washB = new Vector2();
+
+  /** Cuts the puppets off at the wall's edges: `halfWidth` and `halfHeight` metres from the story's centre. */
+  clipToWall(halfWidth: number, halfHeight: number): void {
+    this.clip.set(halfWidth, halfHeight);
+  }
+
+  constructor() {
+    this.group.visible = false;
+  }
+
+  /** Builds the parts of `scene` (and drops a scene built before). */
+  load(scene: PuppetScene): void {
+    if (this.scene === scene) return;
+    this.unload();
+    this.scene = scene;
+    const depths = partDepths(scene);
+    scene.parts.forEach((part, i) => {
+      if (!part.art) return;
+      const glow = part.look === 'glow';
+      const depth = glow ? 0 : depths[i];
+      const far = depths[i] > 0;
+      // Where it draws: a glow standing back (the window's light) goes under the near puppets with the far shadows.
+      const order = puppetPartOrder(glow, depths[i], i);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.w * PX_PER_M * this.scale)));
+      canvas.height = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.h * PX_PER_M * this.scale)));
+      const texture = new CanvasTexture(canvas);
+      texture.colorSpace = SRGBColorSpace;
+      const g = canvas.getContext('2d');
+      // A far part's shadow is soft: its cut-out is blurred once, here, by its depth's blur in this canvas's pixels.
+      const blurPx = (depthBlur(depth) * canvas.width) / part.w;
+      if (isImageArt(part.art)) {
+        const img = new Image();
+        img.onload = () => {
+          if (!g) return;
+          g.clearRect(0, 0, canvas.width, canvas.height);
+          drawSoft(g, img, canvas.width, canvas.height, blurPx);
+          texture.needsUpdate = true;
+        };
+        img.onerror = () => console.warn(`puppet ${part.id}: could not load ${part.art}`);
+        img.src = part.art;
+      } else {
+        const paint = this.extraArt[part.art] ?? PUPPET_ART[part.art];
+        if (!paint) console.warn(`puppet ${part.id}: no art called ${part.art}`);
+        else if (g && blurPx < 0.5) paint(g, canvas.width, canvas.height);
+        else if (g) {
+          const sharp = document.createElement('canvas');
+          sharp.width = canvas.width;
+          sharp.height = canvas.height;
+          const sg = sharp.getContext('2d');
+          if (sg) paint(sg, sharp.width, sharp.height);
+          drawSoft(g, sharp, canvas.width, canvas.height, blurPx);
+        }
+      }
+      const centre = new Vector2(),
+        axisA = new Vector2(),
+        axisB = new Vector2();
+      const uniforms = {
+        map: { value: texture },
+        opacity: { value: 0 },
+        centre: { value: centre },
+        axisA: { value: axisA },
+        axisB: { value: axisB },
+        clip: { value: this.clip },
+      };
+      let material: ShaderMaterial;
+      if (glow) {
+        const tint = part.tint ?? [1, 1, 1];
+        material = new ShaderMaterial({
+          uniforms: { ...uniforms, tint: { value: new Vector3(tint[0], tint[1], tint[2]) } },
+          vertexShader: VERTEX,
+          fragmentShader: GLOW_FRAGMENT,
+          transparent: true,
+          depthWrite: false,
+          side: DoubleSide,
+          toneMapped: false,
+        });
+        if (far) {
+          // Added light that leaves the frame's alpha alone: the scenery's darkening is being kept there.
+          material.blending = CustomBlending;
+          material.blendEquation = AddEquation;
+          material.blendSrc = SrcAlphaFactor;
+          material.blendDst = OneFactor;
+          material.blendSrcAlpha = ZeroFactor;
+          material.blendDstAlpha = OneFactor;
+        } else material.blending = AdditiveBlending;
+      } else if (depth > 0) {
+        material = new ShaderMaterial({
+          uniforms,
+          vertexShader: VERTEX,
+          fragmentShader: FAR_SHADOW_FRAGMENT,
+          transparent: true,
+          blending: CustomBlending,
+          blendEquation: AddEquation,
+          // The colour is kept; the alpha is multiplied by the light let through (the resolve applies it).
+          blendSrc: ZeroFactor,
+          blendDst: OneFactor,
+          blendSrcAlpha: ZeroFactor,
+          blendDstAlpha: OneMinusSrcAlphaFactor,
+          depthWrite: false,
+          side: DoubleSide,
+          toneMapped: false,
+        });
+      } else {
+        material = new ShaderMaterial({
+          uniforms,
+          vertexShader: VERTEX,
+          fragmentShader: SHADOW_FRAGMENT,
+          transparent: true,
+          blending: CustomBlending,
+          // The colour is kept; the alpha goes toward the light this lets through (blendAlpha, set each frame) by the cover (the
+          // fragment's alpha). The resolve applies it.
+          blendEquation: AddEquation,
+          blendSrc: ZeroFactor,
+          blendDst: OneFactor,
+          blendEquationAlpha: AddEquation,
+          blendSrcAlpha: ConstantAlphaFactor,
+          blendDstAlpha: OneMinusSrcAlphaFactor,
+          depthWrite: false,
+          side: DoubleSide,
+          toneMapped: false,
+        });
+      }
+      const mesh = new Mesh(PuppetView.quad, material);
+      mesh.matrixAutoUpdate = false;
+      mesh.frustumCulled = false;
+      // The scenery under everything near; near shadows with the hands' shadows; near glows are light on top of them.
+      mesh.renderOrder = order;
+      mesh.visible = false;
+      this.group.add(mesh);
+      const pivot = part.pivot ?? [0.5, 0.5];
+      this.pieces.push({
+        mesh,
+        part: i,
+        w: part.w,
+        h: part.h,
+        px: pivot[0],
+        py: pivot[1],
+        mirror: part.mirror ? -1 : 1,
+        glow,
+        near: !glow && depth === 0,
+        strength: glow ? 1 : far ? depthStrength(depth) : NEAR_SHADOW_STRENGTH,
+        material,
+        texture,
+        centre,
+        axisA,
+        axisB,
+      });
+    });
+    // The prime sets the wall's alpha to 1 for the shadows to darken; the resolve darkens the colour by it, alpha back to 1. Every
+    // view has its own (the friend's hand is drawn while no memory is): where two are drawn, the second resolve changes nothing.
+    this.prime = this.wash(RenderOrder.puppetPrime, OneFactor);
+    this.resolve = this.wash(RenderOrder.puppetResolve, DstAlphaFactor);
+  }
+
+  /** A quad over the whole wall (the clip) that writes alpha 1 and multiplies the colour by `dst` (1: kept; the alpha: darkened). */
+  private wash(order: number, dst: typeof OneFactor | typeof DstAlphaFactor): Mesh {
+    const material = new ShaderMaterial({
+      uniforms: {
+        centre: { value: new Vector2(0, 0) },
+        axisA: { value: this.washA },
+        axisB: { value: this.washB },
+        clip: { value: this.clip },
+      },
+      vertexShader: VERTEX,
+      fragmentShader: WASH_FRAGMENT,
+      transparent: true,
+      blending: CustomBlending,
+      blendEquation: AddEquation,
+      blendSrc: ZeroFactor,
+      blendDst: dst,
+      blendSrcAlpha: OneFactor,
+      blendDstAlpha: ZeroFactor,
+      depthWrite: false,
+      side: DoubleSide,
+      toneMapped: false,
+    });
+    const mesh = new Mesh(PuppetView.quad, material);
+    mesh.matrixAutoUpdate = false;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = order;
+    this.group.add(mesh);
+    return mesh;
+  }
+
+  /**
+   * Poses the parts from `player` on `stage`. `light` (0..1) is how much of the candle's light reaches the wall times the
+   * shadows' solidity: covering the flame takes the puppets' shadows (and glows) away with the hands'. `fade` (0..1) is how
+   * much of the whole puppet is there, as its parts' own opacity is: a near shadow fading covers the scenery less, rather than
+   * covering it with a paler shadow (which would show as a pale shape on a tree).
+   */
+  update(player: ScenePlayer, stage: StagePlane, light: number, fade = 1): void {
+    this.group.visible = light > 0.001 && fade > 0.001;
+    if (!this.group.visible) return;
+    const world = player.world;
+    const r = stage.right,
+      u = stage.up,
+      n = stage.normal,
+      o = stage.origin;
+    if (this.prime && this.resolve) {
+      const w = 2 * this.clip.x,
+        h = 2 * this.clip.y,
+        l = WASH_LIFT_M;
+      this.washA.set(w, 0);
+      this.washB.set(0, h);
+      // prettier-ignore
+      this.prime.matrix.set(
+        w * r[0], h * u[0], n[0], o[0] + n[0] * l,
+        w * r[1], h * u[1], n[1], o[1] + n[1] * l,
+        w * r[2], h * u[2], n[2], o[2] + n[2] * l,
+        0, 0, 0, 1,
+      );
+      this.prime.matrixWorldNeedsUpdate = true;
+      this.resolve.matrix.copy(this.prime.matrix);
+      this.resolve.matrixWorldNeedsUpdate = true;
+    }
+    for (let k = 0; k < this.pieces.length; k++) {
+      const p = this.pieces[k];
+      const b = p.part * POSE_STRIDE;
+      const there = world[b + 4] * fade;
+      const opacity = there * light * p.strength;
+      p.mesh.visible = opacity > 0.003;
+      if (!p.mesh.visible) continue;
+      if (p.near) {
+        p.material.uniforms.opacity.value = there > 1 ? 1 : there;
+        const dark = light * p.strength;
+        p.material.blendAlpha = dark >= 1 ? 0 : 1 - dark;
+      } else p.material.uniforms.opacity.value = opacity;
+      const c = Math.cos(world[b + 2]),
+        s = Math.sin(world[b + 2]),
+        sc = world[b + 3] * this.scale;
+      const w = p.w * sc,
+        h = p.h * sc;
+      // The quad's centre, from the pivot: its offset to the centre turned with the part.
+      const dx = (0.5 - p.px) * w,
+        dy = (0.5 - p.py) * h;
+      const x = world[b] * this.scale + c * dx - s * dy,
+        y = world[b + 1] * this.scale + s * dx + c * dy;
+      // Its axes in stage coordinates: x along (c, s), y along (-s, c); then into the scene through the stage's frame.
+      const ax = c * w * p.mirror,
+        ay = s * w * p.mirror,
+        bx = -s * h,
+        by = c * h;
+      p.centre.set(x, y);
+      p.axisA.set(ax, ay);
+      p.axisB.set(bx, by);
+      const lift = LIFT_M + k * LIFT_STEP_M;
+      // prettier-ignore
+      p.mesh.matrix.set(
+        r[0] * ax + u[0] * ay, r[0] * bx + u[0] * by, n[0], o[0] + r[0] * x + u[0] * y + n[0] * lift,
+        r[1] * ax + u[1] * ay, r[1] * bx + u[1] * by, n[1], o[1] + r[1] * x + u[1] * y + n[1] * lift,
+        r[2] * ax + u[2] * ay, r[2] * bx + u[2] * by, n[2], o[2] + r[2] * x + u[2] * y + n[2] * lift,
+        0, 0, 0, 1,
+      );
+      p.mesh.matrixWorldNeedsUpdate = true;
+    }
+  }
+
+  /** Hides it until the next update with light. */
+  hide(): void {
+    this.group.visible = false;
+  }
+
+  /** Drops the scene's meshes and textures. */
+  unload(): void {
+    for (const p of this.pieces) {
+      this.group.remove(p.mesh);
+      (p.material as Material).dispose();
+      p.texture.dispose();
+    }
+    this.pieces = [];
+    this.scene = null;
+    for (const m of [this.prime, this.resolve]) {
+      if (!m) continue;
+      this.group.remove(m);
+      (m.material as Material).dispose();
+    }
+    this.prime = this.resolve = null;
+  }
+}
+
+/** Draws `src` over the whole of `g`'s canvas, blurred by `blurPx` (none below half a pixel). */
+function drawSoft(g: CanvasRenderingContext2D, src: CanvasImageSource, w: number, h: number, blurPx: number): void {
+  if (blurPx >= 0.5) g.filter = `blur(${blurPx.toFixed(1)}px)`;
+  g.drawImage(src, 0, 0, w, h);
+  g.filter = 'none';
+}

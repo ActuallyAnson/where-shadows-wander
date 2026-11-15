@@ -1,17 +1,23 @@
 import type { World } from '@iwsdk/core';
-import { sessionModeOf, xrModeFromUrl } from '../engine/xr/session-mode';
 import { DEBUG_TOOLS } from '../debug/debug-flag';
 import { captureOptions, loadCaptureChoice, nextCapture, saveCaptureChoice } from './capture-mode';
 import { createTitleScreen, type TitleScreen } from '../ui/title-screen/title-screen';
 import type { UiSound } from './ui-sound';
 
-/** The judges' build's "other ways in" buttons: dim, to sit under the title screen (background, text, border). */
-const QUIET_BUTTON = ['#0b0e16', '#b5bfd0', '#3a4459'] as const;
-
 /** Things the page's own screens ask of the app, filled in once the app has them (the settings exist after the title does). */
 export interface LauncherHooks {
   openSettings?: () => void;
+  /** The title has finished fading to black and is gone, so the session's own fade-in can start (it would be hidden before). */
+  titleGone?: () => void;
+  /**
+   * Set by the launcher (where VR is supported): starts the session as BEGIN does, without waiting on the title's slow fade.
+   * Resolves to whether a session is running. For dev tools (the Hand Lab's Story tab); call it from a click, like BEGIN.
+   */
+  begin?: () => Promise<boolean>;
 }
+
+/** How long the title takes to fade to black after BEGIN (title-markup.ts: a 0.3 s delay, then 2.5 s). */
+const TITLE_FADE_MS = 2800;
 
 export async function mountEnterArButtonIfNeeded(
   world: World,
@@ -24,7 +30,8 @@ export async function mountEnterArButtonIfNeeded(
     return;
   }
 
-  // Live log buffer for on-screen inspection
+  // The launch log: kept from the start, shown on the page only when BEGIN fails in a debug build (in a session, the
+  // developer overlay shows the errors instead).
   const logs: string[] = [];
 
   // Create UI overlay container
@@ -38,7 +45,7 @@ export async function mountEnterArButtonIfNeeded(
   // Live log window
   const logBox = document.createElement('div');
   logBox.style.cssText =
-    'width:100%;max-height:160px;overflow-y:auto;background:rgba(15,18,24,0.95);' +
+    'width:100%;flex:none;max-height:160px;overflow-y:auto;background:rgba(15,18,24,0.95);' +
     'border:1px solid #3a4459;border-radius:10px;padding:10px 14px;font:11px/1.45 ui-monospace,monospace;' +
     'color:#c9d1d9;box-sizing:border-box;pointer-events:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);';
 
@@ -108,18 +115,19 @@ export async function mountEnterArButtonIfNeeded(
     return btn;
   };
 
-  // An "other way in" button: its own colours in a dev or tester build, the dim title-screen ones in the judges' build.
-  const makeWayBtn = (text: string, debug: readonly [string, string, string], onClick: () => void) => {
-    const [bg, fg, border] = DEBUG_TOOLS ? debug : QUIET_BUTTON;
-    return makeBtn(text, bg, fg, border, onClick);
-  };
-
-  // Direct clean launch function
-  const launchDirect = async (mode: XRSessionMode, forceWebGLLayer: boolean) => {
+  // The one way in (the title's BEGIN). It falls back by itself: to fewer features if the runtime rejects some, and to
+  // the older XRWebGLLayer if three.js can't bind the session with a projection layer (the Pico's driver has none).
+  /** Shows the launch log on the page (set below in debug builds). */
+  let showLaunchLog: (() => void) | null = null;
+  /** When BEGIN was pressed (performance.now()), so the title stays up until its fade to black has finished. */
+  let pressedAt = -Infinity;
+  /** `quick`: the title is hidden as soon as the session starts, not after its fade to black. */
+  const launchDirect = async (mode: XRSessionMode, quick = false) => {
+    pressedAt = quick ? performance.now() - TITLE_FADE_MS : performance.now();
     title?.setBusy(true);
     statusLine.textContent = `● Launching ${mode}...`;
     statusLine.style.color = '#e3b341';
-    appendLog(`Requesting ${mode} session (forceWebGLLayer: ${forceWebGLLayer})...`, '#e3b341');
+    appendLog(`Requesting ${mode} session...`, '#e3b341');
 
     // Stash original createProjectionLayer so we can restore it on failure or session end
     const origCreateProjLayer =
@@ -141,13 +149,6 @@ export async function mountEnterArButtonIfNeeded(
     try {
       const w = world as unknown as { sessionRequestPending?: boolean; session?: XRSession };
       w.sessionRequestPending = false;
-
-      if (forceWebGLLayer) {
-        if (typeof XRWebGLBinding !== 'undefined' && 'createProjectionLayer' in XRWebGLBinding.prototype) {
-          appendLog('Bypassing createProjectionLayer to force XRWebGLLayer', '#d2a8ff');
-          delete (XRWebGLBinding.prototype as unknown as { createProjectionLayer?: unknown }).createProjectionLayer;
-        }
-      }
 
       // Feature ladder: Wolvic on Pico can reject optional features (like bounded-floor or hand-tracking)
       // if controllers are connected, boundary is unconfigured/stationary, or after a session reset.
@@ -231,34 +232,24 @@ export async function mountEnterArButtonIfNeeded(
       appendLog(`Launch failed: ${name}: ${msg}`, '#ff7b72');
       console.error('[XR Direct Launch Error]', err);
       title?.setBusy(false);
-      showNote(
-        "Couldn't start VR. The headset runtime rejected the session.\nTry 'Reload page' below, or restart Wolvic.",
-      );
-      openOtherWays();
+      showNote("Couldn't start VR. Reload the page and press BEGIN again.");
+      showLaunchLog?.();
     }
   };
 
-  const [arSupported, vrSupported] = await Promise.all([
-    xr.isSessionSupported('immersive-ar').catch(() => false),
-    xr.isSessionSupported('immersive-vr').catch(() => false),
-  ]);
+  const vrSupported = await xr.isSessionSupported('immersive-vr').catch(() => false);
+  if (vrSupported)
+    hooks.begin = async () => {
+      if (!world.renderer.xr.isPresenting) {
+        sound?.begin();
+        await launchDirect('immersive-vr', true);
+      }
+      return world.renderer.xr.isPresenting;
+    };
 
-  appendLog(`XR Support: immersive-vr=${vrSupported}, immersive-ar=${arSupported}`);
+  appendLog(`XR Support: immersive-vr=${vrSupported}`);
 
-  // The judges' build shows one Enter VR button; the other ways in (a Pico browser sometimes needs them) are behind
-  // "Trouble starting?". Dev and tester builds show them all, with their technical names.
-  const otherWays = document.createElement('div');
-  otherWays.style.cssText =
-    'display:none;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;pointer-events:auto;';
-  const openOtherWays = (): void => {
-    otherWays.style.display = 'flex';
-  };
-  const waysTarget = DEBUG_TOOLS ? buttonRow : otherWays;
-  if (DEBUG_TOOLS) openOtherWays();
-
-  // The title screen is the way in: BEGIN starts VR. The judges' build has "Trouble starting?" under it; dev and tester
-  // builds keep the debug row at the bottom, on top of it. Without VR support the title is not shown, so the no-XR
-  // notice (no-xr-notice.ts) stays readable.
+  // Without VR support the title is not shown, so the no-XR notice (no-xr-notice.ts) stays readable.
   if (vrSupported) {
     title = createTitleScreen(
       [
@@ -266,11 +257,10 @@ export async function mountEnterArButtonIfNeeded(
           label: 'BEGIN',
           begin: true,
           onPress: () => {
-            void launchDirect('immersive-vr', false);
+            void launchDirect('immersive-vr');
           },
         },
         { label: 'SETTINGS', onPress: () => hooks.openSettings?.() },
-        ...(DEBUG_TOOLS ? [] : [{ label: 'Trouble starting?', quiet: true, onPress: openOtherWays }]),
       ],
       {
         onReach: () => sound?.hover(),
@@ -289,111 +279,47 @@ export async function mountEnterArButtonIfNeeded(
     if (captureOptions(choice).enabled) title.setNote(`Capture mode: ${choice}. Five taps on the flame change it.`);
   }
 
-  if (vrSupported && (DEBUG_TOOLS || !title)) {
-    const vrDirectBtn = makeBtn(
-      DEBUG_TOOLS ? '▶ Enter VR (Direct Hands)' : 'Enter VR',
-      '#163824',
-      '#3fb950',
-      '#2ea043',
-      () => {
-        void launchDirect('immersive-vr', false);
-      },
-    );
-    buttonRow.append(vrDirectBtn);
-
-    const vrSafeBtn = makeWayBtn(
-      DEBUG_TOOLS ? '🛡️ Enter VR (Safe WebGL)' : 'Enter VR (compatibility mode)',
-      ['#1c2d42', '#58a6ff', '#388bfd'],
-      () => {
-        void launchDirect('immersive-vr', true);
-      },
-    );
-    waysTarget.append(vrSafeBtn);
-  }
-
-  // The older passthrough mode is for testing; the game is a VR room (ADR 0005).
-  if (arSupported && (DEBUG_TOOLS || xrModeFromUrl(location.search) === 'ar')) {
-    const arDirectBtn = makeBtn('👁️ Enter AR (Passthrough)', '#3b2300', '#f0883e', '#d29922', () => {
-      void launchDirect('immersive-ar', false);
-    });
-    buttonRow.append(arDirectBtn);
-  }
-
-  const iwsdkBtn = makeWayBtn(
-    DEBUG_TOOLS ? '⚡ Enter via IWSDK' : 'Enter VR (another way)',
-    ['#2d1840', '#bc8cff', '#a371f7'],
-    () => {
-      statusLine.textContent = '● Launching via IWSDK...';
-      statusLine.style.color = '#bc8cff';
-      const mode = sessionModeOf(xrModeFromUrl(location.search));
-      appendLog(`Calling world.launchXR({ sessionMode: "${mode}", features: { handTracking: true } })...`);
-      try {
-        world.launchXR({
-          sessionMode: mode as unknown as import('@iwsdk/core').SessionMode,
-          features: { handTracking: true },
-        });
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        appendLog(`IWSDK launch threw: ${msg}`, '#ff7b72');
-      }
-    },
-  );
-  waysTarget.append(iwsdkBtn);
-
-  const reloadBtn = makeWayBtn(
-    DEBUG_TOOLS ? '🔄 Reload Page' : 'Reload page',
-    ['#3d1f24', '#f85149', '#da3633'],
-    () => {
-      location.reload();
-    },
-  );
-  waysTarget.append(reloadBtn);
-
-  // Copy logs button: a debug tool, not in the judges' build.
+  // The launch log and its copy button, shown when BEGIN fails. A debug tool: only when DEBUG_TOOLS is on (the dev server or
+  // a `--mode tester` build), never in the judges' build. The developer switches are in the room (developer-page.ts).
   if (DEBUG_TOOLS) {
-    const copyBtn = makeBtn('📋 Copy Logs', '#21262d', '#c9d1d9', '#30363d', async () => {
-      try {
-        await navigator.clipboard.writeText(logs.join('\n'));
-        appendLog('Logs copied to clipboard!', '#7ee787');
-      } catch {
-        appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
-      }
-    });
-    buttonRow.append(copyBtn);
+    logBox.style.display = 'none';
+    buttonRow.style.display = 'none';
+    uiContainer.append(logBox);
+    buttonRow.append(
+      makeBtn('📋 Copy logs', '#2b2410', '#e3b341', '#9e6a03', async () => {
+        try {
+          await navigator.clipboard.writeText(logs.join('\n'));
+          appendLog('Logs copied to clipboard!', '#7ee787');
+        } catch {
+          appendLog('Clipboard write blocked. Select and copy from log box.', '#e3b341');
+        }
+      }),
+    );
+    showLaunchLog = () => {
+      logBox.style.display = 'block';
+      buttonRow.style.display = 'flex';
+    };
   }
-
-  if (!DEBUG_TOOLS && !title) {
-    const trouble = document.createElement('button');
-    trouble.type = 'button';
-    trouble.textContent = 'Trouble starting?';
-    trouble.style.cssText =
-      'background:none;border:0;color:#a8a294;font:13px system-ui,-apple-system,sans-serif;text-decoration:underline;' +
-      'cursor:pointer;pointer-events:auto;';
-    trouble.onclick = openOtherWays;
-    buttonRow.append(trouble);
-  }
-
-  // Testing: the address switches (?debug=joints, ?flicker=0, ?record ...) as buttons, for headsets with no easy address
-  // bar. A debug tool: only when DEBUG_TOOLS is on (the dev server or a `--mode tester` build), never in the judges' build.
-  let testingElement: HTMLElement | null = null;
-  if (DEBUG_TOOLS) {
-    const { createTestingPanel } = await import('./testing-panel');
-    const testing = createTestingPanel();
-    testingElement = testing.element;
-    buttonRow.append(makeBtn('🧪 Testing', '#2b2410', '#e3b341', '#9e6a03', testing.toggle));
-  }
-
-  if (testingElement) uiContainer.append(testingElement);
-  if (DEBUG_TOOLS) uiContainer.append(logBox);
-  uiContainer.append(note, buttonRow, otherWays);
+  uiContainer.append(note, buttonRow);
   document.body.append(uiContainer);
 
+  // A session can start a few milliseconds after BEGIN (the emulator): the title stays up, fading, until it is black. The
+  // count makes a hide meant for an earlier session do nothing.
+  let sessions = 0;
   world.renderer.xr.addEventListener('sessionstart', () => {
+    const which = ++sessions;
     uiContainer.style.display = 'none';
-    title?.setVisible(false);
     world.scene.visible = true;
+    const wait = Math.max(0, pressedAt + TITLE_FADE_MS - performance.now());
+    setTimeout(() => {
+      if (which !== sessions || !world.renderer.xr.isPresenting) return;
+      title?.setVisible(false);
+      hooks.titleGone?.();
+    }, wait);
   });
   world.renderer.xr.addEventListener('sessionend', () => {
+    sessions++;
+    pressedAt = -Infinity;
     uiContainer.style.display = 'flex';
     title?.setVisible(true);
     title?.setBusy(false);

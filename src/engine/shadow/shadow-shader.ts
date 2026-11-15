@@ -6,6 +6,7 @@
 // hands; overlaps never darken twice, which matters over passthrough.
 
 import { CAPSULES_PER_SLOT, MAX_CAPSULES } from './pure/shadow-uniforms';
+import { stageEdgeGlsl } from './stage-edge-glsl';
 
 export { CAPSULES_PER_SLOT, MAX_CAPSULES };
 
@@ -25,7 +26,11 @@ export const shadowFragment = /* glsl */ `
   uniform vec2 uSize;  // stage width, height
   uniform vec3 uColor;
   uniform float uOpacity[2];  // per hand: the base opacity plus its sharpen boost
+  uniform vec2 uAreaC;  // the middle of the quad (uSize), metres from the stage's centre
+  uniform vec3 uPool;  // the candle's pool of light: the flame's x, y on the wall, and 1 when on (0: clip to the quad)
+  uniform vec2 uPoolR;  // the pool's radii, metres
   varying vec2 vUv;
+${stageEdgeGlsl}
 
   float segmentDistance(vec2 p, vec2 a, vec2 b) {
     vec2 ab = b - a;
@@ -34,7 +39,7 @@ export const shadowFragment = /* glsl */ `
   }
 
   void main() {
-    vec2 p = (vUv - 0.5) * uSize;
+    vec2 p = (vUv - 0.5) * uSize + uAreaC;
     // One pixel's footprint in stage metres, worked out here where every fragment runs it together (derivatives
     // are undefined inside the bounds tests below, which differ between neighbouring pixels). A distance field
     // changes by at most the footprint per pixel.
@@ -55,6 +60,8 @@ export const shadowFragment = /* glsl */ `
         alpha = max(alpha, a);
       }
     }
+    // Shadows are only where the candle's light falls: they fade with its pool of light, and stop at the wall's edges.
+    if (uPool.z > 0.5) alpha *= lightPool(p, uPool.xy, uPoolR) * stageEdge(p - uAreaC, uSize, 0.03);
     if (alpha < 0.003) discard;
     gl_FragColor = vec4(uColor, alpha);
   }

@@ -54,7 +54,7 @@ The first Pico report came from a PICO 4 (OS 5.13.8) running PicoBrowser 3.3.54 
 
 ## Update 2 (5 Oct 2026): hand data on the Pico
 
-Damon's testing (full write-up in [TESTING_FINDINGS.md](../TESTING_FINDINGS.md), merged in PR #40) found how to get real hand joints on this Pico 4 (OS 5.13.8):
+Damon's testing (full write-up merged in PR #40 as `docs/TESTING_FINDINGS.md`, removed 12 Nov 2026 and kept in git history) found how to get real hand joints on this Pico 4 (OS 5.13.8):
 
 - **Browser.** PicoBrowser 3.3 (Chrome 105) and the Pico Store's Wolvic 1.10 (Gecko) do not give a page `XRHand` joints: the first has no input sources at all, the second runs the Pico's hands-as-controllers mode (`profiles: ["pico-4", ...]`, `hand` null). The **Wolvic Chromium 1.4 generic release APK**, sideloaded, does, and the official [WebXR hands sample](https://immersive-web.github.io/webxr-samples/immersive-hands.html) shows the joints in it.
 - **Session request.** Our page originally asked for seven optional features. The Pico rejected or broke on `anchors`, `plane-detection`, `mesh-detection` and `layers`, and three.js's `XRWebGLBinding.createProjectionLayer` fails on the Pico's runtime. What works: a **VR** session asking only for `local-floor`, `bounded-floor` and `hand-tracking` (all optional), with a fallback to a plain `XRWebGLLayer`. The earlier idea that `hand-tracking` must be *required* was wrong (required makes `requestSession` fail on the Pico).

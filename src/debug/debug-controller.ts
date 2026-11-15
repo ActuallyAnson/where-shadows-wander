@@ -3,11 +3,10 @@
 // the on-page HUD and the hands-only menu. Plain TypeScript.
 import type { DebugKeyAction } from './debug-keys';
 import { DebugActions } from './debug-actions';
-import { TimeControl } from './time-control';
 
 export const SYSTEMS = ['shadow', 'sharpen', 'flicker', 'candleLight', 'handVisual'] as const;
 export type SystemKey = (typeof SYSTEMS)[number];
-export const OVERLAYS = ['capsules', 'colliders', 'joints'] as const;
+export const OVERLAYS = ['capsules', 'joints'] as const;
 export type OverlayKey = (typeof OVERLAYS)[number];
 
 export const SYSTEM_INFO: Readonly<Record<SystemKey, { label: string; help: string }>> = {
@@ -18,8 +17,7 @@ export const SYSTEM_INFO: Readonly<Record<SystemKey, { label: string; help: stri
   handVisual: { label: 'Hand visual', help: 'The glove drawn over your hands.' },
 };
 export const OVERLAY_INFO: Readonly<Record<OverlayKey, { label: string; help: string }>> = {
-  capsules: { label: 'Shadow capsules', help: 'What the collision solver gets from your hands.' },
-  colliders: { label: 'Entity colliders', help: 'A circle round each thing on the stage.' },
+  capsules: { label: 'Shadow capsules', help: 'The capsules your hands are made of on the wall.' },
   joints: { label: 'Joint dots', help: 'A dot on each tracked hand joint.' },
 };
 
@@ -50,7 +48,6 @@ export interface DebugPage {
 export const ITEMS_PER_PAGE = 6;
 
 export class DebugController {
-  readonly time = new TimeControl();
   readonly actions = new DebugActions();
   readonly systems: Record<SystemKey, boolean> = {
     shadow: true,
@@ -59,7 +56,7 @@ export class DebugController {
     candleLight: true,
     handVisual: true,
   };
-  readonly overlays: Record<OverlayKey, boolean> = { capsules: false, colliders: false, joints: false };
+  readonly overlays: Record<OverlayKey, boolean> = { capsules: false, joints: false };
   replaying = false;
   /** Why the last replay start failed, if it did. */
   replayError: string | null = null;
@@ -98,26 +95,10 @@ export class DebugController {
   /** What a keyboard press does; the same actions as the menu buttons. */
   handleKey(action: DebugKeyAction): void {
     switch (action) {
-      case 'pause':
-        this.time.togglePause();
-        break;
-      case 'step':
-        this.time.stepOnce();
-        break;
-      case 'slower':
-        this.time.slower();
-        break;
-      case 'faster':
-        this.time.faster();
-        break;
-      case 'normal':
-        this.time.reset();
-        break;
       case 'replay':
         void this.setReplay(!this.replaying);
         return;
       case 'capsules':
-      case 'colliders':
       case 'joints':
         this.setOverlay(action, !this.overlays[action]);
         return;
@@ -140,8 +121,6 @@ export class DebugController {
   /** One line for a HUD: what is not normal right now. */
   status(): string {
     const parts: string[] = [];
-    if (this.time.paused) parts.push('PAUSED');
-    if (this.time.speed !== 1) parts.push(this.time.speedLabel);
     const off = SYSTEMS.filter((s) => !this.systems[s]);
     if (off.length) parts.push(`off: ${off.join(', ')}`);
     const shown = OVERLAYS.filter((o) => this.overlays[o]);
@@ -150,36 +129,14 @@ export class DebugController {
     return parts.join('  ');
   }
 
-  /** The menu: pages of six buttons. Puzzle jumps and any other registered actions follow, a group at a time. */
+  /** The menu: pages of six buttons. Any registered actions follow, a group at a time. */
   pages(): DebugPage[] {
     const onOff = (on: boolean) => (on ? 'ON' : 'off');
-    const t = this.time;
     const press = (fn: () => void) => () => {
       fn();
       this.changed();
     };
-    const timeAndViews: DebugItem[] = [
-      {
-        id: 'pause',
-        label: 'Simulation',
-        help: 'Pause the simulation; hands and shadows stay live.',
-        text: () => (t.paused ? 'Paused: resume' : 'Running: pause'),
-        press: press(() => t.togglePause()),
-      },
-      {
-        id: 'step',
-        label: 'Step',
-        help: 'Run exactly one fixed step (pauses first).',
-        text: () => 'Step once',
-        press: press(() => t.stepOnce()),
-      },
-      {
-        id: 'speed',
-        label: 'Speed',
-        help: 'Slow motion: each press goes 1x, 1/2x, 1/4x, 1/10x.',
-        text: () => t.speedLabel,
-        press: press(() => t.cycleSpeed()),
-      },
+    const views: DebugItem[] = [
       ...OVERLAYS.map<DebugItem>((o) => ({
         id: o,
         label: OVERLAY_INFO[o].label,
@@ -205,7 +162,7 @@ export class DebugController {
       },
     ];
     const pages: DebugPage[] = [
-      { title: 'Debug: time and views', items: timeAndViews },
+      { title: 'Debug: views', items: views },
       { title: 'Debug: systems and replay', items: systems },
     ];
     const groups = new Map<string, DebugItem[]>();

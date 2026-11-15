@@ -3,17 +3,14 @@
 import type { CapabilityDetector } from '../engine/xr/capabilities';
 
 export interface ReportInputs {
-  simHz: number;
-  simSteps: number;
   handReadMethod: Readonly<Record<string, number>>;
-  /** The mock source's name in mock mode (?mock=1), else null. */
+  /** The mock source's name in mock mode (the Hand Lab), else null. */
   mockSource: string | null;
   capabilities: CapabilityDetector;
 }
 
 export function reportSource(i: ReportInputs): Record<string, unknown> {
   return {
-    sim: { hz: i.simHz, steps: i.simSteps },
     handReadMethod: { ...i.handReadMethod },
     mock: i.mockSource ? { source: i.mockSource } : null,
     capabilities: i.capabilities.toJSON(),

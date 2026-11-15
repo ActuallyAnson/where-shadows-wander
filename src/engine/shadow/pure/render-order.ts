@@ -17,48 +17,66 @@ export interface Pass {
 export const RenderOrder = {
   /** The paper and its painted scenery (one shader). */
   paper: 1,
-  /** Faint paintings of each prop, under the shadows. */
-  propSketch: 1.5,
-  /** The soft glows (solve bloom, a hand almost making a shape). */
-  glow: 1.8,
-  /** The black shadows: the hands', the props', the kindred's. */
+  /** Sets the wall's alpha to 1, for the scenery to keep its darkening in (see puppet-view.ts). */
+  puppetPrime: 1.4,
+  /**
+   * The puppet scenery that stands back (PuppetPart.depth > 0: rooms, trees, the gate, the window and its light): under every
+   * near puppet and the hands, so a character is always in front of it.
+   */
+  scenery: 1.5,
+  /** The near puppets: over the scenery and hiding it (see puppet-view.ts), before the resolve. */
+  puppetNear: 1.6,
+  /** Darkens the wall by the puppets' shadows (kept in the frame's alpha till here), and sets its alpha back to 1. */
+  puppetResolve: 1.7,
+  /** The black shadows of the hands. */
   shadow: 2,
   /** The candle's dust and light shaft, and the in-VR title. */
   air: 2.2,
   /** The pause menu and the wall's menu. */
   menu: 2.5,
-  /** The sprites (the traveller and the world), the captions, the cutscene, the lantern's glow. */
+  /** The captions and the lantern's glow (and the story's puppets to come). */
   sprite: 3,
-  /** The hand's golden trail, and the ghost outline of a wanted shape. */
+  /** The hand's golden trail. */
   trail: 4,
   /** The ring of light when a shape is recognised. */
   ring: 5,
-  /** The puzzle-solved rewards (dust, sparks, drops, leaves, light) and the room's glows. */
-  reward: 6,
-  /** The room's wonders (lamp, bunting, pictures, globe, window). */
-  wonder: 6,
-  /** The page of the book in the lap. */
-  readingPage: 8,
-  /** The spark that flies across the room. */
-  sparkFlight: 60,
+  /**
+   * The ghost hand that comes down over the candle at the end (sleep-hint.ts). It writes depth for itself only (so it reads as
+   * one soft shape, not overlapping capsules), so it draws after everything it could be seen against.
+   */
+  ghost: 7,
   /** The fade to black, over everything. */
   fade: 1000,
 } as const;
 
+/** How far apart two puppet parts' orders are, so later parts in a scene's list draw over earlier ones in the same layer. */
+export const PUPPET_PART_STEP = 0.0001;
+
+/**
+ * Where a puppet part draws (puppet-view.ts). A part standing back (`depth` > 0), shadow or glow, goes in the scenery layer, under
+ * the near puppets and the hands: a far shadow darkens what is under it and a glow lights it, so scenery drawn over a character
+ * would show through the character's shadow (a tree in front of the boy, the window's light on him). Near shadows come next,
+ * under the hands' shadows, and near glows (the torch, the fireflies) are light on top of them. Within a layer, list order (`index`).
+ */
+export function puppetPartOrder(glow: boolean, depth: number, index: number): number {
+  const layer = depth > 0 ? RenderOrder.scenery : glow ? RenderOrder.sprite : RenderOrder.puppetNear;
+  return layer + index * PUPPET_PART_STEP;
+}
+
 /** The layers as a list, for the inspector and the governor. */
 export const PASSES: readonly Pass[] = [
   { id: 'paper', order: RenderOrder.paper, optional: false },
-  { id: 'propSketch', order: RenderOrder.propSketch, optional: true },
-  { id: 'glow', order: RenderOrder.glow, optional: false },
+  { id: 'puppet-prime', order: RenderOrder.puppetPrime, optional: false },
+  { id: 'scenery', order: RenderOrder.scenery, optional: false },
+  { id: 'puppet-near', order: RenderOrder.puppetNear, optional: false },
+  { id: 'puppet-resolve', order: RenderOrder.puppetResolve, optional: false },
   { id: 'shadow', order: RenderOrder.shadow, optional: false },
   { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
   { id: 'trail', order: RenderOrder.trail, optional: true },
   { id: 'ring', order: RenderOrder.ring, optional: true },
-  { id: 'reward', order: RenderOrder.reward, optional: true },
-  { id: 'readingPage', order: RenderOrder.readingPage, optional: false },
-  { id: 'sparkFlight', order: RenderOrder.sparkFlight, optional: false },
+  { id: 'ghost', order: RenderOrder.ghost, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },
 ];
 

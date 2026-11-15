@@ -13,6 +13,22 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // 1 to 2: accessibility settings. An old save has none, so it gets an empty block (the reader fills in the defaults).
   1: (data) =>
     typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data, settings: {}, settingsAt: 0 } : data,
+  // 2 to 3: the puzzles went (ADR 0016). Their progress, puzzles and creature gallery are dropped; the day last played
+  // moves out of the progress block, and the retired "travel scenes" setting is dropped.
+  2: (data) => {
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) return data;
+    const { progress, puzzles: _puzzles, creatures: _creatures, ...rest } = data as Record<string, unknown>;
+    const day =
+      typeof progress === 'object' && progress !== null
+        ? (progress as Record<string, unknown>).lastPlayedDay
+        : undefined;
+    let settings = rest.settings;
+    if (typeof settings === 'object' && settings !== null && !Array.isArray(settings)) {
+      const { travelScenes: _travel, ...kept } = settings as Record<string, unknown>;
+      settings = kept;
+    }
+    return { ...rest, settings, ...(day === undefined ? {} : { lastPlayedDay: day }) };
+  },
 };
 
 export type MigrateResult = { ok: true; data: unknown } | { ok: false; reason: string };

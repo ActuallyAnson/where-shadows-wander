@@ -1,6 +1,6 @@
 // A readout card for one hand: the classifier's state (committed shape, the
 // shape being held and its progress, every shape's margin), palm direction and
-// the features. Shared by the webcam bench and the Hand Lab (?mock=1). Styling
+// the features. Shared by the webcam bench and the Hand Lab. Styling
 // uses the classes .shape, .none, .guess, .hold, .margins, dl, .curls, .curl
 // and .b, and the --right/--left colours.
 import { saveRecording } from '../engine/xr/save-recording';

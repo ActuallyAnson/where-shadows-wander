@@ -20,6 +20,9 @@ import { JOINT, type HandFrame } from '../hands/hand';
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 
+/** The furthest the match's flame leans toward the wick (m). */
+const LEAN_M = 0.015;
+
 export class TitleLighterView {
   readonly group = new Group();
   readonly flame = new LanternGlow(0.12);
@@ -35,6 +38,9 @@ export class TitleLighterView {
   private readonly headMesh: Mesh;
 
   private _visible = false;
+  /** Where the flame leans (the wick) and how far, 0 .. 1 (setLean). */
+  private readonly leanTo = new Float64Array(3);
+  private leanAmount = 0;
   private readonly lightState: LanternLight = {
     position: new Float64Array(3),
     lit: true,
@@ -87,8 +93,19 @@ export class TitleLighterView {
   }
 
   /**
-   * Updates position to follow right hand index fingertip (or wrist/controller) and flickers the flame.
-   * Zero per-frame allocations.
+   * Leans the match's flame toward `to` (the wick, world space) by `amount` (0 .. 1: how near it is, ignition.ts), and makes it
+   * a little bigger, as a flame reaches for a wick. Where it lights from (flamePosition) does not move.
+   */
+  setLean(to: ArrayLike<number>, amount: number): void {
+    this.leanTo[0] = to[0];
+    this.leanTo[1] = to[1];
+    this.leanTo[2] = to[2];
+    this.leanAmount = Math.max(0, Math.min(1, amount));
+  }
+
+  /**
+   * Updates position to sit in the right hand's pinch (between the thumb and index tips; the wrist when only a few joints
+   * are known) and flickers the flame. Zero per-frame allocations.
    */
   update(hand: HandFrame | null, cameraQuaternion: Quaternion, timeSeconds: number): void {
     if (!this._visible) return;
@@ -96,16 +113,33 @@ export class TitleLighterView {
     if (hand && hand.tracked && hand.validJoints >= 5) {
       this.group.visible = true;
       const p = hand.positions;
-      // Prefer index fingertip, fallback to wrist
-      const idx = hand.validJoints >= 20 ? JOINT['index-finger-tip'] * 3 : JOINT['wrist'] * 3;
-      const x = p[idx];
-      const y = p[idx + 1];
-      const z = p[idx + 2];
+      let x: number, y: number, z: number;
+      if (hand.validJoints >= 20) {
+        const i = JOINT['index-finger-tip'] * 3;
+        const t = JOINT['thumb-tip'] * 3;
+        x = (p[i] + p[t]) / 2;
+        y = (p[i + 1] + p[t + 1]) / 2;
+        z = (p[i + 2] + p[t + 2]) / 2;
+      } else {
+        const w = JOINT.wrist * 3;
+        x = p[w];
+        y = p[w + 1];
+        z = p[w + 2];
+      }
 
       this.group.position.set(x, y, z);
       this.flamePosition[0] = x;
       this.flamePosition[1] = y + 0.065;
       this.flamePosition[2] = z;
+
+      // Leaning to the wick: up to LEAN_M along the way to it.
+      const lx = this.leanTo[0] - this.flamePosition[0];
+      const ly = this.leanTo[1] - this.flamePosition[1];
+      const lz = this.leanTo[2] - this.flamePosition[2];
+      const ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
+      const k = ll > 1e-6 ? (Math.min(LEAN_M, ll) * this.leanAmount) / ll : 0;
+      this.flame.mesh.position.set(lx * k, 0.065 + ly * k, lz * k);
+      this.flame.mesh.scale.setScalar(1 + 0.35 * this.leanAmount);
 
       // Subtle organic flicker
       const flicker = 0.88 + 0.12 * Math.sin(timeSeconds * 14.0) * Math.cos(timeSeconds * 7.7);

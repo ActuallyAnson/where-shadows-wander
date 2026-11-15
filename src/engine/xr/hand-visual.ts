@@ -23,6 +23,8 @@ import { FADE_IN_S, FADE_OUT_S, nearFade } from './hand-fade';
 export interface HandVisual {
   /** Add this to the scene. */
   readonly object: Object3D;
+  /** Seconds each hand takes to fade in, [left, right] (FADE_IN_S by default; slower for a hand being revealed). */
+  readonly fadeInS: Float32Array;
   /**
    * Call once per frame. `flame` is the candle flame position, or null when there is none. `shown` is false
    * while the game is paused (no hand data arrives then), which fades the hands out instead of freezing them.
@@ -78,6 +80,7 @@ export class CapsuleHandVisual implements HandVisual {
   private readonly boneFadeAttr: InstancedBufferAttribute;
   /** Each hand's opacity, [left, right]. */
   readonly fade = new Float32Array(2);
+  readonly fadeInS = new Float32Array([FADE_IN_S, FADE_IN_S]);
   // Each hand's last fully tracked pose, [left, right]. A hand that is partly tracked or lost keeps stale
   // (even the other hand's) joints in its HandFrame, so the fade-out draws from these copies instead.
   private readonly seen = new Uint8Array(2);
@@ -154,7 +157,8 @@ export class CapsuleHandVisual implements HandVisual {
         this.seen[side] = 1;
       }
       const was = this.fade[side];
-      const fade = hand.tracked && shown ? Math.min(1, was + dt / FADE_IN_S) : Math.max(0, was - dt / FADE_OUT_S);
+      const fade =
+        hand.tracked && shown ? Math.min(1, was + dt / this.fadeInS[side]) : Math.max(0, was - dt / FADE_OUT_S);
       this.fade[side] = fade;
       if (fade <= 0 || this.seen[side] === 0) continue;
       const p = this.lastPositions[side];

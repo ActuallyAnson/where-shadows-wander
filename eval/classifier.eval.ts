@@ -94,7 +94,7 @@ it('classifier evaluation', () => {
   if (files.length === 0)
     throw new Error(
       `No .handrec.json files in ${dir}/. Make labelled recordings with Guided recording in the Hand Lab ` +
-        '(webcam source) or ?record&script=shapes on a headset, and put them there.',
+        "(webcam source) or the Developer panel's guided shapes recording on a headset, and put them there.",
     );
 
   const evals: (RecordingEval & { file: string })[] = [];

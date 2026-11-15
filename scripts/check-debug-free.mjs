@@ -9,12 +9,14 @@ import { join } from 'node:path';
 
 /** Text that is in the bundle only if a debug tool is. Add one when a new debug tool is added. */
 const MARKERS = [
-  'Alt+P pause', // the HUD line (debug-tools.ts)
-  'Entity colliders', // the debug menu (debug-controller.ts)
-  'Testing: switches', // the launcher's Testing panel (testing-panel.ts)
+  'Alt+K capsules', // the HUD line (debug-tools.ts)
+  'Joint dots', // the debug menu (debug-controller.ts)
+  'Lantern flicker (test)', // the developer overlay's buttons (developer-page.ts)
   'Copy report', // the report panel (report-panel.ts)
   'WebXR Launcher Ready', // the launcher's log box (enter-ar-button.ts)
-  'Copy Logs', // the launcher's log button (enter-ar-button.ts)
+  'Copy logs', // the launch log's copy button, shown when BEGIN fails (enter-ar-button.ts)
+  'Save room layout', // the room editor (room-editor.ts)
+  'Add to room', // the room editor's asset browser (room-editor-assets.ts)
 ];
 
 const jsIn = (dir) =>

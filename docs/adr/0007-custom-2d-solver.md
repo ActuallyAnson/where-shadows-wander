@@ -1,6 +1,6 @@
 # ADR 0007: A small custom 2D solver for the stage, not a physics library
 
-Status: proposed 10 Oct 2026 (Teammate A). For review at the end of A's work.
+Status: superseded by [ADR 0016](0016-story-shadow-theatre.md) on 11 Nov 2026 (the puzzle gameplay was removed). Was: proposed 10 Oct 2026 (Teammate A). For review at the end of A's work.
 
 ## Context
 

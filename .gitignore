@@ -56,3 +56,6 @@ npm-debug.log*
 **/.mcp.json
 **/.cursor/mcp.json
 **/.codex/config.toml
+
+# Raw downloaded art, before it is picked and shrunk into src/assets (see CREDITS.md)
+asset-inbox/

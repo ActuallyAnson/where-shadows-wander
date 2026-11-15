@@ -1,7 +1,7 @@
 // CapsuleHandVisual.update runs every XR frame, so it must not allocate (see frame-pipeline.alloc.test.ts
 // for why). Needs `--expose-gc` (vitest.config.ts sets it).
 import { describe, expect, it } from 'vitest';
-import { bytesPerFrame, gc, inCI } from '../sim/alloc-measure';
+import { bytesPerFrame, gc, inCI } from '../testing/alloc-measure';
 import { createHandFrame } from '../hands/hand';
 import { PRESETS, writeHandPose } from '../hands/synthetic-hand';
 import { CapsuleHandVisual } from './hand-visual';

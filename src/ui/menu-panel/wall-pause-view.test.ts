@@ -122,7 +122,7 @@ describe('WallPauseView', () => {
     hand.tracked = true;
     hand.validJoints = 25;
 
-    // Aim at "Begin this part again" (yMin -0.20 to -0.10, Y ~ -0.15 stage = 0.85 world)
+    // Aim at "Settings" (yMin -0.20 to -0.10, Y ~ -0.15 stage = 0.85 world)
     const idx = JOINT['index-finger-tip'] * 3;
     const mcp = JOINT['index-finger-metacarpal'] * 3;
     hand.positions[idx] = 0;
@@ -132,8 +132,10 @@ describe('WallPauseView', () => {
     hand.positions[mcp + 1] = 0.85;
     hand.positions[mcp + 2] = -0.9;
 
+    // Settings is handled on the wall: the view turns to its settings page and reports no action.
     const action = view.update([hand], stage, true); // trigger pressed
-    expect(action).toBe('restart');
+    expect(action).toBeNull();
+    expect(view.mode).toBe('settings');
 
     view.dispose();
   });

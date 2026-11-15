@@ -1,4 +1,4 @@
-// Plays a .handrec.json back in mock mode (?mock=1&src=replay&file=...). The
+// Plays a .handrec.json back in mock mode (the Hand Lab's Replay source). The
 // frame shown is chosen by mock time, so a replay is identical every run.
 import type { HandFrame } from '../engine/hands/hand';
 import { parseRecording, replayInto, type HandRecording } from '../engine/hands/hand-recording';

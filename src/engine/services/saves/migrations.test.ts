@@ -44,3 +44,31 @@ describe('the real migration table', () => {
       expect(MIGRATIONS[v], `a migration from version ${v}`).toBeTypeOf('function');
   });
 });
+
+describe('version 2 to 3', () => {
+  it('drops the puzzle progress, puzzles, creatures and the travel scenes setting, keeping the day and the rest', () => {
+    const v2 = {
+      createdAt: 1,
+      updatedAt: 2,
+      progress: { chapter: 1, puzzle: 3, chaptersCompleted: [], lastPlayedDay: '2026-10-11', at: 5 },
+      puzzles: { p: { solved: true, solutions: [] } },
+      creatures: { fox: { discoveredAt: 3 } },
+      resetCount: 1,
+      settings: { captions: true, travelScenes: false },
+      settingsAt: 4,
+    };
+    expect(MIGRATIONS[2](v2)).toEqual({
+      createdAt: 1,
+      updatedAt: 2,
+      lastPlayedDay: '2026-10-11',
+      resetCount: 1,
+      settings: { captions: true },
+      settingsAt: 4,
+    });
+  });
+
+  it('never throws on odd data', () => {
+    for (const odd of [null, 5, 'x', [], {}, { progress: null }, { progress: 7, settings: [] }])
+      expect(() => MIGRATIONS[2](odd)).not.toThrow();
+  });
+});

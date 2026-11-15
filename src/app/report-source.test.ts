@@ -23,14 +23,12 @@ describe('report source', () => {
     detector.update(fakeFrame(session, { planes }), fakeRefSpace(), hands, IDENTITY, 0);
 
     const report = reportSource({
-      simHz: 60,
-      simSteps: 12,
       handReadMethod: { fillPoses: 3, getJointPose: 0 },
       mockSource: null,
       capabilities: detector,
     });
     expect(report.capabilities).toEqual(detector.toJSON());
-    expect(report).toMatchObject({ sim: { hz: 60, steps: 12 }, handReadMethod: { fillPoses: 3 }, mock: null });
+    expect(report).toMatchObject({ handReadMethod: { fillPoses: 3 }, mock: null });
     expect(JSON.parse(JSON.stringify(report)).capabilities.planes.status).toBe('found');
   });
 });

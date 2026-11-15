@@ -23,6 +23,8 @@ export class Mixer {
   private masterVolume = 1;
   /** A momentary lift on a bus (the music swelling when a puzzle is solved): 1 is none. Never louder than LIFT_MAX. */
   private readonly lifts = new Float64Array([1, 1, 1]);
+  /** A bus turned down for a moment of the story (setDip): 1 is none, 0 silent. */
+  private readonly dips = new Float64Array([1, 1, 1]);
   private allMuted = false;
   /** Bumped on every change, so the engine only touches Web Audio when something moved. */
   version = 0;
@@ -43,6 +45,24 @@ export class Mixer {
   setVolume(bus: BusId, volume: number): void {
     this.volumes[bus] = clamp01(volume);
     this.version++;
+  }
+
+  /**
+   * Turns a bus down to `level` (0 silent .. 1 as set) on top of its volume, for a moment of the story (the rain easing as he
+   * falls asleep). Unlike a lift it can go quieter. Only a change counts, so it is cheap to call every frame.
+   */
+  setDip(bus: BusId, level: number): void {
+    const l = clamp01(level);
+    const was = this.dips[bus];
+    if (l === was) return;
+    // Tiny steps are skipped, but reaching silence or full always counts.
+    if (Math.abs(l - was) < 0.005 && l > 0 && l < 1) return;
+    this.dips[bus] = l;
+    this.version++;
+  }
+
+  dip(bus: BusId): number {
+    return this.dips[bus];
   }
 
   /** Lifts a bus by `factor` (1 to LIFT_MAX) on top of its volume. Only a change counts, so it is cheap to call every frame. */
@@ -70,7 +90,9 @@ export class Mixer {
 
   /** The linear gain for a bus's node: master and bus volumes through the curve, or 0 if muted. */
   busGain(bus: BusId): number {
-    return this.isMuted(bus) ? 0 : volumeToGain(this.masterVolume) * volumeToGain(this.volumes[bus]) * this.lifts[bus];
+    return this.isMuted(bus)
+      ? 0
+      : volumeToGain(this.masterVolume) * volumeToGain(this.volumes[bus]) * this.lifts[bus] * this.dips[bus];
   }
 }
 

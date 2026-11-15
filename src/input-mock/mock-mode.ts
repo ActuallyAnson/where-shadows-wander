@@ -1,11 +1,11 @@
-// Mock mode (?mock=1): drives the game's hands from a HandSource instead of a
-// headset, so the game runs at a desk. Options:
-//   ?mock=1                         synthetic hands, keyboard controlled (default)
-//   ?mock=1&src=script              every v1 shape on each hand, in a loop
-//   ?mock=1&src=replay&file=<url>   a .handrec.json (default: the emulator demo)
-//   ?mock=1&src=webcam              live hands from the webcam (MediaPipe)
-// The Hand Lab panel (hand-lab.ts) switches sources at runtime, and dropping a
-// .handrec.json onto the page replays it.
+// Mock hands (the Hand Lab, chosen on the page: src/app/launch-mode.ts, ADR 0018): drives the
+// game's hands from a HandSource instead of the device's, in the game's own session.
+// The sources:
+//   synthetic   hands you pose with buttons or keys (the default)
+//   script      every v1 shape on each hand, in a loop
+//   replay      a .handrec.json (the emulator demo, or a file dropped on the page)
+//   webcam      live hands from the webcam (MediaPipe)
+// The Hand Lab panel (hand-lab.ts) switches sources at runtime.
 import type { HandFrame } from '../engine/hands/hand';
 import type { HandSource } from './hand-source';
 import { loadReplay } from './replay-source';
@@ -25,16 +25,9 @@ const DEFAULT_REPLAY = 'recordings/emulator-demo.handrec.json';
 /** Longest frame mock time advances by, matching the sim loop's cap. */
 const MAX_FRAME_S = 0.25;
 
-/** Reads mock mode options from a query string; null when mock mode is off. */
-export function mockOptionsFromUrl(search: string): MockOptions | null {
-  const params = new URLSearchParams(search);
-  const mock = params.get('mock');
-  if (mock === null || mock === '0' || mock === 'false') return null;
-  const src = params.get('src') ?? 'synthetic';
-  return {
-    source: (MOCK_SOURCES as readonly string[]).includes(src) ? (src as MockSourceKind) : 'synthetic',
-    file: params.get('file') ?? DEFAULT_REPLAY,
-  };
+/** The options for starting mock mode with `source` (a replay plays the emulator demo). */
+export function mockOptionsFor(source: MockSourceKind): MockOptions {
+  return { source, file: DEFAULT_REPLAY };
 }
 
 export async function createMockSource(options: MockOptions): Promise<HandSource> {

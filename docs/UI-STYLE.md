@@ -21,7 +21,7 @@ Night, pale and one candle colour. Nothing else on UI.
 | Glow | `#ffc46e` at 30% | the light that follows the fingertip |
 
 The settings panel (`src/ui/settings-panel/markup.ts`) and the pause, solved and end screens
-(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. To look at them: the Hand Lab's **Menu** button steps through pause, solved and end, and the launcher's Testing panel has the same switch (no address to type). The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
+(`src/ui/menu-panel`) use this palette. The menu screens are not UIKit panels: no box, only small serif text on drawn mist, shafts of light and dust, lit by position under a fingertip. To look at them: the Hand Lab's **Menu** button steps through pause, solved and end, and the `menu` testing switch in `localStorage` (`wsw.testing`) shows one when the page starts. The game flow shows a screen with `__wsw.showMenu('pause' | 'solved' | 'end')`
 and reads presses from `menu.onPress`. High contrast stays pure black on pure white
 with black outlines (`PALETTE.high`), and every new screen needs a high-contrast version.
 
@@ -57,11 +57,10 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 
 ## Sound
 
-- Every action has a sound: reach an item (tick), press (a warm knock), BEGIN (a match and the flame
-  catching), recognise (rustle), commit (thump), let go (a soft breath), solve (chime), candle lifted
-  and set down, tracking lost (two low falling notes).
-- Under it all: a low room tone and slow, sparse music (sine pads and music-box notes). Both are made
-  in code (`placeholder-sounds.ts`), so no files and nothing to license.
+- Every action has a sound: reach an item (tick), press (a soft click), BEGIN (a match struck), recognise
+  (a paper crinkle), commit (a thump), let go (a soft slide), tracking lost (a soft sigh).
+- Under it all: the rain on the window and the candle's crackle. No music plays yet. The recordings and
+  their credits are listed in `CREDITS.md`.
 - Short, dry, paper or candle themed. Browsers keep audio locked until the first tap, so the very
   first hover is silent.
 
@@ -77,9 +76,10 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 - Debug is a separate small panel, never part of a title or pause screen, and exists only when
   `DEBUG_TOOLS` is true (dev and `--mode tester` builds). The release build has none of it
   (`check:debug-free`).
-- In a dev or tester build the debug bar (log box, Testing, the other ways in) sits at the bottom
-  on top of the title screen, so a tester build is never mistaken for the release.
-- The judges' build shows only BEGIN and a dim "Trouble starting?" under the title.
+- In a dev or tester build a **🛠 Dev** button at the top left opens the developer overlay, page UI in
+  the emulator's style, never part of the room. The title screen shows the launch log only when BEGIN
+  fails.
+- Every build shows BEGIN and SETTINGS under the title, nothing else.
 
 ## Not doing
 

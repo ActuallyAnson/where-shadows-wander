@@ -3,17 +3,12 @@ import { fontFaceCss, TITLE_CSS, titleMarkup } from './title-markup';
 
 describe('titleMarkup', () => {
   it('has the title and one button per item, in order', () => {
-    const html = titleMarkup([{ label: 'BEGIN' }, { label: 'Trouble starting?', quiet: true }]);
+    const html = titleMarkup([{ label: 'BEGIN' }, { label: 'SETTINGS' }]);
     expect(html).toContain('<h1 class="wsw-title">SHADOWS WANDER</h1>');
     const labels = [...html.matchAll(/<button[^>]*>.*?<\/button>/g)].map((m) => m[0]);
     expect(labels).toHaveLength(2);
     expect(labels[0]).toContain('BEGIN');
-    expect(labels[1]).toContain('Trouble starting?');
-  });
-
-  it('marks only the quiet items', () => {
-    const html = titleMarkup([{ label: 'A' }, { label: 'B', quiet: true }]);
-    expect(html.match(/wsw-quiet/g)).toHaveLength(1);
+    expect(labels[1]).toContain('SETTINGS');
   });
 
   it('escapes labels, so a label can never inject markup', () => {
@@ -66,8 +61,9 @@ describe('fontFaceCss', () => {
 });
 
 describe('the busy look', () => {
-  it('guttering flame and locked items come from one class', () => {
+  it('the guttering flame and the fade to black come from one class, and the items keep their look', () => {
     expect(TITLE_CSS).toContain('.wsw-busy .wsw-flame');
-    expect(TITLE_CSS).toContain('.wsw-busy .wsw-item{pointer-events:none');
+    expect(TITLE_CSS).toContain('.wsw-busy::after{opacity:1');
+    expect(TITLE_CSS).not.toContain('.wsw-busy .wsw-item');
   });
 });

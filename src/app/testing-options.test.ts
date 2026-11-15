@@ -1,105 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildTesting,
   DEFAULT_TESTING,
-  describeTesting,
   loadTesting,
   saveTesting,
   TESTING_KEY,
   nextChoice,
-  parseTesting,
   RECORD_CHOICES,
   type TestingOptions,
-  STORY_CHOICES,
 } from './testing-options';
 
-describe('parseTesting', () => {
-  it('reads nothing from a plain address', () => {
-    expect(parseTesting('')).toEqual(DEFAULT_TESTING);
-    expect(parseTesting('?')).toEqual(DEFAULT_TESTING);
-  });
-
-  it('reads each switch the way the game reads it', () => {
-    expect(parseTesting('?debug=joints,shadow&settings&record=20').record).toBe('free');
-    const o = parseTesting('?debug=joints,shadow&settings&record&script=shapes');
-    expect(o).toEqual({
-      joints: true,
-      shadow: true,
-      settings: true,
-      record: 'shapes',
-      menu: 'off',
-      story: 'off',
-      rewindOnFall: false,
-      cutscene: false,
-      kindred: false,
-    });
-  });
-
-  it('accepts a repeated debug parameter', () => {
-    expect(parseTesting('?debug=joints&debug=shadow')).toMatchObject({ joints: true, shadow: true });
-  });
-});
-
-describe('buildTesting', () => {
-  it('gives an empty address when nothing is on', () => {
-    expect(buildTesting('?debug=joints&settings', DEFAULT_TESTING)).toBe('');
-  });
-
-  it('builds the short forms the docs use', () => {
-    const all: TestingOptions = {
-      joints: true,
-      shadow: true,
-      settings: true,
-      record: 'free',
-      menu: 'off',
-      story: 'off',
-      rewindOnFall: false,
-      cutscene: false,
-      kindred: false,
-    };
-    expect(buildTesting('', all)).toBe('?debug=joints,shadow&settings&record=20');
-    expect(buildTesting('', { ...DEFAULT_TESTING, record: 'shapes' })).toBe('?record&script=shapes');
-  });
-
-  it('keeps parameters it does not own, and unknown debug views', () => {
-    const out = buildTesting('?mock=1&stage=real&debug=other,joints', { ...DEFAULT_TESTING, shadow: true });
-    expect(out).toBe('?mock=1&stage=real&debug=shadow,other');
-  });
-
-  it('removes a note and script when recording is switched off', () => {
-    expect(buildTesting('?record=20&note=hi&script=shapes', DEFAULT_TESTING)).toBe('');
-  });
-
-  it('round-trips every combination through the game reading it back', () => {
-    for (const joints of [false, true])
-      for (const shadow of [false, true])
-        for (const settings of [false, true])
-          for (const record of RECORD_CHOICES) {
-            const o: TestingOptions = {
-              joints,
-              shadow,
-              settings,
-              record,
-              menu: 'off',
-              story: 'off',
-              rewindOnFall: false,
-              cutscene: false,
-              kindred: false,
-            };
-            expect(parseTesting(buildTesting('?mock=1', o))).toEqual(o);
-          }
-  });
-});
-
-describe('describeTesting and nextChoice', () => {
-  it('lists what is on, in words', () => {
-    expect(describeTesting(DEFAULT_TESTING)).toEqual([]);
-    expect(describeTesting({ ...DEFAULT_TESTING, joints: true, record: 'shapes' })).toEqual([
-      'joint dots',
-      'guided shape recording (84 s)',
-    ]);
-  });
-
+describe('nextChoice', () => {
   it('cycles through a list and wraps', () => {
     expect(nextChoice(RECORD_CHOICES, 'off')).toBe('free');
     expect(nextChoice(RECORD_CHOICES, 'shapes')).toBe('off');
@@ -107,6 +17,25 @@ describe('describeTesting and nextChoice', () => {
 });
 
 describe('remembering the switches (no address needed)', () => {
+  it('keeps the flicker between 0 and 1, and ignores anything but a number', () => {
+    const s = new Map<string, string>();
+    const st = { getItem: (k: string) => s.get(k) ?? null, setItem: (k: string, v: string) => void s.set(k, v) };
+    s.set(TESTING_KEY, JSON.stringify({ flicker: 3 }));
+    expect(loadTesting(st).flicker).toBe(1);
+    s.set(TESTING_KEY, JSON.stringify({ flicker: '0' }));
+    expect(loadTesting(st).flicker).toBeNull();
+  });
+
+  it('remembers covering the flame to end the story only when it is plainly on', () => {
+    const s = new Map<string, string>();
+    const st = { getItem: (k: string) => s.get(k) ?? null, setItem: (k: string, v: string) => void s.set(k, v) };
+    expect(loadTesting(st).coverEnds).toBe(false);
+    s.set(TESTING_KEY, JSON.stringify({ coverEnds: true }));
+    expect(loadTesting(st).coverEnds).toBe(true);
+    s.set(TESTING_KEY, JSON.stringify({ coverEnds: 'yes' }));
+    expect(loadTesting(st).coverEnds).toBe(false);
+  });
+
   const store = () => {
     const m = new Map<string, string>();
     return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m };
@@ -122,10 +51,8 @@ describe('remembering the switches (no address needed)', () => {
           settings: joints,
           record,
           menu: 'pause',
-          story: 'off',
-          rewindOnFall: false,
-          cutscene: joints,
-          kindred: !joints,
+          flicker: joints ? 0 : null,
+          coverEnds: !joints,
         };
         expect(saveTesting(o, s)).toBe(true);
         expect(loadTesting(s)).toEqual(o);
@@ -145,10 +72,8 @@ describe('remembering the switches (no address needed)', () => {
       settings: true,
       record: 'off',
       menu: 'off',
-      story: 'off',
-      rewindOnFall: false,
-      cutscene: false,
-      kindred: false,
+      flicker: null,
+      coverEnds: false,
     });
     expect(loadTesting(null)).toEqual(DEFAULT_TESTING);
     const throwing = {
@@ -162,26 +87,5 @@ describe('remembering the switches (no address needed)', () => {
     expect(loadTesting(throwing)).toEqual(DEFAULT_TESTING);
     expect(saveTesting(DEFAULT_TESTING, throwing)).toBe(false);
     expect(saveTesting(DEFAULT_TESTING, null)).toBe(false);
-  });
-});
-
-describe('the story scene switch', () => {
-  it('cycles off, prologue, finale, travel and round again', () => {
-    expect(STORY_CHOICES).toEqual(['off', 'prologue', 'finale', 'travel']);
-    expect(nextChoice(STORY_CHOICES, 'off')).toBe('prologue');
-    expect(nextChoice(STORY_CHOICES, 'travel')).toBe('off');
-  });
-
-  it('is remembered, and reads as off when the remembered value is not one of them', () => {
-    const store = new Map<string, string>();
-    const storage = {
-      getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => void store.set(k, v),
-    };
-    saveTesting({ ...DEFAULT_TESTING, story: 'finale' }, storage);
-    expect(loadTesting(storage).story).toBe('finale');
-    store.set('wsw.testing', JSON.stringify({ story: 'something else' }));
-    expect(loadTesting(storage).story).toBe('off');
-    expect(describeTesting({ ...DEFAULT_TESTING, story: 'prologue' })).toContain('prologue scene on entry');
   });
 });

@@ -17,6 +17,14 @@ export interface ShadowSettings {
   blurPerM: number;
   minBlurM: number;
   maxBlurM: number;
+  /**
+   * How dark a hand's shadow stays when the hand is behind the candle (0..1 of a full shadow). 0 is the physical answer: no
+   * shadow at all. Above 0 the shadow never vanishes; it dims and blurs as if out of focus, and sharpens to full over the
+   * FOCUS_M in front of the flame, so the player can see where their hand is before it casts.
+   */
+  behindOpacity: number;
+  /** The edge blur of a shadow out of focus (behind the candle), metres; it eases to the usual blur as the hand comes into focus. */
+  behindBlurM: number;
 }
 
 export const DEFAULT_SHADOW_SETTINGS: Readonly<ShadowSettings> = {
@@ -25,7 +33,11 @@ export const DEFAULT_SHADOW_SETTINGS: Readonly<ShadowSettings> = {
   blurPerM: 0.03,
   minBlurM: 0.002,
   maxBlurM: 0.02,
+  behindOpacity: 0,
+  behindBlurM: 0,
 };
+/** How far in front of the flame a hand comes fully into focus (its shadow full and sharp), metres. */
+const FOCUS_M = 0.08;
 
 /** Joint pairs for each capsule: the 24 bones (joint to parent), then 4 webs across the palm. */
 // prettier-ignore
@@ -101,18 +113,20 @@ export class ShadowProjector {
     }
     out.distanceM = heightSum / JOINT_COUNT;
 
-    // A hand behind the candle cannot cast a shadow onto the stage (candle is between hand and screen).
-    // Only a hand in front of the candle (between candle and stage) intercepts rays to cast shadows.
+    // Physically, a hand behind the candle casts no shadow onto the stage (the candle is between hand and screen); only a hand
+    // in front of it does. With behindOpacity the shadow stays, dim and blurred ("out of focus"), so it never just vanishes.
     const dAhead = lightD - out.distanceM;
-    if (dAhead <= 0) return;
+    if (dAhead <= 0 && s.behindOpacity <= 0) return;
 
-    // Smooth opacity fade across an 8 cm transition zone in front of the candle plane to eliminate abrupt pops:
-    if (dAhead < 0.08) {
-      const t = dAhead / 0.08;
-      out.opacity = t * t * (3 - 2 * t);
-    } else {
-      out.opacity = 1.0;
+    // Into focus smoothly over FOCUS_M in front of the flame, with no pop: 0 behind it, 1 past it.
+    let focus = 1;
+    if (dAhead <= 0) focus = 0;
+    else if (dAhead < FOCUS_M) {
+      const t = dAhead / FOCUS_M;
+      focus = t * t * (3 - 2 * t);
     }
+    out.opacity = s.behindOpacity + (1 - s.behindOpacity) * focus;
+    const blurOut = s.behindBlurM * s.size;
 
     // Shadow size: scale about the palm's shadow (between the middle finger's base and knuckle, where
     // derivePalm puts the palm), so a bigger shadow stays under the hand.
@@ -147,7 +161,8 @@ export class ShadowProjector {
       out.capsules[o + 3] = by;
       out.capsules[o + 4] = r;
       const h = Math.max((this.height[a] + this.height[b]) / 2, 0);
-      out.blur[c] = Math.min(Math.max(h * s.blurPerM, s.minBlurM), s.maxBlurM) * s.size;
+      const sharp = Math.min(Math.max(h * s.blurPerM, s.minBlurM), s.maxBlurM) * s.size;
+      out.blur[c] = blurOut > sharp ? sharp + (blurOut - sharp) * (1 - focus) : sharp;
       minX = Math.min(minX, ax - r, bx - r);
       maxX = Math.max(maxX, ax + r, bx + r);
       minY = Math.min(minY, ay - r, by - r);

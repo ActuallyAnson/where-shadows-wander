@@ -185,7 +185,7 @@ export class HandTrailView {
       if (s.active && s.onStage) {
         x[0] = (s.bounds[0] + s.bounds[2]) / 2;
         y[0] = (s.bounds[1] + s.bounds[3]) / 2;
-        live[0] = 1;
+        live[0] = s.opacity; // as strong as the shadow: faint behind the candle, where the shadow is out of focus
       } else if (lay) live[0] = 0;
       for (let i = 0; i < TRAIL_POINTS; i++) {
         const k = h * TRAIL_POINTS + i;

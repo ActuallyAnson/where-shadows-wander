@@ -1,9 +1,9 @@
-// Records hand joints during an XR session for offline replay. Enabled with
-// ?record=<seconds> (default 10). Recording starts when the first hand is
-// tracked and stops after that many seconds or when the session ends. The page
-// then shows a "Download recording" button (DOM isn't visible inside XR).
+// Records hand joints during an XR session for offline replay. Armed with the
+// developer overlay's Record buttons (or the `record` testing switch, when the session starts). Recording starts when the first hand is
+// tracked and stops after 20 s or when the session ends. The page then shows a
+// "Download recording" button (DOM isn't visible inside XR).
 //
-// With &script=shapes it's a guided recording instead: the wearer is prompted
+// The guided shapes choice is a guided recording instead: the wearer is prompted
 // through every shape (PromptPanel), the recording lasts as long as the script,
 // and the file carries shape labels (src/engine/hands/shape-script.ts).
 import { GuidedRecording } from '../hands/guided-recording';
@@ -12,7 +12,7 @@ import { createRecording, recordFrame, type HandRecording } from '../hands/hand-
 import { SHAPES_SCRIPT, ShapeScript, type Prompt, type ScriptStep } from '../hands/shape-script';
 import { downloadJson, postRecording, recordingFileName } from './save-recording';
 
-/** Scripts that &script=<name> can choose. */
+/** The guided recording scripts, by name. */
 export const SCRIPTS: Readonly<Record<string, readonly ScriptStep[]>> = { shapes: SHAPES_SCRIPT };
 
 export class HandRecorder {
@@ -76,25 +76,6 @@ export class HandRecorder {
   static make(shapes: boolean, seconds = 20): HandRecorder {
     const script = shapes ? new ShapeScript(SCRIPTS.shapes) : null;
     return new HandRecorder(seconds, script ? 'guided: shapes' : 'testing', script);
-  }
-
-  /**
-   * Reads ?record=N (and &script=<name>, &note=...) from the URL; null if recording is off.
-   * Pass allowScript = false where there's no headset to show prompts on (mock mode).
-   */
-  static fromUrl(allowScript = true): HandRecorder | null {
-    const params = new URLSearchParams(location.search);
-    if (!params.has('record')) return null;
-    const n = Number(params.get('record') || 10);
-    const s = Number.isFinite(n) ? n : 10;
-    const name = params.get('script');
-    let script: ShapeScript | null = null;
-    if (name && !allowScript)
-      console.warn('?script= prompts on a headset; at a desk use Guided recording in the Hand Lab');
-    else if (name && !SCRIPTS[name]) console.warn(`Unknown recording script "${name}"; recording without one`);
-    else if (name) script = new ShapeScript(SCRIPTS[name]);
-    const note = params.get('note') ?? (script ? `guided: ${name}` : '');
-    return new HandRecorder(Math.min(Math.max(s, 1), 120), note, script);
   }
 }
 

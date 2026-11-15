@@ -1,25 +1,31 @@
 // Captions for the sounds that matter to the story, for players who cannot hear them: a small bracketed line such as
-// "[a music-box note]" when one plays, if the Captions setting is on. The shape sounds (rustle, thump) and the loops are
+// "[footsteps outside]" when one plays, if the Captions setting is on. The shape sounds (rustle, thump) and the loops are
 // left out: they happen all the time and the hands already show what they did.
 import type { SoundPlayer } from './game-audio';
 import { Sound, type SoundId } from './sounds';
 
-const NOTE = '[a music-box note]';
-
 export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
-  [Sound.Chime]: '[a soft chime]',
-  [Sound.Twinkle]: '[a tiny sparkle]',
-  [Sound.Note0]: NOTE,
-  [Sound.Note1]: NOTE,
-  [Sound.Note2]: NOTE,
-  [Sound.Note3]: NOTE,
-  [Sound.Note4]: NOTE,
-  [Sound.Creak]: '[a beam creaks]',
-  [Sound.Hop]: '[a soft landing]',
   [Sound.Ignite]: '[a match strikes]',
+  [Sound.Thunder]: '[thunder, far off]',
+  [Sound.Covers]: '[bedclothes rustle]',
+  // Scene 2's hush: a grown-up's footsteps outside the fort.
+  [Sound.Step0]: '[footsteps outside]',
+  [Sound.Step1]: '[footsteps outside]',
+  [Sound.Laugh]: '[children laughing]',
+  [Sound.Click]: '[a torch clicks on]',
+  [Sound.Rumble]: '[distant thunder]',
+  [Sound.Yawn]: '[a sleepy yawn]',
+  [Sound.Giggle]: '[stifled giggles]',
+  [Sound.Bell]: '[a school bell, far off]',
+  [Sound.Gate]: '[a gate creaks]',
+  [Sound.Creak]: '[the house creaks]',
+  [Sound.Gust]: '[a gust of wind]',
+  [Sound.Palms]: '[a warm swell]',
+  [Sound.Snuff]: '[the candle hisses out]',
+  [Sound.Breath]: '[a slow breath]',
 };
 
-/** The least time between two captions, seconds, so a run of sparkles does not flood the wall. */
+/** The least time between two captions, seconds, so a run of footsteps does not flood the wall. */
 export const CAPTION_GAP_S = 1.5;
 
 /** A sound player that tells `show` what each notable sound is, and passes everything on to `inner` unchanged. */

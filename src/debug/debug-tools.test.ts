@@ -2,101 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { DebugActions } from './debug-actions';
 import { DebugController, ITEMS_PER_PAGE, OVERLAYS, SYSTEMS, type DebugEffects } from './debug-controller';
 import { DEBUG_KEYS, debugKeyAction } from './debug-keys';
-import { FixedStepLoop } from '../engine/sim/fixed-step';
-import { SPEEDS, TimeControl } from './time-control';
 
 const effects = (): DebugEffects & { system: ReturnType<typeof vi.fn>; overlay: ReturnType<typeof vi.fn> } => ({
   system: vi.fn(),
   overlay: vi.fn(),
   replay: vi.fn(() => true),
-});
-
-describe('TimeControl with the real fixed-step loop', () => {
-  const make = () => {
-    const seen: number[] = [];
-    const loop = new FixedStepLoop(60, (dt) => seen.push(dt));
-    return { loop, seen };
-  };
-
-  it('running at 1x is the same as calling the loop directly', () => {
-    const a = make();
-    const b = make();
-    const t = new TimeControl();
-    for (let i = 0; i < 100; i++) {
-      t.advance(a.loop, 1 / 72);
-      b.loop.advance(1 / 72);
-    }
-    expect(a.loop.steps).toBe(b.loop.steps);
-    expect(a.loop.alpha).toBeCloseTo(b.loop.alpha, 12);
-  });
-
-  it('slow motion runs the simulation at that fraction of real time, every step still a whole fixed step', () => {
-    for (const speed of SPEEDS) {
-      const { loop, seen } = make();
-      const t = new TimeControl();
-      while (t.speed !== speed) t.slower();
-      for (let i = 0; i < 600; i++) t.advance(loop, 1 / 60); // ten real seconds
-      expect(loop.steps / 60).toBeCloseTo(10 * speed, 0);
-      expect(seen.every((dt) => dt === loop.step)).toBe(true);
-    }
-  });
-
-  it('pausing stops the steps; stepOnce runs exactly one whatever the frame time', () => {
-    const { loop } = make();
-    const t = new TimeControl();
-    t.advance(loop, 1 / 60);
-    t.togglePause();
-    const before = loop.steps;
-    for (let i = 0; i < 20; i++) t.advance(loop, 0.1);
-    expect(loop.steps).toBe(before);
-    t.stepOnce();
-    t.advance(loop, 0);
-    expect(loop.steps).toBe(before + 1);
-    t.advance(loop, 0.1);
-    expect(loop.steps).toBe(before + 1); // one request, one step
-    t.stepOnce();
-    t.stepOnce();
-    t.advance(loop, 0);
-    expect(loop.steps).toBe(before + 3);
-  });
-
-  it('stepOnce pauses a running simulation, and stepping repeatedly keeps the remainder under a step', () => {
-    const { loop } = make();
-    const t = new TimeControl();
-    t.advance(loop, 0.004); // leaves a remainder
-    t.togglePause();
-    expect(t.paused).toBe(true);
-    for (let i = 0; i < 50; i++) {
-      const was = loop.steps;
-      t.stepOnce();
-      t.advance(loop, 0);
-      expect(loop.steps).toBe(was + 1);
-    }
-  });
-
-  it('caps a burst of queued steps, and resuming drops what was queued', () => {
-    const { loop } = make();
-    const t = new TimeControl();
-    for (let i = 0; i < 100; i++) t.stepOnce();
-    t.advance(loop, 0);
-    expect(loop.steps).toBe(8);
-    t.stepOnce();
-    t.togglePause(); // resume
-    t.advance(loop, 0);
-    expect(loop.steps).toBe(8);
-  });
-
-  it('labels the speeds and goes round', () => {
-    const t = new TimeControl();
-    const labels = [t.speedLabel];
-    for (let i = 0; i < SPEEDS.length; i++) {
-      t.cycleSpeed();
-      labels.push(t.speedLabel);
-    }
-    expect(labels).toEqual(['1x', '1/2x', '1/4x', '1/10x', '1x']);
-    t.faster();
-    expect(t.speed).toBe(1);
-  });
 });
 
 describe('DebugController', () => {
@@ -112,13 +22,11 @@ describe('DebugController', () => {
     const c = new DebugController(e);
     c.setSystem('shadow', false);
     c.setSystem('shadow', false);
-    c.setOverlay('colliders', true);
+    c.setOverlay('joints', true);
     expect(e.system).toHaveBeenCalledTimes(1);
     expect(e.system).toHaveBeenCalledWith('shadow', false);
-    expect(e.overlay).toHaveBeenCalledWith('colliders', true);
-    c.handleKey('pause');
-    c.handleKey('slower');
-    expect(c.status()).toBe('PAUSED  1/2x  off: shadow  showing: colliders');
+    expect(e.overlay).toHaveBeenCalledWith('joints', true);
+    expect(c.status()).toBe('off: shadow  showing: joints');
   });
 
   it('every keyboard action does what its menu button does', () => {
@@ -126,8 +34,6 @@ describe('DebugController', () => {
     const c = new DebugController(e);
     const keys = new Set(Object.values(DEBUG_KEYS));
     for (const k of keys) c.handleKey(k);
-    expect(c.time.paused).toBe(false); // Alt+P paused it, then Alt+0 (normal speed) ran it again
-    expect(c.time.speed).toBe(1);
     expect(SYSTEMS.every((s) => !c.systems[s])).toBe(true);
     expect(OVERLAYS.every((o) => c.overlays[o])).toBe(true);
   });
@@ -160,7 +66,7 @@ describe('DebugController', () => {
     });
     c.subscribe(ok);
     c.setOverlay('joints', true);
-    c.handleKey('step');
+    c.handleKey('capsules');
     expect(ok).toHaveBeenCalledTimes(2);
   });
 });
@@ -183,21 +89,18 @@ describe('the menu', () => {
 
   it('buttons change the state and the text they show', () => {
     const c = new DebugController(effects());
-    const [time, systems] = c.pages();
-    const pause = time.items.find((i) => i.id === 'pause')!;
-    expect(pause.text()).toBe('Running: pause');
-    pause.press();
-    expect(pause.text()).toBe('Paused: resume');
-    const speed = time.items.find((i) => i.id === 'speed')!;
-    speed.press();
-    expect(speed.text()).toBe('1/2x');
+    const [views, systems] = c.pages();
+    const joints = views.items.find((i) => i.id === 'joints')!;
+    expect(joints.text()).toBe('off');
+    joints.press();
+    expect(joints.text()).toBe('ON');
     const shadow = systems.items.find((i) => i.id === 'system-shadow')!;
     shadow.press();
     expect(shadow.text()).toBe('OFF');
     expect(c.systems.shadow).toBe(false);
   });
 
-  it('lists registered actions (where skip-to-puzzle plugs in), a group at a time, six to a page', () => {
+  it('lists registered actions, a group at a time, six to a page', () => {
     const c = new DebugController(effects());
     const ran: string[] = [];
     for (let i = 0; i < 8; i++)
@@ -205,7 +108,7 @@ describe('the menu', () => {
     c.actions.register({ id: 'x', group: 'Other', label: 'Other thing', run: () => ran.push('x') });
     const pages = c.pages();
     expect(pages.map((p) => p.title)).toEqual([
-      'Debug: time and views',
+      'Debug: views',
       'Debug: systems and replay',
       'Debug: Puzzles 1',
       'Debug: Puzzles 2',
@@ -241,10 +144,10 @@ describe('DebugActions', () => {
 
 describe('keys', () => {
   it('needs Alt and nothing else held, and ignores the Hand Lab keys', () => {
-    expect(debugKeyAction({ altKey: true, code: 'KeyP' })).toBe('pause');
-    expect(debugKeyAction({ altKey: false, code: 'KeyP' })).toBeNull();
-    expect(debugKeyAction({ altKey: true, ctrlKey: true, code: 'KeyP' })).toBeNull();
-    expect(debugKeyAction({ altKey: true, metaKey: true, code: 'KeyP' })).toBeNull();
+    expect(debugKeyAction({ altKey: true, code: 'KeyK' })).toBe('capsules');
+    expect(debugKeyAction({ altKey: false, code: 'KeyK' })).toBeNull();
+    expect(debugKeyAction({ altKey: true, ctrlKey: true, code: 'KeyK' })).toBeNull();
+    expect(debugKeyAction({ altKey: true, metaKey: true, code: 'KeyK' })).toBeNull();
     for (const labKey of ['KeyR', 'KeyL', 'KeyH', 'Space', 'ArrowUp', 'Digit6']) {
       expect(debugKeyAction({ altKey: false, code: labKey })).toBeNull();
     }

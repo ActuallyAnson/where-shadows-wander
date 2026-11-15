@@ -75,3 +75,20 @@ describe('Mixer lift', () => {
     expect(m.busGain(Bus.Effects)).toBeCloseTo(new Mixer().busGain(Bus.Effects));
   });
 });
+
+describe('Mixer dip', () => {
+  it('turns a bus down (to silence too), ignores tiny changes and leaves the other buses alone', () => {
+    const m = new Mixer();
+    const base = m.busGain(Bus.Ambience);
+    m.setDip(Bus.Ambience, 0.5);
+    expect(m.busGain(Bus.Ambience)).toBeCloseTo(base * 0.5);
+    const v = m.version;
+    m.setDip(Bus.Ambience, 0.502);
+    expect(m.version).toBe(v);
+    m.setDip(Bus.Ambience, -1);
+    expect(m.busGain(Bus.Ambience)).toBe(0);
+    expect(m.busGain(Bus.Music)).toBeCloseTo(new Mixer().busGain(Bus.Music));
+    m.setDip(Bus.Ambience, 1);
+    expect(m.busGain(Bus.Ambience)).toBeCloseTo(base);
+  });
+});

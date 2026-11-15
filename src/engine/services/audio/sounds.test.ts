@@ -28,21 +28,72 @@ describe('SOUND_DEFS', () => {
     expect(Object.values(Sound).sort((a, b) => a - b)).toEqual(Array.from({ length: SOUND_COUNT }, (_, i) => i));
   });
 
-  it('puts the menu and feedback sounds on effects, the flame and the room on ambience and the music on music', () => {
-    expect(SOUND_DEFS[Sound.Music].bus).toBe(Bus.Music);
-    expect(SOUND_DEFS[Sound.Hum].bus).toBe(Bus.Ambience);
-    for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost, Sound.Lift, Sound.Set])
+  it('puts the menu and feedback sounds on effects, and the flame, the rain and the thunder on ambience', () => {
+    for (const id of [Sound.Crackle, Sound.Rain, Sound.Thunder]) expect(SOUND_DEFS[id].bus).toBe(Bus.Ambience);
+    for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost])
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the room tone, the music, the clock and the wind', () => {
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'hum', 'music', 'clock', 'wind']);
+  it('loops only the flame, the rain, the music and the three story beds', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
+      'crackle',
+      'rain',
+      'music',
+      'crickets',
+      'wind',
+      'birds',
+    ]);
   });
 
-  it('keeps the first four sounds where they were: rustle, thump and chime on effects, the crackle on ambience', () => {
+  it('plays the music flat on the music bus, and only from its file', () => {
+    const music = SOUND_DEFS[Sound.Music];
+    expect(music.bus).toBe(Bus.Music);
+    expect(music.flat).toBe(true);
+    expect(music.fileOnly).toBe(true);
+    expect(SOUND_DEFS.filter((d) => d.flat).map((d) => d.name)).toEqual(['music']);
+  });
+
+  it('plays the voices and the recorded story and night sounds only from their files, with no placeholder', () => {
+    expect(SOUND_DEFS.filter((d) => d.fileOnly).map((d) => d.name)).toEqual([
+      'music',
+      'laugh',
+      'yawn',
+      'giggle',
+      'hop',
+      'blanket',
+      'run',
+      'jar',
+      'bell',
+      'gate',
+      'creak',
+      'gust',
+      'crickets',
+      'wind',
+      'firefly',
+      'palms',
+      'slide',
+      'snuff',
+      'breath',
+      'birds',
+    ]);
+  });
+
+  it('fades the story beds (crickets, wind, birds) in and out slowly, and keeps them on ambience', () => {
+    for (const id of [Sound.Crickets, Sound.Wind, Sound.Birds]) {
+      expect(SOUND_DEFS[id].loop).toBe(true);
+      expect(SOUND_DEFS[id].bus).toBe(Bus.Ambience);
+      expect(SOUND_DEFS[id].fadeS).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('plays the far thunder in a memory softer than the room thunder, on ambience', () => {
+    expect(SOUND_DEFS[Sound.Rumble].bus).toBe(Bus.Ambience);
+    expect(SOUND_DEFS[Sound.Rumble].gain).toBeLessThan(SOUND_DEFS[Sound.Thunder].gain);
+  });
+
+  it('keeps the first sounds where they were: rustle and thump on effects, the crackle on ambience', () => {
     expect(SOUND_DEFS[Sound.Rustle].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Thump].bus).toBe(Bus.Effects);
-    expect(SOUND_DEFS[Sound.Chime].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Crackle].bus).toBe(Bus.Ambience);
     expect(SOUND_DEFS[Sound.Crackle].loop).toBe(true);
   });

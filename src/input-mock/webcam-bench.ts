@@ -10,6 +10,7 @@ import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { HandAssigner } from './hand-assigner';
 import { createHandLandmarker, type HandLandmarker, type HandLandmarkerResult } from './hand-landmarker';
 import { handednessFromLabel, resultToHands } from './mediapipe-hands';
+import { saveLaunch } from '../app/launch-mode';
 
 // MediaPipe's 21-landmark skeleton, for drawing the overlay.
 // prettier-ignore
@@ -183,3 +184,8 @@ function toggleRecording(): void {
   void downloadRecording(rec, 'wsw-webcam');
   $<HTMLButtonElement>('guide').disabled = false;
 }
+
+// The Hand Lab link opens the game with webcam hands: the page's choice is kept in the tab, not the address.
+document
+  .getElementById('lab-link')
+  ?.addEventListener('click', () => saveLaunch({ mode: 'game', hands: 'webcam', lab: true }));

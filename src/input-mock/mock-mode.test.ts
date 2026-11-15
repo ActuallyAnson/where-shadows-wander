@@ -4,7 +4,7 @@ import { handFeatures } from '../engine/hands/hand-features';
 import { bestShape } from '../engine/hands/shape-ranges';
 import { createRecording, parseRecording, recordFrame } from '../engine/hands/hand-recording';
 import type { HandSource } from './hand-source';
-import { MockMode, mockOptionsFromUrl } from './mock-mode';
+import { MockMode, mockOptionsFor } from './mock-mode';
 import { ReplaySource } from './replay-source';
 import { SHAPES_SCRIPT } from '../engine/hands/shape-script';
 import { ScriptedSource } from './scripted-source';
@@ -42,23 +42,9 @@ function snapshot(h: HandFrame): number[] {
 }
 
 describe('mock mode options', () => {
-  it('is off without ?mock', () => {
-    expect(mockOptionsFromUrl('')).toBeNull();
-    expect(mockOptionsFromUrl('?mock=0')).toBeNull();
-    expect(mockOptionsFromUrl('?record=10')).toBeNull();
-  });
-
-  it('defaults to synthetic hands and the demo recording', () => {
-    expect(mockOptionsFromUrl('?mock=1')).toEqual({
-      source: 'synthetic',
-      file: 'recordings/emulator-demo.handrec.json',
-    });
-  });
-
-  it('reads the source and file, and ignores unknown sources', () => {
-    expect(mockOptionsFromUrl('?mock=1&src=replay&file=a.json')).toEqual({ source: 'replay', file: 'a.json' });
-    expect(mockOptionsFromUrl('?mock&src=webcam')?.source).toBe('webcam');
-    expect(mockOptionsFromUrl('?mock=1&src=nope')?.source).toBe('synthetic');
+  it('plays the demo recording for a replay', () => {
+    expect(mockOptionsFor('replay')).toEqual({ source: 'replay', file: 'recordings/emulator-demo.handrec.json' });
+    expect(mockOptionsFor('webcam').source).toBe('webcam');
   });
 });
 

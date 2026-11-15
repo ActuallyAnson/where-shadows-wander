@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { checksum } from './checksum';
 import { blockedError, FakeStore, quotaError } from './fake-store';
 import { MAX_SEQ, SaveManager, saveKeys, type SaveManagerOptions } from './save-manager';
-import { defaultData, CURRENT_VERSION, LIMITS, type SaveData } from './schema';
+import { defaultData, CURRENT_VERSION, type SaveData } from './schema';
 import { sanitize } from './schema';
 import { MemoryStore } from './storage';
+import { DEFAULT_SETTINGS } from '../settings/settings';
 
 const KEYS = saveKeys();
 const SLOT_KEYS = KEYS.slots;
@@ -23,10 +24,25 @@ const open = (store: FakeStore | MemoryStore, extra: Partial<SaveManagerOptions>
   return m;
 };
 
+/** Changes one setting: the simplest change that gives the save something to write. */
+const setVolume = (m: SaveManager, volumeMaster: number) => m.setSettings({ ...m.data.settings, volumeMaster });
+const volume = (m: SaveManager) => m.data.settings.volumeMaster;
+/** Save data whose settings were changed at `at`. */
+const withVolume = (volumeMaster: number, at: number, now = 1000): SaveData => ({
+  ...defaultData(now),
+  settings: { ...DEFAULT_SETTINGS, volumeMaster },
+  settingsAt: at,
+});
+const withDay = (lastPlayedDay: string, now = 1000): SaveData => ({ ...defaultData(now), lastPlayedDay });
+
+/** An envelope around exactly this data, for planting in a store (any version's shape). */
+function rawEnvelope(data: object, seq: number, v: number): string {
+  const text = JSON.stringify(data);
+  return JSON.stringify({ format: 'wsw-save', v, seq, sum: checksum(`${v}|${seq}|${text}`), data: text });
+}
 /** An envelope exactly as the manager writes one, for planting in a store. */
 function envelope(data: Partial<SaveData> | object, seq: number, v = CURRENT_VERSION): string {
-  const text = JSON.stringify({ ...defaultData(1000), ...data });
-  return JSON.stringify({ format: 'wsw-save', v, seq, sum: checksum(`${v}|${seq}|${text}`), data: text });
+  return rawEnvelope({ ...defaultData(1000), ...data }, seq, v);
 }
 const read = (store: FakeStore, key: string) =>
   JSON.parse(store.map.get(key)!) as { seq: number; v: number; data: string };
@@ -36,7 +52,10 @@ describe('loading', () => {
   it('starts a new save, and writes nothing, when storage is empty', () => {
     const store = new FakeStore();
     const m = open(store);
-    expect(m.data.progress).toEqual({ chapter: 1, puzzle: 0, chaptersCompleted: [], lastPlayedDay: '', at: 0 });
+    expect(m.data.lastPlayedDay).toBe('');
+    expect(m.data.resetCount).toBe(0);
+    expect(m.data.settings).toEqual(DEFAULT_SETTINGS);
+    expect(m.data.settingsAt).toBe(0);
     expect(m.status).toMatchObject({ recovered: 'none', newerVersion: false, writes: 0 });
     expect(m.flush()).toBe(true);
     expect(store.sets).toEqual([]);
@@ -45,43 +64,50 @@ describe('loading', () => {
   it('loads a save written earlier, exactly', () => {
     const store = new FakeStore();
     const a = open(store);
-    a.setProgress(2, 4);
-    a.discoverCreature('rabbit');
-    a.recordSolution('c1-p2', 'cup');
+    setVolume(a, 0.5);
+    a.touchDay();
     a.flush();
     const b = open(store);
-    expect(b.data.progress).toMatchObject({ chapter: 2, puzzle: 4 });
-    expect(b.hasCreature('rabbit')).toBe(true);
-    expect(b.solutionsFound('c1-p2')).toEqual(['cup']);
-    expect(b.isSolved('c1-p2')).toBe(true);
+    expect(volume(b)).toBe(0.5);
+    expect(b.data.settingsAt).toBe(a.data.settingsAt);
+    expect(b.data.lastPlayedDay).toBe('2026-10-11');
     expect(b.status.recovered).toBe('none');
+    expect(b.status.repairs).toBe(0);
   });
 
   it('takes the higher-numbered slot, and merges the older one in so nothing is lost', () => {
     const store = new FakeStore();
-    const older = defaultData(1000);
-    older.creatures.fox = { discoveredAt: 5 };
-    const newer = defaultData(2000);
-    newer.progress.chapter = 2;
+    const older = withVolume(0.5, 3000); // its settings changed after the newer slot's
+    const newer = withDay('2026-10-10', 2000);
     store.map.set(SLOT_KEYS[0], envelope(older, 4));
     store.map.set(SLOT_KEYS[1], envelope(newer, 5));
     const m = open(store);
-    expect(m.data.progress.chapter).toBe(2);
-    expect(m.hasCreature('fox')).toBe(true);
+    expect(m.data.lastPlayedDay).toBe('2026-10-10');
+    expect(volume(m)).toBe(0.5);
     expect(m.flush()).toBe(true);
     expect(read(store, SLOT_KEYS[0]).seq).toBe(6); // the merged copy goes to the older slot
-    expect(dataIn(store, SLOT_KEYS[0]).creatures.fox).toBeDefined();
+    expect(dataIn(store, SLOT_KEYS[0])).toMatchObject({ lastPlayedDay: '2026-10-10', settingsAt: 3000 });
+    expect(dataIn(store, SLOT_KEYS[0]).settings.volumeMaster).toBe(0.5);
+  });
+
+  it('lets a slot with more resets win outright, even when it is the older slot', () => {
+    const store = new FakeStore();
+    const wiped = { ...defaultData(1000), resetCount: 1 };
+    const stale = { ...withVolume(0.5, 3000, 2000), lastPlayedDay: '2026-10-10' };
+    store.map.set(SLOT_KEYS[0], envelope(wiped, 4));
+    store.map.set(SLOT_KEYS[1], envelope(stale, 5));
+    const m = open(store);
+    expect(m.data).toMatchObject({ resetCount: 1, lastPlayedDay: '', settingsAt: 0 });
+    expect(volume(m)).toBe(DEFAULT_SETTINGS.volumeMaster);
   });
 
   it('uses the other slot when the newest is garbage, and keeps the garbage', () => {
     const store = new FakeStore();
-    const good = defaultData(1000);
-    good.progress.puzzle = 2;
-    store.map.set(SLOT_KEYS[0], envelope(good, 4));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-02'), 4));
     store.map.set(SLOT_KEYS[1], '{"format":"wsw-sa');
     const errors: string[] = [];
     const m = open(store, { onError: (e) => errors.push(e) });
-    expect(m.data.progress.puzzle).toBe(2);
+    expect(m.data.lastPlayedDay).toBe('2026-10-02');
     expect(m.status.recovered).toBe('other-slot');
     expect(m.status.persistent).toBe(true); // a damaged slot is not a failing store
     expect(store.map.get(corruptKey(1, '{"format":"wsw-sa'))).toBe('{"format":"wsw-sa');
@@ -89,24 +115,24 @@ describe('loading', () => {
   });
 
   it.each([
-    ['a changed character', (e: string) => e.replace('\\"chapter\\":1', '\\"chapter\\":9')],
+    ['a changed character', (e: string) => e.replace('\\"resetCount\\":0', '\\"resetCount\\":9')],
     ['a cut-off envelope', (e: string) => e.slice(0, e.length - 20)],
     ['an empty object', () => '{}'],
     ['not an object', () => '42'],
     ['a different format', (e: string) => e.replace('wsw-save', 'other')],
-    ['a version of 0', (e: string) => e.replace('"v":2', '"v":0')],
-    ['a fractional version', (e: string) => e.replace('"v":2', '"v":1.5')],
+    ['a version of 0', (e: string) => e.replace(`"v":${CURRENT_VERSION}`, '"v":0')],
+    ['a fractional version', (e: string) => e.replace(`"v":${CURRENT_VERSION}`, '"v":1.5')],
     ['a negative sequence number', (e: string) => e.replace('"seq":5', '"seq":-5')],
     ['text for the data', (e: string) => e.replace(/"data":".*"\}$/, '"data":5}')],
   ])('treats %s as damaged, recovers from the other slot and keeps the damaged text', (_name, damage) => {
     const store = new FakeStore();
-    const good = defaultData(1000);
-    good.progress.chapter = 3;
-    store.map.set(SLOT_KEYS[0], envelope(good, 4));
-    const bad = damage(envelope(defaultData(2000), 5));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-03'), 4));
+    const good = envelope(defaultData(2000), 5);
+    const bad = damage(good);
+    expect(bad).not.toBe(good);
     store.map.set(SLOT_KEYS[1], bad);
     const m = open(store);
-    expect(m.data.progress.chapter).toBe(3);
+    expect(m.data.lastPlayedDay).toBe('2026-10-03');
     expect(m.status.recovered).toBe('other-slot');
     expect(store.map.get(corruptKey(1, bad))).toBe(bad);
   });
@@ -117,22 +143,22 @@ describe('loading', () => {
     store.map.set(SLOT_KEYS[1], 'garbage two');
     const m = open(store);
     expect(m.status.recovered).toBe('fresh');
-    expect(m.data.progress.chapter).toBe(1);
+    expect(m.data.lastPlayedDay).toBe('');
     expect(store.map.get(corruptKey(0, 'garbage one'))).toBe('garbage one');
     expect(store.map.get(corruptKey(1, 'garbage two'))).toBe('garbage two');
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     expect(m.flush()).toBe(true);
-    expect(open(store).hasCreature('fox')).toBe(true);
+    expect(volume(open(store))).toBe(0.5);
   });
 
   it('repairs a bad field inside a good envelope and writes the repaired copy back', () => {
     const store = new FakeStore();
-    const d = defaultData(1000) as unknown as Record<string, unknown>;
-    d.progress = { chapter: 'two', puzzle: 3, chaptersCompleted: [], lastPlayedDay: '', at: 0 };
+    const d = withDay('2026-10-03') as unknown as Record<string, unknown>;
+    d.resetCount = 'two';
     store.map.set(SLOT_KEYS[0], envelope(d, 2));
     const m = open(store);
     expect(m.status.repairs).toBe(1);
-    expect(m.data.progress).toMatchObject({ chapter: 1, puzzle: 3 });
+    expect(m.data).toMatchObject({ resetCount: 0, lastPlayedDay: '2026-10-03' });
     m.flush();
     expect(open(store).status.repairs).toBe(0);
   });
@@ -148,12 +174,7 @@ describe('loading', () => {
 });
 
 describe('a save from a newer version', () => {
-  const future = () =>
-    envelope(
-      { progress: { chapter: 9, puzzle: 0, chaptersCompleted: [], lastPlayedDay: '', at: 0 } },
-      8,
-      CURRENT_VERSION + 1,
-    );
+  const future = () => envelope({ lastPlayedDay: '2026-12-31' }, 8, CURRENT_VERSION + 1);
 
   it('is left exactly as it is: the session plays from defaults and is not saved, and says so', () => {
     const store = new FakeStore();
@@ -161,11 +182,10 @@ describe('a save from a newer version', () => {
     store.map.set(SLOT_KEYS[0], text);
     const m = open(store);
     expect(m.status).toMatchObject({ newerVersion: true, persistent: false });
-    expect(m.data.progress.chapter).toBe(1);
-    m.discoverCreature('fox');
-    expect(m.hasCreature('fox')).toBe(true);
+    expect(m.data.lastPlayedDay).toBe('');
+    setVolume(m, 0.5);
+    expect(volume(m)).toBe(0.5);
     expect(m.flush()).toBe(false);
-    expect(m.puzzleEnded('p', { solved: true, solutionId: 's' })).toBe(false);
     expect(store.sets).toEqual([]);
     expect(store.map.get(SLOT_KEYS[0])).toBe(text);
     expect(hasCorrupt(store)).toBe(false);
@@ -173,14 +193,12 @@ describe('a save from a newer version', () => {
 
   it('also protects it when the other slot holds a current save: the current one loads, nothing is written', () => {
     const store = new FakeStore();
-    const mine = defaultData(1000);
-    mine.progress.chapter = 2;
-    store.map.set(SLOT_KEYS[0], envelope(mine, 4));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-02'), 4));
     const text = future();
     store.map.set(SLOT_KEYS[1], text);
     const m = open(store);
-    expect(m.data.progress.chapter).toBe(2);
-    m.setProgress(3, 0);
+    expect(m.data.lastPlayedDay).toBe('2026-10-02');
+    setVolume(m, 0.5);
     expect(m.flush()).toBe(false);
     expect(store.sets).toEqual([]);
     expect(store.map.get(SLOT_KEYS[1])).toBe(text);
@@ -189,12 +207,12 @@ describe('a save from a newer version', () => {
   it('becomes read-only when a newer save appears while the page is open (a newer build in another tab)', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     m.flush();
     const text = future();
     store.map.set(SLOT_KEYS[0], text); // another tab's newer build writes
     store.sets = [];
-    m.discoverCreature('owl');
+    setVolume(m, 0.3);
     expect(m.flush()).toBe(false);
     expect(m.status).toMatchObject({ newerVersion: true, persistent: false });
     expect(store.sets).toEqual([]);
@@ -210,9 +228,9 @@ describe('a save from a newer version', () => {
     expect(m.reset()).toBe(true);
     expect(store.map.get(KEYS.newer(0))).toBe(text);
     expect(m.status).toMatchObject({ newerVersion: false, persistent: true });
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     expect(m.flush()).toBe(true);
-    expect(open(store).hasCreature('fox')).toBe(true);
+    expect(volume(open(store))).toBe(0.5);
   });
 
   it('does not start over if the newer save cannot be moved aside first', () => {
@@ -226,13 +244,11 @@ describe('a save from a newer version', () => {
 
   it('a damaged version number is damage, not a newer version: the other slot loads', () => {
     const store = new FakeStore();
-    const good = defaultData(1000);
-    good.progress.chapter = 3;
-    store.map.set(SLOT_KEYS[0], envelope(good, 4));
-    store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), 5).replace('"v":2', '"v":7'));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-03'), 4));
+    store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), 5).replace(`"v":${CURRENT_VERSION}`, '"v":7'));
     const m = open(store);
     expect(m.status).toMatchObject({ newerVersion: false, recovered: 'other-slot' });
-    expect(m.data.progress.chapter).toBe(3);
+    expect(m.data.lastPlayedDay).toBe('2026-10-03');
   });
 
   it('a newer slot that is also damaged is kept as damage', () => {
@@ -245,41 +261,49 @@ describe('a save from a newer version', () => {
 });
 
 describe('migrations through the manager', () => {
-  const v2 = {
-    version: 2,
-    sanitizers: { 2: sanitize },
-    migrations: { 1: (d: unknown) => ({ ...(d as object), creatures: { fox: { discoveredAt: 1 } } }) },
+  // Pretends the schema is one version further on, with a step that stamps a day into the data.
+  const NEXT = CURRENT_VERSION + 1;
+  const next = {
+    version: NEXT,
+    sanitizers: { [NEXT]: sanitize },
+    migrations: { [CURRENT_VERSION]: (d: unknown) => ({ ...(d as object), lastPlayedDay: '2026-01-01' }) },
   };
 
   it('brings an older save up, and writes it back as the newer version', () => {
     const store = new FakeStore();
-    store.map.set(SLOT_KEYS[0], envelope(defaultData(1000), 3, 1));
-    const m = open(store, v2);
-    expect(m.hasCreature('fox')).toBe(true);
-    m.setProgress(2, 0);
+    store.map.set(SLOT_KEYS[0], envelope(defaultData(1000), 3));
+    const m = open(store, next);
+    expect(m.data.lastPlayedDay).toBe('2026-01-01');
+    setVolume(m, 0.5);
     m.flush();
-    expect(read(store, SLOT_KEYS[0]).v === 2 || read(store, SLOT_KEYS[1]).v === 2).toBe(true);
-    expect(open(store, v2).hasCreature('fox')).toBe(true);
+    expect(read(store, SLOT_KEYS[0]).v === NEXT || read(store, SLOT_KEYS[1]).v === NEXT).toBe(true);
+    const again = open(store, next);
+    expect(again.data.lastPlayedDay).toBe('2026-01-01');
+    expect(volume(again)).toBe(0.5);
   });
 
   it.each([
-    ['a missing step', { version: 2, sanitizers: { 2: sanitize }, migrations: {} }, /no migration from version 1 to 2/],
+    [
+      'a missing step',
+      { version: NEXT, sanitizers: { [NEXT]: sanitize }, migrations: {} },
+      new RegExp(`no migration from version ${CURRENT_VERSION} to ${NEXT}`),
+    ],
     [
       'a throwing step',
       {
-        version: 2,
-        sanitizers: { 2: sanitize },
+        version: NEXT,
+        sanitizers: { [NEXT]: sanitize },
         migrations: {
-          1: () => {
+          [CURRENT_VERSION]: () => {
             throw new Error('boom');
           },
         },
       },
-      /migration from version 1 failed: boom/,
+      new RegExp(`migration from version ${CURRENT_VERSION} failed: boom`),
     ],
   ])('keeps the old save and starts fresh in memory after %s', (_name, extra, message) => {
     const store = new FakeStore();
-    const old = envelope(defaultData(1000), 3, 1);
+    const old = envelope(defaultData(1000), 3);
     store.map.set(SLOT_KEYS[0], old);
     const errors: string[] = [];
     const m = open(store, { ...extra, onError: (e) => errors.push(e) });
@@ -290,9 +314,49 @@ describe('migrations through the manager', () => {
 
   it('a step whose output is not an object is treated as damage, not a crash', () => {
     const store = new FakeStore();
-    store.map.set(SLOT_KEYS[0], envelope(defaultData(1000), 3, 1));
-    const m = open(store, { version: 2, sanitizers: { 2: sanitize }, migrations: { 1: () => 42 } });
+    store.map.set(SLOT_KEYS[0], envelope(defaultData(1000), 3));
+    const m = open(store, {
+      version: NEXT,
+      sanitizers: { [NEXT]: sanitize },
+      migrations: { [CURRENT_VERSION]: () => 42 },
+    });
     expect(m.status.recovered).toBe('fresh');
+  });
+
+  // The real steps: a puzzle-game save (versions 1 and 2) keeps its day last played and its settings.
+  const puzzleData = {
+    createdAt: 1000,
+    updatedAt: 2000,
+    progress: { chapter: 3, puzzle: 2, chaptersCompleted: [1, 2], lastPlayedDay: '2026-10-01', at: 1500 },
+    puzzles: { 'c1-p2': { solved: true, solutions: ['cup'] } },
+    creatures: { fox: { discoveredAt: 1200 } },
+    resetCount: 2,
+  };
+
+  it('brings a version 2 save up to the current version, dropping the puzzles and keeping settings and day', () => {
+    const store = new FakeStore();
+    const v2 = { ...puzzleData, settings: { volumeMaster: 0.4, travelScenes: false }, settingsAt: 1800 };
+    store.map.set(SLOT_KEYS[0], rawEnvelope(v2, 7, 2));
+    const m = open(store);
+    expect(m.status).toMatchObject({ recovered: 'none', repairs: 0, newerVersion: false });
+    expect(m.data).toMatchObject({ createdAt: 1000, lastPlayedDay: '2026-10-01', resetCount: 2, settingsAt: 1800 });
+    expect(m.data.settings).toEqual({ ...DEFAULT_SETTINGS, volumeMaster: 0.4 });
+    expect(Object.keys(m.data).sort()).toEqual(Object.keys(defaultData(0)).sort());
+    setVolume(m, 0.5);
+    expect(m.flush()).toBe(true);
+    expect(read(store, SLOT_KEYS[1])).toMatchObject({ v: CURRENT_VERSION, seq: 8 });
+    expect(dataIn(store, SLOT_KEYS[1])).not.toHaveProperty('puzzles');
+    expect(store.map.get(SLOT_KEYS[0])).toBe(rawEnvelope(v2, 7, 2)); // the old copy is untouched
+    expect(open(store).data.lastPlayedDay).toBe('2026-10-01');
+  });
+
+  it('brings a version 1 save (no settings yet) up to the current version', () => {
+    const store = new FakeStore();
+    store.map.set(SLOT_KEYS[0], rawEnvelope(puzzleData, 3, 1));
+    const m = open(store);
+    expect(m.status).toMatchObject({ recovered: 'none', repairs: 0 });
+    expect(m.data).toMatchObject({ lastPlayedDay: '2026-10-01', resetCount: 2, settingsAt: 0 });
+    expect(m.data.settings).toEqual(DEFAULT_SETTINGS);
   });
 });
 
@@ -300,10 +364,10 @@ describe('writing', () => {
   it('writes only when something changed', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.setProgress(1, 0); // already there
+    expect(m.setSettings({ ...m.data.settings })).toBe(false); // already so
     expect(m.flush()).toBe(true);
     expect(store.sets).toEqual([]);
-    m.setProgress(1, 1);
+    setVolume(m, 0.5);
     m.flush();
     expect(store.sets).toHaveLength(1);
     m.flush();
@@ -316,7 +380,7 @@ describe('writing', () => {
     const newestBefore: number[] = [];
     for (let i = 1; i <= 5; i++) {
       newestBefore.push(Math.max(-1, ...SLOT_KEYS.filter((k) => store.map.has(k)).map((k) => read(store, k).seq)));
-      m.setProgress(1, i);
+      setVolume(m, i / 10);
       m.flush();
       const written = store.sets.at(-1)!;
       const other = SLOT_KEYS.find((k) => k !== written)!;
@@ -329,28 +393,28 @@ describe('writing', () => {
   it('a write cut short leaves the previous copy, and the game still has the new data in memory', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.setProgress(1, 1);
+    setVolume(m, 0.5);
     m.flush(); // seq 1 in slot b
-    m.setProgress(1, 2);
+    setVolume(m, 0.3);
     store.distortSet = (_k, v) => v.slice(0, v.length / 2); // the tab dies mid-write
     expect(m.flush()).toBe(false);
     expect(m.status.persistent).toBe(false);
-    expect(m.data.progress.puzzle).toBe(2);
+    expect(volume(m)).toBe(0.3);
     store.distortSet = null;
-    expect(open(store).data.progress.puzzle).toBe(1); // the earlier copy survived intact
+    expect(volume(open(store))).toBe(0.5); // the earlier copy survived intact
     expect(m.flush()).toBe(true); // and the next flush tries again
-    expect(open(store).data.progress.puzzle).toBe(2);
+    expect(volume(open(store))).toBe(0.3);
   });
 
   it('gives a failed write another go at the next flush, and reports persistent again', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     store.setError = () => quotaError();
     expect(m.flush()).toBe(false);
     expect(m.status).toMatchObject({ persistent: false, writes: 0 });
     expect(m.status.lastError).toMatch(/could not write wsw\.save\.b: The quota has been exceeded/);
-    expect(m.hasCreature('fox')).toBe(true);
+    expect(volume(m)).toBe(0.5);
     store.setError = null;
     expect(m.flush()).toBe(true);
     expect(m.status).toMatchObject({ persistent: true, writes: 1, lastError: null });
@@ -359,7 +423,7 @@ describe('writing', () => {
   it('notices a store that accepts a write without keeping it', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     store.distortSet = () => null; // set "succeeds" and stores nothing
     expect(m.flush()).toBe(false);
     expect(m.status.lastError).toMatch(/did not read back the same/);
@@ -368,34 +432,60 @@ describe('writing', () => {
   it('notices a store that changes what it keeps', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.discoverCreature('fox');
-    store.distortSet = (_k, v) => v.replace('fox', 'fax');
+    setVolume(m, 0.5);
+    store.distortSet = (_k, v) => v.replace('volumeMaster', 'volumeMastex');
     expect(m.flush()).toBe(false);
   });
 
   it('reports not persistent for a memory-only store, but keeps working', () => {
     const m = open(new MemoryStore());
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     expect(m.flush()).toBe(true);
     expect(m.status.persistent).toBe(false);
     expect(m.status.writes).toBe(1);
-    expect(m.hasCreature('fox')).toBe(true);
+    expect(volume(m)).toBe(0.5);
   });
 
   it('merges what another tab saved in the meantime, so two tabs never wipe each other', () => {
     const store = new FakeStore();
     const tabA = open(store);
-    const tabB = open(store);
-    tabA.discoverCreature('fox');
-    tabA.recordSolution('c1-p1', 'bridge');
+    const tabB = open(store, { today: () => '2026-10-12' });
+    setVolume(tabA, 0.5);
     tabA.flush();
-    tabB.discoverCreature('rabbit');
-    tabB.setProgress(2, 1);
+    tabB.touchDay();
     tabB.flush();
     const after = open(store);
-    expect(after.hasCreature('fox') && after.hasCreature('rabbit')).toBe(true);
-    expect(after.solutionsFound('c1-p1')).toEqual(['bridge']);
-    expect(after.data.progress).toMatchObject({ chapter: 2, puzzle: 1 });
+    expect(volume(after)).toBe(0.5);
+    expect(after.data.lastPlayedDay).toBe('2026-10-12');
+    expect(volume(tabB)).toBe(0.5); // tab B picked up tab A's change as it wrote
+  });
+
+  it('takes the settings changed last when two tabs change them, whichever writes last', () => {
+    const store = new FakeStore();
+    const tabA = open(store);
+    const tabB = open(store);
+    setVolume(tabB, 0.3); // changed first...
+    clock += 1000;
+    setVolume(tabA, 0.5);
+    tabA.flush();
+    tabB.flush(); // ...but written last
+    expect(volume(open(store))).toBe(0.5);
+    expect(volume(tabB)).toBe(0.5);
+    clock += 1000;
+    setVolume(tabB, 0.2);
+    tabB.flush();
+    expect(volume(open(store))).toBe(0.2);
+  });
+
+  it('keeps the latest day played when two tabs disagree', () => {
+    const store = new FakeStore();
+    const later = open(store, { today: () => '2026-10-12' });
+    const earlier = open(store, { today: () => '2026-10-10' });
+    later.touchDay();
+    later.flush();
+    earlier.touchDay();
+    earlier.flush();
+    expect(open(store).data.lastPlayedDay).toBe('2026-10-12');
   });
 
   it('numbers its writes above anything another tab wrote', () => {
@@ -403,13 +493,15 @@ describe('writing', () => {
     const tabA = open(store);
     const tabB = open(store);
     for (let i = 0; i < 4; i++) {
-      tabA.setProgress(1, i + 1);
+      setVolume(tabA, (i + 1) / 10);
       tabA.flush();
     }
-    tabB.discoverCreature('fox');
+    tabB.touchDay();
     tabB.flush();
     expect(Math.max(read(store, SLOT_KEYS[0]).seq, read(store, SLOT_KEYS[1]).seq)).toBe(5);
-    expect(open(store).hasCreature('fox')).toBe(true);
+    const after = open(store);
+    expect(after.data.lastPlayedDay).toBe('2026-10-11');
+    expect(volume(after)).toBe(0.4);
   });
 });
 
@@ -419,7 +511,7 @@ describe('storage that fails', () => {
     store.getError = () => blockedError();
     const errors: string[] = [];
     const m = open(store, { onError: (e) => errors.push(e) });
-    expect(m.data.progress.chapter).toBe(1);
+    expect(m.data.lastPlayedDay).toBe('');
     expect(m.status.persistent).toBe(false);
     expect(errors[0]).toMatch(/could not read wsw\.save\.a: The operation is insecure/);
   });
@@ -429,15 +521,15 @@ describe('storage that fails', () => {
     store.getError = () => blockedError();
     store.setError = () => blockedError();
     const m = open(store);
-    m.discoverCreature('fox');
-    m.setProgress(1, 2);
+    setVolume(m, 0.5);
+    m.touchDay();
     expect(m.flush()).toBe(false);
     store.getError = null;
     store.setError = null;
     expect(m.flush()).toBe(true);
     const again = open(store);
-    expect(again.hasCreature('fox')).toBe(true);
-    expect(again.data.progress.puzzle).toBe(2);
+    expect(volume(again)).toBe(0.5);
+    expect(again.data.lastPlayedDay).toBe('2026-10-11');
   });
 
   it('still recovers when keeping the damaged slot fails too', () => {
@@ -455,183 +547,90 @@ describe('storage that fails', () => {
         throw new Error('logger broke');
       },
     });
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     store.setError = () => quotaError();
     expect(m.flush()).toBe(false);
     store.setError = null;
     expect(m.flush()).toBe(true);
-    expect(open(store).hasCreature('fox')).toBe(true);
+    expect(volume(open(store))).toBe(0.5);
   });
 });
 
 describe('changes', () => {
-  it('setProgress refuses what is not a whole number in range', () => {
-    const m = open(new FakeStore());
-    for (const [c, p] of [
-      [0, 0],
-      [1, -1],
-      [1.5, 0],
-      [1, 0.5],
-      [NaN, 0],
-      [1, NaN],
-      [Infinity, 0],
-    ] as const)
-      expect(m.setProgress(c, p)).toBe(false);
-    expect(m.data.progress).toMatchObject({ chapter: 1, puzzle: 0 });
-    expect(m.setProgress(3, 2)).toBe(true);
-  });
-
-  it('discoverCreature says whether it is new, and refuses bad ids', () => {
-    const m = open(new FakeStore());
-    expect(m.discoverCreature('rabbit')).toBe(true);
-    expect(m.discoverCreature('rabbit')).toBe(false);
-    expect(m.discoverCreature('')).toBe(false);
-    expect(m.discoverCreature('__proto__')).toBe(false);
-    expect(m.discoverCreature('a b')).toBe(false);
-    expect(m.discoverCreature('constructor')).toBe(true);
-    expect(m.hasCreature('constructor')).toBe(true);
-    expect(m.hasCreature('toString')).toBe(false);
-  });
-
-  it('stops adding creatures and puzzles at the limits', () => {
-    const m = open(new FakeStore());
-    for (let i = 0; i < LIMITS.creatures + 5; i++) m.discoverCreature(`c${i}`);
-    expect(Object.keys(m.data.creatures)).toHaveLength(LIMITS.creatures);
-    for (let i = 0; i < LIMITS.puzzles + 5; i++) m.recordSolution(`p${i}`, 's');
-    expect(Object.keys(m.data.puzzles)).toHaveLength(LIMITS.puzzles);
-    expect(m.recordSolution('one-more', 's')).toBe(false);
-  });
-
-  it('recordSolution says whether the solution is new, marks the puzzle solved, and caps the list', () => {
-    const m = open(new FakeStore());
-    expect(m.isSolved('p')).toBe(false);
-    expect(m.recordSolution('p', 'cup')).toBe(true);
-    expect(m.recordSolution('p', 'cup')).toBe(false);
-    expect(m.recordSolution('p', 'roof')).toBe(true);
-    expect(m.solutionsFound('p')).toEqual(['cup', 'roof']);
-    expect(m.isSolved('p')).toBe(true);
-    expect(m.recordSolution('', 'x')).toBe(false);
-    expect(m.recordSolution('p', 'bad id')).toBe(false);
-    for (let i = 0; i < LIMITS.solutionsPerPuzzle + 3; i++) m.recordSolution('q', `s${i}`);
-    expect(m.solutionsFound('q')).toHaveLength(LIMITS.solutionsPerPuzzle);
-  });
-
-  it('completeChapter keeps a sorted list without repeats', () => {
-    const m = open(new FakeStore());
-    m.completeChapter(2);
-    m.completeChapter(1);
-    m.completeChapter(2);
-    expect(m.completeChapter(0)).toBe(false);
-    expect(m.completeChapter(LIMITS.chapters + 1)).toBe(false);
-    expect(m.data.progress.chaptersCompleted).toEqual([1, 2]);
+  it('setSettings repairs each value into range, stamps the time and says whether anything changed', () => {
+    const m = open(new FakeStore(), { now: () => 7000 });
+    expect(m.setSettings({ ...m.data.settings, volumeMaster: -3, holdTime: 0.43 })).toBe(true);
+    expect(m.data.settings).toMatchObject({ volumeMaster: 0, holdTime: 0.4 });
+    expect(m.data.settingsAt).toBe(7000);
+    expect(m.setSettings({ ...m.data.settings })).toBe(false);
+    expect(m.setSettings({ ...m.data.settings, volumeMaster: -1 })).toBe(false); // repairs to the same
   });
 
   it('touchDay records today once', () => {
     const store = new FakeStore();
     const m = open(store);
     m.touchDay();
-    expect(m.data.progress.lastPlayedDay).toBe('2026-10-11');
+    expect(m.data.lastPlayedDay).toBe('2026-10-11');
     expect(m.flush()).toBe(true);
     const sets = store.sets.length;
     m.touchDay();
     m.flush();
     expect(store.sets.length).toBe(sets);
   });
-
-  it('answers questions about puzzles it has not seen', () => {
-    const m = open(new FakeStore());
-    expect(m.isSolved('nope')).toBe(false);
-    expect(m.solutionsFound('nope')).toEqual([]);
-    expect(m.hasCreature('nope')).toBe(false);
-  });
-});
-
-describe('puzzleEnded', () => {
-  it('records the solution, moves the resume point on and writes at once', () => {
-    const store = new FakeStore();
-    const m = open(store);
-    expect(m.puzzleEnded('c1-p1', { solved: true, solutionId: 'flat-bridge', next: { chapter: 1, puzzle: 1 } })).toBe(
-      true,
-    );
-    expect(store.sets).toHaveLength(1);
-    const again = open(store);
-    expect(again.solutionsFound('c1-p1')).toEqual(['flat-bridge']);
-    expect(again.data.progress).toMatchObject({ chapter: 1, puzzle: 1 });
-  });
-
-  it('marks a puzzle solved even with no named solution', () => {
-    const m = open(new FakeStore());
-    m.puzzleEnded('c1-p1', { solved: true });
-    expect(m.isSolved('c1-p1')).toBe(true);
-    expect(m.solutionsFound('c1-p1')).toEqual([]);
-  });
-
-  it('does not move the resume point or record anything when the puzzle was not solved', () => {
-    const store = new FakeStore();
-    const m = open(store);
-    m.puzzleEnded('c1-p1', { solved: false, solutionId: 'x', next: { chapter: 1, puzzle: 5 } });
-    expect(m.data.progress.puzzle).toBe(0);
-    expect(m.isSolved('c1-p1')).toBe(false);
-    expect(store.sets).toEqual([]);
-  });
-
-  it('survives bad ids and a bad next without writing nonsense', () => {
-    const m = open(new FakeStore());
-    expect(m.puzzleEnded('bad id', { solved: true, solutionId: 'x', next: { chapter: 0, puzzle: -1 } })).toBe(true);
-    expect(Object.keys(m.data.puzzles)).toEqual([]);
-    expect(m.data.progress).toMatchObject({ chapter: 1, puzzle: 0 });
-  });
-
-  it('reports false when the write failed, and keeps the result in memory', () => {
-    const store = new FakeStore();
-    store.setError = () => quotaError();
-    const m = open(store);
-    expect(m.puzzleEnded('c1-p1', { solved: true, solutionId: 's' })).toBe(false);
-    expect(m.isSolved('c1-p1')).toBe(true);
-  });
 });
 
 describe('reset', () => {
   it('wipes both slots, so an older copy cannot come back', () => {
     const store = new FakeStore();
-    const m = open(store);
-    m.discoverCreature('fox');
+    const m = open(store, { today: () => '2026-10-10' });
+    m.touchDay();
     m.flush();
-    m.discoverCreature('rabbit');
+    setVolume(m, 0.5);
     m.flush();
     expect(m.reset()).toBe(true);
     const again = open(store);
-    expect(again.hasCreature('fox') || again.hasCreature('rabbit')).toBe(false);
-    expect(again.data.progress.chapter).toBe(1);
-    expect(dataIn(store, SLOT_KEYS[0]).creatures).toEqual({});
-    expect(dataIn(store, SLOT_KEYS[1]).creatures).toEqual({});
+    expect(again.data).toMatchObject({ lastPlayedDay: '', resetCount: 1 });
+    expect(dataIn(store, SLOT_KEYS[0])).toMatchObject({ lastPlayedDay: '', resetCount: 1 });
+    expect(dataIn(store, SLOT_KEYS[1])).toMatchObject({ lastPlayedDay: '', resetCount: 1 });
   });
 
-  it('does not resurrect the old save when another tab flushes after it', () => {
+  it("keeps the player's settings", () => {
+    const store = new FakeStore();
+    const m = open(store);
+    setVolume(m, 0.5);
+    const at = m.data.settingsAt;
+    m.touchDay();
+    m.flush();
+    expect(m.reset()).toBe(true);
+    expect(volume(m)).toBe(0.5);
+    expect(m.data.settingsAt).toBe(at);
+    expect(volume(open(store))).toBe(0.5);
+  });
+
+  it('does not resurrect the old save when the same tab flushes after it', () => {
     const store = new FakeStore();
     const tab = open(store);
-    tab.discoverCreature('fox');
+    tab.touchDay();
     tab.flush();
     tab.reset();
-    tab.discoverCreature('owl');
+    setVolume(tab, 0.5);
     tab.flush();
     const after = open(store);
-    expect(after.hasCreature('owl')).toBe(true);
-    expect(after.hasCreature('fox')).toBe(false);
+    expect(volume(after)).toBe(0.5);
+    expect(after.data.lastPlayedDay).toBe('');
   });
 });
 
 describe('no per-frame work', () => {
-  it('touches storage only inside load, flush, puzzleEnded and reset', () => {
+  it('touches storage only inside load, flush and reset', () => {
     const store = new FakeStore();
     const m = open(store);
     const before = store.gets;
     for (let i = 0; i < 1000; i++) {
-      m.hasCreature('fox');
-      m.isSolved('p');
-      m.solutionsFound('p');
-      void m.data;
+      void m.data.settings.volumeMaster;
+      void m.data.lastPlayedDay;
       void m.status;
+      void m.previousDay;
     }
     expect(store.gets).toBe(before);
     expect(store.sets).toEqual([]);
@@ -640,8 +639,8 @@ describe('no per-frame work', () => {
   it('a burst of changes is one write', () => {
     const store = new FakeStore();
     const m = open(store);
-    for (let i = 0; i < 20; i++) m.discoverCreature(`c${i}`);
-    m.setProgress(2, 2);
+    for (let i = 0; i < 10; i++) setVolume(m, i / 10);
+    m.touchDay();
     m.flush();
     expect(store.sets).toHaveLength(1);
   });
@@ -652,8 +651,8 @@ it('uses the injected clock for timestamps', () => {
   const now = vi.fn(() => 5000);
   const m = new SaveManager({ store, now });
   m.load();
-  m.discoverCreature('fox');
-  expect(m.data.creatures.fox.discoveredAt).toBe(5000);
+  setVolume(m, 0.5);
+  expect(m.data.settingsAt).toBe(5000);
   m.flush();
   expect(dataIn(store, SLOT_KEYS[1]).updatedAt).toBe(5000);
 });
@@ -661,24 +660,20 @@ it('uses the injected clock for timestamps', () => {
 describe('the slot a write goes to', () => {
   it('never the one holding the newest valid copy, even when the other slot is damaged', () => {
     const store = new FakeStore();
-    const good = defaultData(1000);
-    good.progress.chapter = 4;
-    store.map.set(SLOT_KEYS[0], envelope(good, 4));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-04'), 4));
     store.map.set(SLOT_KEYS[1], 'damaged (it had seq 5)');
     const m = open(store);
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     store.distortSet = (_k, v) => v.slice(0, v.length / 2); // a write cut short
     expect(m.flush()).toBe(false);
     expect(store.sets.filter((k) => SLOT_KEYS.includes(k as never))).toEqual([SLOT_KEYS[1]]);
     store.distortSet = null;
-    expect(open(store).data.progress.chapter).toBe(4); // the good copy in slot a is intact
+    expect(open(store).data.lastPlayedDay).toBe('2026-10-04'); // the good copy in slot a is intact
   });
 
   it('is not fooled by a damaged sequence number: the checksum covers it, so the slot is damaged, not newest', () => {
     const store = new FakeStore();
-    const four = defaultData(1000);
-    four.progress.chapter = 4;
-    store.map.set(SLOT_KEYS[0], envelope(four, 4).replace('"seq":4', '"seq":5'));
+    store.map.set(SLOT_KEYS[0], envelope(withDay('2026-10-04'), 4).replace('"seq":4', '"seq":5'));
     store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), 3));
     const m = open(store);
     expect(m.status.recovered).toBe('other-slot');
@@ -695,7 +690,7 @@ describe('the slot a write goes to', () => {
     store.map.set(SLOT_KEYS[1], envelope(defaultData(2000), seq as number));
     const m = open(store);
     expect(m.status.recovered).toBe('other-slot');
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     expect(m.flush()).toBe(true);
     const next = Math.max(read(store, SLOT_KEYS[0]).seq, read(store, SLOT_KEYS[1]).seq);
     expect(next).toBe(5);
@@ -706,7 +701,7 @@ describe('the slot a write goes to', () => {
     store.map.set(SLOT_KEYS[0], envelope(defaultData(1000), 6));
     store.map.set(SLOT_KEYS[1], envelope(defaultData(1000), 6));
     const m = open(store);
-    m.discoverCreature('fox');
+    setVolume(m, 0.5);
     m.flush();
     expect(Math.max(read(store, SLOT_KEYS[0]).seq, read(store, SLOT_KEYS[1]).seq)).toBe(7);
   });
@@ -716,59 +711,23 @@ describe('a slot that cannot be read', () => {
   it('stops anything being written, because the newest copy might be the one that cannot be seen', () => {
     const store = new FakeStore();
     const a = open(store);
-    a.discoverCreature('fox');
+    setVolume(a, 0.5);
     a.flush();
-    a.discoverCreature('owl');
+    setVolume(a, 0.3);
     a.flush(); // slot a is now the newest, slot b the one before
     const newest = store.map.get(SLOT_KEYS[0])!;
     store.getError = (k) => (k === SLOT_KEYS[0] ? blockedError() : null);
     const m = open(store);
-    m.discoverCreature('bat');
+    setVolume(m, 0.2);
     store.sets = [];
     expect(m.flush()).toBe(false);
     expect(store.sets).toEqual([]);
     expect(m.status.persistent).toBe(false);
-    expect(m.hasCreature('bat')).toBe(true); // kept in memory
+    expect(volume(m)).toBe(0.2); // kept in memory
     expect(store.map.get(SLOT_KEYS[0])).toBe(newest);
     store.getError = null;
     expect(m.flush()).toBe(true); // and it saves once it can see both slots
-    expect(open(store).hasCreature('bat')).toBe(true);
-  });
-});
-
-describe('the resume point', () => {
-  it('can go back: replaying an earlier puzzle is not undone by the next save', () => {
-    const store = new FakeStore();
-    const m = open(store);
-    m.setProgress(3, 2);
-    m.flush();
-    clock += 1000;
-    m.setProgress(1, 0);
-    m.flush();
-    expect(m.data.progress).toMatchObject({ chapter: 1, puzzle: 0 });
-    expect(open(store).data.progress).toMatchObject({ chapter: 1, puzzle: 0 });
-  });
-
-  it('does not jump while playing when nothing else changed', () => {
-    const store = new FakeStore();
-    const m = open(store);
-    m.setProgress(2, 1);
-    m.flush();
-    m.setProgress(1, 0);
-    m.flush();
-    expect(m.data.progress).toMatchObject({ chapter: 1, puzzle: 0 });
-  });
-
-  it('takes the latest resume point when two tabs set it', () => {
-    const store = new FakeStore();
-    const tabA = open(store);
-    const tabB = open(store);
-    tabA.setProgress(2, 0);
-    tabA.flush();
-    clock += 1000;
-    tabB.setProgress(1, 4);
-    tabB.flush();
-    expect(open(store).data.progress).toMatchObject({ chapter: 1, puzzle: 4 });
+    expect(volume(open(store))).toBe(0.2);
   });
 });
 
@@ -782,26 +741,11 @@ describe('touchDay', () => {
     const later = open(store, { today: () => '2026-10-11' });
     expect(later.touchDay()).toBe('2026-10-10');
     expect(later.previousDay).toBe('2026-10-10');
-    expect(later.data.progress.lastPlayedDay).toBe('2026-10-11');
+    expect(later.data.lastPlayedDay).toBe('2026-10-11');
     later.flush();
     const sameNight = open(store, { today: () => '2026-10-11' });
     expect(sameNight.touchDay()).toBe('2026-10-11');
     expect(sameNight.previousDay).toBe('2026-10-11');
-  });
-});
-
-describe('puzzleEnded with an unusable solution id', () => {
-  it('still marks the puzzle solved and moves on, and reports it', () => {
-    const store = new FakeStore();
-    const errors: string[] = [];
-    const m = open(store, { onError: (e) => errors.push(e) });
-    expect(m.puzzleEnded('c1-p2', { solved: true, solutionId: 'Cup Shape', next: { chapter: 1, puzzle: 3 } })).toBe(
-      true,
-    );
-    expect(m.isSolved('c1-p2')).toBe(true);
-    expect(m.solutionsFound('c1-p2')).toEqual([]);
-    expect(m.data.progress.puzzle).toBe(3);
-    expect(errors.join()).toMatch(/"Cup Shape" is not a usable solution id/);
   });
 });
 
@@ -810,32 +754,32 @@ describe('starting over', () => {
     const store = new FakeStore();
     const tabA = open(store);
     const tabB = open(store);
-    tabA.discoverCreature('fox');
+    tabA.touchDay();
     tabA.flush();
-    tabB.discoverCreature('owl'); // tab B has only the owl in memory and will merge the fox in
+    setVolume(tabB, 0.3); // tab B will merge tab A's day in as it writes
     tabA.reset();
     expect(tabB.flush()).toBe(true);
     const after = open(store);
-    expect(after.hasCreature('fox')).toBe(false);
+    expect(after.data).toMatchObject({ lastPlayedDay: '', resetCount: 1 });
   });
 
   it('is not undone in the same session when the second write fails', () => {
     const store = new FakeStore();
     const m = open(store);
-    m.discoverCreature('fox');
+    m.touchDay();
     m.flush();
-    m.discoverCreature('owl');
+    setVolume(m, 0.5);
     m.flush();
     let n = 0;
     store.setError = () => (++n === 2 ? quotaError() : null);
     expect(m.reset()).toBe(false);
     store.setError = null;
-    m.discoverCreature('bat');
+    setVolume(m, 0.3);
     expect(m.flush()).toBe(true);
-    expect(m.hasCreature('fox') || m.hasCreature('owl')).toBe(false);
+    expect(m.data.lastPlayedDay).toBe('');
     const after = open(store);
-    expect(after.hasCreature('bat')).toBe(true);
-    expect(after.hasCreature('fox') || after.hasCreature('owl')).toBe(false);
+    expect(volume(after)).toBe(0.3);
+    expect(after.data).toMatchObject({ lastPlayedDay: '', resetCount: 1 });
   });
 });
 
@@ -871,22 +815,22 @@ describe('keys and types', () => {
   it('a manager with its own prefix never reads or writes another prefix’s save', () => {
     const store = new FakeStore();
     const real = open(store);
-    real.discoverCreature('fox');
+    setVolume(real, 0.5);
     real.flush();
     const mock = open(store, { prefix: 'wsw.save.mock' });
-    expect(mock.hasCreature('fox')).toBe(false);
-    mock.discoverCreature('owl');
+    expect(volume(mock)).toBe(DEFAULT_SETTINGS.volumeMaster);
+    setVolume(mock, 0.3);
     mock.flush();
     expect([...store.map.keys()].sort()).toEqual(['wsw.save.b', 'wsw.save.mock.b']);
-    expect(open(store).hasCreature('owl')).toBe(false);
+    expect(volume(open(store))).toBe(0.5);
   });
 
   it('does not let callers change the save through data (checked by the compiler)', () => {
     const m = open(new FakeStore());
-    // @ts-expect-error data is read-only all the way down
-    m.data.progress.chapter = 9;
-    // @ts-expect-error nested lists are read-only too
-    m.data.progress.chaptersCompleted.push(1);
+    // @ts-expect-error data is read-only
+    m.data.lastPlayedDay = '2026-01-01';
+    // @ts-expect-error nested objects are read-only too
+    m.data.settings.volumeMaster = 0;
     expect(true).toBe(true);
   });
 
@@ -895,13 +839,5 @@ describe('keys and types', () => {
     store.map.set(SLOT_KEYS[0], envelope({ ...defaultData(1000), futureField: 1 }, 2));
     const m = open(store);
     expect(m.status.repairs).toBe(1);
-  });
-
-  it('says when the gallery is full instead of failing silently', () => {
-    const errors: string[] = [];
-    const m = open(new FakeStore(), { onError: (e) => errors.push(e) });
-    for (let i = 0; i < LIMITS.creatures; i++) m.discoverCreature(`c${i}`);
-    expect(m.discoverCreature('one-more')).toBe(false);
-    expect(errors.join()).toMatch(/the gallery is full/);
   });
 });

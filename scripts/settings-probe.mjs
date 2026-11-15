@@ -8,6 +8,7 @@
 //   Reset restores the defaults; Close hides the panel and removes its poke target;
 //   a change is saved and survives a reload.
 import { chromium } from 'playwright';
+import { launchIn } from './lib/launch.mjs';
 
 const base = process.argv[2] ?? 'https://localhost:8097';
 const shot = process.argv[3];
@@ -25,7 +26,8 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto(`${base}/?mock=1&stage=real&flicker=0`);
+await launchIn(page, { flicker: 0 }); // the game with the Hand Lab's mock hands
+await page.goto(`${base}/`);
 await page.waitForFunction(() => window.__wsw?.settingsPanel, null, { timeout: 90000 });
 await page.getByRole('button', { name: 'Settings', exact: true }).click(); // the Hand Lab's button
 await page.waitForFunction(() => window.__wsw.settingsPanel.isOpen || window.__wsw.settingsPanel.lastError, null, {

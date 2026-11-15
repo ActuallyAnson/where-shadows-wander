@@ -28,25 +28,29 @@ function setup() {
   };
 }
 
+/** Any change to the save: the captions setting flipped. */
+const change = (saves: SaveManager) =>
+  saves.setSettings({ ...saves.data.settings, captions: !saves.data.settings.captions });
+
 describe('attachSaveHooks', () => {
   it('saves when the headset comes off or the system menu opens (paused), not when it resumes', () => {
     const { saves, store, fire } = setup();
-    saves.discoverCreature('fox');
+    change(saves);
     fire('visible', false);
     expect(store.sets).toEqual([]);
     fire('hidden', true);
     expect(store.sets).toHaveLength(1);
-    saves.discoverCreature('owl');
+    change(saves);
     fire('visible-blurred', true);
     expect(store.sets).toHaveLength(2);
   });
 
   it('saves when the page is hidden or closed', () => {
     const { saves, store, win, doc } = setup();
-    saves.discoverCreature('fox');
+    change(saves);
     win.dispatchEvent(new Event('pagehide'));
     expect(store.sets).toHaveLength(1);
-    saves.discoverCreature('owl');
+    change(saves);
     doc.hidden = false;
     doc.dispatchEvent(new Event('visibilitychange'));
     expect(store.sets).toHaveLength(1);
@@ -66,7 +70,7 @@ describe('attachSaveHooks', () => {
     const { saves, store, win, detach, listening } = setup();
     detach();
     expect(listening()).toBe(false);
-    saves.discoverCreature('fox');
+    change(saves);
     win.dispatchEvent(new Event('pagehide'));
     expect(store.sets).toEqual([]);
   });
@@ -74,7 +78,7 @@ describe('attachSaveHooks', () => {
   it('a failing store does not throw out of an event handler', () => {
     const { saves, store, win, fire } = setup();
     store.setError = () => new Error('full');
-    saves.discoverCreature('fox');
+    change(saves);
     expect(() => win.dispatchEvent(new Event('pagehide'))).not.toThrow();
     expect(() => fire('hidden', true)).not.toThrow();
   });

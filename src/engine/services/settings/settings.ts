@@ -24,11 +24,9 @@ export interface Settings {
   textSize: number;
   /** Pure black on bright white, no paper texture. */
   highContrast: boolean;
-  /** Text captions for the traveller's sounds and story beats . */
+  /** Text captions for the sounds that matter and the story's beats. */
   captions: boolean;
-  /** The short walks between puzzles: the traveller turns and walks into the next land. Off goes straight to the puzzle. */
-  travelScenes: boolean;
-  /** Press the pause, solved and end screens' buttons by looking at them for a moment, for players who cannot poke. */
+  /** Press the pause screen's buttons by looking at them for a moment, for players who cannot poke. */
   gazeMenus: boolean;
   /** The hand the panel listens to and opens beside; the game may read it as the player's main hand. */
   hand: Hand;
@@ -51,7 +49,7 @@ export interface NumberSpec {
 }
 export interface ToggleSpec {
   kind: 'toggle';
-  key: 'highContrast' | 'captions' | 'gazeMenus' | 'travelScenes';
+  key: 'highContrast' | 'captions' | 'gazeMenus';
   label: string;
   help: string;
   default: boolean;
@@ -144,7 +142,7 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     kind: 'number',
     key: 'volumeEffects',
     label: 'Sound effects',
-    help: 'The loudness of the traveller, the paper and the shapes.',
+    help: 'The loudness of the candle, the paper and the shapes.',
     min: 0,
     max: 1,
     step: 0.1,
@@ -181,15 +179,8 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     kind: 'toggle',
     key: 'captions',
     label: 'Captions',
-    help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or a creak.',
+    help: 'Writes a few words on the wall for the sounds that matter, like thunder or footsteps.',
     default: false,
-  },
-  {
-    kind: 'toggle',
-    key: 'travelScenes',
-    label: 'Travel scenes',
-    help: 'The short walks between puzzles. Turn off to go straight to the next puzzle (less motion).',
-    default: true,
   },
   {
     kind: 'toggle',

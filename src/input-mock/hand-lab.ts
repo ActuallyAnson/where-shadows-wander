@@ -1,9 +1,8 @@
-// The Hand Lab: mock mode's control panel (?mock=1). One page to try hand
-// sources (synthetic, scripted, replay, webcam), make shapes, read the
-// classifier's features, record, and look around the hands in 3D.
-import type { PerspectiveCamera, Scene } from '@iwsdk/core';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { HandFrame, Handedness, Vec3 } from '../engine/hands/hand';
+// The Hand Lab: the panel that picks whose hands play (ADR 0018, src/app/launch-mode.ts). The game runs in its normal session
+// (the emulator at a desk) and the lab only changes where the hands come from, live, with no reload: the device's own, or a mock
+// source (synthetic, scripted, replay, webcam). It also makes shapes, reads the classifier's features and records. Everything in
+// the room is the game's own, as on a headset.
+import type { HandFrame, Handedness } from '../engine/hands/hand';
 import { GuidedRecording } from '../engine/hands/guided-recording';
 import { createRecording, recordFrame, type HandRecording } from '../engine/hands/hand-recording';
 import type { GestureDetector } from '../engine/hands/gesture-detector';
@@ -13,15 +12,11 @@ import { SHAPE_HOW, SHAPES_SCRIPT, ShapeScript } from '../engine/hands/shape-scr
 import { sampleImage } from '../engine/xr/hand-sample-draw';
 import { SHAPES } from '../engine/hands/shapes';
 import type { PresetName } from '../engine/hands/synthetic-hand';
-import { HandBones } from './hand-bones';
-import type { Quaternion } from '@iwsdk/core';
-import type { LanternLight } from '../engine/shadow/pure/lantern-light';
-import { LanternMarker } from './lantern-marker';
+import type { DeskFrame } from './desk-frame';
 import { downloadRecording, handCardHtml } from './hand-card';
-import { MOCK_WRIST, type HandSource } from './hand-source';
-import { createMockSource, type MockMode, type MockSourceKind } from './mock-mode';
+import type { HandSource } from './hand-source';
+import { createMockSource, mockOptionsFor, type MockMode, type MockSourceKind } from './mock-mode';
 import { replayFromFile } from './replay-source';
-import type { EditAction, LevelEditor } from '../debug/level-editor';
 import { ScriptedSource } from './scripted-source';
 import { SyntheticSource } from './synthetic-source';
 import type { WebcamSource } from './webcam-source';
@@ -32,49 +27,80 @@ const TURN_DEG = 15;
 const JITTER_M = 0.003;
 const SHAPE_KEYS: PresetName[] = ['relaxed', ...SHAPES];
 
+/** Where the hands come from: the device's own (headset or emulator), or a mock source. */
+export type LabSource = 'device' | MockSourceKind;
+
 export interface LabView {
-  scene: Scene;
-  camera: PerspectiveCamera;
-  canvas: HTMLCanvasElement;
   /** The accessibility settings panel, if the page has one: the Settings button opens and closes it. */
   settings?: { toggle(): void; isOpen(): boolean };
-  /** The pause, solved and end screens: the Menu button steps through them (and off), and says which is showing. */
+  /** The pause screen: the Menu button shows and hides it, and says whether it is showing. */
   menu?: { cycle(): void; label(): string };
-  /** The test cutscene (a bird crossing the wall): the Cutscene button plays it. */
-  cutscene?: { play(): void };
-  /** The kindred (a shadow bird that flies about the wall): the Kindred button shows and hides it. */
-  kindred?: { toggle(): void; isOn(): boolean };
-  /** The solve moment (the wall's light swells and the kindred bursts into sparkles): the Solve button plays it. */
-  solve?: { play(): void };
-  /** The ending cutscene (the fox flies to the traveller, the room settles): the Ending button plays it. */
-  ending?: { play(): void };
-  /** The traveller's stickers (sad, happy, surprised, puzzled): the Sticker button shows the next one over them. */
-  sticker?: { next(): void };
-  /** The prologue (the story drawn in white calligraphy in a black void): the Prologue button plays it. */
-  prologue?: { play(): void };
-  /** The travel scenes between puzzles (the land wakes, the traveller walks into the next): the Travel button plays the next pair. */
-  travel?: { play(): void };
-  /** Turns the night back a few seconds (the puzzle is reloaded and its recorded inputs played again): the Rewind button. */
-  rewind?: { go(): void };
-  /** The level editor for the puzzle being played: `current()` is its editor (null before a puzzle loads); `changed()` loads the puzzle again with the edit. */
-  editor?: { open(): void; current(): LevelEditor | null; changed(): void };
-  /** The stand-in stage (not on the real wall): the Stage button switches the tabletop theatre and a wall-sized stage. */
-  stage?: { toggle(): void; label(): string };
+  /** Told the source in use whenever it changes, so the page can start with it again after a reload. */
+  onSourceKind?(kind: LabSource): void;
+  /** Hides the panel (its Hide button). The hands stay with the source picked. */
+  hide?(): void;
+  /** The Steps tab's ready-made setups, which move the emulator's headset and hands (absent without the emulator). */
+  steps?: LabSteps;
+  /** The gloves the hands can be drawn with (the Glove row): which there are, which is drawn, and picking one. */
+  gloves?: LabGloves;
+  /** The Story tab's checkpoints: jumps to any scene of the story (absent where there is no story). */
+  story?: LabStory;
 }
 
+/** A place in the story to jump to (the Story tab): a scene, waiting on its friend's hand. */
+export interface LabCheckpoint {
+  readonly id: string;
+  readonly label: string;
+  /** The shape the friend's hand shows there, or null (no shape: the waking, the sleep). */
+  readonly shape: string | null;
+}
+
+/** The Story tab: checkpoints to jump to, and moving the story on by hand. */
+export interface LabStory {
+  readonly checkpoints: readonly LabCheckpoint[];
+  /**
+   * Jumps to checkpoint `id`; with `play`, as if its shape were copied at once, so its memory plays. Starts the session first
+   * if it is not running (a promise then). Says what it did.
+   */
+  jump(id: string, play: boolean): string | Promise<string>;
+  /** Copies the shape the friend's hand is waiting for (or covers the flame, at the end). Says what it did. */
+  advance(): string;
+  /** Skips the memory playing to its last picture. Says what it did. */
+  skip(): string;
+  /** The shape the friend's hand is waiting for now, or null. */
+  waitingFor(): PresetName | null;
+  /** Where the story is now, for the panel. */
+  status(): string;
+}
+
+export interface LabGloves {
+  readonly options: readonly { readonly id: string; readonly label: string; readonly title: string }[];
+  current(): string;
+  choose(id: string): void;
+}
+
+/** Ready-made setups for testing at a desk (the Steps tab). */
+export interface LabSteps {
+  /** Sits the player at the candle with the right hand's match over the wick (the device's hands play). */
+  candle(): void;
+  /** Puts the emulator's headset and hands back where they started. */
+  reset(): void;
+  /** What the last step did, for the panel. */
+  status(): string;
+}
+
+type LabTab = 'lab' | 'steps' | 'story';
+const TABS: readonly LabTab[] = ['lab', 'steps', 'story'];
+const TAB_KEY = 'wsw.lab.tab';
+
 export class HandLab {
-  private readonly bones = new HandBones();
-  private readonly marker: LanternMarker;
   /** The latest gesture events, newest first (copied: the detector reuses its event objects). */
   private readonly gestureLog: string[] = [];
   private calibrationSaved = true;
-  private readonly orbit: OrbitControls;
+  /** Where the candle is, as the desk rig sees it (the G key aims a hand at it). */
+  private readonly deskLantern = [0, 0, 0];
   private readonly root = document.createElement('aside');
   private selected: Handedness = 'right';
-  /** The level editor row is open. */
-  private editing = false;
-  /** The editor the row was last drawn for. */
-  private shownEditor: LevelEditor | null = null;
   private recording: HandRecording | null = null;
   /** A guided recording in progress: prompts every shape and labels the file. */
   private guided: GuidedRecording | null = null;
@@ -84,45 +110,53 @@ export class HandLab {
   private recordStart = 0;
   private busy = false;
   private message = '';
+  /** The device's own hands play (the Device source): the mock source is kept but not used. */
+  private device = true;
+  private tab: LabTab = readTab();
+  /** What the Story tab's last button did. */
+  private storyMessage = '';
 
   constructor(
     private readonly mode: MockMode,
     private readonly hands: Record<Handedness, HandFrame>,
     private readonly shapes: ShapeRecognizer,
     private readonly gestures: GestureDetector,
-    private readonly lantern: Readonly<Vec3>,
+    /** The candle the game placed (read when used: it moves when the rig is placed again or the candle is carried). */
+    private readonly lantern: Readonly<ArrayLike<number>>,
+    /** The sources pose hands for the desk rig; this maps the room back to it. */
+    private readonly desk: DeskFrame,
     private readonly view: LabView,
   ) {
-    view.scene.add(this.bones.mesh);
     loadCalibration(shapes);
-    this.marker = new LanternMarker(lantern, gestures.config.coverRadiusM);
-    view.scene.add(this.marker.group);
-    this.orbit = new OrbitControls(view.camera, view.canvas);
-    const [lx, ly, lz] = MOCK_WRIST.left;
-    const [rx] = MOCK_WRIST.right;
-    // Between the hands and the lantern, which sits nearer the player on the table edge.
-    this.orbit.target.set((lx + rx) / 2, (ly + lantern[1]) / 2, (lz + lantern[2]) / 2);
-    // Above and to the side of the player, so curled fingers and the lantern are both in view.
-    view.camera.position.set(0.3, ly + 0.3, lantern[2] + 0.35);
-    this.orbit.update();
-    this.fitView();
-    window.addEventListener('resize', () => this.fitView());
-
-    this.onSourceChanged();
     this.mount();
+    this.show(false);
     setInterval(() => this.renderLive(), 100);
   }
 
-  /** The lantern marker's glow follows the flickering light. */
-  applyLight(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
-    this.marker.setLight(light, cameraQuaternion);
+  /** Whether a mock source plays (false: the device's own hands, read by the game as usual). */
+  get mockActive(): boolean {
+    return !this.device;
   }
 
-  /** Call once per frame, after the hands are filled. */
+  get shown(): boolean {
+    return this.root.style.display !== 'none';
+  }
+
+  show(on: boolean): void {
+    this.root.style.display = on ? '' : 'none';
+  }
+
+  /** Starts with `kind` (a reload's saved choice): a replay plays the emulator demo. */
+  start(kind: LabSource): Promise<void> {
+    return this.switchSource(kind);
+  }
+
+  /**
+   * Call once per frame, right after the source has filled the hands and before they are moved into the room's rig, so a
+   * recording keeps the desk rig's space (the one every mock source replays in).
+   */
   frame(): void {
-    this.bones.update([this.hands.left, this.hands.right]);
     const g = this.gestures;
-    this.marker.setProgress(Math.max(g.state.left.coverProgress, g.state.right.coverProgress));
     for (let i = 0; i < g.events.count; i++) {
       const e = g.events.at(i);
       const at = e.position.map((v) => v.toFixed(2)).join(', ');
@@ -136,14 +170,6 @@ export class HandLab {
     else if (this.guided) this.lockToPrompt();
   }
 
-  /** Keeps the hands centred in the part of the window the panel doesn't cover. */
-  private fitView(): void {
-    const w = window.innerWidth,
-      h = window.innerHeight;
-    const narrow = w < 700;
-    this.view.camera.setViewOffset(w, h, narrow ? 0 : PANEL_W / 2, narrow ? h * 0.22 : 0, w, h);
-  }
-
   /** Changes the hand source; the classifier starts fresh, since mock time restarts at 0. */
   private setSource(source: HandSource): void {
     this.mode.setSource(source);
@@ -153,29 +179,43 @@ export class HandLab {
   }
 
   private get synthetic(): SyntheticSource | null {
-    return this.mode.source instanceof SyntheticSource ? this.mode.source : null;
+    return !this.device && this.mode.source instanceof SyntheticSource ? this.mode.source : null;
+  }
+
+  private get kind(): LabSource {
+    return this.device ? 'device' : kindOf(this.mode.source.name);
   }
 
   private onSourceChanged(): void {
-    // The guide matters most with real hands (webcam, replays); synthetic hands show the shape anyway.
+    // The guide matters most with real hands (webcam, replays, the device); synthetic hands show the shape anyway.
     const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
-    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
+    if (guide) guide.open = this.synthetic === null;
     // Synthetic hands start one-handed, like a player gesturing.
     this.synthetic?.setShape('left', null);
-    const url = new URL(location.href);
-    url.searchParams.set('src', kindOf(this.mode.source.name));
-    history.replaceState(null, '', url);
+    this.view.onSourceKind?.(this.kind);
   }
 
-  private async switchSource(kind: MockSourceKind, file?: File): Promise<void> {
+  /** `file`: a recording to replay. Without one, Replay plays the emulator demo. */
+  private async switchSource(kind: LabSource, file?: File): Promise<void> {
     if (this.busy) return;
+    if (kind === 'device') {
+      // The game reads the device's hands again from the next frame; the classifier starts fresh on its clock.
+      this.device = true;
+      this.shapes.reset();
+      this.gestures.reset();
+      this.gestureLog.length = 0;
+      this.message = '';
+      this.onSourceChanged();
+      return this.renderControls();
+    }
     this.busy = true;
     this.message =
       kind === 'webcam' ? 'Starting the camera. The first start downloads the hand model (about 8 MB)…' : '';
     this.renderControls();
     try {
-      const source = file ? await replayFromFile(file) : await createMockSource({ source: kind, file: '' });
+      const source = file ? await replayFromFile(file) : await createMockSource(mockOptionsFor(kind));
       this.setSource(source);
+      this.device = false;
       this.onSourceChanged();
       this.message = '';
     } catch (e) {
@@ -257,18 +297,21 @@ export class HandLab {
 
   private mount(): void {
     document.head.append(Object.assign(document.createElement('style'), { textContent: CSS }));
-    // The canvas is transparent (for passthrough); give the lab a dark backdrop so bones show up.
-    document.body.style.background = '#101217';
     this.root.className = 'lab';
     this.root.innerHTML = `
-      <header><h1>Hand Lab</h1><p>Mock hands for testing at a desk. Drag to look around, scroll to zoom.
-        <a href="./">Back to the game</a></p></header>
-      <section id="lab-controls"></section>
-      <details class="guide" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
+      <header><h1>Hand Lab</h1><p>Whose hands play the game, in its own session. Press BEGIN, and move the head with the
+        emulator's controls.</p><button type="button" data-act="hide-panel" data-arg="">Hide panel</button></header>
+      <nav class="tabs" role="tablist"><button type="button" role="tab" data-act="tab" data-arg="lab">Lab</button
+      ><button type="button" role="tab" data-act="tab" data-arg="steps">Steps</button
+      ><button type="button" role="tab" data-act="tab" data-arg="story">Story</button></nav>
+      <section class="tab-steps" id="lab-steps"></section>
+      <section class="tab-story" id="lab-story"></section>
+      <section class="tab-lab" id="lab-controls"></section>
+      <details class="guide tab-lab" id="lab-guide"><summary>Shape guide</summary><div class="shapes">${SHAPES.map(
         (s) =>
           `<figure title="${SHAPE_HOW[s]}"><img src="${sampleImage(s, '#f0a24a', 'right', 168)}" alt=""><figcaption><b>${s}</b>${SHAPE_HOW[s]}</figcaption></figure>`,
       ).join('')}</div></details>
-      <section class="hand" id="lab-calibration">
+      <section class="hand tab-lab" id="lab-calibration">
         <h2>Calibration <span>your straight fingers</span></h2>
         <div class="row"><button type="button" data-act="calibrate" data-arg="left">Calibrate left</button
         ><button type="button" data-act="calibrate" data-arg="right">Calibrate right</button
@@ -276,17 +319,17 @@ export class HandLab {
         <div id="lab-cal-status"></div>
         <p class="keys">Hold the hand flat for 2 s: curl is then measured from your own straight. Saved in this browser.</p>
       </section>
-      <section class="hand" id="lab-gestures"></section>
-      <section class="hand" id="lab-hand-right"></section>
-      <section class="hand" id="lab-hand-left"></section>
-      <p class="foot">The big label is what the classifier has committed; "holding" shows a shape on its way
+      <section class="hand tab-lab" id="lab-gestures"></section>
+      <section class="hand tab-lab" id="lab-hand-right"></section>
+      <section class="hand tab-lab" id="lab-hand-left"></section>
+      <p class="foot tab-lab">The big label is what the classifier has committed; "holding" shows a shape on its way
       there (0.4 s for verbs, 1 s for rabbit and fox). The bars show how far inside each shape's ranges the hand
       is: above the line matches. <a href="./webcam.html">Webcam bench</a> shows the camera image with
       landmarks.</p>
       <input type="file" accept=".json,application/json" hidden id="lab-file" />`;
     document.body.append(this.root);
     const guide = this.root.querySelector<HTMLDetailsElement>('#lab-guide');
-    if (guide) guide.open = !(this.mode.source instanceof SyntheticSource);
+    if (guide) guide.open = this.synthetic === null;
 
     const file = this.root.querySelector<HTMLInputElement>('#lab-file')!;
     file.addEventListener('change', () => {
@@ -300,30 +343,18 @@ export class HandLab {
       const s = this.synthetic;
       if (act === 'source') {
         if (arg === 'replay') file.click();
-        else void this.switchSource(arg as MockSourceKind);
+        else void this.switchSource(arg as LabSource);
       } else if (act === 'hand') this.selected = arg as Handedness;
       else if (act === 'lock' && this.mode.source.name === 'webcam')
         (this.mode.source as WebcamSource).lockSide = arg === 'auto' ? null : (arg as Handedness);
       else if (act === 'shape') s?.setShape(this.selected, arg as PresetName);
+      else if (act === 'hide-panel') return this.view.hide?.();
       else if (act === 'hide') s?.setShape(this.selected, s.shapeOf(this.selected) === null ? 'relaxed' : null);
       else if (act === 'jitter' && s) s.jitter = s.jitter > 0 ? 0 : JITTER_M;
       else if (act === 'pause') this.mode.paused = !this.mode.paused;
       else if (act === 'record') this.toggleRecording();
       else if (act === 'settings') this.view.settings?.toggle();
       else if (act === 'menu') this.view.menu?.cycle();
-      else if (act === 'cutscene') this.view.cutscene?.play();
-      else if (act === 'kindred') this.view.kindred?.toggle();
-      else if (act === 'solve') this.view.solve?.play();
-      else if (act === 'ending') this.view.ending?.play();
-      else if (act === 'sticker') this.view.sticker?.next();
-      else if (act === 'prologue') this.view.prologue?.play();
-      else if (act === 'travel') this.view.travel?.play();
-      else if (act === 'rewind') this.view.rewind?.go();
-      else if (act === 'edit') {
-        this.editing = !this.editing;
-        if (this.editing) this.view.editor?.open();
-      } else if (act === 'edit-do') this.editStep(arg as EditAction | 'copy');
-      else if (act === 'stage') this.view.stage?.toggle();
       else if (act === 'calibrate') this.shapes.startCalibration(arg as Handedness);
       else if (act === 'uncalibrate') {
         this.shapes.setCalibration('left', null);
@@ -333,7 +364,14 @@ export class HandLab {
       } else if (act === 'guided') {
         if (this.guided) this.finishGuided();
         else this.startGuided();
-      }
+      } else if (act === 'tab') this.setTab(TABS.find((t) => t === arg) ?? 'lab');
+      else if (act === 'story' || act === 'story-play') {
+        if (this.view.story && arg) void this.storyJump(arg, act === 'story-play');
+      } else if (act === 'story-make') void this.makeStoryShape();
+      else if (act === 'story-advance') this.storyMessage = this.view.story?.advance() ?? '';
+      else if (act === 'story-skip') this.storyMessage = this.view.story?.skip() ?? '';
+      else if (act === 'step') void this.runStep(arg ?? '');
+      else if (act === 'glove') this.view.gloves?.choose(arg ?? '');
       this.renderControls();
     });
     window.addEventListener('keydown', (e) => this.onKey(e));
@@ -352,15 +390,147 @@ export class HandLab {
     this.renderLive();
   }
 
-  private renderControls(): void {
+  private setTab(tab: LabTab): void {
+    this.tab = tab;
+    try {
+      localStorage.setItem(TAB_KEY, tab);
+    } catch {
+      // Storage unavailable: the tab lasts until reload.
+    }
+  }
+
+  /** Runs a Steps button. The candle step plays with the device's hands, so a mock source gives way to them first. */
+  private async runStep(step: string): Promise<void> {
+    const steps = this.view.steps;
+    if (!steps || this.busy || this.guided || this.recording) return;
+    if (step === 'candle') {
+      if (!this.device) await this.switchSource('device');
+      steps.candle();
+    } else if (step === 'reset') steps.reset();
+    this.renderControls();
+  }
+
+  /** The Steps tab: ready-made setups that move the emulator's headset and hands. */
+  private renderSteps(): void {
+    const el = this.root.querySelector('#lab-steps');
+    if (!el) return;
+    const steps = this.view.steps;
+    const why = !steps
+      ? "Needs the dev server's emulator."
+      : this.guided || this.recording
+        ? 'Stop the recording first.'
+        : '';
+    const step = (arg: string, label: string, help: string) =>
+      `<div class="step"><button type="button" data-act="step" data-arg="${arg}" ${why || this.busy ? 'disabled' : ''}>${label}</button><p class="keys">${help}</p></div>`;
+    el.innerHTML = `<h2>Steps <span>emulator setups</span></h2>
+      ${step('candle', 'Hand over the candle', 'Match over the wick: lights in 3 s.')}
+      ${step('reset', 'Reset position', 'Headset and hands back to the start.')}
+      ${why ? `<p class="msg">${why}</p>` : '<p class="msg" id="lab-step-status"></p>'}`;
+    this.renderStepStatus();
+  }
+
+  /** The Story tab: every scene as a checkpoint, waiting on its friend's hand or playing its memory at once. */
+  private renderStory(): void {
+    const el = this.root.querySelector('#lab-story');
+    if (!el) return;
+    const story = this.view.story;
+    if (!story) {
+      el.innerHTML = '<h2>Story</h2><p class="msg">No story in this page.</p>';
+      return;
+    }
+    const row = (c: LabCheckpoint) =>
+      `<div class="checkpoint"><span>${c.label}${c.shape ? ` <em>${c.shape}</em>` : ''}</span><button type="button" data-act="story" data-arg="${c.id}" title="${c.shape ? `Jump here: the friend's hand waits for the ${c.shape}` : 'Jump here'}">${c.shape ? 'Wait' : 'Go'}</button>${c.shape ? `<button type="button" data-act="story-play" data-arg="${c.id}" title="Jump here and copy the ${c.shape} at once: the memory plays">Play</button>` : ''}</div>`;
+    el.innerHTML = `<h2>Story <span>checkpoints</span></h2>
+      <p class="keys">Jumps to a scene, its picture on the wall and its light already set; the candle is lit first if it was not.
+      Wait shows the friend's hand; Play copies its shape at once. Before BEGIN, a checkpoint starts the session itself. While the hand waits, Make shape forms it
+      with the Lab's synthetic hand (switching to it from the device's), so the real gesture recognition moves the story on;
+      Copy shape skips the recognition.</p>
+      ${story.checkpoints.map(row).join('')}
+      <div class="row"><button type="button" data-act="story-make" data-arg="" title="Form the shape the friend's hand shows with the synthetic hand, recognised as a player's would be">Make shape</button
+      ><button type="button" data-act="story-advance" data-arg="" title="Copy the shape the friend's hand shows (at the end: cover the flame)">Copy shape</button
+      ><button type="button" data-act="story-skip" data-arg="" title="Skip the memory playing to its last picture">Skip memory</button></div>
+      <p class="msg" id="lab-story-message"></p>
+      <p class="keys" id="lab-story-status"></p>`;
+    this.renderStoryStatus();
+  }
+
+  /** A Story checkpoint's Wait, Play or Go: the session is started first if need be, so the message may come later. */
+  private async storyJump(id: string, play: boolean): Promise<void> {
+    const story = this.view.story;
+    if (!story) return;
+    const r = story.jump(id, play);
+    if (typeof r !== 'string') {
+      this.storyMessage = 'Starting the session…';
+      this.renderStoryStatus();
+    }
+    this.storyMessage = await r;
+    this.renderStoryStatus();
+  }
+
+  /**
+   * The Story tab's Make shape: the synthetic hand (switched to from any other source) forms the shape the friend's hand waits
+   * for, through the classifier like a player's hand. It relaxes first, so a shape already held commits again.
+   */
+  private async makeStoryShape(): Promise<void> {
+    const shape = this.view.story?.waitingFor() ?? null;
+    if (!shape) {
+      this.storyMessage = 'Nothing is waiting for a shape.';
+      return this.renderStoryStatus();
+    }
+    if (!this.synthetic) await this.switchSource('synthetic');
     const s = this.synthetic;
-    const kind = kindOf(this.mode.source.name);
-    // While a guided recording runs, its clock must keep moving forward: no source changes or pausing.
-    const locked = new Set(this.guided ? ['source', 'pause', 'record'] : this.recording ? ['guided'] : []);
+    if (!s) {
+      this.storyMessage = "Couldn't start the synthetic hands.";
+      return this.renderStoryStatus();
+    }
+    s.setShape(this.selected, 'relaxed');
+    await new Promise((r) => setTimeout(r, 400));
+    s.setShape(this.selected, shape);
+    this.storyMessage = `The synthetic ${this.selected} hand makes the ${shape}; it moves the story on once it is recognised.`;
+    this.renderStoryStatus();
+  }
+
+  private renderStoryStatus(): void {
+    const msg = this.root.querySelector('#lab-story-message');
+    if (msg && msg.textContent !== this.storyMessage) msg.textContent = this.storyMessage;
+    const el = this.root.querySelector('#lab-story-status');
+    const status = this.view.story?.status() ?? '';
+    if (el && el.textContent !== status) el.textContent = status;
+  }
+
+  private renderStepStatus(): void {
+    const el = this.root.querySelector('#lab-step-status');
+    const status = this.view.steps?.status() ?? '';
+    if (el && el.textContent !== status) el.textContent = status;
+  }
+
+  private renderControls(): void {
+    this.root.dataset.tab = this.tab;
+    for (const b of this.root.querySelectorAll<HTMLButtonElement>('[data-act="tab"]')) {
+      const on = b.dataset.arg === this.tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    }
+    this.renderSteps();
+    this.renderStory();
+    const s = this.synthetic;
+    const kind = this.kind;
+    // While a guided recording runs, its clock must keep moving forward: no source changes or pausing. A recording keeps its
+    // source. The device's hands are read by the game itself: the lab neither pauses nor records them.
+    const locked = new Set(
+      this.guided
+        ? ['source', 'pause', 'record']
+        : this.recording
+          ? ['guided', 'source']
+          : this.device
+            ? ['pause', 'record', 'guided']
+            : [],
+    );
     const btn = (act: string, arg: string, label: string, on = false, title = '') =>
       `<button type="button" data-act="${act}" data-arg="${arg}" class="${on ? 'on' : ''}" ${title ? `title="${title}"` : ''} ${this.busy || locked.has(act) ? 'disabled' : ''}>${label}</button>`;
     const sources = (
       [
+        ['device', 'Device', "The emulator's or the headset's own hands"],
         ['synthetic', 'Synthetic', 'Hands you pose with buttons or keys'],
         ['script', 'Script', 'Every shape on each hand, in a loop'],
         ['replay', 'Replay…', 'Play a .handrec.json (or drop one on the page)'],
@@ -380,61 +550,25 @@ export class HandLab {
       <h2>Source</h2><div class="row">${sources}</div>
       ${this.message ? `<p class="msg">${this.message}</p>` : ''}
       ${synth ? `<h2>Pose <span>${this.selected} hand</span></h2>${synth}` : ''}
-      ${this.mode.source.name === 'webcam' ? this.lockRow(btn) : ''}
+      ${kind === 'webcam' ? this.lockRow(btn) : ''}
       <div class="row">${btn('pause', '', this.mode.paused ? 'Resume' : 'Pause', this.mode.paused, 'Space')}
-        ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show the pause, solved and end screens, one after the other') : ''}
-        ${this.view.kindred ? btn('kindred', '', 'Kindred', this.view.kindred.isOn(), 'A shadow bird that flies about the wall and circles the light') : ''}
-        ${this.view.stage ? btn('stage', '', `Stage: ${this.view.stage.label()}`, false, 'Switch the stand-in stage between the tabletop theatre and a wall-sized one (the tutorial needs the wall)') : ''}
-        ${this.view.sticker ? btn('sticker', '', 'Sticker', false, "Show the traveller's next sticker: happy, sad, surprised, puzzled") : ''}
-        ${this.view.prologue ? btn('prologue', '', 'Prologue', false, 'Play the prologue: the story drawn in calligraphy in the dark') : ''}
-        ${this.view.travel ? btn('travel', '', 'Travel', false, 'Play a travel scene: a land wakes, and the traveller walks into the next one') : ''}
-        ${this.view.rewind ? btn('rewind', '', 'Rewind 3 s', false, 'Turn the night back three seconds: the puzzle is reloaded and its recorded input played again') : ''}
-        ${this.view.editor ? btn('edit', '', 'Level editor', this.editing, 'Move, resize, add and remove the ground of the puzzle being played, and copy it out as code') : ''}
-        ${this.view.ending ? btn('ending', '', 'Ending', false, 'Play the ending: the candle burns low and the fox flies to the traveller') : ''}
-        ${this.view.solve ? btn('solve', '', 'Solve', false, 'Play the solve moment: the wall glows and light bursts out') : ''}
-        ${this.view.cutscene ? btn('cutscene', '', 'Cutscene', false, 'Play the opening: the title, and the fox drifts in') : ''}
+        ${this.view.menu ? btn('menu', '', `Menu: ${this.view.menu.label()}`, this.view.menu.label() !== 'off', 'Show and hide the pause screen') : ''}
         ${this.view.settings ? btn('settings', '', 'Settings', this.view.settings.isOpen(), 'The accessibility settings panel') : ''}
         ${btn('record', '', this.recording ? 'Stop and download' : '● Record', !!this.recording)}
         ${btn('guided', '', this.guided ? 'Stop guided' : 'Guided recording', !!this.guided, 'Prompts every shape on each hand (84 s) and saves a labelled recording')}
         <span class="time" id="lab-time"></span></div>
-      ${this.editing ? this.editorRow(btn) : ''}
-      <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>`;
+      <div class="prompt" id="lab-prompt" ${this.guided ? '' : 'hidden'}></div>
+      ${this.gloveRow(btn)}`;
     // Fill the new prompt element now rather than leaving it blank until the next live update.
     if (this.guided) this.renderLive();
   }
 
-  private editorRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
-    const editor = this.view.editor?.current();
-    this.shownEditor = editor ?? null;
-    if (!editor) return '<h2>Level editor</h2><div class="row">No puzzle is loaded yet.</div>';
-    const b = (arg: string, label: string, title = '') => btn('edit-do', arg, label, false, title);
-    const controls = editor.editable
-      ? `<div class="row">${b('prev', '◀ Piece')}${b('next', 'Piece ▶')}${b('left', '←')}${b('right', '→')}${b('up', '↑')}${b('down', '↓')}</div>
-         <div class="row">${b('wider', 'Wider')}${b('narrower', 'Narrower')}${b('taller', 'Taller')}${b('shorter', 'Shorter')}${b('add', '+ Ledge')}${b('remove', 'Delete')}${b('revert', 'Revert')}${b('copy', 'Copy code')}</div>`
-      : '';
-    return `<h2>Level editor</h2><div class="row"><span>${editor.describe()}</span> <span>${editor.message}</span></div>${controls}`;
-  }
-
-  private editStep(action: EditAction | 'copy'): void {
-    const editor = this.view.editor?.current();
-    if (!editor) return;
-    if (action === 'copy') {
-      const clipboard = navigator.clipboard;
-      if (!clipboard) editor.message = 'This page cannot reach the clipboard (it needs https or localhost).';
-      else {
-        editor.message = 'Copying…';
-        clipboard.writeText(editor.toSource()).then(
-          () => {
-            editor.message = 'Copied: paste it into the puzzle file.';
-            this.renderControls();
-          },
-          () => {
-            editor.message = 'The clipboard said no: click the page and try again.';
-            this.renderControls();
-          },
-        );
-      }
-    } else if (editor.run(action)) this.view.editor?.changed();
+  /** Which glove the hands are drawn with (remembered in this browser). */
+  private gloveRow(btn: (act: string, arg: string, label: string, on?: boolean, title?: string) => string): string {
+    const gloves = this.view.gloves;
+    if (!gloves) return '';
+    const now = gloves.current();
+    return `<h2>Glove</h2><div class="row">${gloves.options.map((g) => btn('glove', g.id, g.label, g.id === now, g.title)).join('')}</div>`;
   }
 
   /** For one hand in front of the webcam: say which it is, since MediaPipe often guesses a lone hand wrong. */
@@ -444,9 +578,8 @@ export class HandLab {
   }
 
   private renderLive(): void {
-    // The editor follows the puzzle: when it changes (solved, restart), the row is drawn again for the new one.
-    const current = this.editing ? (this.view.editor?.current() ?? null) : null;
-    if (this.editing && current !== this.shownEditor) this.renderControls();
+    this.renderStepStatus();
+    this.renderStoryStatus();
     // The default view is from the player's eyes, looking down -Z.
     for (const side of ['right', 'left'] as const) {
       const el = this.root.querySelector(`#lab-hand-${side}`);
@@ -454,7 +587,7 @@ export class HandLab {
         el.innerHTML = handCardHtml(
           this.hands[side],
           ['toward you', 'away from you'],
-          this.mode.source.shapeOf?.(side) ?? null,
+          this.device ? null : (this.mode.source.shapeOf?.(side) ?? null),
           this.shapes[side].state,
           this.shapes[side].margins,
         );
@@ -516,7 +649,7 @@ export class HandLab {
     const time = this.root.querySelector('#lab-time');
     if (time) {
       const rec = this.recording ? ` · recording ${(this.mode.time - this.recordStart).toFixed(1)} s` : '';
-      const status = this.mode.source.status?.() ?? this.mode.source.name;
+      const status = this.device ? 'device hands' : (this.mode.source.status?.() ?? this.mode.source.name);
       time.textContent = `${status} · ${this.mode.time.toFixed(1)} s${rec}`;
     }
   }
@@ -539,8 +672,10 @@ export class HandLab {
     else if (k === 'l') this.selected = 'left';
     else if (k === 'j') s.jitter = s.jitter > 0 ? 0 : JITTER_M;
     else if (k === 'p') s.setPinch(sel, !s.pinching(sel));
-    else if (k === 'g') s.placeOver(sel, this.lantern);
-    else if (k === 'b') s.home(sel);
+    else if (k === 'g') {
+      this.desk.toDesk(this.lantern, this.deskLantern);
+      s.placeOver(sel, [this.deskLantern[0], this.deskLantern[1], this.deskLantern[2]]);
+    } else if (k === 'b') s.home(sel);
     else if (k === 'q') s.turn(sel, -TURN_DEG, 0);
     else if (k === 'e') s.turn(sel, TURN_DEG, 0);
     else if (k === 'z') s.turn(sel, 0, TURN_DEG);
@@ -557,6 +692,16 @@ export class HandLab {
   }
 }
 
+/** The tab last open in this browser (Lab by default). */
+function readTab(): LabTab {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    return TABS.find((t) => t === saved) ?? 'lab';
+  } catch {
+    return 'lab';
+  }
+}
+
 function kindOf(sourceName: string): MockSourceKind {
   return sourceName.startsWith('replay') ? 'replay' : (sourceName as MockSourceKind);
 }
@@ -565,13 +710,23 @@ const CSS = `
 .lab {
   --ink: #ece6d8; --muted: #a8a294; --panel: #1b1e26; --line: #2e333f; --stage: #262a34;
   --accent: #f0a24a; --right: #f09a3e; --left: #5aa0d8;
-  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 10; overflow-y: auto;
+  position: fixed; top: 0; right: 0; bottom: 0; width: ${PANEL_W}px; z-index: 10000; overflow-y: auto; /* over the title screen (9998) and launcher (9999) */
   box-sizing: border-box; padding: 14px; display: grid; gap: 12px; align-content: start;
   background: #14161c; color: var(--ink); border-left: 1px solid var(--line);
   font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (max-width: 699px) { .lab { top: auto; left: 0; width: auto; height: 45vh; border-left: 0; border-top: 1px solid var(--line); } }
 .lab h1 { margin: 0; font-size: 18px; font-weight: 650; }
+.lab .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); }
+.lab .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 14px; color: var(--muted); }
+.lab .tabs button.on { background: none; color: var(--ink); border-bottom-color: var(--accent); }
+.lab:not([data-tab="lab"]) .tab-lab, .lab:not([data-tab="steps"]) .tab-steps, .lab:not([data-tab="story"]) .tab-story { display: none; }
+.lab .tab-steps, .lab .tab-story { display: grid; gap: 10px; }
+.lab .tab-story h2 { margin: 0; }
+.lab .checkpoint { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.lab .checkpoint em { font-style: normal; color: var(--muted); margin-left: 4px; }
+.lab .step { display: grid; gap: 4px; justify-items: start; }
+.lab .tab-steps h2 { margin: 0; }
 .lab header p, .lab .foot, .lab .keys { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
 .lab .foot a, .lab header a { color: var(--accent); }
 .lab h2 { margin: 6px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }

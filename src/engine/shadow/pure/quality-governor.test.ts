@@ -19,7 +19,7 @@ describe('QualityGovernor', () => {
     const g = new QualityGovernor();
     run(g, 100, BUDGET * 2); // a window of frames at twice the budget
     expect(g.level).toBe(1);
-    expect(g.isOn('propSketch')).toBe(false);
+    expect(g.isOn('ring')).toBe(false);
     expect(g.isOn('trail')).toBe(true); // the next step
     run(g, 200, BUDGET * 2);
     expect(g.level).toBeGreaterThanOrEqual(2);

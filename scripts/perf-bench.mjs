@@ -1,13 +1,15 @@
-// A repeatable performance benchmark of the running game, for before-and-after numbers. It opens the Hand Lab in headless Chromium
+// A repeatable performance benchmark of the running game, for before-and-after numbers. It plays the game in the emulator's session in headless Chromium
 // (a software renderer, so the milliseconds are a proxy that rises and falls with the real cost, not a headset's numbers), puts the
-// game in four states and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
+// game in its states (the lit room, then with the decoration shed) and records, for each: the cost of drawing one frame (the median of many manual renders), the draw calls,
 // triangles and textures, the texture memory, and the JavaScript the frame allocates. It also records the start-up time and the heap.
 //
 //   npm run dev                                   (in another terminal, then:)
 //   node scripts/perf-bench.mjs [url] [--label name] [--out file.json] [--runs 3]
 //
-// The default address is https://localhost:5173/?mock=1 (the Vite dev server). Compare two runs with `--out`.
+// The default address is https://localhost:5173/ (the Vite dev server). Compare two runs with `--out`. Runs from before ADR 0018
+// (11 Nov 2026) drew the desk view of the old Hand Lab, not a session's, so compare only runs made since.
 import { chromium } from 'playwright';
+import { enterVr, launchIn, lightCandle } from './lib/launch.mjs';
 import { writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -15,7 +17,7 @@ const flag = (name, fallback) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const url = args.find((a) => a.startsWith('http')) ?? 'https://localhost:5173/?mock=1';
+const url = args.find((a) => a.startsWith('http')) ?? 'https://localhost:5173/';
 const label = flag('--label', 'run');
 const out = flag('--out', null);
 const runs = Number(flag('--runs', '3'));
@@ -35,22 +37,16 @@ async function once() {
       for (const e of list.getEntries()) window.__longTasks.push(e.duration);
     }).observe({ entryTypes: ['longtask'] });
   });
+  await launchIn(page);
   const t0 = Date.now();
   await page.goto(url);
   await page.waitForFunction(() => window.__wsw);
   const startupMs = Date.now() - t0;
-  await page.waitForTimeout(26000); // the opening is over and the night has started
-  await page.evaluate(() => {
-    window.__wsw.storyLine.clear();
-    const c = window.__wsw.world.camera;
-    c.fov = 85;
-    c.updateProjectionMatrix();
-    window.__pin = () => {
-      c.position.set(0, 1.3, 0.3);
-      c.lookAt(0, 1.2, -2);
-    };
-    window.__pin();
-  });
+  // Into the session, the candle lit (as a player would after 3 s), then 26 s in all, so the stall counts compare between runs.
+  await enterVr(page);
+  await page.waitForTimeout(3000);
+  await lightCandle(page);
+  await page.waitForTimeout(23000);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');
   const heapMb = await page.evaluate(() => performance.memory.usedJSHeapSize / 1048576);
@@ -148,22 +144,6 @@ async function once() {
     await page.evaluate(() => (window.__wsw.governor.level = 0));
     await page.waitForTimeout(500);
   }
-  await page.evaluate(() => {
-    window.__wsw.roomDressing.setAwake(3);
-    window.__wsw.wakeSleeper(1);
-    window.__wsw.rewards.play('light', 0, 0);
-  });
-  await page.waitForTimeout(600);
-  states.push(await measure('room + spark + reward'));
-  await page.getByText('Prologue').click();
-  await page.waitForTimeout(5500);
-  await page.evaluate(() => window.__pin());
-  states.push(await measure('opening reel'));
-  await page.evaluate(() => window.__wsw.prologue.skip());
-  await page.waitForTimeout(3000);
-  await page.getByText('Ending').click();
-  await page.waitForTimeout(5000);
-  states.push(await measure('finale hall'));
   await browser.close();
   return { startupMs, heapMb, calibMs, stalls, states };
 }

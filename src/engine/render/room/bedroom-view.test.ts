@@ -1,20 +1,19 @@
-import { Quaternion } from '@iwsdk/core';
+import { Quaternion, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
-import { BedroomView, MOONLIGHT_COLOR } from './bedroom-view';
+import { emptyRoomLayout, placement } from '../../stage/room-layout';
+import { BedroomView, MOONLIGHT_COLOR, PLAYER_SPOT_LIMITS } from './bedroom-view';
 
 describe('BedroomView', () => {
-  it('constructs room shell, props, and moonlight within budget', () => {
+  it('constructs room shell and moonlight within budget', () => {
     const room = new BedroomView();
 
-    // Group contains main shell, walls, window, pallet, tin can, and moonlight
-    expect(room.group.children.length).toBeGreaterThan(10);
+    // Group contains main shell, walls, window, the player's spot and moonlight
+    expect(room.group.children.length).toBeGreaterThan(8);
     expect(room.floorMesh).toBeDefined();
     expect(room.ceilingMesh).toBeDefined();
     expect(room.frontWallMesh).toBeDefined();
     expect(room.windowGroup.children.length).toBeGreaterThanOrEqual(3); // the merged frame, the sky, the moon wash
-    expect(room.strawPalletGroup.children.length).toBe(3);
-    expect(room.tinCanGroup.children.length).toBe(2);
 
     // Moonlight
     expect(room.moonlight.color.getHex()).toBe(MOONLIGHT_COLOR);
@@ -29,8 +28,8 @@ describe('BedroomView', () => {
     expect(room.group.position.y).toBeCloseTo(0, 3);
     expect(room.group.position.z).toBeCloseTo(-0.2, 3);
     expect(room.group.rotation.y).toBeCloseTo(Math.PI / 4, 3);
-    // 2.0m stage distance -> front wall at -(2.0 + 0.35) = -2.35m
-    expect(room.frontWallMesh.position.z).toBeCloseTo(-2.35, 3);
+    // 2.0m stage distance -> the front wall just behind the stage, which is on it: -(2.0 + 0.02) = -2.02m
+    expect(room.frontWallMesh.position.z).toBeCloseTo(-2.02, 3);
   });
 
   it('transitions between lit warm candlelight and unlit blue moonlight', () => {
@@ -62,5 +61,39 @@ describe('BedroomView', () => {
   it('disposes resources cleanly', () => {
     const room = new BedroomView();
     expect(() => room.dispose()).not.toThrow();
+  });
+
+  it("lists only the player's spot for the room editor", () => {
+    expect(new BedroomView().editables().map((p) => p.id)).toEqual(['player']);
+  });
+
+  it("stands the room so the player's spot is under the head, with the front wall the stage's distance ahead of it", () => {
+    const layout = emptyRoomLayout();
+    layout.room.player = placement([0.5, 0, 0.05]);
+    const v = new BedroomView(layout);
+    v.place([1, 1.2, 2], Math.PI / 2, 2.0);
+    v.group.updateMatrixWorld(true);
+    const spot = v.playerSpot.getWorldPosition(new Vector3());
+    expect(spot.x).toBeCloseTo(1, 6);
+    expect(spot.z).toBeCloseTo(2, 6);
+    expect(v.frontWallMesh.position.z).toBeCloseTo(0.05 - 2.02, 6);
+  });
+
+  it("keeps the player's spot inside the room", () => {
+    const layout = emptyRoomLayout();
+    layout.room.player = placement([5, 0, -5]);
+    const v = new BedroomView(layout);
+    expect(v.playerX()).toBe(PLAYER_SPOT_LIMITS.x);
+    expect(v.playerZ()).toBe(PLAYER_SPOT_LIMITS.zMin);
+  });
+
+  it("tells main.ts when the editor moves the player's spot, and not for other pieces", () => {
+    const v = new BedroomView();
+    let told = 0;
+    v.onPlayerMoved = () => told++;
+    const [player] = v.editables();
+    v.moved();
+    v.moved(player);
+    expect(told).toBe(1);
   });
 });

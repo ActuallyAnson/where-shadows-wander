@@ -31,8 +31,11 @@ import {
 import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 import { RenderOrder } from './pure/render-order';
+import { LIGHT_POOL_RX_M, LIGHT_POOL_RY_M, stageEdgeGlsl } from './stage-edge-glsl';
 
 const PAPER = new Color(0xf2e6c9);
+/** On the room's wall: how far out (a share of the pool's radius) the candle's light stays solid before it starts to thin. */
+const POOL_SOLID = 0.3;
 
 const vertex = /* glsl */ `
   varying vec2 vUv;
@@ -44,14 +47,21 @@ const vertex = /* glsl */ `
 
 // The paper, lit by the flame without any scene light: an inverse-square pool of light round the point of the wall nearest
 // the flame (so a far wall still reads), a floor so the edges never go black, fine fibres and soft mottling that the light
-// rakes across, and edges that darken like the rim of a sheet. One quad, one draw call, nothing per pixel but arithmetic.
+// rakes across. On the room's wall the quad covers most of the wall and the paper is the middle of the candle's round pool of
+// light, fading into the wallpaper; elsewhere it is a sheet whose rim darkens. One quad, one draw call, nothing per pixel but arithmetic.
+/** The paper's tint for a mood, 0 (cold and bluish) to 1 (warm). */
+function moodTint(mood: number, out: Vector3): Vector3 {
+  return out.set(0.8 + 0.28 * mood, 0.9 + 0.05 * mood, 1.06 - 0.3 * mood);
+}
+
 const fragment = /* glsl */ `
   uniform vec3 uPaper;
   uniform vec3 uFlame;     // the flame on the wall: x, y metres from the centre, z metres in front of it
   uniform vec2 uSize;      // the wall's width and height, metres
   uniform float uBright;   // 0..1 flame brightness (flicker and cover-the-flame included)
   uniform float uOpacity;
-  uniform float uMood;     // 0 cold and bluish .. 1 warm
+  uniform float uMood;     // 0 cold and bluish .. 1 warm (the painted scenery's tint)
+  uniform vec3 uTint;      // the candle's pool's tint (from the mood, or the candle's mood: setTint)
   uniform float uTime;
   uniform float uHigh;     // 1 for high contrast: plain white, no texture
   uniform sampler2D uSky;
@@ -62,7 +72,12 @@ const fragment = /* glsl */ `
   uniform vec2 uHead;      // the head's place across and up from the stage's centre, metres (the scenery's layers shift with it)
   uniform float uBackdrop; // how much of the paper the painted scenery replaces, 0..1
   uniform float uMidShift; // how far the near scenery has slid sideways (a set change), in widths of the paper
+  uniform vec2 uStage;     // the stage's (the puzzles') width and height, metres: the paper and its scenery
+  uniform vec2 uAreaC;     // the middle of the drawn quad (uSize), metres from the stage's centre
+  uniform vec2 uPoolR;     // the candle's pool of light's radii, metres
+  uniform float uPoolOn;   // 1: the stage is the middle of a pool of light on the room's wall; 0: a sheet with a darkened rim
   varying vec2 vUv;
+${stageEdgeGlsl}
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -77,12 +92,15 @@ const fragment = /* glsl */ `
   }
 
   void main() {
+    // p: metres from the stage's centre (the quad may be bigger than the stage, and centred elsewhere: the whole wall).
+    vec2 p = (vUv - 0.5) * uSize + uAreaC;
+    vec2 su = p / uStage + 0.5; // 0..1 across the stage
     if (uHigh > 0.5) {
+      if (su.x < 0.0 || su.x > 1.0 || su.y < 0.0 || su.y > 1.0) discard; // the plain, hard sheet: only the stage
       gl_FragColor = vec4(1.0, 1.0, 1.0, uOpacity);
       #include <colorspace_fragment>
       return;
     }
-    vec2 p = (vUv - 0.5) * uSize;
     vec2 d = p - uFlame.xy;
     float h = max(uFlame.z, 0.05);
     float pool = pow(h * h / (h * h + dot(d, d)), 1.5);
@@ -101,15 +119,14 @@ const fragment = /* glsl */ `
     float tooth = clamp(dot(n, l) / l.z, 0.94, 1.05);
 
     float light = uBright * (0.42 + 0.58 * pool) * 1.12;
-    vec3 tint = mix(vec3(0.8, 0.9, 1.06), vec3(1.08, 0.95, 0.76), uMood);
-    vec3 col = uPaper * tint * light * tooth * (0.965 + 0.02 * fine + 0.015 * fibre) * (0.97 + 0.03 * blot);
+    vec3 col = uPaper * uTint * light * tooth * (0.965 + 0.02 * fine + 0.015 * fibre) * (0.97 + 0.03 * blot);
 
     // The painted scenery behind the shadows: sky and moon, far hills, drifting clouds, near hills with a cottage, a fringe of
     // grass, and a few fireflies. Each layer is shifted a little by where the head is (the far ones with it, the near ones against
     // it), so the paper has depth. It is pale and low in contrast on purpose, so the black shadows still read.
     if (uBackdrop > 0.0) {
       vec2 head = clamp(uHead, vec2(-0.5), vec2(0.5));
-      vec2 base = (vUv - 0.5) * 0.93 + 0.5;
+      vec2 base = (su - 0.5) * 0.93 + 0.5;
       vec3 bg = texture2D(uSky, base - head * 0.012).rgb;
       vec4 far = texture2D(uFar, base - head * 0.03);
       bg = mix(bg, far.rgb, far.a);
@@ -121,7 +138,7 @@ const fragment = /* glsl */ `
       bg = mix(bg, nr.rgb, nr.a);
       for (int i = 0; i < 7; i++) {
         float fi = float(i);
-        vec2 home = (vec2(hash(vec2(fi, 1.3)), 0.2 + 0.55 * hash(vec2(fi, 7.1))) - 0.5) * uSize;
+        vec2 home = (vec2(hash(vec2(fi, 1.3)), 0.2 + 0.55 * hash(vec2(fi, 7.1))) - 0.5) * uStage;
         vec2 fp = home + vec2(0.035 * sin(uTime * 0.4 + fi * 2.1), 0.025 * cos(uTime * 0.5 + fi * 1.7));
         vec2 dd = p - fp;
         float flick = 0.5 + 0.5 * sin(uTime * (1.2 + fi * 0.3) + fi * 4.0);
@@ -130,15 +147,28 @@ const fragment = /* glsl */ `
       }
       vec3 sceneTint = mix(vec3(0.84, 0.92, 1.08), vec3(1.1, 0.95, 0.8), uMood);
       vec3 scene = bg * sceneTint * light * tooth * (0.97 + 0.03 * blot);
-      col = mix(col, scene, uBackdrop);
+      // The scenery belongs to the stage: on the wall it fades out in an oval inside the stage, into the plain candlelight, so no
+      // edge of it shows.
+      float sceneryMask = uPoolOn > 0.5 ? 1.0 - smoothstep(0.45, 1.0, length(p / (0.5 * uStage))) : 1.0;
+      col = mix(col, scene, uBackdrop * sceneryMask);
     }
 
-    // The rim of the sheet darkens a little, unevenly.
-    float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
-    float rim = smoothstep(0.0, 0.035 + 0.01 * blot, edge);
-    col *= mix(0.7, 1.0, rim);
+    // On the room's wall the stage is the middle of the candle's pool of light: one light, round, covering most of the wall, leaning
+    // toward the flame. Everything about it falls off smoothly with the distance from its centre, with no step anywhere (the stage
+    // has no edge of its own): it thins into the wallpaper, dims, and warms toward the rim, a little unevenly, like light through a
+    // worn shade. The floor, ceiling and side walls cut it off. Otherwise (a sheet) the rim of the sheet darkens.
+    float alpha = uOpacity;
+    if (uPoolOn > 0.5) {
+      float r = poolDist(p, uFlame.xy, uPoolR * (0.97 + 0.06 * blot));
+      float core = 1.0 - smoothstep(0.0, 1.0, r);
+      col *= (0.7 + 0.3 * core) * mix(vec3(1.0, 0.8, 0.58), vec3(1.0), 1.0 - smoothstep(0.15, 0.95, r));
+      alpha = uOpacity * (1.0 - smoothstep(${POOL_SOLID.toFixed(3)}, 1.0, r)) * stageEdge(p - uAreaC, uSize, 0.03);
+    } else {
+      float edge = min(min(vUv.x, 1.0 - vUv.x) * uSize.x, min(vUv.y, 1.0 - vUv.y) * uSize.y);
+      col *= mix(0.7, 1.0, smoothstep(0.0, 0.035 + 0.01 * blot, edge));
+    }
 
-    gl_FragColor = vec4(col, uOpacity);
+    gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
 `;
@@ -170,6 +200,8 @@ export class TestStageView {
   private themeWanted = -1;
   private slide = 1;
   private readonly headLocal = new Vector3();
+  /** Where the candle's pool of light is drawn ([width, height, centre x, centre y], stage metres; lightArea), or null for a sheet. */
+  private pool: Float64Array | null = null;
 
   constructor() {
     this.paperMaterial = new ShaderMaterial({
@@ -180,6 +212,7 @@ export class TestStageView {
         uBright: { value: 0.04 },
         uOpacity: { value: PAPER_OPACITY },
         uMood: { value: this._mood },
+        uTint: { value: moodTint(this._mood, new Vector3()) },
         uTime: { value: 0 },
         uHigh: { value: 0 },
         uSky: { value: this.layerTexture('sky') },
@@ -190,6 +223,10 @@ export class TestStageView {
         uHead: { value: new Vector2(0, 0) },
         uBackdrop: { value: BACKDROP },
         uMidShift: { value: 0 },
+        uStage: { value: new Vector2(1.6, 1) },
+        uAreaC: { value: new Vector2(0, 0) },
+        uPoolR: { value: new Vector2(LIGHT_POOL_RX_M, LIGHT_POOL_RY_M) },
+        uPoolOn: { value: 0 },
       },
       vertexShader: vertex,
       fragmentShader: fragment,
@@ -298,6 +335,18 @@ export class TestStageView {
     return t;
   }
 
+  /**
+   * Draws the stage as the middle of the candle's pool of light over `area` ([width, height, centre x, centre y], metres from the
+   * stage's centre: lightArea in stage-edge-glsl.ts), or as a plain sheet with `null`. Takes effect at the next `place`.
+   */
+  setPool(area: Readonly<ArrayLike<number>> | null): void {
+    if (!area) this.pool = null;
+    else {
+      this.pool ??= new Float64Array(4);
+      for (let i = 0; i < 4; i++) this.pool[i] = area[i];
+    }
+  }
+
   /** Places the paper on the stage and the flame at the lantern. Call when either moves. */
   place(stage: StagePlane, lantern: Readonly<ArrayLike<number>>): void {
     this.stage = stage;
@@ -312,13 +361,39 @@ export class TestStageView {
       r[2] * stage.width, u[2] * stage.height, n[2], o[2],
       0, 0, 0, 1,
     );
-    this.paper.matrix.copy(this.m);
     this.border.matrix.copy(this.m);
+    // The paper's quad: the stage, or the whole area the candle's pool of light is drawn on.
+    const a = this.pool;
+    const w = a ? a[0] : stage.width,
+      h = a ? a[1] : stage.height,
+      cx = a ? a[2] : 0,
+      cy = a ? a[3] : 0;
+    // prettier-ignore
+    this.m.set(
+      r[0] * w, u[0] * h, n[0], o[0] + r[0] * cx + u[0] * cy,
+      r[1] * w, u[1] * h, n[1], o[1] + r[1] * cx + u[1] * cy,
+      r[2] * w, u[2] * h, n[2], o[2] + r[2] * cx + u[2] * cy,
+      0, 0, 0, 1,
+    );
+    this.paper.matrix.copy(this.m);
     this.paper.matrixWorldNeedsUpdate = this.border.matrixWorldNeedsUpdate = true;
-    (this.paperMaterial.uniforms.uSize.value as Vector2).set(stage.width, stage.height);
+    const uniforms = this.paperMaterial.uniforms;
+    (uniforms.uSize.value as Vector2).set(w, h);
+    (uniforms.uAreaC.value as Vector2).set(cx, cy);
+    (uniforms.uStage.value as Vector2).set(stage.width, stage.height);
+    uniforms.uPoolOn.value = a && !this._highContrast ? 1 : 0;
+    this.border.visible = !a || this._highContrast; // a pool of light has no outline; a sheet (and high contrast) does
+    // On the room's wall the candle lights the wallpaper itself (candle-light.ts) and the shadows fall on it: no paper is drawn,
+    // except the plain, hard sheet of high contrast.
+    this.paper.visible = !a || this._highContrast;
     this.flame.mesh.position.set(lantern[0], lantern[1], lantern[2]);
     this.setFlameOnWall(lantern);
     this.group.visible = true;
+  }
+
+  /** Where the flame is, across, up and out from the stage's centre, metres (as of the last place or applyLight). */
+  get flameOnWall(): Readonly<Vector3> {
+    return this.local;
   }
 
   /** The flame's place relative to the wall: across, up and out from the centre, metres. */
@@ -345,6 +420,10 @@ export class TestStageView {
     this.paperMaterial.uniforms.uOpacity.value = on ? 1 : PAPER_OPACITY;
     this.paperMaterial.uniforms.uHigh.value = on ? 1 : 0;
     (this.border.material as LineBasicMaterial).color.setHex(on ? 0x000000 : BORDER);
+    // High contrast keeps a hard, outlined sheet: the clearest edge there is.
+    this.border.visible = on || !this.pool;
+    this.paper.visible = on || !this.pool;
+    this.paperMaterial.uniforms.uPoolOn.value = on || !this.pool ? 0 : 1;
   }
 
   get highContrast(): boolean {
@@ -355,6 +434,12 @@ export class TestStageView {
   set mood(v: number) {
     this._mood = v >= 1 ? 1 : v > 0 ? v : 0;
     this.paperMaterial.uniforms.uMood.value = this._mood;
+    moodTint(this._mood, this.paperMaterial.uniforms.uTint.value as Vector3);
+  }
+
+  /** Tints the candle's pool of light on the wall (about 1 each is neutral; the candle's mood, candle-mood.ts). */
+  setTint(r: number, g: number, b: number): void {
+    (this.paperMaterial.uniforms.uTint.value as Vector3).set(r, g, b);
   }
 
   get mood(): number {

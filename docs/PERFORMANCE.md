@@ -8,21 +8,29 @@ a headset**. Nothing has been measured on a Pico or a Quest yet.
 
 | Tool | What it does |
 | --- | --- |
-| `node scripts/perf-bench.mjs "https://localhost:PORT/?mock=1" --label NAME --out FILE --runs 2` | Opens the game in a browser, steps through the room, the spark and reward, the opening reel and the finale hall, and records render time, draw calls, textures, texture memory, our own allocation per frame and long main-thread stalls. A calibration loop scales the time to this machine's speed so two runs on different days can be compared. |
-| `npm run perf` | Micro-benchmarks: the solver, a whole game frame in the busiest scenes, prop shadows, the Verlet rope and the quality governor. |
+| `node scripts/perf-bench.mjs "https://localhost:PORT/" --label NAME --out FILE --runs 2` | Opens the game in a browser, measures the lit room with and without the decoration the quality governor sheds, and records render time, draw calls, textures, texture memory, our own allocation per frame and long main-thread stalls. A calibration loop scales the time to this machine's speed so two runs on different days can be compared. |
+| `npm run perf` | Micro-benchmarks: the per-frame hand pipeline (shape recognizer, gesture detector, shadow projector), the Verlet rope and the quality governor. The [frame budget](ARCHITECTURE.md#frame-budget) divided by 4 is the desktop guide: read 0.1 ms, classify and gestures 0.175 ms, shadow 0.225 ms. Measured 3 Oct 2026: recognizer 3.4 µs, shadow 4.3 µs per frame. |
+| `perf` in the diagnostics report (**Copy report**) | Our stages on a headset: `msAvg` and `msWorst` per stage (`read`, `classify`, `gestures`, `shadow`, `handVisual`, `audio`, `lab`, `total`; the shape-event sounds are timed inside `shadow`; `frameErrors` counts any part of the frame that threw) over the last 300 frames. Compare each stage with the frame budget. Browsers coarsen timers on Pages, so trust averages, not single frames. |
 | Debug bar (`FrameInspector`) | Live frame time, draw calls and the governor's level in the headset. |
+| Pico or Quest performance overlay | GPU time, which is not visible from JavaScript. Check with both shadows covering the stage and the Developer panel's shadow capsules on. |
 
 `docs/perf/2026-11-01-baseline.json` is the benchmark before the engine-systems work.
 
 ## Guards in `npm run check`
 
-- Whole game frame stays under 0.5 ms in the three busiest scenes (`game.budget.test.ts`).
-- Per-frame allocation stays under 64 B for the solver, entity store, fixed step, prop shadows, hand visuals, and the
-  spark, hand trail, reward and bunting views (`*.alloc.test.ts`).
+- Per-frame allocation stays under 64 B for the hand reader, the hands status, the hand visual, the audio engine, and
+  the hand trail and bunting views (`*.alloc.test.ts`; the last two are in `room-views.alloc.test.ts`, which was
+  `story-views.alloc.test.ts`), and under 700 B for the whole hand pipeline (`frame-pipeline.alloc.test.ts`). The
+  pipeline test runs the recognizer, gestures and projector for 3,000 frames and also fails if garbage collection runs
+  inside the window. It measures about 530 B a frame, which is the engine boxing numbers returned by small helpers; it
+  was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths.
 - Download size budgets per file and for the first-load JavaScript (`check:budgets`).
-- Replay determinism, so the rewind and bug-report recordings stay exact (`determinism.test.ts`).
 
 ## What the engine-systems work added
+
+The tables below were measured on 1 Nov 2026, with the puzzle game that has since been removed
+([ADR 0016](adr/0016-story-shadow-theatre.md)). Several of the scenes and features in them (the spark and reward,
+the opening reel, the finale hall, the cinematic scenes, rewind) no longer exist. They are kept as a record.
 
 | Change | Why | Measured |
 | --- | --- | --- |
@@ -30,7 +38,7 @@ a headset**. Nothing has been measured on a Pico or a Quest yet.
 | Sound rendering on a worker | All 26 sounds are made off the main thread, room loops first. | About 290 ms of work for all sounds (music about 130 ms), now off the main thread. Not measured on a headset. |
 | Cinematic scenes built on entry | The dusk and hall scenes no longer keep about 35 textures on the GPU while idle. | Expected about 10 MB less texture memory in the room; not yet re-measured. |
 | Texture size cuts | Paper scenery layers 640x360, side walls 800x400. | Texture memory 66.5 to 56.7 MB. |
-| Verlet bunting | Live flags that flutter in the fan's wind and ripple when a spark lands. | 3.3 microseconds per frame for a rope; about 0 bytes allocated. |
+| Verlet bunting (removed 13 Nov 2026) | Live flags that flutter in the fan's wind and ripple when a spark lands. | 3.3 microseconds per frame for a rope; about 0 bytes allocated. |
 | Rewind by replay | Turns the night back 3 s by replaying recorded input into a fresh game. | Exact against the original run in tests. |
 
 ## Before and after (same laptop, one browser at a time, median of 2 runs, software renderer 1000x700)
