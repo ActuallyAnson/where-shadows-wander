@@ -23,6 +23,11 @@ A seated, hands-only WebXR story for the Meta VR Start Developer Competition 202
 - Tests sit next to the code (`thing.ts` + `thing.test.ts`) and run in Node with Vitest.
 - There is only one three.js: IWSDK's `super-three` fork. Never add a second copy.
 
+## Names and credits
+
+- One team member takes part only under the alias **Nyove** (GitHub `Nyoveee`). Wherever the team is named (README credits, CREDITS.md, docs, commits, PR text, store or competition copy), write "Nyove". Never write, guess or look up their real name.
+- The README's Credits section is the team list. Change how anyone is credited only with that person's say-so.
+
 ## Workflow
 
 - Before every commit: `npm run format`, then `npm run check`.
