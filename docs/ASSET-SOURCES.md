@@ -1,6 +1,6 @@
 # Asset sources
 
-Where to download art for the game, what the bedroom needs, and how a downloaded file gets into the game. Every asset that ships is listed in [`CREDITS.md`](../CREDITS.md). Check the competition's rule on third-party assets in [`COMPETITION.md`](COMPETITION.md) before relying on anything that is not CC0.
+Where to download art for the game, what the bedroom needs, and how a downloaded file gets into the game. Every asset that ships is listed in [`CREDITS.md`](../CREDITS.md); what exists, what is a placeholder and what is still needed is tracked in [`ASSETS.md`](ASSETS.md), which supersedes the "What the bedroom needs" list below. Check the competition's rule on third-party assets in [`COMPETITION.md`](COMPETITION.md) before relying on anything that is not CC0.
 
 ## Workflow
 

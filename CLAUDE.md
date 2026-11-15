@@ -5,7 +5,7 @@ A seated, hands-only WebXR story for the Meta VR Start Developer Competition 202
 ## Where things are written down
 
 - **The story:** [docs/STORY.md](docs/STORY.md) is the source of truth for the seven scenes. Scenes are built one at a time; when one changes, rewrite its section and add a dated line to the change log at the bottom.
-- **The design:** [docs/GDD.md](docs/GDD.md) (premise, tone, shapes, accessibility). **How to run and test:** [docs/getting-started.md](docs/getting-started.md). **Structure and frame budget:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). **Decisions:** [docs/adr/](docs/adr/); ADR 0016 is the current direction.
+- **The design:** [docs/GDD.md](docs/GDD.md) (premise, tone, shapes, accessibility). **How to run and test:** [docs/getting-started.md](docs/getting-started.md). **Structure and frame budget:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). **Decisions:** [docs/adr/](docs/adr/); ADR 0016 is the current direction. **Assets (sounds, music, models):** [docs/ASSETS.md](docs/ASSETS.md) tracks what is final, placeholder or still needed; update it when one changes.
 - The puzzle gameplay (`src/game`, `src/engine/sim`, the traveller, props and solver) was deleted on 11 Nov 2026. Ignore anything that still describes it; git history has it.
 
 ## Story rules
