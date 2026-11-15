@@ -34,13 +34,14 @@ describe('SOUND_DEFS', () => {
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the rain, the music and the two story beds', () => {
+  it('loops only the flame, the rain, the music and the three story beds', () => {
     expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
       'crackle',
       'rain',
       'music',
       'crickets',
       'wind',
+      'birds',
     ]);
   });
 
@@ -68,11 +69,17 @@ describe('SOUND_DEFS', () => {
       'gust',
       'crickets',
       'wind',
+      'firefly',
+      'palms',
+      'slide',
+      'snuff',
+      'breath',
+      'birds',
     ]);
   });
 
-  it('fades the story beds (crickets, wind) in and out slowly, and keeps them on ambience', () => {
-    for (const id of [Sound.Crickets, Sound.Wind]) {
+  it('fades the story beds (crickets, wind, birds) in and out slowly, and keeps them on ambience', () => {
+    for (const id of [Sound.Crickets, Sound.Wind, Sound.Birds]) {
       expect(SOUND_DEFS[id].loop).toBe(true);
       expect(SOUND_DEFS[id].bus).toBe(Bus.Ambience);
       expect(SOUND_DEFS[id].fadeS).toBeGreaterThanOrEqual(1);

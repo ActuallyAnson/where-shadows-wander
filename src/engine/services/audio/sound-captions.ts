@@ -20,6 +20,9 @@ export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
   [Sound.Gate]: '[a gate creaks]',
   [Sound.Creak]: '[the house creaks]',
   [Sound.Gust]: '[a gust of wind]',
+  [Sound.Palms]: '[a warm swell]',
+  [Sound.Snuff]: '[the candle hisses out]',
+  [Sound.Breath]: '[a slow breath]',
 };
 
 /** The least time between two captions, seconds, so a run of footsteps does not flood the wall. */

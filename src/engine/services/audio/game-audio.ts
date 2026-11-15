@@ -30,10 +30,17 @@ const STORY_SOUND_IDS: Readonly<Record<StorySound, SoundId>> = {
   bell: Sound.Bell,
   gate: Sound.Gate,
   gust: Sound.Gust,
+  firefly: Sound.Firefly,
+  palms: Sound.Palms,
+  slide: Sound.Slide,
 };
 
 /** The loop each story bed plays. */
-const STORY_BED_IDS: Readonly<Record<StoryBed, SoundId>> = { crickets: Sound.Crickets, wind: Sound.Wind };
+const STORY_BED_IDS: Readonly<Record<StoryBed, SoundId>> = {
+  crickets: Sound.Crickets,
+  wind: Sound.Wind,
+  birds: Sound.Birds,
+};
 
 /** Sounds from the wall come from this far in front of it, metres, so they are not inside the paper. */
 const WALL_LIFT_M = 0.05;
@@ -102,6 +109,16 @@ export class GameAudio {
   /** A sleepy yawn as he falls asleep, from his lap (`at`, its world position). */
   yawn(at: ArrayLike<number>): void {
     this.player.playAt(Sound.Yawn, at[0], at[1], at[2]);
+  }
+
+  /** The flame hissing out as his hand covers it (the end), from the flame (`at`, its world position). */
+  snuff(at: ArrayLike<number>): void {
+    this.player.playAt(Sound.Snuff, at[0], at[1], at[2]);
+  }
+
+  /** One slow breath as he falls asleep, from his lap (`at`, its world position). */
+  breath(at: ArrayLike<number>): void {
+    this.player.playAt(Sound.Breath, at[0], at[1], at[2]);
   }
 
   /** Call every frame: the crackle plays while the flame is lit, from the flame. `flame` is its scene position. */

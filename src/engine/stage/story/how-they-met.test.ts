@@ -67,15 +67,15 @@ describe('the memories’ sounds', () => {
   };
 
   it('clicks her torch on and throws the blanket up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
-    expect(sounds('the-storm')).toEqual(['click', 'blanket']);
+    expect(sounds('the-storm')).toEqual(['slide', 'click', 'blanket']);
     expect(sounds('how-they-met')).toEqual(['hop', 'rumble', 'hop', 'hop', 'laugh', 'hop', 'hop', 'giggle']);
-    expect(sounds('the-park')).toEqual(['run', 'run', 'laugh']);
+    expect(sounds('the-park')).toEqual(['slide', 'slide', 'run', 'run', 'laugh']);
   });
 
-  it('clinks the jar and rings a far bell in scene 4, creaks the gate in scene 5, and gusts as she fades in scene 6', () => {
-    expect(sounds('fireflies')).toEqual(['jar', 'bell']);
-    expect(sounds('last-ordinary-day')).toEqual(['gate']);
-    expect(sounds('goodbye')).toEqual(['gust']);
+  it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate in scene 5, swells and gusts in 6', () => {
+    expect(sounds('fireflies')).toEqual(['firefly', 'firefly', 'firefly', 'jar', 'slide', 'slide', 'bell']);
+    expect(sounds('last-ordinary-day')).toEqual(['gate', 'slide', 'slide', 'slide']);
+    expect(sounds('goodbye')).toEqual(['palms', 'gust']);
   });
 
   it('has no laughter or giggles after the park: their absence is part of the loss', () => {
@@ -86,16 +86,18 @@ describe('the memories’ sounds', () => {
     }
   });
 
-  it('lays crickets under the dusk until morning, and a wind under the empty wall until the goodbye ends', () => {
+  it('lays birds under the park by day and the morning gate, crickets under the dusk, and a wind under the empty wall', () => {
     const cues = STORY_STAGE.cues;
     const at = (id: keyof typeof STORY_CHAPTER, k: number) =>
       STORY_CHAPTER[id].start + k * (STORY_CHAPTER[id].end - STORY_CHAPTER[id].start);
     expect(bedAt(cues, at('how-they-met', 0.5))).toBeNull();
-    expect(bedAt(cues, at('the-park', 0.2))).toBeNull();
+    expect(bedAt(cues, at('the-park', 0.05))).toBeNull(); // still the fort
+    expect(bedAt(cues, at('the-park', 0.45))).toBe('birds'); // the spring park, by day
     expect(bedAt(cues, STORY_CHAPTER['the-park'].end)).toBe('crickets'); // held while her cup waits
     expect(bedAt(cues, at('fireflies', 0.3))).toBe('crickets');
-    expect(bedAt(cues, STORY_CHAPTER.fireflies.end)).toBeNull(); // morning at the gate
-    expect(bedAt(cues, at('last-ordinary-day', 0.2))).toBeNull();
+    expect(bedAt(cues, STORY_CHAPTER.fireflies.end)).toBe('birds'); // morning at the gate
+    expect(bedAt(cues, at('last-ordinary-day', 0.1))).toBe('birds');
+    expect(bedAt(cues, at('last-ordinary-day', 0.6))).toBeNull(); // the gate gone: no birds, and no wind yet
     expect(bedAt(cues, STORY_CHAPTER['last-ordinary-day'].end)).toBe('wind'); // held while her flat hand waits
     expect(bedAt(cues, at('goodbye', 0.5))).toBe('wind');
     expect(bedAt(cues, STORY_CHAPTER.goodbye.end)).toBeNull(); // scene 7 is the room's own quiet

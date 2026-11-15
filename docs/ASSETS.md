@@ -43,6 +43,12 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `gust` | A gust of wind | Between memories, now and then, on the room's window (`night-sounds.ts`); scene 6, as she fades. Captioned "[a gust of wind]" | Final: "Gust (Weather & Nature SFX Free)" by heyheytheree (CC BY 4.0), 3.8 s. No placeholder |
 | `crickets` | Crickets at dusk, seamless loop (a story bed) | From dusk in the park (scene 3) through the fireflies until the park slides off into morning (scene 4), from the wall | Final: "crickets night urban park..." by kyles (CC0), a 20 s loop. No placeholder |
 | `wind` | A thin, gentle wind, seamless loop (a story bed) | From the park sliding away at the end of scene 5, through the friend's lone hand and the goodbye, until he fades (scene 6), from the wall | Final: "Wind strong gusts in small hangar" by Angel_Perez_Grandi (CC BY 4.0), a 20 s loop, band-passed, very quiet. No placeholder |
+| `birds` | Birdsong, seamless loop (a story bed) | Scene 3's spring park from when it slides in until dusk (the crickets take over), and the morning at the school gate from the end of scene 4 until the gate slides off in scene 5, from the wall | Final: "Birdsong in Tuscany" by evernaut (CC BY 4.0), a 20 s loop. No placeholder |
+| `firefly` | A tiny soft shimmer | Scene 4: as the firefly settles in the player's cup, and as the first two come down to the kids' hands | Final: "Magic Fireflies" by IENBA (CC0), 1.6 s. No placeholder |
+| `palms` | One warm swell | Scene 6's start, as palm meets palm. Captioned "[a warm swell]" | Final: "Xylovibez_Reverse_LoFi" by L0sts1gnal_404 (CC BY 4.0), its second swell played backwards so it blooms at the touch and fades over 4 s. No placeholder |
+| `slide` | A soft, dry slide of card | Every time places slide on or off the wall (scenes 2 to 5), very quiet | Final: one slide of "sliding paper on table" by 123jorre456 (CC0), 0.85 s. No placeholder |
+| `snuff` | A small hiss as a flame gutters out | The end, just after his hand covers the flame (`ending-timeline.ts`), from the flame. Captioned "[the candle hisses out]" | Final: "Match Sizzle 02" by squareal (CC0), 1.75 s. No placeholder |
+| `breath` | One slow breath in and out | The end, from the second heavy blink into the black before the credits (`ending-timeline.ts`), from his lap. Captioned "[a slow breath]" | Final: "Deep Breath 1_1" by Joao_Janz (CC0), 7.4 s. No placeholder |
 | `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). Final: "Footsteps - Stone, Rock, Concrete, Cement" by SecureSubset (CC0), two of its steps, low-passed to sound beyond a door. Stone, not wood: swap if a wooden-floor take turns up |
 
 ### Removed
@@ -63,20 +69,20 @@ Each would be one more `Sound` in `sounds.ts`; a memory's would be one more name
 | Blanket thrown up | Scene 2's prologue | | Done: `blanket` |
 | Rabbit hops | Scene 2 | | Done: `hop` (one take; a second to alternate would help) |
 | A short, soft giggle | Scene 2, after the hush | | Done: `giggle` |
-| Birdsong and a breeze in leaves **(high)** | Scene 3, the spring park, from the trees sliding in until dusk | The first daylight memory: a change of air from the rainy room says "outside, spring" faster than any picture | Needed: a quiet loop on ambience, only while the park is on the wall |
+| Birdsong and a breeze in leaves | Scene 3, the spring park | | Done: `birds` (a story bed; birdsong only, no leaves) |
 | Running feet on grass | Scene 3, the chase | | Done: `run` (a quiet, hissy take; a cleaner one would help) |
 | Crickets at dusk | Scenes 3 and 4 | | Done: `crickets` (a story bed) |
-| A firefly settling **(high)** | Scene 4, as a firefly lands in the player's cupped shadow, and on the kids' hands | A tiny, soft shimmer (a glassy tink, a breath of chime) rewards the cup and makes the light feel alive | Needed |
+| A firefly settling | Scene 4 | | Done: `firefly` |
 | The jar's lid | Scene 4, the firefly going into her jar | | Done: `jar` (a glass clink; no tin lid) |
-| A school bell far off, morning birds | Scene 5, the last ordinary day at the gate | Places the morning and the ordinary routine, so the unanswered wave lands against it | Bell done: `bell`, as the gate slides in. Morning birds still needed |
+| A school bell far off, morning birds | Scene 5, the last ordinary day at the gate | Places the morning and the ordinary routine, so the unanswered wave lands against it | Done: `bell` as the gate slides in, and `birds` at the gate |
 | A gate's latch or creak | Scene 5 | | Done: `gate` |
 | Wind on a hill | Scenes 5 (the empty wall) and 6 | | Done: `wind` (a story bed) and a `gust` as she fades |
-| A soft swell as palm meets palm **(high)** | Scene 6, when the two hands touch | The game's emotional peak: one warm swell (or the music lifting) marks it | Needed, or done with the music's level instead |
-| Candle guttering out **(high)** | Scene 7, as the flame goes out after it is covered | A small "pff" and a fading hiss: the flame really is out, and it was his choice | Needed |
-| Breathing, slow and slowing | Scene 7, under the last blinks and into the black before the credits | The story says "the boy's breathing slows": two or three soft breaths, each longer, say he is asleep without a word | Needed |
+| A soft swell as palm meets palm | Scene 6 | | Done: `palms` |
+| Candle guttering out | Scene 7 | | Done: `snuff` (a hiss as it is covered; nothing when the light finally goes) |
+| Breathing, slow and slowing | Scene 7 | | Done: `breath` (one breath; a second, slower one would say "slowing" better) |
 | Quilt pulled up, a head on the pillow | Scene 7, between the candle going out and the blinks | He lies back down: the mirror of `covers` in scene 1, so the night closes as it opened | Needed (`covers` played softer could stand in) |
 | Rain easing off | Scene 7 | | Done by fading `rain` as he falls asleep (`ending-timeline.ts`); a lighter take would still help |
-| Paper scenery sliding | Every scene change, as places slide on or off the wall | A soft, dry slide of card, very quiet: the shadow theatre is made of paper, and the player hears it moved | Needed |
+| Paper scenery sliding | Every scene change | | Done: `slide` |
 
 ## Music
 

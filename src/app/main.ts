@@ -1321,7 +1321,9 @@ async function start(): Promise<void> {
         wakeView.update(ending.lid, 0, fadeHead, wakeHead, 0);
         candleView.goingOut = 1 - ending.candle;
         if (ending.out) candleView.lit = false; // the flame is gone: its sound stops and the room's light draws in
+        if (ending.snuff) gameAudio.snuff(candleView.flamePosition); // the flame hisses as it gutters under his hand
         if (ending.yawn) gameAudio.yawn(saucerPos); // his eyes grow heavy: a yawn, from his lap
+        if (ending.breath) gameAudio.breath(saucerPos); // one slow breath as his eyes close
         audio.mixer.setDip(Bus.Ambience, ending.rain);
         audio.mixer.setDip(Bus.Music, ending.music);
         if (ending.creditsStart) {

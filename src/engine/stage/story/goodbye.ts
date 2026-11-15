@@ -235,8 +235,12 @@ const wobbles: Wobble[] = [
   { part: 'goodbye-girl-torso', prop: 'angle', amp: 0.008, period: 3.9, phase: 2 },
 ];
 
-/** The wind from the empty wall goes on; it lifts once, a gust, as she fades, and dies away with him. */
+/**
+ * A warm swell as palm meets palm. The wind from the empty wall goes on; it lifts once, a gust, as she fades, and dies away with
+ * him.
+ */
 const cues: Cue[] = [
+  { t: 0.05, kind: 'sound', sound: 'palms', x: GOODBYE_AT[0], y: GOODBYE_AT[1] },
   { t: GIRL_GO_S, kind: 'sound', sound: 'gust', x: 0, y: 0 },
   { t: BOY_GO_S + 1, kind: 'bed', bed: null },
 ];

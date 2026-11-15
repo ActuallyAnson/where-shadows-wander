@@ -59,6 +59,18 @@ export const Sound = {
   Crickets: 27,
   /** A thin wind, a loop (a story bed): the empty wall and the goodbye (scenes 5 and 6). */
   Wind: 28,
+  /** A tiny soft shimmer: a firefly settling in the player's cupped shadow, and on the kids' hands (scene 4). */
+  Firefly: 29,
+  /** One warm swell as palm meets palm (scene 6's start): the story's peak. */
+  Palms: 30,
+  /** A soft, dry slide of card: the paper scenery sliding on or off the wall at a change of place. */
+  Slide: 31,
+  /** A small hiss as his hand covers the flame and it gutters out (the end), from the flame. */
+  Snuff: 32,
+  /** One slow breath in and out, from his lap, as his eyes close for the last time (the end). */
+  Breath: 33,
+  /** Birdsong, a loop (a story bed): the spring park by day (scene 3) and the morning at the school gate (scenes 4 and 5). */
+  Birds: 34,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -311,6 +323,12 @@ export const SOUND_DEFS: readonly SoundDef[] = [
   recorded('gust', 0.3, { far: true, minGapS: 4, priority: 0 }),
   recorded('crickets', 0.3, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.2 }),
   recorded('wind', 0.25, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.5 }),
+  recorded('firefly', 0.3, { near: true, minGapS: 0.4 }),
+  recorded('palms', 0.45, { priority: 3, minGapS: 4 }),
+  recorded('slide', 0.15, { minGapS: 0.5, priority: 0 }),
+  recorded('snuff', 0.4, { near: true, priority: 3, minGapS: 4 }),
+  recorded('breath', 0.35, { priority: 2, minGapS: 4 }),
+  recorded('birds', 0.22, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.5 }),
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */
 export const SOUND_COUNT = SOUND_DEFS.length;

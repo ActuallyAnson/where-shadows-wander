@@ -27,6 +27,23 @@ describe('ENDING_SCRIPT', () => {
     expect(yawns).toBe(1);
   });
 
+  it('hisses the flame out as it is covered, and breathes once, slowly, under the last blinks before the credits', () => {
+    expect(S.snuffAt).toBeLessThan(1);
+    expect(S.breathAt).toBeGreaterThan(S.yawnAt);
+    expect(S.breathAt).toBeLessThan(S.creditsAt);
+    const e = new EndingTimeline();
+    e.start();
+    let snuffs = 0;
+    let breaths = 0;
+    for (let t = 0; t < S.endAt + 1; t += 0.1) {
+      e.update(0.1);
+      if (e.snuff) snuffs++;
+      if (e.breath) breaths++;
+    }
+    expect(snuffs).toBe(1);
+    expect(breaths).toBe(1);
+  });
+
   it('dims the candle slowly from where it was to nothing by the time it goes out', () => {
     expect(sampleKeys(S.candleKeys, 0)).toBe(1);
     expect(sampleKeys(S.candleKeys, S.outAt)).toBe(0);

@@ -8,6 +8,8 @@ import { sampleKeys, type WakeKey } from './wake-timeline';
 export interface EndingScript {
   /** How much of the candle's light is left (1 as it was covered .. 0 out). The flame shrinks with it. */
   readonly candleKeys: readonly WakeKey[];
+  /** When the flame hisses as it gutters under his hand, seconds. */
+  readonly snuffAt: number;
   /** When the flame is gone (the candle is out, its sound stops), seconds. */
   readonly outAt: number;
   /** The moon's light, as a multiple of its night level (1); it dims as he falls asleep, as it rose when the candle caught. */
@@ -16,6 +18,8 @@ export interface EndingScript {
   readonly lidKeys: readonly WakeKey[];
   /** When he yawns, seconds: as his eyes come back open after the first heavy blink. */
   readonly yawnAt: number;
+  /** When he breathes in and out once, slowly, as his eyes close for the last time, seconds. */
+  readonly breathAt: number;
   /** The rain's level (1 as it was .. 0 silent): it eases as he sleeps. */
   readonly rainKeys: readonly WakeKey[];
   /** The music's level (1 as it was .. 0 silent): out with the candle, back softly under the credits. */
@@ -37,6 +41,8 @@ export const ENDING_SCRIPT: EndingScript = {
     { t: 1.8, v: 0.6 },
     { t: 6.5, v: 0 },
   ],
+  // The flame hisses as it gutters, just after his hand covers it.
+  snuffAt: 0.2,
   outAt: 6.5,
   // The opening's moon rises from 0.35 to 1 as the candle catches; here it sinks most of the way back, so the room is still
   // there, dim and blue, for the blinks.
@@ -59,6 +65,8 @@ export const ENDING_SCRIPT: EndingScript = {
     { t: 17.6, v: 0 }, // asleep
   ],
   yawnAt: 10.2,
+  // One slow breath in and out (about 7 s) from the second heavy blink into the black, before the music comes back.
+  breathAt: 13.4,
   rainKeys: [
     { t: 0, v: 1 },
     { t: 9, v: 0.45 },
@@ -91,6 +99,8 @@ export class EndingTimeline {
   private running = false;
   private outNow = false;
   private yawnNow = false;
+  private snuffNow = false;
+  private breathNow = false;
   private creditsNow = false;
   private doneNow = false;
 
@@ -100,13 +110,13 @@ export class EndingTimeline {
   start(): void {
     this.t = 0;
     this.running = true;
-    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = this.snuffNow = this.breathNow = false;
   }
 
   /** Stops it where it is (a jump back into the story, or the session ending). */
   stop(): void {
     this.running = false;
-    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = this.snuffNow = this.breathNow = false;
   }
 
   /** Whether it is playing (started and not yet over). */
@@ -120,13 +130,15 @@ export class EndingTimeline {
 
   /** Moves on by `dt` seconds. */
   update(dt: number): void {
-    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = this.snuffNow = this.breathNow = false;
     if (!this.running) return;
     const before = this.t;
     this.t += dt > 0 ? dt : 0;
     const s = this.script;
     if (before <= s.outAt && this.t > s.outAt) this.outNow = true;
     if (before <= s.yawnAt && this.t > s.yawnAt) this.yawnNow = true;
+    if (before <= s.snuffAt && this.t > s.snuffAt) this.snuffNow = true;
+    if (before <= s.breathAt && this.t > s.breathAt) this.breathNow = true;
     if (before <= s.creditsAt && this.t > s.creditsAt) this.creditsNow = true;
     if (this.t >= s.endAt) {
       this.t = s.endAt;
@@ -148,6 +160,16 @@ export class EndingTimeline {
   /** True on the one update he yawns. */
   get yawn(): boolean {
     return this.yawnNow;
+  }
+
+  /** True on the one update the flame hisses as it gutters. */
+  get snuff(): boolean {
+    return this.snuffNow;
+  }
+
+  /** True on the one update he takes his slow breath. */
+  get breath(): boolean {
+    return this.breathNow;
   }
 
   /** The moon's light now, as a multiple of its night level. */

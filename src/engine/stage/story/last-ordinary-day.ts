@@ -194,12 +194,17 @@ const tracks: Track[] = [
 const wobbles: Wobble[] = [];
 
 /**
- * The gate creaks as he goes through it, the light lowers as they leave the gate, and as the park slides away a thin wind comes
- * up on the emptying wall, and stays through the goodbye.
+ * The morning birds go on at the gate, which creaks as he goes through it. The light lowers as they leave the gate and the birds
+ * stop as it slides off; the park slides back, and as it slides away a thin wind comes up on the emptying wall, and stays through
+ * the goodbye.
  */
 const cues: Cue[] = [
   { t: PART_S + 0.4, kind: 'sound', sound: 'gate', x: GATE_X, y: 0 },
+  { t: GATE_OUT_S, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 },
+  { t: GATE_OUT_S, kind: 'bed', bed: null },
+  { t: PARK_BACK_S, kind: 'sound', sound: 'slide', x: -0.4, y: 0 },
+  { t: PARK_AWAY_S, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: PARK_AWAY_S + 2, kind: 'bed', bed: 'wind' },
 ];
 

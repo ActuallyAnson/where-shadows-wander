@@ -386,9 +386,15 @@ const wobbles: Wobble[] = [
   ...PARK_TREES.map((t, i): Wobble => ({ part: t.id, prop: 'angle', amp: 0.006, period: 4.1 + i * 0.7, phase: i })),
 ];
 
-/** The light warms as the park comes in, and turns to dusk; the crickets come in with the dusk, and stay into scene 4. */
+/**
+ * The fort slides off and the park slides in, each with a dry slide of card; birdsong comes in with the park and the light warms,
+ * and at dusk the crickets take over from the birds, and stay into scene 4.
+ */
 const cues: Cue[] = [
+  { t: SLIDE_OUT_S, kind: 'sound', sound: 'slide', x: -0.4, y: 0 },
+  { t: PARK_IN_S, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: PARK_IN_S, kind: 'mood', mood: 'warm', seconds: 4 },
+  { t: PARK_IN_S + 1, kind: 'bed', bed: 'birds' },
   // Once they are kids, running feet on the grass, twice, until she catches him.
   { t: CHANGE_S + 0.5, kind: 'sound', sound: 'run', x: BOY_CAUGHT_X, y: FLOOR_Y },
   { t: CHANGE_S + 1.8, kind: 'sound', sound: 'run', x: BOY_CAUGHT_X, y: FLOOR_Y },

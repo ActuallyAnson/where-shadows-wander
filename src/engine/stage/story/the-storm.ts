@@ -309,8 +309,9 @@ const wobbles: Wobble[] = [
   { part: 'arrive-beam', prop: 'opacity', amp: 0.04, period: 0.9 },
 ];
 
-/** The storm: the room's window flashes too, and its thunder follows. */
+/** The paper room slides in; the storm: the room's window flashes too, and its thunder follows. */
 const cues: Cue[] = [
+  { t: 0.05, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: FLASH_S, kind: 'storm', thunderAfter: STORM_THUNDER_AFTER_S },
   // Her torch clicks on as she sets it down between them.
   { t: CLICK_S, kind: 'sound', sound: 'click', x: (FRIEND_X + BOY_X) / 2, y: FLOOR_Y },

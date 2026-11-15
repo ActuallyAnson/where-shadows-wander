@@ -96,14 +96,17 @@ export const STORY_SOUNDS = [
   'bell',
   'gate',
   'gust',
+  'firefly',
+  'palms',
+  'slide',
 ] as const;
 export type StorySound = (typeof STORY_SOUNDS)[number];
 
 /**
  * The loops a memory can lay under itself with a `bed` cue (each a looping sound of the same name in sounds.ts): crickets at
- * dusk, a thin wind on the empty wall.
+ * dusk, a thin wind on the empty wall, birdsong by day.
  */
-export type StoryBed = 'crickets' | 'wind';
+export type StoryBed = 'crickets' | 'wind' | 'birds';
 
 /**
  * The bed playing `t` seconds into a scene: the last `bed` cue at or before `t`, or null (none yet, or the last turned it off).

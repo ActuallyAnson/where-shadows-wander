@@ -510,13 +510,20 @@ const wobbles: Wobble[] = [
 ];
 
 /**
- * A small clink of glass as the firefly settles in her jar. The crickets go with the night as the park slides off into morning,
- * and as the school gate comes in a bell rings far off.
+ * A soft shimmer as the firefly settles in the player's cup, and as the first two come down to the kids' hands; a small clink of
+ * glass as it settles in her jar. The crickets go with the night as the park slides off into morning, and as the school gate
+ * slides in the morning birds start and a bell rings far off.
  */
 const cues: Cue[] = [
+  { t: 0.1, kind: 'sound', sound: 'firefly', x: FIREFLY_HOVER[0], y: FIREFLY_HOVER[1] },
+  { t: gatherAt(0) + INTO_HAND_S, kind: 'sound', sound: 'firefly', x: FRIEND_HAND[0], y: FRIEND_HAND[1] },
+  { t: gatherAt(1) + INTO_HAND_S, kind: 'sound', sound: 'firefly', x: BOY_HAND[0], y: BOY_HAND[1] },
   { t: INTO_JAR_S + INTO_JAR_LEN_S, kind: 'sound', sound: 'jar', x: JAR_IN_LAP[0], y: JAR_IN_LAP[1] },
+  { t: PARK_OUT_S, kind: 'sound', sound: 'slide', x: -0.4, y: 0 },
   { t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 },
   { t: PARK_OUT_S, kind: 'bed', bed: null },
+  { t: GATE_IN_S, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
+  { t: GATE_IN_S + 0.5, kind: 'bed', bed: 'birds' },
   { t: GATE_IN_S + 1.2, kind: 'sound', sound: 'bell', x: 0.6, y: 0.2 },
 ];
 
