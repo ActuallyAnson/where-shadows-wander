@@ -54,17 +54,14 @@ function setHandJointsDown(hand: HandFrame, x: number, y: number, z: number): vo
 }
 
 describe('CandleView', () => {
-  it('builds the group with plate, rim, wax, wick, flame quad, point light, and feedback rings', () => {
+  it('builds the group with plate, rim, wax, wick, flame quad, point light, wick glow and pause ring', () => {
     const candle = new CandleView();
-    expect(candle.group.children).toHaveLength(10);
+    expect(candle.group.children).toHaveLength(8);
     expect(candle.pointLight.castShadow).toBe(false);
     expect(candle.pointLight.position.y).toBeCloseTo(0.095, 3);
     expect(candle.flame.mesh.position.y).toBeCloseTo(0.095, 3);
     expect(candle.lightIntensity).toBe(1.2);
-    expect(candle.state).toBe('placed');
-    expect(candle.isHeld).toBe(false);
     expect(candle.lit).toBe(true);
-    expect(candle.isLocked).toBe(false);
     expect(candle.isCovered).toBe(false);
   });
 
@@ -120,22 +117,6 @@ describe('CandleView', () => {
     expect(candle.lightIntensity).toBe(0);
   });
 
-  it('disables pickup when locked', () => {
-    const candle = new CandleView();
-    candle.place([0, 0.75, -0.4]);
-    candle.setLocked(true);
-    expect(candle.isLocked).toBe(true);
-
-    const left = createHandFrame('left');
-    const right = createHandFrame('right');
-    setPalm(left, -0.05, 0.76, -0.4);
-    setPalm(right, 0.05, 0.76, -0.4);
-
-    const res = candle.updateInteraction({ left, right }, 0.2);
-    expect(res.state).toBe('placed');
-    expect(candle.isHeld).toBe(false);
-  });
-
   it('detects palm hovering over flame to trigger isCovered pause', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
@@ -159,65 +140,6 @@ describe('CandleView', () => {
     setPalm(left, 0.5, 0.9, -0.4);
     candle.updateInteraction({ left, right }, 2.5);
     expect(candle.isCovered).toBe(false);
-  });
-
-  it('handles two-handed pickup, moving, and 1-second separation placement feedback', () => {
-    const candle = new CandleView();
-    candle.place([0, 0.75, -0.4]);
-
-    const left = createHandFrame('left');
-    const right = createHandFrame('right');
-
-    // Hands positioned far away: no pickup
-    setPalm(left, -0.4, 0.75, -0.4);
-    setPalm(right, 0.4, 0.75, -0.4);
-    let res = candle.updateInteraction({ left, right }, 0.016);
-    expect(res.state).toBe('placed');
-    expect(candle.isHeld).toBe(false);
-
-    // Hands brought together grasping the saucer (<0.13m from candle, height matched)
-    setPalm(left, -0.05, 0.76, -0.4);
-    setPalm(right, 0.05, 0.76, -0.4);
-    // Dwell step 1 (0.05s elapsed < 0.12s dwell requirement): preview aura, still placed
-    res = candle.updateInteraction({ left, right }, 0.05);
-    expect(res.state).toBe('placed');
-    expect(candle.isHeld).toBe(false);
-
-    // Dwell step 2 (additional 0.10s elapsed >= 0.12s): confirmed pickup!
-    res = candle.updateInteraction({ left, right }, 0.1);
-    expect(res.state).toBe('held');
-    expect(res.justPickedUp).toBe(true);
-    expect(candle.isHeld).toBe(true);
-    expect(candle.flame.mesh.scale.x).toBeCloseTo(1.25, 2);
-
-    // Hands move forward and to the right
-    setPalm(left, 0.05, 0.78, -0.45);
-    setPalm(right, 0.15, 0.78, -0.45);
-    res = candle.updateInteraction({ left, right }, 0.1);
-    expect(res.state).toBe('held');
-    expect(candle.group.position.x).toBeGreaterThan(0.0);
-    expect(candle.group.position.z).toBeLessThan(-0.4);
-    expect(candle.flamePosition[1]).toBeCloseTo(candle.group.position.y + 0.095, 4);
-
-    // Hands move far enough apart (>0.22m) -> triggers placement and 1-second feedback
-    setPalm(left, -0.15, 0.78, -0.45);
-    setPalm(right, 0.15, 0.78, -0.45); // 0.30m distance apart
-    res = candle.updateInteraction({ left, right }, 0.016);
-    expect(res.state).toBe('placing');
-    expect(res.justPlaced).toBe(true);
-    expect(candle.isPlacing).toBe(true);
-
-    // Progress through feedback animation (0.5s elapsed)
-    res = candle.updateInteraction({ left, right }, 0.5);
-    expect(res.state).toBe('placing');
-    expect(candle.isPlacing).toBe(true);
-
-    // Finalize 1-second feedback (another 0.6s elapsed, total > 1.0s)
-    res = candle.updateInteraction({ left, right }, 0.6);
-    expect(res.state).toBe('placed');
-    expect(candle.isPlacing).toBe(false);
-    expect(candle.isHeld).toBe(false);
-    expect(candle.flame.mesh.scale.x).toBeCloseTo(1.0, 2);
   });
 
   it('dims light when a hand is close to the flame (light occlusion)', () => {
@@ -304,7 +226,6 @@ describe('CandleView', () => {
   it('at the end (sleep mode) shows going out, not the pause ring, and answers a hand from further off', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
-    candle.setLocked(true);
     const cameraQuat = new Quaternion(0, 0, 0, 1);
     const light: LanternLight = {
       position: new Float64Array([0, 1, 0]),
@@ -316,7 +237,7 @@ describe('CandleView', () => {
     const left = createHandFrame('left');
     const right = createHandFrame('right');
     right.tracked = false;
-    const ring = candle.group.children[9];
+    const ring = candle.group.children[7];
 
     // 22 cm above the flame: out of reach in play, already dimming it at the end.
     setPalm(left, 0, 0.845 + 0.22, -0.4);

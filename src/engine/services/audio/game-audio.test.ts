@@ -143,17 +143,3 @@ describe('GameAudio weather', () => {
     expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Covers, 0, 0.7, -0.45]]);
   });
 });
-
-describe('GameAudio.candleMoved', () => {
-  it('lifts and sets the candle down from the flame, and is silent on a frame where neither happened', () => {
-    const { audio, rec } = setup();
-    audio.candleMoved(false, false, [0.2, 1, -0.3]);
-    expect(rec.plays).toEqual([]);
-    audio.candleMoved(true, false, [0.2, 1, -0.3]);
-    audio.candleMoved(false, true, [0.4, 0.9, -0.1]);
-    expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([
-      [Sound.Lift, 0.2, 1, -0.3],
-      [Sound.Set, 0.4, 0.9, -0.1],
-    ]);
-  });
-});

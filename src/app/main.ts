@@ -589,7 +589,6 @@ async function start(): Promise<void> {
       menu.hide();
       menuChoice = 'off';
       sessionState = 'playing';
-      candleView.setLocked(true);
     } else if (screen === 'pause' && button === 'exit') {
       // Back to the browser page: the session ends, and the title is there again.
       menu.hide();
@@ -605,7 +604,6 @@ async function start(): Promise<void> {
   /** Where mock hands go: the rig placeRig last placed (made with the Hand Lab). */
   let deskFrame: DeskFrame | null = null;
   let badPoseReported = false;
-  let headY = 1.2; // the eye height the rig was last placed for; the tray is TRAY_BELOW_EYES_M below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
@@ -618,7 +616,6 @@ async function start(): Promise<void> {
       }
       return false;
     }
-    headY = head[1];
     lastHead[0] = head[0];
     lastHead[1] = head[1];
     lastHead[2] = head[2];
@@ -962,7 +959,6 @@ async function start(): Promise<void> {
     frameErrors: failures.toJSON(),
     interaction: {
       sessionState,
-      candleLocked: candleView.isLocked,
       palmOverFlame: candleView.isCovered,
       coverProgress: candleView.coverProgress,
       wallPauseActive: wallPauseView.visible,
@@ -991,8 +987,6 @@ async function start(): Promise<void> {
       lit: lanternLight.light.lit,
       intensity: lanternLight.light.intensity,
       pointLightIntensity: candleView.lightIntensity,
-      state: candleView.state,
-      isHeld: candleView.isHeld,
     },
     xrInput: {
       handsStatus: { state: HANDS_STATE_NAMES[handsStatus.state], showMessage: handsStatus.showMessage },
@@ -1088,7 +1082,6 @@ async function start(): Promise<void> {
       moonLift = START_MOON_LIFT;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
-      candleView.setLocked(false);
       titleLighter.visible = false;
       wallPauseView.hide();
       stopStory();
@@ -1220,7 +1213,6 @@ async function start(): Promise<void> {
     candleView.ignitionProgress = 0;
     roomDressing.ignition = 0;
     candleView.lit = true;
-    candleView.setLocked(true);
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
     if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
@@ -1266,7 +1258,6 @@ async function start(): Promise<void> {
       sessionState = 'playing';
       candleView.resetCover();
       candleView.lit = true;
-      candleView.setLocked(true);
       audio.mixer.setLift(Bus.Ambience, 1.0);
       audio.mixer.setLift(Bus.Music, 1.0);
     }
@@ -1417,16 +1408,9 @@ async function start(): Promise<void> {
       }
       if (rigPlaced) {
         try {
-          const candleAction = candleView.updateInteraction(hands.hands, step, headY - TRAY_BELOW_EYES_M + 0.05);
-          if (candleAction.justPickedUp || candleAction.justPlaced)
-            gameAudio.candleMoved(candleAction.justPickedUp, candleAction.justPlaced, candleView.flamePosition);
-          if (candleAction.state === 'held' || candleAction.justPlaced) {
-            lantern[0] = candleView.group.position.x;
-            lantern[1] = candleView.group.position.y;
-            lantern[2] = candleView.group.position.z;
-          }
+          candleView.updateInteraction(hands.hands, step);
         } catch (e) {
-          failures.report('candle pickup', e);
+          failures.report('candle cover', e);
         }
         world.camera.getWorldQuaternion(cameraQuat);
         // The Steps tab's candle step: moves the emulator's right hand until its match is over the wick (dev only).
@@ -1477,7 +1461,6 @@ async function start(): Promise<void> {
               sessionState = 'playing';
               candleView.resetCover();
               candleView.lit = true;
-              candleView.setLocked(true);
               audio.mixer.setLift(Bus.Ambience, 1.0);
               audio.mixer.setLift(Bus.Music, 1.0);
               gameAudio.candleIgnited(candleView.flamePosition);

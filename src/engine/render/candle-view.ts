@@ -7,13 +7,10 @@
 // - Wick: matte charcoal cylinder centered on the top of the wax.
 // - Flame: soft glowing billboard quad from LanternGlow at the tip of the wick.
 // - Dynamic Scene Light: non-shadow-casting PointLight matching the flame position and flickering with it.
-// - Interactive feedback:
-//   - Aura Ring: warm glowing halo around the saucer indicating the candle is "picked up".
-//   - Placement Ring: 1-second expanding ripple animation when hands separate to place the candle.
+// - Interactive feedback (the candle stays where it is put: it is not picked up, so the light never moves in play):
 //   - Wick Indicator: soft pulsing warm glow hovering over the wick when the candle is unlit.
 //   - Palm Covering & Deliberate Pause: hovering a palm over the flame displays a radial progress ring filling
 //     clockwise over 3.0 seconds before extinguishing the candle and pausing.
-//   - In-Game Lock: locks candle in place once gameplay starts.
 //   - Sleep mode (the end, scene 7): covering puts the candle out instead of pausing, so there is no pause ring; the flame
 //     shrinks and its light dims as the cover goes on, and a hand starts to dim it from further off.
 //   - Match near (the start): the wick's glow brightens, grows and quickens as the matchstick comes near it.
@@ -29,7 +26,6 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
-  RingGeometry,
   ShaderMaterial,
   SphereGeometry,
   TorusGeometry,
@@ -38,8 +34,6 @@ import type { Quaternion } from '@iwsdk/core';
 import { createPalm, derivePalm, type HandFrame, type Handedness } from '../hands/hand';
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
-
-export type CandleInteractionState = 'placed' | 'held' | 'placing';
 
 export const COVER_PAUSE_DURATION_S = 3.0;
 /** How far from the flame (m) a hand starts to dim it: in play, and at the end (sleep mode), where it answers from further off. */
@@ -103,19 +97,13 @@ export class CandleView {
   private readonly rimGeometry: TorusGeometry;
   private readonly waxGeometry: CylinderGeometry;
   private readonly wickGeometry: CylinderGeometry;
-  private readonly auraGeometry: TorusGeometry;
-  private readonly placementRingGeometry: RingGeometry;
   private readonly wickIndicatorGeometry: SphereGeometry;
 
   private readonly plateMaterial: MeshStandardMaterial;
   private readonly waxMaterial: MeshStandardMaterial;
   private readonly wickMaterial: MeshStandardMaterial;
-  private readonly auraMaterial: MeshBasicMaterial;
-  private readonly placementRingMaterial: MeshBasicMaterial;
   private readonly wickIndicatorMaterial: MeshBasicMaterial;
 
-  private readonly auraMesh: Mesh;
-  private readonly placementRingMesh: Mesh;
   private readonly wickIndicator: Mesh;
 
   // Deliberate pause radial gauge
@@ -124,15 +112,10 @@ export class CandleView {
   private readonly coverProgressMesh: Mesh;
 
   // Interaction state
-  private _state: CandleInteractionState = 'placed';
   private _lit = true;
-  private _isLocked = false;
   private _isCovered = false;
   private _ignitionProgress = 0;
   private coverTimer = 0;
-  private placingTimer = 0;
-  private cooldownTimer = 0;
-  private pickupDwellTimer = 0;
   private lightOcclusion = 1.0;
   /** The point light at the last update as a share of a clear, uncovered flame's (for beginGoingOut). */
   private lastLightShare = 1;
@@ -159,8 +142,6 @@ export class CandleView {
   // Scratch arrays for zero-allocation interaction tracking
   private readonly leftPalm = new Float64Array(3);
   private readonly rightPalm = new Float64Array(3);
-  private readonly handsMidpoint = new Float64Array(3);
-  private readonly targetPos = new Float64Array(3);
   private readonly scratchPalm = createPalm();
 
   constructor() {
@@ -211,34 +192,7 @@ export class CandleView {
     this.pointLight.position.set(0, 0.095, 0);
     this.pointLight.castShadow = false;
 
-    // 7. Pickup Feedback Aura Ring: glowing highlight on the rim when held
-    this.auraGeometry = new TorusGeometry(0.088, 0.004, 8, 24);
-    this.auraMaterial = new MeshBasicMaterial({
-      color: 0xffaa33,
-      transparent: true,
-      opacity: 0.0,
-      toneMapped: false,
-    });
-    this.auraMesh = new Mesh(this.auraGeometry, this.auraMaterial);
-    this.auraMesh.rotation.x = Math.PI / 2;
-    this.auraMesh.position.set(0, 0.015, 0);
-    this.auraMesh.visible = false;
-
-    // 8. Placement Feedback Ripple Ring: 1-second expanding pulse when let go
-    this.placementRingGeometry = new RingGeometry(0.08, 0.095, 32);
-    this.placementRingMaterial = new MeshBasicMaterial({
-      color: 0xffe080,
-      transparent: true,
-      opacity: 0.0,
-      side: DoubleSide,
-      toneMapped: false,
-    });
-    this.placementRingMesh = new Mesh(this.placementRingGeometry, this.placementRingMaterial);
-    this.placementRingMesh.rotation.x = -Math.PI / 2;
-    this.placementRingMesh.position.set(0, 0.002, 0);
-    this.placementRingMesh.visible = false;
-
-    // 9. Unlit Wick Indicator: soft warm pulsing orb hovering over wick when candle is unlit
+    // 7. Unlit Wick Indicator: soft warm pulsing orb hovering over wick when candle is unlit
     this.wickIndicatorGeometry = new SphereGeometry(0.012, 10, 10);
     this.wickIndicatorMaterial = new MeshBasicMaterial({
       color: 0xffb844,
@@ -250,7 +204,7 @@ export class CandleView {
     this.wickIndicator.position.set(0, 0.098, 0);
     this.wickIndicator.visible = false;
 
-    // 10. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when hands cup/cover flame
+    // 8. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when hands cup/cover flame
     this.coverProgressGeometry = new PlaneGeometry(0.2, 0.2);
     this.coverProgressMaterial = new ShaderMaterial({
       vertexShader: COVER_RING_VERT,
@@ -275,8 +229,6 @@ export class CandleView {
       wickMesh,
       this.flame.mesh,
       this.pointLight,
-      this.auraMesh,
-      this.placementRingMesh,
       this.wickIndicator,
       this.coverProgressMesh,
     );
@@ -302,19 +254,6 @@ export class CandleView {
     if (!value) {
       this.pointLight.intensity = 0;
     }
-  }
-
-  /** Locks candle position during gameplay so projection math remains stable. */
-  setLocked(locked: boolean): void {
-    this._isLocked = locked;
-    if (locked && this._state === 'held') {
-      this._state = 'placed';
-      this.auraMesh.visible = false;
-    }
-  }
-
-  get isLocked(): boolean {
-    return this._isLocked;
   }
 
   /** Whether a player's palm is currently covering the flame to pause. */
@@ -381,40 +320,16 @@ export class CandleView {
     return this.pointLight.intensity;
   }
 
-  /** Current interaction state ('placed' | 'held' | 'placing'). */
-  get state(): CandleInteractionState {
-    return this._state;
-  }
-
-  get isHeld(): boolean {
-    return this._state === 'held';
-  }
-
-  get isPlacing(): boolean {
-    return this._state === 'placing';
-  }
-
   /** Current light occlusion factor (0 = fully blocked, 1 = fully open). */
   get occlusion(): number {
     return this.lightOcclusion;
   }
 
   /**
-   * Updates candle pickup, placement, light occlusion, and palm-over-flame pause detection.
+   * Updates light occlusion and palm-over-flame pause detection.
    * Zero per-frame allocations.
    */
-  updateInteraction(
-    hands: Readonly<Record<Handedness, HandFrame>>,
-    delta: number,
-    minTableY?: number,
-  ): { state: CandleInteractionState; justPlaced: boolean; justPickedUp: boolean } {
-    if (this.cooldownTimer > 0) {
-      this.cooldownTimer = Math.max(0, this.cooldownTimer - delta);
-    }
-
-    let justPlaced = false;
-    let justPickedUp = false;
-
+  updateInteraction(hands: Readonly<Record<Handedness, HandFrame>>, delta: number): void {
     const left = hands.left;
     const right = hands.right;
     const leftTracked = left.tracked && left.validJoints >= 20;
@@ -535,140 +450,6 @@ export class CandleView {
         this.coverProgressMesh.visible = false;
       }
     }
-
-    // If locked during gameplay or unlit in title ritual, pickup is disabled
-    if (this._isLocked || !this._lit) {
-      if (this._state === 'held') {
-        this._state = 'placed';
-        this.auraMesh.visible = false;
-      }
-      return { state: this._state, justPlaced, justPickedUp };
-    }
-
-    if (leftTracked && rightTracked) {
-      // Distance between both hands
-      const dx = this.leftPalm[0] - this.rightPalm[0];
-      const dy = this.leftPalm[1] - this.rightPalm[1];
-      const dz = this.leftPalm[2] - this.rightPalm[2];
-      const handDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-      // Midpoint between hands
-      this.handsMidpoint[0] = (this.leftPalm[0] + this.rightPalm[0]) * 0.5;
-      this.handsMidpoint[1] = (this.leftPalm[1] + this.rightPalm[1]) * 0.5;
-      this.handsMidpoint[2] = (this.leftPalm[2] + this.rightPalm[2]) * 0.5;
-
-      const cx = this.group.position.x;
-      const cy = this.group.position.y;
-      const cz = this.group.position.z;
-
-      const dmx = this.handsMidpoint[0] - cx;
-      const dmy = this.handsMidpoint[1] - cy;
-      const dmz = this.handsMidpoint[2] - cz;
-      const midDist = Math.sqrt(dmx * dmx + dmy * dmy + dmz * dmz);
-
-      const dlx = this.leftPalm[0] - cx;
-      const dly = this.leftPalm[1] - cy;
-      const dlz = this.leftPalm[2] - cz;
-      const leftDist = Math.sqrt(dlx * dlx + dly * dly + dlz * dlz);
-
-      const drx = this.rightPalm[0] - cx;
-      const dry = this.rightPalm[1] - cy;
-      const drz = this.rightPalm[2] - cz;
-      const rightDist = Math.sqrt(drx * drx + dry * dry + drz * drz);
-
-      // 1. Check pickup condition when resting (small, intentional grasp around the 18cm saucer)
-      if (this._state === 'placed') {
-        const heightMatch = Math.abs(this.leftPalm[1] - cy) < 0.07 && Math.abs(this.rightPalm[1] - cy) < 0.07;
-        const inGrabZone =
-          leftDist < 0.13 && rightDist < 0.13 && midDist < 0.08 && handDist >= 0.06 && handDist <= 0.19 && heightMatch;
-
-        if (inGrabZone && this.cooldownTimer <= 0) {
-          this.pickupDwellTimer += delta;
-          this.auraMesh.visible = true;
-          this.auraMaterial.opacity = 0.35; // gentle approach preview
-
-          if (this.pickupDwellTimer >= 0.12) {
-            this._state = 'held';
-            justPickedUp = true;
-            this.pickupDwellTimer = 0;
-            this.auraMaterial.opacity = 0.85;
-            this.auraMaterial.color.setHex(0xffaa33);
-            this.flame.mesh.scale.setScalar(1.25);
-          }
-        } else {
-          this.pickupDwellTimer = 0;
-          this.auraMesh.visible = false;
-        }
-      }
-
-      // 2. Check holding & moving
-      if (this._state === 'held') {
-        // Separation check: moving hands far enough apart triggers placement!
-        if (handDist > 0.22) {
-          this._state = 'placing';
-          this.placingTimer = 1.0; // 1-second feedback timer
-          this.cooldownTimer = 0.6; // Cooldown before can pick up again
-          justPlaced = true;
-          this.placementRingMesh.visible = true;
-          this.placementRingMesh.scale.setScalar(1.0);
-          this.placementRingMaterial.opacity = 0.9;
-          this.auraMaterial.color.setHex(0xffe080);
-          this.auraMaterial.opacity = 1.0;
-        } else {
-          // Follow hands midpoint
-          const targetY =
-            minTableY !== undefined ? Math.max(minTableY, this.handsMidpoint[1] - 0.03) : this.handsMidpoint[1] - 0.03;
-          this.targetPos[0] = this.handsMidpoint[0];
-          this.targetPos[1] = targetY;
-          this.targetPos[2] = this.handsMidpoint[2];
-
-          const lerpFactor = Math.min(1.0, delta * 15.0);
-          const nx = cx + (this.targetPos[0] - cx) * lerpFactor;
-          const ny = cy + (this.targetPos[1] - cy) * lerpFactor;
-          const nz = cz + (this.targetPos[2] - cz) * lerpFactor;
-          this.place([nx, ny, nz]);
-
-          // Aura pulsing animation while held
-          this.auraMaterial.opacity = 0.7 + 0.15 * Math.sin(performance.now() * 0.008);
-        }
-      }
-    } else if (this._state === 'held') {
-      // If tracking lost on both hands while held, settle smoothly
-      this._state = 'placing';
-      this.placingTimer = 1.0;
-      this.cooldownTimer = 0.6;
-      justPlaced = true;
-      this.placementRingMesh.visible = true;
-      this.placementRingMesh.scale.setScalar(1.0);
-      this.placementRingMaterial.opacity = 0.9;
-    }
-
-    // 3. Process 1-second placement feedback animation
-    if (this._state === 'placing') {
-      this.placingTimer -= delta;
-      const progress = Math.max(0, Math.min(1.0, 1.0 - this.placingTimer / 1.0));
-
-      // Expand placement ripple from 1.0 to 2.6x
-      this.placementRingMesh.scale.setScalar(1.0 + progress * 1.6);
-      this.placementRingMaterial.opacity = (1.0 - progress) * 0.9;
-
-      // Aura fade out
-      this.auraMaterial.opacity = (1.0 - progress) * 0.85;
-
-      // Settle flame scale back to 1.0
-      this.flame.mesh.scale.setScalar(1.25 - progress * 0.25);
-
-      if (this.placingTimer <= 0) {
-        this._state = 'placed';
-        this.placementRingMesh.visible = false;
-        this.auraMesh.visible = false;
-        this.auraMaterial.opacity = 0.0;
-        this.auraMaterial.color.setHex(0xffaa33);
-        this.flame.mesh.scale.setScalar(1.0);
-      }
-    }
-
-    return { state: this._state, justPlaced, justPickedUp };
   }
 
   /**
@@ -775,15 +556,11 @@ export class CandleView {
     this.rimGeometry.dispose();
     this.waxGeometry.dispose();
     this.wickGeometry.dispose();
-    this.auraGeometry.dispose();
-    this.placementRingGeometry.dispose();
     this.wickIndicatorGeometry.dispose();
     this.coverProgressGeometry.dispose();
     this.plateMaterial.dispose();
     this.waxMaterial.dispose();
     this.wickMaterial.dispose();
-    this.auraMaterial.dispose();
-    this.placementRingMaterial.dispose();
     this.wickIndicatorMaterial.dispose();
     this.coverProgressMaterial.dispose();
   }

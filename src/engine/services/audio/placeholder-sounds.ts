@@ -43,8 +43,6 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Hum]: HUM_PEAK,
   [Sound.Release]: 0.8,
   [Sound.Lost]: 0.8,
-  [Sound.Lift]: 0.8,
-  [Sound.Set]: 0.8,
   [Sound.Music]: MUSIC_PEAK,
   [Sound.Twinkle]: 0.8,
   [Sound.Hop]: 0.8,
@@ -122,10 +120,6 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
       return letGo(sr);
     case Sound.Lost:
       return lost(sr);
-    case Sound.Lift:
-      return lift(sr);
-    case Sound.Set:
-      return set(sr);
     case Sound.Music:
       return music(sr);
     default: {
@@ -647,43 +641,6 @@ function lost(sr: number): Float32Array<ArrayBuffer> {
       s += (Math.sin(TAU * f * t) + 0.25 * Math.sin(TAU * f * 2 * t)) * Math.min(1, u / 0.012) * Math.exp(-u * 5.5);
     }
     out[i] = s;
-  }
-  return out;
-}
-
-/** The candle lifted off the table: a small wooden tap and a hush of cloth sliding. */
-function lift(sr: number): Float32Array<ArrayBuffer> {
-  const n = Math.floor(sr * 0.25);
-  const out = new Float32Array(n);
-  const rnd = seeded(61);
-  let phase = 0;
-  let prev = 0;
-  for (let i = 0; i < n; i++) {
-    const t = i / sr;
-    phase += (TAU * (160 + 70 * Math.exp(-t * 40))) / sr;
-    const noise = rnd() * 2 - 1;
-    const hp = noise - prev * 0.8;
-    prev = noise;
-    out[i] = Math.sin(phase) * Math.exp(-t * 30) + hp * 0.14 * Math.min(1, t / 0.02) * Math.exp(-t * 12);
-  }
-  return out;
-}
-
-/** The candle set down: a low settled thud and a tiny ceramic tink. */
-function set(sr: number): Float32Array<ArrayBuffer> {
-  const n = Math.floor(sr * 0.35);
-  const out = new Float32Array(n);
-  let phase = 0;
-  for (let i = 0; i < n; i++) {
-    const t = i / sr;
-    phase += (TAU * (50 + 50 * Math.exp(-t * 20))) / sr;
-    const thud = Math.sin(phase) * Math.exp(-t * 15);
-    const tink =
-      t > 0.004
-        ? Math.sin(TAU * 1180 * t) * 0.2 * Math.exp(-(t - 0.004) * 30) +
-          Math.sin(TAU * 1790 * t) * 0.1 * Math.exp(-(t - 0.004) * 38)
-        : 0;
-    out[i] = thud + tink;
   }
   return out;
 }

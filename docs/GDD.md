@@ -169,7 +169,7 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 ### Audio
 
-- **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, its crackle, and a sound when it is lifted and set down.
+- **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, and its crackle. The candle can't be picked up (15 Nov 2026): it stays on the tray, so the light the shadows are cast from never moves.
 
 - **For the story:** the sound definitions for a chime, notes, music and ambience are kept as a palette for the scenes. What each scene needs is to be written with it. The music should be quiet and bittersweet: the music-box notes suit memories from childhood, and the night ends in near silence as he falls asleep.
 

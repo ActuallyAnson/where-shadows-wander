@@ -31,7 +31,7 @@ describe('SOUND_DEFS', () => {
   it('puts the menu and feedback sounds on effects, the flame and the room on ambience and the music on music', () => {
     expect(SOUND_DEFS[Sound.Music].bus).toBe(Bus.Music);
     expect(SOUND_DEFS[Sound.Hum].bus).toBe(Bus.Ambience);
-    for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost, Sound.Lift, Sound.Set])
+    for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost])
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 

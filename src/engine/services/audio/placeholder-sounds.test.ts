@@ -125,15 +125,7 @@ describe('renderPlaceholder', () => {
   });
 
   it('dies away: the last tenth of a one-shot is much quieter than the first', () => {
-    for (const id of [
-      Sound.Rustle,
-      Sound.Thump,
-      Sound.Chime,
-      Sound.Tick,
-      Sound.Press,
-      Sound.Lost,
-      Sound.Set,
-    ] as const) {
+    for (const id of [Sound.Rustle, Sound.Thump, Sound.Chime, Sound.Tick, Sound.Press, Sound.Lost] as const) {
       const s = renderPlaceholder(id, SR);
       const tenth = Math.floor(s.length / 10);
       const rms = (from: number) => Math.sqrt(s.slice(from, from + tenth).reduce((t, x) => t + x * x, 0) / tenth);

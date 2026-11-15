@@ -64,12 +64,6 @@ export class GameAudio {
     this.player.playAt(variant === 1 ? Sound.Step1 : Sound.Step0, this.at.x, this.at.y, this.at.z);
   }
 
-  /** The candle lifted or set down, from the flame (`flame` is its scene position). Call with the frame's two flags. */
-  candleMoved(pickedUp: boolean, placed: boolean, flame: ArrayLike<number>): void {
-    if (pickedUp) this.player.playAt(Sound.Lift, flame[0], flame[1], flame[2]);
-    if (placed) this.player.playAt(Sound.Set, flame[0], flame[1], flame[2]);
-  }
-
   /** Call every frame: the crackle plays while the flame is lit, from the flame. `flame` is its scene position. */
   setFlame(lit: boolean, flame: ArrayLike<number>): void {
     if (lit && !this.flameLit) this.player.setLoop(Sound.Crackle, true, flame[0], flame[1], flame[2]);

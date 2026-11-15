@@ -22,8 +22,6 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `covers` | A soft slide of heavy bedclothes | He sits up in bed (scene 1) | Final: "Bed sheets (SoundAction 104)" by alexarje (CC BY 4.0), cut to 3.5 s |
 | `ignite` | A match struck, then a flame catching | Lighting the candle; BEGIN on the title screen | Placeholder |
 | `crackle` | A quiet candle flame, seamless loop | While the candle is lit | Placeholder |
-| `lift` | The candle picked up off the tray | Moving the candle | Placeholder |
-| `set` | The candle set down on the tray | Moving the candle | Placeholder |
 | `rustle` | A light, dry paper crinkle | A hand shape is recognised | Placeholder |
 | `thump` | A soft, low thump | A hand shape is accepted | Placeholder |
 | `release` | A soft letting-go | A shape is let go | Placeholder |
@@ -45,6 +43,8 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 ### Left over from the puzzle game
 
 `twinkle` (spirit fox), `hop` (rabbit landing), `snowtick` (snow on the glass), `creak` (a beam). Status: **Drop**. (`step0` and `step1` were here too; scene 2's hush plays them now, so they are in the first table.)
+
+`lift` and `set` (the candle picked up and set down) were removed on 15 Nov 2026, with picking up the candle: it stays on the tray, so the light never moves.
 
 ### Sounds the story needs that don't exist
 

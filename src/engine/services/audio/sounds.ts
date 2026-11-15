@@ -20,39 +20,35 @@ export const Sound = {
   Release: 8,
   /** Tracking was lost for too long. */
   Lost: 9,
-  /** The candle is picked up. */
-  Lift: 10,
-  /** The candle is set down. */
-  Set: 11,
   /** The slow background music, a loop. */
-  Music: 12,
+  Music: 10,
   /** The spirit fox's sparkle: a few soft high notes falling like fairy dust. */
-  Twinkle: 13,
+  Twinkle: 11,
   /** A rabbit's soft landing. */
-  Hop: 14,
+  Hop: 12,
   /** The lullaby's five music-box notes, one for each sleeper the spark wakes (a rising pentatonic phrase, in the music's key). */
-  Note0: 15,
-  Note1: 16,
-  Note2: 17,
-  Note3: 18,
-  Note4: 19,
+  Note0: 13,
+  Note1: 14,
+  Note2: 15,
+  Note3: 16,
+  Note4: 17,
   /** The room's slow wooden clock, a loop (ambience). */
-  Clock: 20,
+  Clock: 18,
   /** Wind outside the window, a loop (ambience). */
-  Wind: 21,
+  Wind: 19,
   /** A beam creaking somewhere above, now and then. */
-  Creak: 22,
+  Creak: 20,
   /** A few flakes of snow ticking on the window glass. */
-  Snowtick: 23,
+  Snowtick: 21,
   /** The traveller's footsteps: two soft steps, alternated. */
-  Step0: 24,
-  Step1: 25,
+  Step0: 22,
+  Step1: 23,
   /** Rain outside, on the window and the roof, a loop (ambience): the night's constant bed. */
-  Rain: 26,
+  Rain: 24,
   /** Thunder far off, low and muffled by the distance and the walls: now and then, after a flash in the window (storm.ts). */
-  Thunder: 27,
+  Thunder: 25,
   /** The bedclothes as he sits up in bed (scene 1, as his eyes open): a soft slide of heavy cloth. */
-  Covers: 28,
+  Covers: 26,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -171,26 +167,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     loop: false,
     priority: 2,
     minGapS: 2,
-    refDistance: 1,
-    maxDistance: 8,
-  },
-  {
-    name: 'lift',
-    bus: Bus.Effects,
-    gain: 0.6,
-    loop: false,
-    priority: 2,
-    minGapS: 0.3,
-    refDistance: 1,
-    maxDistance: 8,
-  },
-  {
-    name: 'set',
-    bus: Bus.Effects,
-    gain: 0.7,
-    loop: false,
-    priority: 2,
-    minGapS: 0.3,
     refDistance: 1,
     maxDistance: 8,
   },
