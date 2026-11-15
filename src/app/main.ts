@@ -359,8 +359,8 @@ async function start(): Promise<void> {
   // The friend's hand rises from below the wall, its arm running off the bottom: the wall's edge cuts it off, as it does the puppets.
   friendView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
-  // The shape guide (shape-guide.ts): while her hand waits, a faint ghost of her shape follows the player's shadow (an outline
-  // for it to fill), the candle steadies and brightens as the player's hand nears the shape, and her hand leans toward theirs
+  // The shape guide (shape-guide.ts): while her hand waits, a faint ghost of her shape stands beside it (an outline to fill,
+  // where his matching hand would go), the candle steadies and brightens as the player's hand nears the shape, and her hand leans toward theirs
   // while they hold it.
   const guide = new ShapeGuide();
   const guideView = new PuppetView();
@@ -1582,7 +1582,7 @@ async function start(): Promise<void> {
               shadowsVisible ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion : 0,
             );
           } else friendView.hide();
-          // The ghost of her shape on the player's shadow: an outline for it to fill.
+          // The ghost of her shape beside her hand: an outline for the player's shadow to fill.
           if (guideScene && guide.presence > 0.001) {
             let gp = guidePlayers.get(guideScene);
             if (!gp) {

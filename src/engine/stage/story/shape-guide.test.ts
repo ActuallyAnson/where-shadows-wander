@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closenessOf, GUIDE_REACH, LEAN_M, ShapeGuide } from './shape-guide';
+import { closenessOf, GHOST_GAP_M, GUIDE_REACH, LEAN_M, ShapeGuide } from './shape-guide';
 
 const run = (
   g: ShapeGuide,
@@ -31,15 +31,27 @@ describe('ShapeGuide', () => {
     expect(g.boost).toBeGreaterThan(0.09);
   });
 
-  it('shows the ghost on the player’s shadow while she waits and a hand is seen, and lets it go after', () => {
+  it('shows the ghost beside her hand while she waits, still wherever the player’s shadow goes, and lets it go after', () => {
     const g = new ShapeGuide();
-    run(g, 1, true, -1, 0, 0.1, 0.05, -0.3, 0.2);
-    expect(g.presence).toBe(1);
-    expect(g.x).toBeCloseTo(0.1);
-    expect(g.y).toBeCloseTo(0.05);
-    run(g, 1, true, -1, 0, NaN, NaN, -0.3, 0.2);
+    run(g, 1, true, -1, 0, NaN, NaN, -0.5, 0.17);
+    expect(g.presence).toBe(1); // no hand needed
+    expect(g.x).toBeCloseTo(-0.5 + GHOST_GAP_M);
+    expect(g.y).toBeCloseTo(0.17);
+    // A shadow swinging about (a hand behind the flame) does not move it.
+    for (let i = 0; i < 60; i++) g.update(1 / 60, true, -1, 0, i % 2 ? 0.8 : -0.8, i % 2 ? 0.4 : -0.4, -0.5, 0.17);
+    expect(g.x).toBeCloseTo(-0.5 + GHOST_GAP_M);
+    expect(g.y).toBeCloseTo(0.17);
+    run(g, 1, false, -1, 0, 0.1, 0.05, 0.3, 0);
     expect(g.presence).toBe(0);
-    expect(g.x).toBeCloseTo(0.1); // it stays where it was as it goes
+    expect(g.x).toBeCloseTo(-0.5 + GHOST_GAP_M); // it stays where it was as it goes
+  });
+
+  it('stands toward the middle of the wall: right of a hand on the left or in the middle, left of one on the right', () => {
+    const g = new ShapeGuide();
+    g.update(1 / 60, true, -1, 0, NaN, NaN, 0, 0.06);
+    expect(g.x).toBeCloseTo(GHOST_GAP_M);
+    g.update(1 / 60, true, -1, 0, NaN, NaN, 0.5, 0.1);
+    expect(g.x).toBeCloseTo(0.5 - GHOST_GAP_M);
   });
 
   it('leans her hand toward the player’s while the shape is held, and back after', () => {
