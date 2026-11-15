@@ -6,8 +6,10 @@ import {
   FRIEND_FROM_Y,
   FRIEND_IN_S,
   FRIEND_OUT_S,
+  FRIEND_SWAP_S,
   HANDOFF_S,
   MIRROR_REACH_M,
+  MIRROR_SWITCH_S,
   StoryDirector,
   validateStory,
   type StoryScene,
@@ -469,6 +471,44 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
       expect(d.friendDX).toBeCloseTo(MIRROR_REACH_M, 3);
       expect(d.friendDY).toBeCloseTo(-MIRROR_REACH_M, 3);
       expect(d.mirroring).toBe(true);
+    });
+
+    it('keeps its copy through a shape the player’s hand only flickers into', () => {
+      const d = new StoryDirector(mirrored);
+      d.start();
+      run(d, inPlace);
+      d.follow(0, 0, null);
+      d.update(0.05);
+      for (let i = 0; i < 60; i++) {
+        d.follow(0, 0, i % 6 < 3 ? 'rabbit' : null); // three frames of a rabbit, three of none, over and over
+        d.update(1 / 60);
+      }
+      expect(d.friendPuppet).toBe('flat');
+      expect(d.friendPrevPuppet).toBe(null);
+      d.follow(0, 0, 'rabbit');
+      run(d, MIRROR_SWITCH_S + 0.05);
+      expect(d.friendPuppet).toBe('rabbit');
+    });
+
+    it('changes hands by overlapping the old and the new, never thinning out, and lets the old one go', () => {
+      const d = new StoryDirector(mirrored);
+      d.start();
+      run(d, inPlace);
+      expect(d.friendSwapIn).toBe(1);
+      expect(d.friendSwapOut).toBe(0);
+      d.follow(0, 0, null);
+      run(d, 2.5); // the copying runs out: her own rabbit
+      expect(d.friendPuppet).toBe('rabbit');
+      expect(d.friendPrevPuppet).toBe('flat');
+      let least = 2;
+      for (let t = 0; t < FRIEND_SWAP_S; t += 1 / 60) {
+        least = Math.min(least, Math.max(d.friendSwapIn, d.friendSwapOut));
+        d.update(1 / 60);
+      }
+      expect(least).toBeGreaterThan(0.5);
+      expect(d.friendSwapIn).toBe(1);
+      expect(d.friendPrevPuppet).toBe(null);
+      expect(d.friendSwapOut).toBe(0);
     });
 
     it('takes the shape it waits for even while still copying', () => {

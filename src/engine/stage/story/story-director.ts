@@ -87,6 +87,18 @@ export const MIRROR_REACH_M = 0.3;
 const MIRROR_TAU_S = 0.15;
 /** How long it takes her hand to drift back to its place once it stops copying, seconds (a time constant). */
 const MIRROR_HOME_TAU_S = 0.45;
+/**
+ * While copying, how long the player's hand must hold a new shape before hers changes to it, seconds: a shape recognised for a
+ * moment (a hand passing through one, or flickering between two) leaves her hand as it was.
+ */
+export const MIRROR_SWITCH_S = 0.25;
+/**
+ * Seconds one painted hand of hers takes to give way to another (her copy of the player's to the next, or to her own shape):
+ * the new one comes in over the first FRIEND_SWAP_IN of it and the old one goes over the last, so they overlap in the middle
+ * and the hand never thins out or pops.
+ */
+export const FRIEND_SWAP_S = 0.5;
+const FRIEND_SWAP_IN = 0.6;
 /** Seconds a memory's `from` puppet takes to travel from the player's shadow to its own place. */
 export const HANDOFF_S = 1.6;
 
@@ -118,6 +130,10 @@ export class StoryDirector {
   readonly scenes: readonly StoryScene[];
   /** The name of the friend's painted hand showing (FriendBeat.puppet, or its shape), while friendShape is set. */
   friendPuppet: string | null = null;
+  /** The painted hand it is changing from (friendSwapOut says how much of it is left), or null. */
+  friendPrevPuppet: string | null = null;
+  /** Seconds into the old hand's shape when it was let go: it holds that pose as it goes. */
+  friendPrevShapeT = 0;
   /** Set once the player has covered the flame at the end (a sleep beat): the story is over. */
   asleep = false;
   /** The scene playing, by index, or -1. */
@@ -149,6 +165,11 @@ export class StoryDirector {
   private playerShape: Shape | null = null;
   /** Her hand's clock (friendT) when it began forming the shape it shows. */
   private formAt = FRIEND_FORM_AT_S;
+  /** Seconds since her painted hand last changed (FRIEND_SWAP_S or more: done). */
+  private swapT = FRIEND_SWAP_S;
+  /** While copying: the painted hand the player's shape asks for that hers is not yet, and for how long it has asked. */
+  private pendingPuppet: string | null = null;
+  private pendingFor = 0;
   private waitLeft = -1;
   private sleepWaiting = false;
   private handoffS = HANDOFF_S;
@@ -287,6 +308,7 @@ export class StoryDirector {
     this.waiting = false;
     this.friendShape = null;
     this.friendPuppet = null;
+    this.endSwap();
     this.friendLevel = 0;
     this.friendDX = this.friendDY = 0;
     this.mirrorLeft = 0;
@@ -320,6 +342,10 @@ export class StoryDirector {
     if (dt <= 0) return;
     // The friend's hand: waits, rises into place while it waits, lowers (or fades) after.
     if (this.friendShape !== null) {
+      if (this.swapT < FRIEND_SWAP_S) {
+        this.swapT += dt;
+        if (this.swapT >= FRIEND_SWAP_S) this.endSwap();
+      }
       if (this.waiting) {
         if (this.friendWait > 0) this.friendWait -= dt;
         else {
@@ -331,7 +357,10 @@ export class StoryDirector {
       } else {
         this.friendT += dt;
         this.friendLevel = Math.max(0, this.friendLevel - dt / this.friendOut);
-        if (this.friendLevel === 0) this.friendShape = this.friendPuppet = null;
+        if (this.friendLevel === 0) {
+          this.friendShape = this.friendPuppet = null;
+          this.endSwap();
+        }
       }
     }
     if (this.waitLeft >= 0) {
@@ -374,10 +403,47 @@ export class StoryDirector {
     this.friendDY += (ty - this.friendDY) * k;
     const s = this.playerShape;
     const want = this.mirrorLeft <= 0 ? this.ownPuppet : tracked && s !== null && s in FRIEND_PUPPETS ? s : 'flat';
-    if (want !== this.friendPuppet) {
-      this.friendPuppet = want;
-      this.formAt = this.friendT;
+    if (want === this.friendPuppet) {
+      this.pendingPuppet = null;
+      return;
     }
+    // Her own shape, once the copying is over, comes at once; a copy waits until the player's shape has held a moment.
+    if (want !== this.pendingPuppet) {
+      this.pendingPuppet = want;
+      this.pendingFor = 0;
+    }
+    this.pendingFor += dt;
+    if (this.mirrorLeft <= 0 || this.pendingFor >= MIRROR_SWITCH_S) this.swapTo(want);
+  }
+
+  /** Changes her painted hand to `puppet`: it forms afresh, over the old one going (friendSwapIn, friendSwapOut). */
+  private swapTo(puppet: string): void {
+    this.friendPrevPuppet = this.friendPuppet;
+    this.friendPrevShapeT = this.friendShapeT;
+    this.friendPuppet = puppet;
+    this.formAt = this.friendT;
+    this.swapT = 0;
+    this.pendingPuppet = null;
+  }
+
+  /** Lets any old painted hand go, and forgets a change waiting to be taken. */
+  private endSwap(): void {
+    this.friendPrevPuppet = null;
+    this.swapT = FRIEND_SWAP_S;
+    this.pendingPuppet = null;
+    this.pendingFor = 0;
+  }
+
+  /** How much of her painted hand (friendPuppet) is drawn, 0..1: it comes in over the start of a change, 1 otherwise. */
+  get friendSwapIn(): number {
+    return smooth(this.swapT / (FRIEND_SWAP_S * FRIEND_SWAP_IN));
+  }
+
+  /** How much of the old painted hand (friendPrevPuppet) is still drawn, 0..1: it goes over the end of a change. */
+  get friendSwapOut(): number {
+    if (this.friendPrevPuppet === null) return 0;
+    const from = FRIEND_SWAP_S * (1 - FRIEND_SWAP_IN);
+    return 1 - smooth((this.swapT - from) / (FRIEND_SWAP_S * FRIEND_SWAP_IN));
   }
 
   /** Once it has stopped copying, her hand drifts back to its own place. */
@@ -454,6 +520,7 @@ export class StoryDirector {
       this.formAt = FRIEND_FORM_AT_S;
       // Copying first, it comes up as an open hand.
       this.friendPuppet = this.mirrorLeft > 0 ? 'flat' : (b.puppet ?? b.shape);
+      this.endSwap();
       this.friendOut = b.out ?? FRIEND_OUT_S;
       this.friendX = b.x;
       this.friendY = b.y;

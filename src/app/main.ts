@@ -359,9 +359,13 @@ async function start(): Promise<void> {
   // The friend's hand rises from below the wall, its arm running off the bottom: the wall's edge cuts it off, as it does the puppets.
   friendView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
+  // The painted hand hers is changing from (StoryDirector.friendPrevPuppet), going as the new one comes, so it never pops.
+  const friendOutView = new PuppetView();
+  friendOutView.scale = STORY_SCALE;
+  friendOutView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   // The shape guide (shape-guide.ts): while her hand waits, a faint ghost of her shape stands beside it (an outline to fill,
-  // where his matching hand would go), the candle steadies and brightens as the player's hand nears the shape, and her hand leans toward theirs
-  // while they hold it.
+  // where his matching hand would go), the candle steadies and brightens as the player's hand nears the shape, and her hand
+  // leans toward theirs while they hold it.
   const guide = new ShapeGuide();
   const guideView = new PuppetView();
   guideView.scale = STORY_SCALE;
@@ -402,6 +406,7 @@ async function start(): Promise<void> {
     storyLine.clear();
     puppets.hide();
     friendView.hide();
+    friendOutView.hide();
   };
   const skipTips = new Float32Array(6);
   // The quality governor: when a headset's frames keep running over what its display allows, the decoration switches off a step at a
@@ -425,6 +430,7 @@ async function start(): Promise<void> {
     bedroomView.group,
     shadowRenderer.mesh,
     friendView.group,
+    friendOutView.group,
     guideView.group,
     puppets.group,
     storyTitle.group,
@@ -1569,6 +1575,9 @@ async function start(): Promise<void> {
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
           if (friendScene && story.friendShowing) guideScene = friendScene;
+          const friendLight = shadowsVisible
+            ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion
+            : 0;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
@@ -1576,12 +1585,19 @@ async function start(): Promise<void> {
             fp.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
             fp.seek(friendSceneTime(story.friendShapeT));
             friendView.load(friendScene);
-            friendView.update(
-              fp,
-              storyFrame,
-              shadowsVisible ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion : 0,
-            );
+            friendView.update(fp, storyFrame, friendLight * story.friendSwapIn);
           } else friendView.hide();
+          // The hand it is changing from, held in its last pose where hers is now, going.
+          const outScene = story.friendPrevPuppet !== null ? FRIEND_PUPPETS[story.friendPrevPuppet] : undefined;
+          if (outScene && outScene !== friendScene && story.friendSwapOut > 0.001 && story.friendOpacity > 0.001) {
+            let op = friendPlayers.get(outScene);
+            if (!op) friendPlayers.set(outScene, (op = new ScenePlayer(outScene)));
+            op.offset[0] = story.friendX + story.friendDX + guide.leanX;
+            op.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
+            op.seek(friendSceneTime(story.friendPrevShapeT));
+            friendOutView.load(outScene);
+            friendOutView.update(op, storyFrame, friendLight * story.friendSwapOut);
+          } else friendOutView.hide();
           // The ghost of her shape beside her hand: an outline for the player's shadow to fill.
           if (guideScene && guide.presence > 0.001) {
             let gp = guidePlayers.get(guideScene);
