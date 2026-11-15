@@ -19,12 +19,24 @@ export const METRES_PER_PX = PANEL_WIDTH_M / PANEL_WIDTH_PX;
 /** Every press target is at least this many pixels across: 64 px is 4.1 cm at the panel's real size. */
 export const BUTTON_PX = 64;
 
-/** Which settings are on which page: how you play, what you see and read, then sound. Every setting is on exactly one page. */
-export const PAGES: readonly (readonly (keyof Settings)[])[] = [
-  ['tolerance', 'holdTime', 'shadowSize', 'sharpen', 'flicker', 'hand'],
-  ['highContrast', 'captions', 'textSize', 'gazeMenus'],
-  ['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience'],
+export type SettingCategory = 'Basic' | 'Advanced';
+
+export interface SettingsPageDef {
+  readonly category: SettingCategory;
+  readonly keys: readonly (keyof Settings)[];
+}
+
+/**
+ * Which settings are on which page, split into Basic (volumes, comfort and display) and Advanced (shadow size, tuning and
+ * tracking). Every setting is on exactly one page, at most six to a page.
+ */
+export const SETTING_PAGES: readonly SettingsPageDef[] = [
+  { category: 'Basic', keys: ['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience'] },
+  { category: 'Basic', keys: ['hand', 'captions', 'highContrast', 'textSize', 'gazeMenus'] },
+  { category: 'Advanced', keys: ['shadowSize', 'sharpen', 'flicker', 'tolerance', 'holdTime'] },
 ];
+
+export const PAGES: readonly (readonly (keyof Settings)[])[] = SETTING_PAGES.map((p) => p.keys);
 
 export const ids = {
   dec: (key: string) => `${key}-dec`,
