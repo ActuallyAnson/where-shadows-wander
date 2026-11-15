@@ -5,7 +5,7 @@ A seated, hands-only WebXR story for the Meta VR Start Developer Competition 202
 ## Where things are written down
 
 - **The story:** [docs/STORY.md](docs/STORY.md) is the source of truth for the seven scenes. Scenes are built one at a time; when one changes, rewrite its section and add a dated line to the change log at the bottom.
-- **The design:** [docs/GDD.md](docs/GDD.md) (premise, tone, shapes, accessibility). **How to run and test:** [docs/getting-started.md](docs/getting-started.md). **Structure and frame budget:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). **Decisions:** [docs/adr/](docs/adr/); ADR 0016 is the current direction. **Assets (sounds, music, models):** [docs/ASSETS.md](docs/ASSETS.md) tracks what is final, placeholder or still needed, and where to get new ones; update it when one changes.
+- **The design:** [docs/GDD.md](docs/GDD.md) (premise, tone, shapes, accessibility). **How to run and test:** [docs/getting-started.md](docs/getting-started.md). **Structure and frame budget:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). **Decisions:** [docs/adr/](docs/adr/); ADR 0016 is the current direction. **Assets (sounds, music, models):** [docs/ASSETS.md](docs/ASSETS.md) tracks what is final, placeholder or still needed, and where to get new ones (see the asset rule under Workflow).
 - The puzzle gameplay (`src/game`, `src/engine/sim`, the traveller, props and solver) was deleted on 11 Nov 2026. Ignore anything that still describes it; git history has it.
 
 ## Story rules
@@ -31,6 +31,7 @@ A seated, hands-only WebXR story for the Meta VR Start Developer Competition 202
 ## Workflow
 
 - Before every commit: `npm run format`, then `npm run check`.
+- Update [docs/ASSETS.md](docs/ASSETS.md) in the same commit whenever an asset is added, changed, put back into use or dropped. This covers every kind of asset: a sound, music, model, texture, font or painted art, whether it is a real file, a placeholder or made in code (for example a sound in `placeholder-sounds.ts` or a cut-out in `puppet-art.ts`). Say what it is, where it is used and its status; a third-party file also needs its row in CREDITS.md.
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`), one branch per task.
 - Don't commit `package-lock.json` churn (`"peer": true` lines) unless a dependency actually changed.
 - Known failures from before 11 Nov, not caused by new work: `src/engine/xr/xr-hands.alloc.test.ts` (2 tests) and `scripts/settings-probe.mjs` (reads the old `settingsPanel.doc`).

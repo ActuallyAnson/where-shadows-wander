@@ -96,6 +96,8 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 
 The bed tray, the quilt on his lap, the candle and its flame, the walls, the window with the rain, the shelf, the windowsill, the two pictures (`picture-hill`, `picture-moon`), the moonlight patch on the floor, the tin can, and all of the puppets and scenery on the wall (`src/engine/shadow`, `src/engine/render`, `src/engine/stage/puppet`). The shelf's "wonders" glows are left over from the puzzle game.
 
+The puppets' cut-outs are painted by `src/engine/shadow/puppet-art.ts` (`PUPPET_ART`): the kids (`kid`, `kid-head`, `kid-torso`, `girl-head`, `girl-torso`, `ponytail`, `arm`, `leg`), the friend's hands (`friend-rabbit`, `friend-ear`, `friend-fox`, `friend-cup`, `friend-palm`, `friend-arm`, `side-hand`), the animals (`rabbit`, `fox`, `lump`), the places (`fort`, `blanket`, `window`, `pane`, `box`, `leafy-tree`, `autumn-tree`, `leaf`, `grass`, `hill`, `school-gate`), the lights (`torch`, `beam`, `orb`, `jar`, and `door-light`, the line of light from a door ajar in scene 2's hush, added 15 Nov), and the old prologue's `castle`, `hills`, `tree`, `cloak`, `hood`, `staff` and `lantern` (used only by the old `src/engine/stage/puppet/prologue-scene.ts`, which nothing plays; drop with it). All are made in code and owe nothing to anyone.
+
 ### Needed: tied to the story
 
 | Model | Why | Status |
