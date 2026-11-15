@@ -43,8 +43,9 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '4 · Fireflies',
     candle: 'dusk',
     beats: [
-      // Lying in the grass, the friend reaches up; her hand rises at the wall's left (clear of her, lying), cupped.
-      { kind: 'friend', shape: 'cup', x: -0.62, y: 0.22 },
+      // Lying in the grass, the friend reaches up; her hand rises cupped in the sky between the left and middle trees (clear of
+      // her, lying), and the outline of the cup stands in the gap between the middle and right trees' crowns.
+      { kind: 'friend', shape: 'cup', x: -0.25, y: 0.33, guide: [0.28, 0.36] },
       // The firefly sits in the player's cup, then the fireflies on their hands, the jar, and the walk to school.
       { kind: 'memory', from: 'firefly', handoff: CUP_HOLD_S, ...chapter('fireflies') },
     ],

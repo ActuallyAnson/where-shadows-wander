@@ -1574,13 +1574,15 @@ async function start(): Promise<void> {
             followY,
             story.friendX + story.friendDX,
             story.friendY,
+            story.guideX,
+            story.guideY,
           );
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
           if (friendScene && story.friendShowing) guideScene = friendScene;
-          const friendLight = shadowsVisible
-            ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion
-            : 0;
+          // How dark her hand's shadow is; how much of it is there (fading, changing shape) goes in separately, so a fading hand
+          // covers the scenery less rather than paling over it (PuppetView.update).
+          const friendLight = shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
@@ -1588,7 +1590,7 @@ async function start(): Promise<void> {
             fp.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
             fp.seek(friendSceneTime(story.friendShapeT));
             friendView.load(friendScene);
-            friendView.update(fp, storyFrame, friendLight * story.friendSwapIn);
+            friendView.update(fp, storyFrame, friendLight, story.friendOpacity * story.friendSwapIn);
           } else friendView.hide();
           // The hand it is changing from, held in its last pose where hers is now, going.
           const outScene = story.friendPrevPuppet !== null ? FRIEND_PUPPETS[story.friendPrevPuppet] : undefined;
@@ -1599,7 +1601,7 @@ async function start(): Promise<void> {
             op.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
             op.seek(friendSceneTime(story.friendPrevShapeT));
             friendOutView.load(outScene);
-            friendOutView.update(op, storyFrame, friendLight * story.friendSwapOut);
+            friendOutView.update(op, storyFrame, friendLight, story.friendOpacity * story.friendSwapOut);
           } else friendOutView.hide();
           // The outline of her shape beside her hand, facing it: a frame for the player's shadow to fill.
           if (guideScene && guide.presence > 0.001) {
@@ -1611,11 +1613,13 @@ async function start(): Promise<void> {
             gp.offset[1] = guide.y;
             gp.seek(0);
             guideView.load(outline);
-            const strength = (GUIDE_FAINT + GUIDE_CLOSE * guide.closeness) * guide.presence;
+            // Faint on the paper; over scenery it covers, a paler line through it, so it reads as in front.
+            const strength = GUIDE_FAINT + GUIDE_CLOSE * guide.closeness;
             guideView.update(
               gp,
               storyFrame,
               shadowsVisible ? shadowRenderer.baseOpacity * strength * candleView.occlusion : 0,
+              guide.presence,
             );
           } else guideView.hide();
           const memory = story.memory;

@@ -29,6 +29,11 @@ export interface FriendBeat {
    * hand to copy does it make its own. Default 0: it shows the shape at once.
    */
   readonly mirror?: number;
+  /**
+   * Where the outline of her shape stands (shape-guide.ts), metres as `x`, `y`, where the wall's picture leaves no room beside
+   * her hand (scene 4's trees). Default: GHOST_GAP_M from her hand, toward the middle of the wall.
+   */
+  readonly guide?: readonly [number, number];
 }
 
 /** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
@@ -459,6 +464,16 @@ export class StoryDirector {
   private get ownPuppet(): string {
     const b = this.beat;
     return b?.kind === 'friend' ? (b.puppet ?? b.shape) : 'flat';
+  }
+
+  /** Where the outline of her shape stands (FriendBeat.guide), or NaN for the default beside her hand. */
+  get guideX(): number {
+    const b = this.beat;
+    return b?.kind === 'friend' && b.guide ? b.guide[0] : NaN;
+  }
+  get guideY(): number {
+    const b = this.beat;
+    return b?.kind === 'friend' && b.guide ? b.guide[1] : NaN;
   }
 
   /** Whether the friend's hand is going, once copied, by fading where it is (FriendBeat.leave). */

@@ -57,6 +57,7 @@ export class ShapeGuide {
    * @param hold 0..1 of the player's hold of her shape (1 once committed)
    * @param ax where the player's shadow is (NaN with no hand): only her lean goes toward it
    * @param fx where her hand is, without the lean
+   * @param gx where the outline stands when the scene sets it (FriendBeat.guide); NaN: beside her hand
    */
   update(
     dt: number,
@@ -67,6 +68,8 @@ export class ShapeGuide {
     ay: number,
     fx: number,
     fy: number,
+    gx = NaN,
+    gy = NaN,
   ): void {
     if (!(dt > 0)) return;
     const tracked = Number.isFinite(ax) && Number.isFinite(ay);
@@ -77,7 +80,10 @@ export class ShapeGuide {
     this.closeness = ease(this.closeness, active ? closenessOf(margin) : 0, dt, CLOSE_TAU);
     const h = active ? Math.min(1, Math.max(0, hold)) : 0;
     this.hold = ease(this.hold, h, dt, h > this.hold ? HOLD_UP_TAU : HOLD_DOWN_TAU);
-    if (active && Number.isFinite(fx) && Number.isFinite(fy)) {
+    if (active && Number.isFinite(gx) && Number.isFinite(gy)) {
+      this.x = gx;
+      this.y = gy;
+    } else if (active && Number.isFinite(fx) && Number.isFinite(fy)) {
       this.x = fx + (fx > 0 ? -GHOST_GAP_M : GHOST_GAP_M);
       this.y = fy;
     }

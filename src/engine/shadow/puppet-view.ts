@@ -2,10 +2,12 @@
 // image) lying on the wall. Shadow parts darken the lit wall in proportion, as the hands' shadows do, and they do it in the
 // frame's alpha (unused on the wall), as scratch: the prime sets the wall's alpha to 1 (the light let through); a part standing
 // back (PuppetPart.depth: paler and softer, so the scenery stands back) multiplies it by the light it lets through, so overlapping
-// scenery darkens twice, which reads as one layer in front of another; a near part takes the smaller of it and its own light let
-// through (a min blend), so where two near parts overlap (a leg over the cloak) they never darken twice, and a near puppet hides
-// the scenery behind it, smoothly at its soft edges, with no outline: in front of a tree its shadow is its own darkness, not the
-// tree's on top of it; and the resolve darkens the wall's colour by what is left and sets the alpha back to 1
+// scenery darkens twice, which reads as one layer in front of another; a near part covers it with its own light let through, by
+// how much of the part is there (its cut-out's alpha, times how far it has faded in): alpha = alpha * (1 - cover) + cover * light,
+// its light coming in as the blend's constant alpha. So where two near parts overlap (a leg over the cloak) they never darken
+// twice, and a near puppet hides the scenery behind it, smoothly at its soft edges, with no outline: in front of a tree, even one
+// darker than it, its shadow is its own darkness, not the tree's showing through (a min blend let a darker tree through her
+// hand); and the resolve darkens the wall's colour by what is left and sets the alpha back to 1
 // (RenderOrder.puppetPrime .. puppetResolve, before the hands' shadows). Glow parts add their light. Everything can be cut off at
 // the wall's edges (clipToWall), as a shadow theatre's screen cuts off a piece of scenery sliding into the wings. Built when a
 // scene loads; a frame only sets matrices, a few uniforms and one opacity each.
@@ -13,12 +15,12 @@ import {
   AddEquation,
   AdditiveBlending,
   CanvasTexture,
+  ConstantAlphaFactor,
   CustomBlending,
   DoubleSide,
   DstAlphaFactor,
   Group,
   Mesh,
-  MinEquation,
   OneFactor,
   OneMinusSrcAlphaFactor,
   PlaneGeometry,
@@ -70,7 +72,8 @@ uniform vec2 clip;
 varying vec2 vWall;`;
 const CLIP_TEST = /* glsl */ `if (abs(vWall.x) > clip.x || abs(vWall.y) > clip.y) discard;`;
 
-// A near shadow: the light it lets through, 1 - alpha (an opacity of 0.88 leaves 12 %), into the frame's alpha by a min blend.
+// A near shadow: how much of it is here (its `opacity` here is that cover, 0..1); its blend lays its light (the material's
+// blendAlpha) over the frame's alpha by that much.
 const SHADOW_FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float opacity;
@@ -80,7 +83,7 @@ void main() {
   ${CLIP_TEST}
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0 - a);
+  gl_FragColor = vec4(0.0, 0.0, 0.0, a);
 }`;
 
 // A shadow standing back: takes its share (its alpha) of the light however dim the wall is. Its blend multiplies the frame's
@@ -129,6 +132,8 @@ interface Piece {
   readonly py: number;
   readonly mirror: number;
   readonly glow: boolean;
+  /** A near shadow: it covers what is under it (its cover in `opacity`, its light in the material's blendAlpha). */
+  readonly near: boolean;
   /** Its opacity is multiplied by this: 1 against the wall, less the further back it stands. */
   readonly strength: number;
   readonly material: ShaderMaterial;
@@ -267,13 +272,14 @@ export class PuppetView {
           fragmentShader: SHADOW_FRAGMENT,
           transparent: true,
           blending: CustomBlending,
-          // The colour is kept; the alpha is the smaller of it and the light this lets through (the resolve applies it).
+          // The colour is kept; the alpha goes toward the light this lets through (blendAlpha, set each frame) by the cover (the
+          // fragment's alpha). The resolve applies it.
           blendEquation: AddEquation,
           blendSrc: ZeroFactor,
           blendDst: OneFactor,
-          blendEquationAlpha: MinEquation,
-          blendSrcAlpha: OneFactor,
-          blendDstAlpha: OneFactor,
+          blendEquationAlpha: AddEquation,
+          blendSrcAlpha: ConstantAlphaFactor,
+          blendDstAlpha: OneMinusSrcAlphaFactor,
           depthWrite: false,
           side: DoubleSide,
           toneMapped: false,
@@ -296,6 +302,7 @@ export class PuppetView {
         py: pivot[1],
         mirror: part.mirror ? -1 : 1,
         glow,
+        near: !glow && depth === 0,
         strength: glow ? 1 : far ? depthStrength(depth) : NEAR_SHADOW_STRENGTH,
         material,
         texture,
@@ -342,10 +349,12 @@ export class PuppetView {
 
   /**
    * Poses the parts from `player` on `stage`. `light` (0..1) is how much of the candle's light reaches the wall times the
-   * shadows' solidity: covering the flame takes the puppets' shadows (and glows) away with the hands'.
+   * shadows' solidity: covering the flame takes the puppets' shadows (and glows) away with the hands'. `fade` (0..1) is how
+   * much of the whole puppet is there, as its parts' own opacity is: a near shadow fading covers the scenery less, rather than
+   * covering it with a paler shadow (which would show as a pale shape on a tree).
    */
-  update(player: ScenePlayer, stage: StagePlane, light: number): void {
-    this.group.visible = light > 0.001;
+  update(player: ScenePlayer, stage: StagePlane, light: number, fade = 1): void {
+    this.group.visible = light > 0.001 && fade > 0.001;
     if (!this.group.visible) return;
     const world = player.world;
     const r = stage.right,
@@ -372,10 +381,15 @@ export class PuppetView {
     for (let k = 0; k < this.pieces.length; k++) {
       const p = this.pieces[k];
       const b = p.part * POSE_STRIDE;
-      const opacity = world[b + 4] * light * p.strength;
+      const there = world[b + 4] * fade;
+      const opacity = there * light * p.strength;
       p.mesh.visible = opacity > 0.003;
       if (!p.mesh.visible) continue;
-      p.material.uniforms.opacity.value = opacity;
+      if (p.near) {
+        p.material.uniforms.opacity.value = there > 1 ? 1 : there;
+        const dark = light * p.strength;
+        p.material.blendAlpha = dark >= 1 ? 0 : 1 - dark;
+      } else p.material.uniforms.opacity.value = opacity;
       const c = Math.cos(world[b + 2]),
         s = Math.sin(world[b + 2]),
         sc = world[b + 3] * this.scale;

@@ -54,6 +54,13 @@ describe('ShapeGuide', () => {
     expect(g.x).toBeCloseTo(0.5 - GHOST_GAP_M);
   });
 
+  it('stands where the scene puts it when the scene says (FriendBeat.guide)', () => {
+    const g = new ShapeGuide();
+    g.update(1 / 60, true, -1, 0, NaN, NaN, -0.25, 0.33, 0.28, 0.36);
+    expect(g.x).toBeCloseTo(0.28);
+    expect(g.y).toBeCloseTo(0.36);
+  });
+
   it('leans her hand toward the player’s while the shape is held, and back after', () => {
     const g = new ShapeGuide();
     run(g, 2, true, 0, 1, 0.3, 0.2, -0.3, 0.2);
