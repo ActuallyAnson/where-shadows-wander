@@ -64,12 +64,18 @@ export const HANDOVER_S = GIVE_S + OFFER_LEN_S + 0.3;
 const TAKE_LEN_S = 0.9;
 /** They stand and walk on; the park slides away and the school gate slides in, in a pale morning. */
 const STAND_S = HANDOVER_S + TAKE_LEN_S + 1.4;
-const WALK_S = STAND_S + 0.6;
-const PARK_OUT_S = WALK_S + 0.4;
+const WALK_S = STAND_S + 0.55;
+const WALK_LEG1_S = 4.05; // 4.5 full WALK strides across the park off the right edge
+const WALK_FRIEND_LAG_S = 0.15;
+const WALK_ENTER_S = WALK_S + 4.35;
+const WALK_LEG2_S = 4.5; // 5 full WALK strides in from the left edge to the gate
+const WALK_FRIEND_LEG2_S = 4.05;
+const PARK_OUT_S = WALK_S;
 const PARK_OUT_LEN_S = 4.0;
 const GATE_IN_S = PARK_OUT_S + 1.4;
 const GATE_IN_LEN_S = 4.0;
-const STOP_S = GATE_IN_S + GATE_IN_LEN_S + 0.8;
+const STOP_S = WALK_ENTER_S + WALK_LEG2_S;
+const FRIEND_STOP_S = WALK_ENTER_S + WALK_FRIEND_LAG_S + WALK_FRIEND_LEG2_S;
 /** At the gate the boy turns round to face the friend, and she raises her hand. */
 const TURN_S = STOP_S + 0.8;
 const TURN_LEN_S = 0.3;
@@ -163,14 +169,15 @@ const handGlow = (kid: string): PuppetPart => ({
 });
 
 /** A firefly's light in a jar. */
-const jarGlow = (jar: string): PuppetPart => ({
+const jarGlow = (jar: string, y = 0, size = 0.1): PuppetPart => ({
   id: `${jar}-glow`,
   art: 'orb',
   look: 'glow',
   tint: FIREFLY_TINT,
   parent: jar,
-  w: 0.1,
-  h: 0.1,
+  w: size,
+  h: size,
+  ...(y !== 0 ? { y } : {}),
   opacity: 0,
 });
 
@@ -237,8 +244,17 @@ const parts: PuppetPart[] = [
   // The walk to school: the kids again, the boy carrying the jar.
   ...standingKid('walk-friend', FRIEND_SIT_X, 1, { opacity: 0, girl: true }),
   ...standingKid('walk-boy', BOY_SIT_X, 1, { opacity: 0 }),
-  { id: 'walk-jar', art: 'jar', parent: 'walk-boy', w: 0.04, h: 0.054, pivot: [0.5, 0], x: 0.05, y: 0.11 },
-  jarGlow('walk-jar'),
+  {
+    id: 'walk-jar',
+    art: 'jar',
+    parent: 'walk-boy',
+    w: JAR_W,
+    h: JAR_H,
+    pivot: [0.5, 0.5],
+    x: 0.05,
+    y: 0.11 + JAR_H / 2,
+  },
+  jarGlow('walk-jar', -0.08 * JAR_H, 0.08),
   // At the gate, each turned the other way about: the boy to face her (the jar still in his arm), then her to go her own way.
   ...standingKid('walk-boy-back', BOY_GATE_X, -1, { opacity: 0 }),
   {
@@ -271,6 +287,19 @@ const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smo
 ];
 
 const step = (t: number, to: number): Key => [t, to, 'step'];
+
+/** Merges tracks that animate the same part property across separate time stretches in order. */
+function joinTracks(...batches: readonly Track[][]): Track[] {
+  const bySlot = new Map<string, Track>();
+  for (const batch of batches) {
+    for (const tr of batch) {
+      const k = `${tr.part}.${tr.prop}`;
+      const prev = bySlot.get(k);
+      bySlot.set(k, prev ? { ...prev, keys: [...prev.keys, ...tr.keys] } : tr);
+    }
+  }
+  return [...bySlot.values()];
+}
 
 /** How bright the firefly in the jar is. */
 const JAR_GLOW = 0.8;
@@ -430,16 +459,58 @@ const tracks: Track[] = [
     prop: 'opacity',
     keys: [
       [PARK_OUT_S, JAR_GLOW],
-      [PARK_OUT_S + 5, 0, 'smooth'],
+      [PARK_OUT_S + 6.5, 0, 'smooth'],
     ],
   },
-  { part: 'walk-boy', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 0, 1) },
-  { part: 'walk-friend', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 0, 1) },
+  {
+    part: 'walk-boy',
+    prop: 'opacity',
+    keys: [
+      ...fadeKeys(STAND_S, CROSS_S, 0, 1),
+      [WALK_S + WALK_LEG1_S - 0.05, 1],
+      [WALK_S + WALK_LEG1_S, 0],
+      step(WALK_ENTER_S, 1),
+      [TURN_S, 1],
+      [TURN_S + TURN_LEN_S, 0],
+    ],
+  },
+  {
+    part: 'walk-friend',
+    prop: 'opacity',
+    keys: [
+      ...fadeKeys(STAND_S, CROSS_S, 0, 1),
+      [WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S - 0.05, 1],
+      [WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, 0],
+      step(WALK_ENTER_S + WALK_FRIEND_LAG_S, 1),
+    ],
+  },
   { part: 'walk-boy-arm-front', prop: 'angle', keys: [[0, -1.7]] },
-  ...stepTracks('walk-boy', 1, WALK_S, STOP_S, WALK, { armsBusy: 'front' }),
-  ...stepTracks('walk-friend', 1, WALK_S, STOP_S, WALK, { girl: true }),
-  { part: 'walk-boy', prop: 'x', keys: move(WALK_S, BOY_SIT_X, STOP_S, BOY_GATE_X, 'linear') },
-  { part: 'walk-friend', prop: 'x', keys: move(WALK_S, FRIEND_SIT_X, STOP_S, FRIEND_GATE_X, 'linear') },
+  ...joinTracks(
+    stepTracks('walk-boy', 1, WALK_S, WALK_S + WALK_LEG1_S, WALK, { armsBusy: 'front' }),
+    stepTracks('walk-boy', 1, WALK_ENTER_S, STOP_S, WALK, { armsBusy: 'front' }),
+    stepTracks('walk-friend', 1, WALK_S + WALK_FRIEND_LAG_S, WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, WALK, {
+      girl: true,
+    }),
+    stepTracks('walk-friend', 1, WALK_ENTER_S + WALK_FRIEND_LAG_S, FRIEND_STOP_S, WALK, { girl: true }),
+  ),
+  {
+    part: 'walk-boy',
+    prop: 'x',
+    keys: [
+      ...move(WALK_S, BOY_SIT_X, WALK_S + WALK_LEG1_S, 1.25, 'linear'),
+      step(WALK_ENTER_S, -0.98),
+      [STOP_S, BOY_GATE_X, 'linear'],
+    ],
+  },
+  {
+    part: 'walk-friend',
+    prop: 'x',
+    keys: [
+      ...move(WALK_S + WALK_FRIEND_LAG_S, FRIEND_SIT_X, WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, 1.04, 'linear'),
+      step(WALK_ENTER_S + WALK_FRIEND_LAG_S, -1.15),
+      [FRIEND_STOP_S, FRIEND_GATE_X, 'linear'],
+    ],
+  },
   ...PARK_TREES.map((t): Track => ({
     part: t.id,
     prop: 'x',
@@ -474,14 +545,6 @@ const tracks: Track[] = [
   }),
   // At the gate the boy turns round to face her (he is the other way about now, the jar still in his arm)...
   {
-    part: 'walk-boy',
-    prop: 'opacity',
-    keys: [
-      [TURN_S, 1],
-      [TURN_S + TURN_LEN_S, 0],
-    ],
-  },
-  {
     part: 'walk-boy-back',
     prop: 'opacity',
     keys: [
@@ -510,14 +573,16 @@ const wobbles: Wobble[] = [
 ];
 
 /**
- * A soft shimmer as the firefly settles in the player's cup, and as the first two come down to the kids' hands; a small clink of
- * glass as it settles in her jar. The crickets go with the night as the park slides off into morning, and as the school gate
+ * A soft shimmer as the firefly settles in the player's cup, and as each firefly comes down to the kids' hands; a small clink
+ * of glass as it settles in her jar. The crickets go with the night as the park slides off into morning, and as the school gate
  * slides in the morning birds start and a bell rings far off.
  */
 const cues: Cue[] = [
   { t: 0.1, kind: 'sound', sound: 'firefly', x: FIREFLY_HOVER[0], y: FIREFLY_HOVER[1] },
-  { t: gatherAt(0) + INTO_HAND_S, kind: 'sound', sound: 'firefly', x: FRIEND_HAND[0], y: FRIEND_HAND[1] },
-  { t: gatherAt(1) + INTO_HAND_S, kind: 'sound', sound: 'firefly', x: BOY_HAND[0], y: BOY_HAND[1] },
+  ...ALL_FLIES.map((_, i): Cue => {
+    const hand = toFriend(i) ? FRIEND_HAND : BOY_HAND;
+    return { t: gatherAt(i) + INTO_HAND_S, kind: 'sound', sound: 'firefly', x: hand[0], y: hand[1] };
+  }),
   { t: INTO_JAR_S + INTO_JAR_LEN_S, kind: 'sound', sound: 'jar', x: JAR_IN_LAP[0], y: JAR_IN_LAP[1] },
   { t: PARK_OUT_S, kind: 'sound', sound: 'slide', x: -0.4, y: 0 },
   { t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 },

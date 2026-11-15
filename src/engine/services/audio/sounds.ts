@@ -314,7 +314,7 @@ export const SOUND_DEFS: readonly SoundDef[] = [
   // the rain, the candle and the music are the bed, and these sit on top. Tune by ear on a headset.
   recorded('giggle', 0.45, { priority: 2, minGapS: 1 }),
   recorded('hop', 0.3, { near: true, minGapS: 0.1, priority: 0 }),
-  recorded('blanket', 0.4, { minGapS: 1 }),
+  recorded('blanket', 0.75, { minGapS: 1 }),
   recorded('run', 0.35, { near: true, minGapS: 0.5, priority: 0 }),
   recorded('jar', 0.2, { near: true, minGapS: 1 }),
   recorded('bell', 0.25, { far: true, minGapS: 4 }),

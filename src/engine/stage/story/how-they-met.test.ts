@@ -66,14 +66,14 @@ describe('the memories’ sounds', () => {
       .map((q) => (q.kind === 'sound' ? q.sound : ''));
   };
 
-  it('clicks her torch on and throws the blanket up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
-    expect(sounds('the-storm')).toEqual(['slide', 'click', 'blanket']);
+  it('pulls the blanket over him and throws it up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
+    expect(sounds('the-storm')).toEqual(['slide', 'blanket', 'click', 'blanket']);
     expect(sounds('how-they-met')).toEqual(['hop', 'rumble', 'hop', 'hop', 'laugh', 'hop', 'hop', 'giggle']);
     expect(sounds('the-park')).toEqual(['slide', 'slide', 'run', 'run', 'laugh']);
   });
 
   it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate in scene 5, swells and gusts in 6', () => {
-    expect(sounds('fireflies')).toEqual(['firefly', 'firefly', 'firefly', 'jar', 'slide', 'slide', 'bell']);
+    expect(sounds('fireflies')).toEqual([...Array(10).fill('firefly'), 'jar', 'slide', 'slide', 'bell']);
     expect(sounds('last-ordinary-day')).toEqual(['gate', 'slide', 'slide', 'slide']);
     expect(sounds('goodbye')).toEqual(['palms', 'gust']);
   });
