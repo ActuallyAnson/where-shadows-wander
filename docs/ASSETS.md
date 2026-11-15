@@ -33,6 +33,7 @@ All 29 sounds are made in code by `src/engine/services/audio/placeholder-sounds.
 | `note0` to `note4` | Five music-box notes: C5, D5, E5, G5, A5 | The lullaby notes in the prologue | Placeholder |
 | `tick` | A tiny tick | A fingertip reaches a menu item | Placeholder |
 | `press` | A soft click | A menu item is pressed | Placeholder |
+| `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). The placeholder is a small muffled pat made for the old traveller, so it may be too faint and too small for a grown-up | Placeholder |
 
 ### Made but not played
 
@@ -45,7 +46,7 @@ All 29 sounds are made in code by `src/engine/services/audio/placeholder-sounds.
 
 ### Left over from the puzzle game
 
-`twinkle` (spirit fox), `hop` (rabbit landing), `step0` and `step1` (the traveller's footsteps), `snowtick` (snow on the glass), `creak` (a beam). Status: **Drop**.
+`twinkle` (spirit fox), `hop` (rabbit landing), `snowtick` (snow on the glass), `creak` (a beam). Status: **Drop**. (`step0` and `step1` were here too; scene 2's hush plays them now, so they are in the first table.)
 
 ### Sounds the story needs that don't exist
 
@@ -55,13 +56,13 @@ All 29 sounds are made in code by `src/engine/services/audio/placeholder-sounds.
 | Torch clicking on | The prologue, when she sets the torch down. A lullaby note plays there now. | Needed |
 | Far thunder inside the memory | Scene 3, listed as "still to do" | Needed (could reuse `thunder`) |
 | Breathing slowing, or a small yawn | Scene 7, as he falls asleep | Needed |
-| Rain easing off | Scene 7 | Needed (could be `rain` faded, or a lighter take) |
+| Rain easing off | Scene 7 | Done by fading `rain` as he falls asleep (the ending turns the ambience down, `ending-timeline.ts`); a lighter take would still help |
 
 ## Music
 
 | Name | What it is | Status |
 |---|---|---|
-| `music` | A 24 s loop of sine pads and music-box notes over A minor, F, C, G (in code) | Placeholder, and **never started**: no music plays in the game now |
+| `music` | A 24 s loop of sine pads and music-box notes over A minor, F, C, G (in code) | Placeholder, and **never started**: no music plays in the game now. The ending already turns the music bus down with the candle and back up softly under the credits (`ending-timeline.ts`), so music started on that bus will follow it |
 | The lullaby | One music-box melody through the whole story: fuller in scenes 2 to 4, thinning in 5, a single note in 6, silent in 7 (`STORY.md`, "The music"). Best delivered as layers or stems so it can thin out. Keep it in a key the five notes fit, or replace the notes to match. | Needed |
 
 ## 3D models
