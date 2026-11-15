@@ -4,7 +4,8 @@
 // ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 //
 // What runs (docs/adr/0016-story-shadow-theatre.md): the bedroom, lighting the candle, the hands' shadows on the
-// wall, and covering the flame to pause. The story told in shadow puppets on the wall comes next.
+// wall, the story told in shadow puppets (docs/STORY.md), covering the flame to pause, and at the end to sleep.
+// docs/ARCHITECTURE.md walks through one frame.
 import {
   AmbientLight,
   AssetManager,
@@ -205,10 +206,10 @@ async function start(): Promise<void> {
   saves.touchDay();
   attachSaveHooks(saves, visibility, { window, document });
 
-  // Shape recognition on both hands every frame; the story will listen to its commits.
+  // Shape recognition on both hands every frame; the story listens to its commits.
   const shapes = new ShapeRecognizer();
-  // Lantern gestures. The cover-flame gesture waits for the lantern flow: the candle sits in the lap, where a resting fist
-  // would read as "pause" (covering the flame is read by CandleView instead).
+  // Lantern gestures. Nothing listens to them now that the candle stays on its saucer (only the diagnostics count them):
+  // covering the flame is read by CandleView, and no lantern is set, so a resting fist near it never reads as "pause".
   const gestures = new GestureDetector();
   gestures.setLantern(null);
   let clock = 0;

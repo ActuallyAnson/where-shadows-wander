@@ -16,7 +16,7 @@ Pure code               src/engine/hands, src/engine/stage, src/engine/shadow/pu
 
 - **IWSDK** owns the XR session, the renderer and the display loop. We use it for the session and the emulator, and nothing else: v1 is a virtual room, so no scene understanding, planes or anchors, and sound is plain Web Audio ([ADR 0008](adr/0008-audio.md)); IWSDK's own audio system is still registered and makes its own audio context, so the page has two. Game state never goes into IWSDK's ECS ([ADR 0001](adr/0001-iwsdk-as-xr-and-view-layer.md)).
 - **Engine-facing code** talks to IWSDK, three.js, WebXR and the DOM. It turns the outside world into plain data, and plain data into things on screen.
-- **Pure code** holds the logic: hand maths and the classifier, shadow projection and stage geometry. It's unit-tested in Node and can't see the engine, which ESLint enforces. This is also why the plain three.js fallback stays cheap ([ADR 0002](adr/0002-plain-threejs-fallback.md)).
+- **Pure code** holds the logic: hand maths and the classifier, shadow projection, stage geometry, and the story (its running order, puppet scenes and timelines, all as numbers). It's unit-tested in Node and can't see the engine, which ESLint enforces. This is also why the plain three.js fallback stays cheap ([ADR 0002](adr/0002-plain-threejs-fallback.md)).
 
 ## One frame
 
@@ -26,20 +26,37 @@ IWSDK calls `renderer.setAnimationLoop` and runs its systems in priority order. 
 flowchart LR
   XR["XR frame<br/>(IWSDK)"] --> Hands["Read hands<br/>engine/xr"]
   Hands --> Classify["Classify shapes,<br/>detect gestures<br/>engine/hands"]
-  Classify --> Shadow["Project and draw<br/>hand shadows<br/>engine/shadow"]
-  Shadow --> Light["Light the room<br/>engine/shadow, render"]
-  Classify -->|"shape events"| Audio["Audio<br/>engine/services"]
+  Classify --> Candle["Candle: light it,<br/>cover it<br/>engine/render"]
+  Candle --> Shadow["Project and draw<br/>hand shadows<br/>engine/shadow"]
+  Shadow --> Story["Story: friend's hand,<br/>memories in puppets<br/>engine/stage/story"]
+  Classify -->|"shape commits"| Story
+  Story --> Light["Light the room<br/>engine/shadow, render"]
+  Story -->|"cues"| Audio["Audio<br/>engine/services"]
   Light --> Draw["three.js render<br/>(IWSDK)"]
 ```
 
 1. **Read hands and capabilities** (`engine/xr`): raw WebXR joints into `HandFrame`, 25 joints per hand in scene space ([ADR 0004](adr/0004-webcam-bench-and-hand-recordings.md)). In mock mode the webcam or a recording fills the same `HandFrame`. `CapabilityDetector` keeps one `Capabilities` object up to date (hands, passthrough, planes, meshes, anchors) and the detected planes as `DetectedPlane` records in scene space, normals toward the viewer, for StageFrame.
-2. **Classify** (`engine/hands`): features, then the shape classifier with hold-to-commit and hysteresis, which emits shape events (`ShapeRecognizer`). Then the lantern gestures on the same features (`GestureDetector`): pinch-and-release to place or relight, a closed hand over the flame to pause.
-3. **Shadows** (`engine/shadow`): `ShadowProjector` (pure, in `shadow/pure`) projects each hand onto the stage from the lantern with one matrix blended toward orthographic (k = 0.9), filling `HandShadow` (in `engine/hands`): 28 capsules per hand in 2D stage space, an outline and an edge blur. `ShadowRenderer` draws both hands from those capsules in one draw call, soft-edged and clipped to the stage. The stage is A's `StageFrame`, in a headset and in the Hand Lab alike, and the candle stands on the bed tray's saucer (`placeRig` in `main.ts`).
-4. **Light the room** (`engine/shadow`, `engine/render`): the lantern light follows the candle's flame and flicker, and the paper wall, the bedroom, its dressing and the candle read it. The room's light spreads out from the flame once the candle is lit and draws back while the flame is covered (the pause).
-5. **Audio** (`engine/services`): the shape events rustle and thump from where that hand's shadow is, and the candle crackles, lifts and sets down. Saves are written only on events (the headset coming off, the session ending, the page hidden), never per frame.
-6. IWSDK renders the scene.
+2. **Classify** (`engine/hands`): features, then the shape classifier with hold-to-commit and hysteresis, which emits shape events (`ShapeRecognizer`). `GestureDetector` still runs on the same features, but nothing listens to its events since the candle stopped moving (only the diagnostics count them).
+3. **The candle** (`engine/render/candle-view.ts`): before the story the matchstick lights it (`IgnitionHold`, `engine/stage/ignition.ts`); after that a hand held over the flame covers it (`CandleView.isCovered`, read from the hands, not from a gesture). Covering pauses the story; in scene 7 it is how the player falls asleep. The candle never moves: it stands on the bed tray's saucer.
+4. **Shadows** (`engine/shadow`): `ShadowProjector` (pure, in `shadow/pure`) projects each hand onto the stage from the lantern with one matrix blended toward orthographic (0.65 on the wall: `shadow/pure/real-wall.ts`), filling `HandShadow` (in `engine/hands`): 28 capsules per hand in 2D stage space, an outline and an edge blur. `ShadowRenderer` draws both hands from those capsules in one draw call, soft-edged and clipped to the stage. The stage is the wall's `StageFrame`, in a headset and in the Hand Lab alike, and the candle stands on the bed tray's saucer (`placeRig` in `main.ts`). `HandPresence` sets how dark the player's shadow is: faint while a memory plays, full when the story waits for a hand.
+5. **The story** (`engine/stage/story`, drawn by `engine/shadow/puppet-view.ts`; [STORY.md](STORY.md), [ADR 0016](adr/0016-story-shadow-theatre.md)): see [The story](#the-story) below. It holds still while the game is paused or the flame is covered.
+6. **Light the room** (`engine/shadow`, `engine/render`): the lantern light follows the candle's flame and flicker, tinted by the story's candle mood (`CandleMoodBlend`), and the paper wall, the bedroom, its dressing and the candle read it. The room's light spreads out from the flame once the candle is lit, draws back while the flame is covered (the pause), dims with scene 2's hush (`LightHush`) and under scene 7's ghost hand (`SleepHint`), and goes out with the ending. The storm outside (`engine/stage/storm.ts`) flashes the window.
+7. **Audio** (`engine/services/audio`): one music track from the candle's lighting to the end; rain, thunder and the story's cue sounds (footsteps, laughter, her torch's click, a yawn) placed where they happen on the wall or in the room; the shape events rustle and thump from where that hand's shadow is; captions name the sounds on the wall. Saves are written only on events (the headset coming off, the session ending, the page hidden), never per frame.
+8. IWSDK renders the scene.
 
-There is no gameplay step yet. The puzzle game and its fixed-step simulation were removed ([ADR 0016](adr/0016-story-shadow-theatre.md)); a story told in shadow puppets, advanced by the player's hand shapes, is planned in their place, and will get its own place in the frame when it is built.
+The opening and the end are timelines that run around this: `WakeTimeline` (scene 1: black, thunder, the eyes opening) before the candle is lit, and `EndingTimeline` (the candle going out, the eyes closing, the credits, the session ending) once the flame is covered in scene 7. There is no fixed-step simulation; everything steps on the frame's `dt`.
+
+## The story
+
+The seven scenes are written in [STORY.md](STORY.md); this is how the code plays them.
+
+- **Running order.** `StoryDirector` (`story/story-director.ts`) plays `STORY_SCRIPT` (`story/story-script.ts`): each scene is a list of beats. A `friend` beat shows the friend's hand making a shape and waits, for as long as it takes, until the player's hand commits that shape (`story.commit` from the shape events). A `memory` beat plays one chapter of the puppet show to its end. Scene 1 (waking) runs before the script, from the candle; scene 7 ends with `waitingForSleep`, which the covered flame answers.
+- **One puppet show.** Every memory is a chapter (`the-storm.ts`, `how-they-met.ts`, `the-park.ts`, `fireflies.ts`, `last-ordinary-day.ts`, `goodbye.ts`) joined end to end into one `PuppetScene` (`puppet/chapters.ts`, `story/story-stage.ts`), so the kids, the rabbit and the places carry over and the wall never goes blank. `story-kit.ts` has the stock puppets and moves. A `PuppetScene` is plain data: cut-out parts hung from each other at pivots, keyframed tracks and cues. `ScenePlayer` (`puppet/scene-player.ts`) compiles it into flat arrays on load and samples a pose as a pure function of the time, so a skip or seek can't leave a part half-way, and a frame allocates nothing.
+- **Cues.** A scene's cues change the candle's mood, strike the storm, play a step or a sound from a point on the wall, hush the light, or write a word on the wall (`StoryLineView`). `main.ts`'s `onStoryCue` routes them.
+- **The friend's hand.** A painted shadow of a child's hand making the shape (`story/friend-puppet.ts`), played by time as a puppet of its own. `ShapeGuide` reads how near the player's hand is to her shape and leans her hand and steadies the flame as it gets close; an outline of her shape sits on the player's shadow to fill.
+- **The end.** `SleepHint` shows a ghost hand (`engine/render/ghost-hand-view.ts`) covering the flame, stronger the longer the wait, then one word. Covering the flame plays `EndingTimeline`.
+- **Where it draws.** The story has its own `StageFrame`, `storyFrame`: the same wall at `STORY_SCALE` (2.375) times the stage, centred on the wall (`setStoryArea`), so the memories fill most of the 4 × 2.5 m wall. Puppets are clipped to the wall's edges. The player's own shadow and the captions keep the stage.
+- **Testing.** The Hand Lab's Story tab has a checkpoint for every scene and can make the waiting shape with synthetic hands; `__wsw.playStory()` restarts it in dev.
 
 The stage is a 2D world on one surface, the fixed virtual wall of the room. `StageFrame` (`engine/stage`) converts between 3D scene space and 2D stage space; a real table or wall (a possible later mode) would only supply a different frame.
 
@@ -66,19 +83,21 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 
 ## Modules
 
-| Folder | Owner | Pure | Responsibility |
-|---|---|---|---|
-| `src/app` | Anson | No | Entry point: `World.create`, the driver system, wiring, the no-AR notice, IWSDK manifests |
-| `src/engine/xr` | Anson | No | WebXR hand reading, capability detection, IWSDK workarounds, hand recorder, the hand visual (glove) |
-| `src/engine/hands` | Anson | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, recording format |
-| `src/engine/shadow` | Anson | No (`pure/` yes) | Projected-shadow renderer; `pure/`: projection maths, capsules, stand-in rig |
-| `src/input-mock` | Anson | No | Hand Lab (mock hands in the game's session, chosen on the page: `src/app/launch-mode.ts`, [ADR 0018](adr/0018-hand-lab-in-session.md)) and its hand sources, the desk-to-rig mapping, webcam bench, MediaPipe conversion and worker |
-| `src/engine/stage` | A | Yes | `StageFrame`: 3D ↔ 2D for the fixed virtual wall (a real surface in a later mode); the room layout file |
-| `src/engine/render` | B | No | The candle, the title lighter, the bedroom and the bed tray |
-| `src/engine/anim` | B | Core yes | Procedural rod-puppet animation |
-| `src/engine/services` | Anson (B owns the content: sounds) | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), settings (`settings/`: the accessibility settings table and the store that applies them live, ADR 0011), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio |
-| `src/ui` | B (settings panel: Anson) | No | Onboarding, lantern flow, placement, chapter flow, the settings panel (`settings-panel/`, ADR 0011) |
-| `src/debug` | B (debug tools: Anson) | No | Diagnostics report, anchor probe, profiler, Copy report panel; the debug tools (overlays, system switches, replay, keys, menu pages), dev and tester builds only ([ADR 0012](adr/0012-debug-tools.md)) |
+Since 11 Nov 2026 no folder has an owner: anyone on the team edits any of them.
+
+| Folder | Pure | Responsibility |
+|---|---|---|
+| `src/app` | No | Entry point: `World.create`, the driver system, wiring (the story, the wake and the ending included), the launcher and title, the 🛠 Dev overlay, capture mode, frame timings, the no-XR notice, IWSDK manifests |
+| `src/engine/xr` | No | WebXR hand reading, capability detection, the no-hands cue, session visibility, IWSDK workarounds, hand recorder, the hand visual (glove) |
+| `src/engine/hands` | Yes | `HandFrame`, derived palm, shape features, classifier, gestures, the covering hand, synthetic hands, recording format |
+| `src/engine/shadow` | No (`pure/` yes) | Projected-shadow renderer; the bedroom's dressing and placed models, the puppet view, the story's ink lines, the wake's lids and fades; `pure/`: projection maths, capsules, lantern light, sharpen, the skip touch, stand-in rig |
+| `src/engine/stage` | Yes | `StageFrame`: 3D ↔ 2D for the fixed virtual wall (a real surface in a later mode); the room layout file; `story/`: the story's running order, script, chapters and helpers; `puppet/`: puppet scenes and their player; the wake, ignition, storm and ending timelines |
+| `src/engine/render` | No | The candle, the title lighter, the ghost hand, the bedroom and the bed tray |
+| `src/engine/services` | Adapters no | Saves (`saves/`: two checksummed slots, migrations, ADR 0010), settings (`settings/`: the accessibility settings table and the store that applies them live, ADR 0011), assets (`assets/`: budgets, manifest-from-files, loader; ADR 0009), audio (`audio/`: Web Audio engine, mixer and voice pool, recorded and placeholder sounds, captions) |
+| `src/engine/testing` | Yes | Shared test helpers: the allocation meter and the frame-pipeline fixture and allocation test |
+| `src/ui` | No | The title screen, the wall menu and pause, the settings panel (`settings-panel/`, ADR 0011), the credits |
+| `src/input-mock` | No | Hand Lab (mock hands in the game's session, chosen on the page: `src/app/launch-mode.ts`, [ADR 0018](adr/0018-hand-lab-in-session.md)) with its Steps and Story tabs and hand sources, the desk-to-rig mapping, webcam bench, MediaPipe conversion and worker |
+| `src/debug` | No | Diagnostics report, anchor probe, profiler, Copy report panel; the debug tools (overlays, system switches, replay, keys, menu pages), dev and tester builds only ([ADR 0012](adr/0012-debug-tools.md)) |
 
 "Adapters no" means only the thin layer that talks to IWSDK or three.js may import them; the logic behind it stays pure.
 
@@ -86,20 +105,21 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 
 At 72 fps a frame has **13.9 ms**. Judges require at least 60 fps (16.7 ms), so 72 gives margin. These are **CPU** budgets per frame. GPU time is separate, so measure it on the Pico.
 
-| Module | Owner | Budget |
-|---|---|---|
-| IWSDK systems and three.js render submission | (engine) | 4.0 ms |
-| Read hands, capabilities | Anson | 0.4 ms |
-| Features, classifier, gestures | Anson | 0.7 ms |
-| Shadow projection and capsules | Anson | 0.9 ms |
-| Hand visual | Anson | 0.2 ms |
-| Room lighting and views | B | 2.3 ms |
-| Services (audio, saves, asset streaming) | B | 0.5 ms |
-| Diagnostics and profiler | B | 0.3 ms |
-| **Headroom** | | **4.6 ms** |
-| **Total** | | **13.9 ms** |
+| Module | Budget |
+|---|---|
+| IWSDK systems and three.js render submission | 4.0 ms |
+| Read hands, capabilities | 0.4 ms |
+| Features, classifier, gestures | 0.7 ms |
+| Shadow projection and capsules | 0.9 ms |
+| Story: director, puppet scenes, friend's hand, ink lines | 1.0 ms |
+| Hand visual | 0.2 ms |
+| Room lighting and views | 2.3 ms |
+| Services (audio, saves, asset streaming) | 0.5 ms |
+| Diagnostics and profiler | 0.3 ms |
+| **Headroom** | **3.6 ms** |
+| **Total** | **13.9 ms** |
 
-These are starting estimates. Desktop measurements so far: our whole frame was about 0.06 ms, and 500 instanced quads about 0.08 ms. Expect a headset to be 3–5× slower. Teammate B's profiler (`src/debug`) will measure each module against this table on the Pico, and the table should be updated from real numbers.
+These are starting estimates; the story's 1.0 ms came out of the headroom when it was built. Desktop measurements so far: our whole frame was about 0.06 ms, and 500 instanced quads about 0.08 ms (both before the story). Expect a headset to be 3–5× slower. The profiler (`src/debug`, `src/app/frame-timings.ts`) measures the frame on the Pico, and the table should be updated from real numbers. Its slots don't match the table yet: the story runs inside the `shadow` slot, so that slot's number is shadows and story together.
 
 How to measure against this table, and the numbers so far, are in [PERFORMANCE.md](PERFORMANCE.md).
 
@@ -111,13 +131,13 @@ The game runs in an `immersive-vr` session, seated (`local-floor`), and, beyond 
 
 **What the page starts as.** The address is always the plain page: no query options. `src/app/launch-mode.ts` keeps the mode (`game`, or `room-editor` in dev and tester builds) and whose hands play (`device`, or a Hand Lab mock source in dev and tester builds) in the tab's `sessionStorage`, with whether the Hand Lab panel shows. The panel and the hands change live (the 🛠 Dev overlay's **Hand Lab panel** button, the panel's sources); only the room editor reloads. The game always runs in a session; mock hands only replace the device's hands in it, and the room editor is the one mode with no session ([ADR 0018](adr/0018-hand-lab-in-session.md)). The testing switches are in `localStorage` (`src/app/testing-options.ts`). Probe scripts set both before the page loads and press BEGIN to enter the emulator's session (`scripts/lib/launch.mjs`).
 
-| Part | How it works | Owner |
-|---|---|---|
-| The room | A small scene: the bed and its tray, the candle, the paper wall, lit by the candle. Opaque geometry; scenery near the shadows stays light and low-contrast | B |
-| The stage | The paper wall is a `StageFrame` (`engine/stage`, structurally a `StagePlane`): `placeInFront(head, yaw)` puts it upright 2 m ahead, 1.6 × 1.0 m, 0.2 m below the eyes, facing the player, when the session starts and again on a recentre. `main.ts` uses it in a headset and in the Hand Lab; the old tabletop stand-in stage was removed. The projector blends 0.65 toward orthographic on the real wall with a low edge blur (`shadow/pure/real-wall.ts`), so a puppet hand casts a steady shadow about 15 × 35 cm (`stage-frame-geometry.test.ts`: with full perspective the shadows are several times too big and leave the wall). A bad head pose is ignored, not thrown on (`placeRig`). No plane detection and no fallback. The shadow renderer lifts the shadow 2 mm off the wall as before | A (frame), B (look) |
-| The hands | The player cannot see their real hands, so `HandVisual` (`engine/xr/hand-visual.ts`) draws them from the 25 joints. `CapsuleHandVisual` is the first look: a flat dark glove from the shadow's own capsule pairs (`CAPSULE_JOINTS`), 2 instanced draw calls, about 0.01 ms a frame on a desktop, and under 64 bytes a frame in its allocation test. It draws after the paper and before the shadow without writing depth, so the shadow always draws over a hand that overlaps it. Each hand fades in over 0.15 s and out over 0.4 s when tracking is lost or the game is paused, drawn from its last fully tracked pose (the reader leaves stale joints in a partly tracked hand), (`hand-fade.ts`; an ordered dither, not blending, so overlapping joints do not show as blobs), and warms near the flame like the debug dots do (`candle-tint.ts`). It hides itself when the session's blend mode is not opaque (passthrough), whatever `?occlude` says. Known limit: it writes no depth, so the candle's flame shows through a hand held in front of it. A different look (a model, a paper-cut glove) implements `HandVisual` and replaces the one line in `main.ts` that makes it; the shadow comes from the joints, never from the model. The joint dots are a debug view: `?debug=joints` | Anson (rig and mapping), B (art) |
-| No-hands cue | `HandsStatus` (`engine/xr/hands-status.ts`) turns the hand reader's output into `tracking`, `lost` or `unavailable`. With no tracked hand for 3 s, or no hand input source at all for 5 s (hand tracking off, controllers held, a browser that does not pass joints), a panel in front of the wearer says "Show me your hands" (`PromptPanel`, a second instance) and goes away the moment a hand is tracked. A frame step is counted up to 0.1 s, so the first frame after the headset was off does not read as a long dropout. This assumes a runtime keeps a hand's input source while the hand is out of view; if one drops it, a player resting their hands for 5 s would see the unavailable text. Check on a Pico by dropping the hands out of view and looking for `-(…:hand)` in `xrInput.readerEvents` in the diagnostics report. The thresholds and the two short texts are constants at the top of the file | Anson (signal), B (text) |
-| Pause | `SessionVisibility` (`engine/xr/session-visibility.ts`) follows `session.visibilityState` (IWSDK also keeps `world.visibilityState`; this copy is Node-testable and survives the plain three.js fallback). `paused` is true for `hidden` and `visible-blurred` (the system menu has focus and no hand data arrives); `subscribe(fn)` is called on each change, for saves. The driver system skips hand reading and classification while `paused`, so nothing runs ahead of a game that is not being played. Other code reads `paused` (or subscribes) | Anson (signal), A, B |
+| Part | How it works |
+|---|---|
+| The room | A lived-in bedroom lit by the candle and a faint moon: the bed and its tray with the candle on its saucer, the paper wall, a window with the storm outside, a desk, wardrobe, door and nightstand, her jar and torch, moving boxes and a toy fox (`engine/render/room`, `engine/shadow/room-dressing-view.ts`, models placed from the layout file; [ASSETS.md](ASSETS.md)). The candle never moves. Opaque geometry; scenery near the shadows stays light and low-contrast |
+| The stage | The paper wall is a `StageFrame` (`engine/stage`, structurally a `StagePlane`): `placeInFront(head, yaw)` puts it upright 2 m ahead, 1.6 × 1.0 m, 0.2 m below the eyes, facing the player, when the session starts and again on a recentre. `main.ts` uses it in a headset and in the Hand Lab; the old tabletop stand-in stage was removed. The projector blends 0.65 toward orthographic on the real wall with a low edge blur (`shadow/pure/real-wall.ts`), so a puppet hand casts a steady shadow about 15 × 35 cm (`stage-frame-geometry.test.ts`: with full perspective the shadows are several times too big and leave the wall). A bad head pose is ignored, not thrown on (`placeRig`). No plane detection and no fallback. The shadow renderer lifts the shadow 2 mm off the wall as before |
+| The hands | The player cannot see their real hands, so `HandVisual` (`engine/xr/hand-visual.ts`) draws them from the 25 joints. `CapsuleHandVisual` is the first look: a flat dark glove from the shadow's own capsule pairs (`CAPSULE_JOINTS`), 2 instanced draw calls, about 0.01 ms a frame on a desktop, and under 64 bytes a frame in its allocation test. It draws after the paper and before the shadow without writing depth, so the shadow always draws over a hand that overlaps it. Each hand fades in over 0.15 s and out over 0.4 s when tracking is lost or the game is paused, drawn from its last fully tracked pose (the reader leaves stale joints in a partly tracked hand), (`hand-fade.ts`; an ordered dither, not blending, so overlapping joints do not show as blobs), and warms near the flame like the debug dots do (`candle-tint.ts`). It hides itself when the session's blend mode is not opaque (passthrough), whatever `?occlude` says. Known limit: it writes no depth, so the candle's flame shows through a hand held in front of it. A different look (a model, a paper-cut glove) implements `HandVisual` and replaces the one line in `main.ts` that makes it; the shadow comes from the joints, never from the model. The joint dots are a debug view: `?debug=joints` |
+| No-hands cue | `HandsStatus` (`engine/xr/hands-status.ts`) turns the hand reader's output into `tracking`, `lost` or `unavailable`. With no tracked hand for 3 s, or no hand input source at all for 5 s (hand tracking off, controllers held, a browser that does not pass joints), a panel in front of the wearer says "Show me your hands" (`PromptPanel`, a second instance) and goes away the moment a hand is tracked. A frame step is counted up to 0.1 s, so the first frame after the headset was off does not read as a long dropout. This assumes a runtime keeps a hand's input source while the hand is out of view; if one drops it, a player resting their hands for 5 s would see the unavailable text. Check on a Pico by dropping the hands out of view and looking for `-(…:hand)` in `xrInput.readerEvents` in the diagnostics report. The thresholds and the two short texts are constants at the top of the file |
+| Pause | `SessionVisibility` (`engine/xr/session-visibility.ts`) follows `session.visibilityState` (IWSDK also keeps `world.visibilityState`; this copy is Node-testable and survives the plain three.js fallback). `paused` is true for `hidden` and `visible-blurred` (the system menu has focus and no hand data arrives); `subscribe(fn)` is called on each change, for saves. The driver system skips hand reading and classification while `paused`, so nothing runs ahead of a game that is not being played. Other code reads `paused` (or subscribes) |
 
 Switched off for v1 (still in the repository for a possible real-room mode): the plane tracker and plane capabilities, and the passthrough compositing rules below. The `HandOccluder` and the composite probe were removed with the AR mode ([ADR 0017](adr/0017-one-address.md)); git history has them. The hand-tracking, shape, gesture, shadow, sharpen, flicker and performance work is used as built.
 
@@ -133,7 +153,7 @@ The stage and shadows are drawn into the same frame as the room camera image (`i
 | A real-room mode needs a depth-only hand occluder (removed; see git history for `HandOccluder`) | The paper and shadow cover the camera image, so without it a real hand held in front of the stage would be hidden behind them |
 | Any colour shader we add includes `colorspace_fragment` | The XR target is sRGB. Only black-only shaders (the shadow) may skip it |
 
-The lantern's glow (`LanternGlow`) is a camera-facing quad with a bright core and a soft halo, drawn at order 3 with ordinary alpha blending (never additive, which would vanish on a passthrough display) and `colorspace_fragment`. It and the paper's shimmer read one `LanternLight` (position, lit, intensity, colour) from `LanternLightModel`; Teammate B's lantern flow sets `lit` and the position.
+The lantern's glow (`LanternGlow`) is a camera-facing quad with a bright core and a soft halo, drawn at order 3 with ordinary alpha blending (never additive, which would vanish on a passthrough display) and `colorspace_fragment`. It and the paper's shimmer read one `LanternLight` (position, lit, intensity, colour) from `LanternLightModel`; `main.ts` sets `lit` from the candle and the position from its flame.
 
 The diagnostics report has a `render` section (`clearAlpha`, `toneMapping`, `outputColorSpace`, `blendMode`, `layer`) to read this off a real session. Stop and report if the blend mode is `additive` or `opaque` (black shadows are invisible on an additive display) or the tone mapping is not `none`. `clearAlpha` shows IWSDK's setting; in an `alpha-blend` session three clears to transparent whatever it says, so `blendMode` is the field that matters.
 
