@@ -7,10 +7,14 @@
 // 0.03 per metre every capsule of a hand 1.5 m from the wall gets the 2 cm maximum, 20 % of a shadow's width,
 // and the gaps between fingers close.
 // A night light fixed behind the player (the bedroom proposal) would need these re-tuned.
+// A hand behind the candle keeps a dim, blurred shadow (a third as dark, a 4 cm blur): out of focus, not gone, so the player
+// sees where it is and brings it forward into focus.
 import type { ShadowSettings } from './shadow-projector';
 
 export const REAL_WALL_SHADOW_SETTINGS: Partial<ShadowSettings> = {
   blend: 0.65,
   blurPerM: 0.005,
   maxBlurM: 0.008,
+  behindOpacity: 0.35,
+  behindBlurM: 0.04,
 };

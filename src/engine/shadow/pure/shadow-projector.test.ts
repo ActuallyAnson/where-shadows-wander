@@ -130,6 +130,26 @@ describe('shadow projector edge cases', () => {
     expect(p.shadows.right.opacity).toBe(0.0);
   });
 
+  it('keeps a dim, blurred shadow behind the candle when asked, sharpening into focus in front of it', () => {
+    const p = new ShadowProjector({ blend: 0.65, behindOpacity: 0.35, behindBlurM: 0.04 });
+    p.update(hands([0, -0.05, 0.8]), stage, LANTERN); // behind the candle
+    const behind = p.shadows.right;
+    expect(behind.active).toBe(true);
+    expect(behind.opacity).toBeCloseTo(0.35, 6);
+    expect(behind.blur[0]).toBeCloseTo(0.04, 6);
+    const behindX = behind.joints[0];
+    expect(Number.isFinite(behindX)).toBe(true);
+
+    p.update(hands([0, -0.05, 0.65]), stage, LANTERN); // coming into focus
+    expect(p.shadows.right.opacity).toBeGreaterThan(0.35);
+    expect(p.shadows.right.opacity).toBeLessThan(1);
+    expect(p.shadows.right.blur[0]).toBeLessThan(0.04);
+
+    p.update(hands([0, -0.05, 0.3]), stage, LANTERN); // in front: full and sharp
+    expect(p.shadows.right.opacity).toBe(1);
+    expect(p.shadows.right.blur[0]).toBeLessThan(0.02);
+  });
+
   it('hands perpendicular/to the side of candle cast rays that miss the stage in perspective', () => {
     const p = new ShadowProjector({ blend: 0 });
     // Hand placed to the side of the candle (x = 0.25, z = 0.5 vs lantern at [0, 0, 0.6])
