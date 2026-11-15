@@ -122,6 +122,17 @@ Keep everything off the wall ahead and out of the space between the candle and t
 | String lights (unlit) | Needed |
 | Ceiling lamp (off) | Needed |
 
+### Needed: props to pick up and throw (planned)
+
+Small and light-looking, placed within a seated reach (the tray, the quilt, the bed's edges, a nightstand). See the GDD, "The room and the hands".
+
+| Model | Status |
+|---|---|
+| A spare pillow | Needed |
+| A small plush toy | Needed (could be the stuffed rabbit above) |
+| A soft ball | Needed |
+| Sounds for a prop landing (soft thud on the floor, on the bed) | Needed |
+
 ## Fonts
 
 | File | What | Status |

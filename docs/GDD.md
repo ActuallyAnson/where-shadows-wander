@@ -80,7 +80,9 @@ The stage is a plain, pale patch of the bedroom wall at the foot of the bed, abo
 
 ### The room and the hands
 
-- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the candle. The bed with its tray and the candle, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf, a rug, a few toys). Anything near the shadow area stays light and low-contrast so the black shadows stay readable. Its layout is edited in the room editor ([ADR 0015](adr/0015-room-layout-file-and-editor.md)).
+- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the candle. The bed with its tray and the candle, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf, a rug, a few toys). Anything near the shadow area stays light and low-contrast so the black shadows stay readable. Its layout is edited in the room editor ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). The bed stands against the back wall (`ROOM_BACK_WALL_Z`, 15 Nov 2026); the room stays its current size, about 4 by 2.9 m.
+
+- **Props to pick up and throw (planned, 15 Nov 2026):** small things the player can grab and toss, just for the feel of being there (a pillow, a plush toy, a ball). The room is not made bigger for them: a seated player reaches only about 60 to 70 cm, so they sit within reach, on the tray, the quilt, the bed's edges or a nightstand beside the bed. A prop may cast a shadow on the stage while it is held or in the air, but only for a moment: once thrown it falls to the floor and comes to rest out of the light's path, so nothing stays in front of the story. Never part of a scene's progress, so ignoring them costs nothing.
 
 - **The hands:** in VR the player cannot see their real hands, so the game draws a hand for each tracked hand, following the 25 joints. Rules: always visible while tracked, simple and low-detail rather than realistic, never covering the shadow area, fading out when tracking is lost with a gentle "show me your hands" cue. The shadow is cast from the tracked joints, not from the hand model, so the model can look any way without changing the game.
 
