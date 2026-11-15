@@ -7,7 +7,7 @@ Where Shadows Wander is a seated, hands-only virtual reality story about grief a
 | Item | Detail |
 |----|----|
 | Competition | Meta VR Start Developer Competition 2026 |
-| Track | Gaming |
+| Track | Entertainment (immersive storytelling) |
 | Division | New Experience (built from 24 Sep 2026) |
 | Submission deadline | 19 Nov 2026, 4:00am SGT |
 | Platform | Meta Quest 3 / 3S, Quest Browser (WebXR, immersive VR) |
@@ -309,7 +309,7 @@ The whole game can be played seated, with one hand, within a two-foot radius.
 
 ## Competition fit
 
-Where Shadows Wander targets Best New Gaming Experience (\$100,000). The organisers' rules, judging criteria, dates and links are summarised in [COMPETITION.md](COMPETITION.md).
+Where Shadows Wander is entered in the Entertainment track as immersive storytelling, New Experience division. The organisers' rules, judging criteria, dates and links are summarised in [COMPETITION.md](COMPETITION.md).
 
 ### Requirements and guidelines
 
@@ -336,7 +336,7 @@ Where Shadows Wander targets Best New Gaming Experience (\$100,000). The organis
 
 - [ ] The person submitting has joined the Meta VR Start Program, and everyone on the team is 18 or older
 
-- [ ] Devpost: track Gaming and division New Experience selected; video is public on YouTube or Vimeo
+- [ ] Devpost: track Entertainment and division New Experience selected; video is public on YouTube or Vimeo
 
 - [ ] The deployed page stays up until the winners are announced (about 11 Dec) and is not changed after 18 Nov 12:00 PM Pacific (19 Nov 4:00 AM Singapore)
 
