@@ -11,7 +11,7 @@ Last checked: 15 Nov 2026.
 
 ## Sound effects
 
-Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`. Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
+Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
 
 ### In the game now (replace these first)
 
@@ -20,31 +20,20 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `thunder` | Far-off thunder, low and muffled by distance and walls, about 6 s | Wakes him in scene 1; after the window flashes; the prologue's storm | Final: "Huge Thunder Crack [XY]" by -CASK- (CC BY 4.0), cut to 7 s and low-passed |
 | `rain` | Steady rain on the window and roof, seamless loop | All night, from the window's side | Final: "rain wind city 40m 002" by klankbeeld (CC BY 4.0; credit freesound.org too, never share the raw file), a 24 s loop |
 | `covers` | A soft slide of heavy bedclothes | He sits up in bed (scene 1) | Final: "Bed sheets (SoundAction 104)" by alexarje (CC BY 4.0), cut to 3.5 s |
-| `ignite` | A match struck, then a flame catching | Lighting the candle; BEGIN on the title screen | Placeholder |
-| `crackle` | A quiet candle flame, seamless loop | While the candle is lit | Placeholder |
-| `rustle` | A light, dry paper crinkle | A hand shape is recognised | Placeholder |
-| `thump` | A soft, low thump | A hand shape is accepted | Placeholder |
-| `release` | A soft letting-go | A shape is let go | Placeholder |
+| `ignite` | A match struck, then a flame catching | Lighting the candle; BEGIN on the title screen | Final: "match strike 05" by tim.kahn (CC BY 4.0), cut to 1.9 s |
+| `crackle` | A quiet candle flame, seamless loop | While the candle is lit | Final: "fire crackling, fireplace, BBQ" by AlexanderChe (CC0), a 14 s loop |
+| `rustle` | A light, dry paper crinkle | A hand shape is recognised | Final: "Crinkle; Paper" by Crovic (CC0), cut to 0.45 s |
+| `thump` | A soft, low thump | A hand shape is accepted | Final: "Deck of Cards, Thump on Table" by designerschoice (CC BY 4.0), one thump, 0.32 s |
+| `release` | A soft letting-go | A shape is let go | Final: "Slide release (PSX Horror SFX Free)" by heyheytheree (CC BY 4.0), cut to 0.3 s and softened |
 | `lost` | A low falling pair of tones | Hand tracking lost for too long | Placeholder |
 | `note0` to `note4` | Five music-box notes: C5, D5, E5, G5, A5 | The lullaby notes in the prologue | Placeholder |
-| `tick` | A tiny tick | A fingertip reaches a menu item | Placeholder |
-| `press` | A soft click | A menu item is pressed | Placeholder |
+| `tick` | A tiny tick | A fingertip reaches a menu item | Final: "Button hover" by Fachii (CC0) |
+| `press` | A soft click | A menu item is pressed | Final: "UI Button Press" by el_boss (CC0), cut to 0.18 s |
 | `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). The placeholder is a small muffled pat made for the old traveller, so it may be too faint and too small for a grown-up | Placeholder |
 
-### Made but not played
+### Removed
 
-| Name | What it is | Status |
-|---|---|---|
-| `hum` | The room tone, a low loop. Scene 1 asks for "a short silence, then the room tone". | Unused (needs wiring) |
-| `clock` | A slow wooden clock, loop | Unused. Keep only if a clock goes in the room. |
-| `wind` | Wind outside, loop | Unused. Rain is the night's sound now. |
-| `chime` | A small bell | Unused |
-
-### Left over from the puzzle game
-
-`twinkle` (spirit fox), `hop` (rabbit landing), `snowtick` (snow on the glass), `creak` (a beam). Status: **Drop**. (`step0` and `step1` were here too; scene 2's hush plays them now, so they are in the first table.)
-
-`lift` and `set` (the candle picked up and set down) were removed on 15 Nov 2026, with picking up the candle: it stays on the tray, so the light never moves.
+On 15 Nov 2026 the sounds nothing played were removed from `sounds.ts` and `placeholder-sounds.ts`: `hum` (the room tone; the rain is the room's sound now), `clock`, `wind` (the rain recording has wind in it), `chime`, and the puzzle game's `twinkle`, `hop`, `snowtick` and `creak`. Git history has them. `lift` and `set` (the candle picked up and set down) went earlier the same day, with picking up the candle: it stays on the tray, so the light never moves.
 
 ### Sounds the story needs that don't exist
 
@@ -60,7 +49,7 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 
 | Name | What it is | Status |
 |---|---|---|
-| `music` | A 24 s loop of sine pads and music-box notes over A minor, F, C, G (in code) | Placeholder, and **never started**: no music plays in the game now. The ending already turns the music bus down with the candle and back up softly under the credits (`ending-timeline.ts`), so music started on that bus will follow it |
+| `music` | A 24 s loop of sine pads and music-box notes, made in code | Removed 15 Nov 2026: it was never started. No music plays in the game now. The music bus and its volume setting are kept, and the ending already turns that bus down with the candle and back up softly under the credits (`ending-timeline.ts`), so the lullaby will follow it once it is wired |
 | The lullaby | One music-box melody through the whole story: fuller in scenes 2 to 4, thinning in 5, a single note in 6, silent in 7 (`STORY.md`, "The music"). Best delivered as layers or stems so it can thin out. Keep it in a key the five notes fit, or replace the notes to match. | Needed |
 
 ## 3D models
@@ -81,14 +70,14 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 
 ### In the repo but not placed
 
+Kept to dress the room with the room editor: the bear can stand in for a stuffed toy, the side table for the nightstand. `candleStick.glb` and `candles.glb` were removed on 15 Nov 2026: the candle on the tray is drawn in code and never moves.
+
 | File | What | Status |
 |---|---|---|
 | `bear.glb` | Teddy bear | Unused |
 | `books.glb` | Loose books | Unused |
 | `sideTable.glb` | Bedside table | Unused |
 | `lampRoundTable.glb` | Small table lamp | Unused |
-| `candleStick.glb` | Candlestick | Unused (the candle on the tray is drawn in code) |
-| `candles.glb` | Candles | Unused |
 
 ### Drawn in code (no file)
 

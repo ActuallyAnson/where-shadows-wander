@@ -179,7 +179,7 @@ export const SETTING_SPECS: readonly SettingSpec[] = [
     kind: 'toggle',
     key: 'captions',
     label: 'Captions',
-    help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or a creak.',
+    help: 'Writes a few words on the wall for the sounds that matter, like a music-box note or footsteps.',
     default: false,
   },
   {

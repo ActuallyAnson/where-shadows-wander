@@ -28,28 +28,19 @@ describe('SOUND_DEFS', () => {
     expect(Object.values(Sound).sort((a, b) => a - b)).toEqual(Array.from({ length: SOUND_COUNT }, (_, i) => i));
   });
 
-  it('puts the menu and feedback sounds on effects, the flame and the room on ambience and the music on music', () => {
-    expect(SOUND_DEFS[Sound.Music].bus).toBe(Bus.Music);
-    expect(SOUND_DEFS[Sound.Hum].bus).toBe(Bus.Ambience);
+  it('puts the menu and feedback sounds on effects, and the flame, the rain and the thunder on ambience', () => {
+    for (const id of [Sound.Crackle, Sound.Rain, Sound.Thunder]) expect(SOUND_DEFS[id].bus).toBe(Bus.Ambience);
     for (const id of [Sound.Tick, Sound.Press, Sound.Ignite, Sound.Release, Sound.Lost])
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the room tone, the music, the clock, the wind and the rain', () => {
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
-      'crackle',
-      'hum',
-      'music',
-      'clock',
-      'wind',
-      'rain',
-    ]);
+  it('loops only the flame and the rain', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'rain']);
   });
 
-  it('keeps the first four sounds where they were: rustle, thump and chime on effects, the crackle on ambience', () => {
+  it('keeps the first sounds where they were: rustle and thump on effects, the crackle on ambience', () => {
     expect(SOUND_DEFS[Sound.Rustle].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Thump].bus).toBe(Bus.Effects);
-    expect(SOUND_DEFS[Sound.Chime].bus).toBe(Bus.Effects);
     expect(SOUND_DEFS[Sound.Crackle].bus).toBe(Bus.Ambience);
     expect(SOUND_DEFS[Sound.Crackle].loop).toBe(true);
   });

@@ -451,8 +451,10 @@ async function start(): Promise<void> {
   const audio = new AudioEngine();
   audio.attachGestureUnlock(document);
   uiAudio = audio;
-  // The sounds are made in code; rendering them takes real time on a headset's CPU, so a worker does it ahead while the title
-  // screen sits idle, and the engine finds each ready. Without workers the pool does the same on the main thread.
+  // Real sound files (src/assets/audio/sfx/<name>.ogg) replace their placeholders once decoded (sound-files.ts).
+  const sfxFiles = soundFiles(assetFiles);
+  // The other sounds are made in code; rendering them takes real time on a headset's CPU, so a worker does it ahead while the
+  // title screen sits idle, and the engine finds each ready. Without workers the pool does the same on the main thread.
   const whenIdle = (window as { requestIdleCallback?: (fn: () => void) => void }).requestIdleCallback;
   const soundPool = new TaskPool<RenderJob, RenderedSound>({
     create: () =>
@@ -465,13 +467,14 @@ async function start(): Promise<void> {
     fallback: renderJob,
   });
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
-    void startSoundPrerender(soundPool, audioContextRate()).then(() => soundPool.dispose());
+    void startSoundPrerender(soundPool, audioContextRate(), undefined, new Set(sfxFiles.map((f) => f.sound))).then(() =>
+      soundPool.dispose(),
+    );
   });
-  // Real sound files (src/assets/audio/sfx/<name>.ogg) replace their placeholders once decoded (sound-files.ts).
   if (typeof OfflineAudioContext !== 'undefined') {
     const decoder = new OfflineAudioContext(1, 1, audioContextRate());
     void loadSoundFiles(
-      soundFiles(assetFiles),
+      sfxFiles,
       (url) => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${r.status} ${url}`)))),
       (bytes) => decoder.decodeAudioData(bytes),
       (sound, buffer) => audio.setBuffer(sound, buffer),

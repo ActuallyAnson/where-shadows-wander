@@ -1,54 +1,38 @@
 // The game's sounds as data: which bus each plays on, how loud, how it carries, and how often it may repeat.
-// The files come later from the team; until then placeholder-sounds.ts makes each one in code. Plain TypeScript.
+// A file in src/assets/audio/sfx named after a sound replaces it (sound-files.ts); one without a file is made in code
+// (placeholder-sounds.ts). Plain TypeScript.
 import type { ReleaseReason, ShapeEventType } from '../../hands/shape-events';
 import { Bus, type BusId } from './mixer';
 
 export const Sound = {
   Rustle: 0,
   Thump: 1,
-  Chime: 2,
-  Crackle: 3,
+  Crackle: 2,
   /** A fingertip reaches a menu item. */
-  Tick: 4,
+  Tick: 3,
   /** A menu item is pressed. */
-  Press: 5,
+  Press: 4,
   /** BEGIN: a match is struck and the flame catches. */
-  Ignite: 6,
-  /** The room's low tone, a loop under everything. */
-  Hum: 7,
+  Ignite: 5,
   /** A shape is let go. */
-  Release: 8,
+  Release: 6,
   /** Tracking was lost for too long. */
-  Lost: 9,
-  /** The slow background music, a loop. */
-  Music: 10,
-  /** The spirit fox's sparkle: a few soft high notes falling like fairy dust. */
-  Twinkle: 11,
-  /** A rabbit's soft landing. */
-  Hop: 12,
-  /** The lullaby's five music-box notes, one for each sleeper the spark wakes (a rising pentatonic phrase, in the music's key). */
-  Note0: 13,
-  Note1: 14,
-  Note2: 15,
-  Note3: 16,
-  Note4: 17,
-  /** The room's slow wooden clock, a loop (ambience). */
-  Clock: 18,
-  /** Wind outside the window, a loop (ambience). */
-  Wind: 19,
-  /** A beam creaking somewhere above, now and then. */
-  Creak: 20,
-  /** A few flakes of snow ticking on the window glass. */
-  Snowtick: 21,
-  /** The traveller's footsteps: two soft steps, alternated. */
-  Step0: 22,
-  Step1: 23,
+  Lost: 7,
+  /** The lullaby's five music-box notes (a rising pentatonic phrase): the story's cues. */
+  Note0: 8,
+  Note1: 9,
+  Note2: 10,
+  Note3: 11,
+  Note4: 12,
+  /** Footsteps outside (scene 2's hush): two soft steps, alternated. */
+  Step0: 13,
+  Step1: 14,
   /** Rain outside, on the window and the roof, a loop (ambience): the night's constant bed. */
-  Rain: 24,
+  Rain: 15,
   /** Thunder far off, low and muffled by the distance and the walls: now and then, after a flash in the window (storm.ts). */
-  Thunder: 25,
+  Thunder: 16,
   /** The bedclothes as he sits up in bed (scene 1, as his eyes open): a soft slide of heavy cloth. */
-  Covers: 26,
+  Covers: 17,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -88,16 +72,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     minGapS: 0.15,
     refDistance: 1,
     maxDistance: 8,
-  },
-  {
-    name: 'chime',
-    bus: Bus.Effects,
-    gain: 0.8,
-    loop: false,
-    priority: 3,
-    minGapS: 0.5,
-    refDistance: 1,
-    maxDistance: 10,
   },
   {
     name: 'crackle',
@@ -140,17 +114,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     maxDistance: 8,
   },
   {
-    name: 'hum',
-    bus: Bus.Ambience,
-    gain: 0.5,
-    loop: true,
-    priority: 0,
-    minGapS: 0,
-    // Heard the same from anywhere in the room: it is the room, not a thing in it.
-    refDistance: 50,
-    maxDistance: 100,
-  },
-  {
     name: 'release',
     bus: Bus.Effects,
     gain: 0.35,
@@ -167,37 +130,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     loop: false,
     priority: 2,
     minGapS: 2,
-    refDistance: 1,
-    maxDistance: 8,
-  },
-  {
-    name: 'music',
-    bus: Bus.Music,
-    gain: 0.6,
-    loop: true,
-    priority: 0,
-    minGapS: 0,
-    // Like the hum, it is the room's, not a thing in it.
-    refDistance: 50,
-    maxDistance: 100,
-  },
-  {
-    name: 'twinkle',
-    bus: Bus.Effects,
-    gain: 0.45,
-    loop: false,
-    priority: 1,
-    minGapS: 0.6,
-    refDistance: 1,
-    maxDistance: 10,
-  },
-  {
-    name: 'hop',
-    bus: Bus.Effects,
-    gain: 0.5,
-    loop: false,
-    priority: 1,
-    minGapS: 0.2,
     refDistance: 1,
     maxDistance: 8,
   },
@@ -250,46 +182,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     minGapS: 0.05,
     refDistance: 1.5,
     maxDistance: 12,
-  },
-  {
-    name: 'clock',
-    bus: Bus.Ambience,
-    gain: 0.4,
-    loop: true,
-    priority: 0,
-    minGapS: 0,
-    refDistance: 1.5,
-    maxDistance: 8,
-  },
-  {
-    name: 'wind',
-    bus: Bus.Ambience,
-    gain: 0.45,
-    loop: true,
-    priority: 0,
-    minGapS: 0,
-    refDistance: 2,
-    maxDistance: 10,
-  },
-  {
-    name: 'creak',
-    bus: Bus.Ambience,
-    gain: 0.5,
-    loop: false,
-    priority: 1,
-    minGapS: 2,
-    refDistance: 1.5,
-    maxDistance: 10,
-  },
-  {
-    name: 'snowtick',
-    bus: Bus.Ambience,
-    gain: 0.35,
-    loop: false,
-    priority: 0,
-    minGapS: 0.1,
-    refDistance: 1,
-    maxDistance: 6,
   },
   {
     name: 'step0',

@@ -8,7 +8,7 @@
 // frame and only writes numbers into audio parameters. No three.js and no IWSDK: the listener pose is passed
 // in. Placeholder sounds are rendered in code the first time each is needed; `setBuffer` swaps in a file.
 import { BUS_COUNT, Mixer, type BusId } from './mixer';
-import { renderRateFor, takeSamples } from './placeholder-sounds';
+import { takeSamples } from './placeholder-sounds';
 import { Cooldowns, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 import { VoicePool } from './voice-pool';
 
@@ -384,7 +384,7 @@ export class AudioEngine {
   private bufferFor(ctx: AudioContext, id: SoundId): AudioBuffer {
     let buffer = this.buffers[id];
     if (!buffer) {
-      const rate = renderRateFor(id, ctx.sampleRate);
+      const rate = ctx.sampleRate;
       const samples = takeSamples(id, rate);
       buffer = ctx.createBuffer(1, samples.length, rate);
       buffer.copyToChannel(samples, 0);

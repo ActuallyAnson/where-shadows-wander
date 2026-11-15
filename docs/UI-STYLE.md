@@ -57,10 +57,10 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 
 ## Sound
 
-- Every action has a sound: reach an item (tick), press (a warm knock), BEGIN (a match and the flame
-  catching), recognise (rustle), commit (thump), let go (a soft breath), solve (chime), tracking lost (two low falling notes).
-- Under it all: a low room tone and slow, sparse music (sine pads and music-box notes). Both are made
-  in code (`placeholder-sounds.ts`), so no files and nothing to license.
+- Every action has a sound: reach an item (tick), press (a soft click), BEGIN (a match struck), recognise
+  (a paper crinkle), commit (a thump), let go (a soft slide), tracking lost (two low falling notes).
+- Under it all: the rain on the window and the candle's crackle. No music plays yet. The recordings and
+  their credits are listed in `CREDITS.md`.
 - Short, dry, paper or candle themed. Browsers keep audio locked until the first tap, so the very
   first hover is silent.
 

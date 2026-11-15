@@ -109,7 +109,7 @@ describe('unlocking', () => {
       },
     });
     engine.unlock();
-    expect(engine.playAt(Sound.Chime, 0, 0, 0)).toBe(false);
+    expect(engine.playAt(Sound.Note0, 0, 0, 0)).toBe(false);
     expect(() => engine.update(POSE)).not.toThrow();
   });
 
@@ -169,8 +169,8 @@ describe('playing', () => {
     };
     engine.unlock();
     expect(made).toHaveLength(0);
-    engine.playAt(Sound.Chime, 0, 0, 0);
-    engine.playAt(Sound.Chime, 0, 0, 0);
+    engine.playAt(Sound.Note0, 0, 0, 0);
+    engine.playAt(Sound.Note0, 0, 0, 0);
     expect(made).toHaveLength(1);
   });
 
@@ -196,7 +196,7 @@ describe('playing', () => {
   it('does not use up the gap when no voice was free for the sound', () => {
     const { engine, ctx } = make({ voices: 1 });
     engine.unlock();
-    expect(engine.playAt(Sound.Chime, 0, 0, 0)).toBe(true); // priority 3 holds the only voice
+    expect(engine.playAt(Sound.Note0, 0, 0, 0)).toBe(true); // priority 3 holds the only voice
     ctx.currentTime += 1;
     expect(engine.playAt(Sound.Rustle, 0, 0, 0)).toBe(false);
     expect(engine.stats.noVoice).toBe(1);

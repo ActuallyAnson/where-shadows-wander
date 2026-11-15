@@ -7,15 +7,11 @@ import { Sound, type SoundId } from './sounds';
 const NOTE = '[a music-box note]';
 
 export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
-  [Sound.Chime]: '[a soft chime]',
-  [Sound.Twinkle]: '[a tiny sparkle]',
   [Sound.Note0]: NOTE,
   [Sound.Note1]: NOTE,
   [Sound.Note2]: NOTE,
   [Sound.Note3]: NOTE,
   [Sound.Note4]: NOTE,
-  [Sound.Creak]: '[a beam creaks]',
-  [Sound.Hop]: '[a soft landing]',
   [Sound.Ignite]: '[a match strikes]',
   [Sound.Thunder]: '[thunder, far off]',
   [Sound.Covers]: '[bedclothes rustle]',
@@ -24,7 +20,7 @@ export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
   [Sound.Step1]: '[footsteps outside]',
 };
 
-/** The least time between two captions, seconds, so a run of sparkles does not flood the wall. */
+/** The least time between two captions, seconds, so a run of footsteps does not flood the wall. */
 export const CAPTION_GAP_S = 1.5;
 
 /** A sound player that tells `show` what each notable sound is, and passes everything on to `inner` unchanged. */
