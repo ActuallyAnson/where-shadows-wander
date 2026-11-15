@@ -31,9 +31,10 @@ export interface FriendBeat {
   readonly mirror?: number;
   /**
    * Where the outline of her shape stands (shape-guide.ts), metres as `x`, `y`, where the wall's picture leaves no room beside
-   * her hand (scene 4's trees). Default: GHOST_GAP_M from her hand, toward the middle of the wall.
+   * her hand (scene 4's trees), or `false` to omit the outline altogether. Default: GHOST_GAP_M from her hand, toward the middle
+   * of the wall.
    */
-  readonly guide?: readonly [number, number];
+  readonly guide?: readonly [number, number] | false;
 }
 
 /** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
@@ -466,7 +467,12 @@ export class StoryDirector {
     return b?.kind === 'friend' ? (b.puppet ?? b.shape) : 'flat';
   }
 
-  /** Where the outline of her shape stands (FriendBeat.guide), or NaN for the default beside her hand. */
+  /** Whether the friend's outline should be shown for the active friend beat (false when `FriendBeat.guide` is `false`). */
+  get friendGuide(): boolean {
+    const b = this.beat;
+    return !(b?.kind === 'friend' && b.guide === false);
+  }
+  /** Where the outline of her shape stands (FriendBeat.guide), or NaN for the default beside her hand or when hidden. */
   get guideX(): number {
     const b = this.beat;
     return b?.kind === 'friend' && b.guide ? b.guide[0] : NaN;

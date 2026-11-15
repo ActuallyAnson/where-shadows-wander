@@ -53,6 +53,19 @@ describe('the goodbye', () => {
     expect(girl.x).toBeCloseTo(-boy.x, 4);
   });
 
+  it('keeps each palm on its own side of the touch as their arms come down (no clipping)', () => {
+    const palmFaceOffset = 0.013 * 1.4 * (0.86 - 0.5);
+    for (let t = 5; t <= GOODBYE_LENGTH_S; t += 0.05) {
+      const boy = at('goodbye-boy-hand', t);
+      const girl = at('goodbye-girl-hand', t);
+      const boyPalmEdge = boy.x + palmFaceOffset * boy.scale;
+      const girlPalmEdge = girl.x - palmFaceOffset * girl.scale;
+      expect(boyPalmEdge, `boy palm edge at ${t}`).toBeLessThanOrEqual(GOODBYE_AT[0] + 1e-6);
+      expect(girlPalmEdge, `girl palm edge at ${t}`).toBeGreaterThanOrEqual(GOODBYE_AT[0] - 1e-6);
+      expect(boyPalmEdge, `palms separated/touching at ${t}`).toBeLessThanOrEqual(girlPalmEdge + 1e-6);
+    }
+  });
+
   it('draws back to the kids from the waist up, and leaves the wall empty', () => {
     const boy = at('goodbye-boy-torso', 5);
     expect(boy.y).toBeGreaterThan(-0.56);

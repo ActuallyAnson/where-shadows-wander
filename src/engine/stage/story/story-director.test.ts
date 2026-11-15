@@ -412,6 +412,20 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     expect(d.handHidden).toBe(false);
   });
 
+  it('reports friendGuide false only when a friend beat asks to hide the outline (goodbye)', () => {
+    const goodbyeIndex = STORY_SCRIPT.findIndex((s) => s.id === 'goodbye');
+    expect(goodbyeIndex).toBeGreaterThan(0);
+    const d = new StoryDirector(STORY_SCRIPT);
+    d.start(0);
+    d.skipMemory();
+    expect(d.beat?.kind).toBe('friend');
+    expect(d.friendGuide).toBe(true);
+    d.start(goodbyeIndex);
+    expect(d.friendGuide).toBe(false);
+    expect(d.guideX).toBeNaN();
+    expect(d.guideY).toBeNaN();
+  });
+
   it('plays the whole story, a shape at a time, to sleep', () => {
     const d = new StoryDirector(STORY_SCRIPT);
     d.start();

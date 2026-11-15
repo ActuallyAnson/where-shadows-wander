@@ -71,6 +71,16 @@ describe('ShapeGuide', () => {
     expect(g.closeness).toBeLessThan(0.01);
   });
 
+  it('omits the outline when showOutline is false while still keeping closeness, steady, boost, and lean active', () => {
+    const g = new ShapeGuide();
+    run(g, 2, true, 0, 1, 0.3, 0.2, -0.3, 0.2, NaN, NaN, false);
+    expect(g.presence).toBe(0);
+    expect(g.closeness).toBeGreaterThan(0.99);
+    expect(g.steady).toBeGreaterThan(0.8);
+    expect(g.boost).toBeGreaterThan(0.19);
+    expect(g.leanX).toBeCloseTo(LEAN_M, 3);
+  });
+
   it('holds still at dt 0', () => {
     const g = new ShapeGuide();
     g.update(0, true, 0, 1, 0, 0, 1, 1);
