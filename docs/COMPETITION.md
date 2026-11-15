@@ -1,6 +1,8 @@
 # Competition reference: Meta VR Start Developer Competition 2026
 
-What the organisers' pages say, read on 5 Oct 2026 from the [Devpost site](https://start-developer-competition-26.devpost.com/). The official [Rules](https://start-developer-competition-26.devpost.com/rules) win if anything here differs. Items marked **unconfirmed** were not stated clearly; ask in the forum or in an office hour.
+What the organisers' pages say, read on 5 Oct 2026 from the [Devpost site](https://start-developer-competition-26.devpost.com/). The tracks, divisions, requirements and submission form were re-read on 15 Nov 2026 from the updated overview page. The official [Rules](https://start-developer-competition-26.devpost.com/rules) win if anything here differs. Items marked **unconfirmed** were not stated clearly; ask in the forum or in an office hour.
+
+Prizes: $1M in total, top prizes of $100,000. Top awards go to the strongest entry in each track; special awards are open to all tracks.
 
 ## Dates
 
@@ -18,12 +20,33 @@ What the organisers' pages say, read on 5 Oct 2026 from the [Devpost site](https
 - One entry per team, one prize per entry. Studios and teams are allowed; the prize goes to one representative.
 - Not eligible: apps funded by Meta (RFPs), and anything using unreleased Meta tools.
 
-## What to submit (on Devpost)
+## Tracks and divisions
 
-1. **A link to the game.** For IWSDK (WebXR) that is the GitHub Pages link; other hosts are allowed.
-2. **A demo video under 3 minutes**, public on YouTube or Vimeo. Footage from a Meta Quest, the XR Simulator or an equivalent emulator is accepted. Show real gameplay and lead with what makes it distinct; do not lean on AI-generated video.
-3. **A text description:** inspiration, how it was built, future plans, a target launch date.
-4. **Division** (New Experience) and **track** (Gaming).
+Pick at least one track:
+
+- **Entertainment:** lean-back media and content: spatial cinema, interactive video, music visualisation, **immersive storytelling**, spatial audio, media companion apps.
+- **Gaming:** games for hands-first or eyes and hands; puzzle, strategy, casual, social, **narrative**; genres that thrive seated, without controllers.
+- **Productivity:** effectiveness tools and apps built around a daily moment (morning routine, commute, **wind-down**).
+
+Pick a division:
+
+- **New Experience:** conceived and built within the competition window, from 24 Sep 2026. No pre-existing codebase, shipped title or repurposed early-access build. This is ours.
+- **Adapted / Significantly Updated Experience:** a project that existed before 24 Sep 2026, plus a significant new feature shipped in the window (hand interactions, multiplayer, an MR mode, a UGC tool). Bug fixes, cosmetic changes and performance work alone don't count.
+
+## What to submit
+
+Three things: a playable build, a short video and the submission form. Judges can't score what they can't launch.
+
+1. **The build.** For IWSDK (WebXR), a link: GitHub Pages, or another host (Vercel, DigitalOcean, AWS, Azure). It must stay up and reachable throughout judging, and is judged as it stood at the deadline.
+2. **A demo video under 3 minutes**, public on YouTube or Vimeo, linked on the form. Footage from a Meta VR device, the XR Simulator or an equivalent emulator. Judges need not watch past 3 minutes, so **lead with the best material**. Do not lean on AI-generated video.
+3. **The submission form**, which includes at least:
+   - submission name
+   - **tagline, 140 characters max**
+   - track (Entertainment, Gaming or Productivity) and division (New Experience)
+   - text description: inspiration, how we built it, future plans (**suggested 500 words or less**)
+   - how hand interactions are implemented, and what excites us about the future of VR (optional, but worth filling in)
+   - target launch date, if not published
+   - **name, email and role for each team member.** The Nyove alias rule in CLAUDE.md still applies to everything we publish; **unconfirmed** whether this form field is shown publicly or only to the organisers, so check before filling it in.
 
 ## How it is judged
 
@@ -38,18 +61,27 @@ Four criteria, 25 % each, after a first check of the baseline requirements.
 
 ## Our entry and these criteria
 
-From 5 Oct our entry is a virtual room (see [ADR 0005](adr/0005-virtual-room.md)): it does not use passthrough, scene understanding or anchors, which the judging text names for entries that use them. We lean on hands-first design, the first five minutes, accessibility and polish, and we should ask the organisers how a VR-only entry is scored under Technical implementation.
+Our entry is a virtual room (see [ADR 0005](adr/0005-virtual-room.md)): it does not use passthrough, scene understanding or anchors, which the judging text names for entries that use them. We lean on hands-first design, the first five minutes, accessibility and polish, and we should ask the organisers how a VR-only entry is scored under Technical implementation.
+
+**Track: open question.** We planned for Gaming when the entry was a puzzle game. Since 11 Nov it is a seated shadow-puppet story ([ADR 0016](adr/0016-story-shadow-theatre.md)), which fits both Entertainment ("immersive storytelling") and Gaming ("narrative"). Entertainment probably competes against fewer interactive entries; Gaming fits the hand-shape interaction. Decide before submitting.
 
 ## Requirements that shape the game
 
-- **Hands-first:** "fully usable with hands, end-to-end"; a controller is optional. The test is whether someone can finish the whole experience without pairing a controller.
-- **Seated and stationary (a guideline, not a rule):** Meta's [announcement](https://developers.meta.com/blog/meta-connect-2026-vr-start-developer-competition/) (read 10 Oct 2026) suggests the experience be "seated-optimized" and "designed for seated, stationary use; limit roomscale and avoid large physical movement". Breaking it does not disqualify an entry, but judges will expect it: keep play in front of the player, within an easy head turn, and never ask them to stand, walk or turn around. Some news articles call this a requirement; Meta's own wording says "suggested". **Unconfirmed** whether the Devpost Rules make it binding.
-- **Short sessions (a guideline):** the same announcement suggests a "fast cold start, clean pause/resume and something satisfying in 10 minutes or less". Our 5–8 minute chapter fits.
+Hard requirements (an entry can fail on these):
+
+- **Hands-first:** "fully usable with hands, end-to-end"; a controller is optional. The test: can someone complete the whole experience without ever pairing a controller?
+- **Policy compliance:** the Start Program Terms, Community Standards, Code of Conduct in VR, Developer App Policies, Developer Content Guidelines and the other developer policies (age rating 10+, 13+ or 18+).
+
+Design guidelines (judges will expect them; breaking one does not disqualify):
+
+- **Seated-optimised, airplane seat test:** designed for seated, stationary use, limited roomscale, no large physical movement; every interaction should work within a two-foot radius. Keep play in front of the player, within an easy head turn, and never ask them to stand, walk or turn around. The updated page now lists this clearly as a guideline, not a hard requirement.
+- **Easy in and out, one bus stop test:** fast cold start, clean pause/resume, and something satisfying in 10 minutes or less; someone should have a complete moment in a short ride.
+- **Original, not a wrapper, take-it-away test:** the core is built by us; if you removed any third-party service, there would still be a project.
+
+Suggested SDK for web: Node.js 20.19.0 or higher and IWSDK (`npm create @iwsdk@latest` for the latest version). Meta also mentions AI tooling including the Meta VR CLI (optional).
 - **Target devices:** Meta's [announcement](https://developers.meta.com/blog/meta-connect-2026-vr-start-developer-competition/) (read 3 Nov 2026) says to build "for Meta VR Glasses, Meta Quest, or both". It names no Quest model (no "Quest 3"), and the judging text says "Meta Quest hardware". VR Glasses "ship in spring 2027" and "run the same operating system as Meta Quest"; the announcement lists the Immersive Web Emulator among the simulators for designing before the hardware ships. We target Meta Quest only; in the submission, say what we tested on (e.g. "built for Meta Quest, tested on Quest 3"), and don't claim VR Glasses or a model we never ran. **Unconfirmed** which Quest models the judges use; the Devpost Rules could not be re-read on 3 Nov (the site blocks automated fetches).
 - Do not require a third-party device (the judges all use Meta VR devices).
 - **Original:** the entry must be the entrant's own, or public domain, or provided by Meta. Third-party tools, code and assets are allowed only if you are authorised by their licence. **Unconfirmed** how strictly "original" is read for licensed free art: use CC0 where possible, record every asset in `CREDITS.md`, and ask before relying on anything else.
-- Follow Meta's developer policies, Community Standards and content guidelines (age rating 10+, 13+ or 18+).
-- A thin wrapper around an existing service is discouraged; the core must be built by us.
 
 ## Special awards
 
