@@ -1,26 +1,29 @@
 // Draws a puppet scene's parts on the stage, posed by a ScenePlayer: each part is a quad with its cut-out (puppet-art.ts, or an
-// image) lying on the wall. Shadow parts darken the lit wall the way the hands' shadows do, but where two parts overlap (a leg
-// over the cloak) they never darken twice: they blend by taking the darker of the wall and the shadow (a min blend), as one
-// shadow would. A part's depth (PuppetPart.depth) makes its shadow paler and softer, so the scenery stands back from the near
-// puppets; a pale shadow can't be a min blend (the candle-lit wall is darker than its floor, so it would vanish), so a part
-// standing back darkens the wall in proportion instead, over black as the hands' shadows do (overlaps there do darken twice,
-// which reads as one layer in front of another). Glow parts add their light. Everything can be cut off at the wall's edges
-// (clipToWall), as a shadow theatre's screen cuts off a piece of scenery sliding into the wings. Built when a scene loads; a frame
-// only sets matrices, a few uniforms and one opacity each.
+// image) lying on the wall. Shadow parts darken the lit wall in proportion, as the hands' shadows do, and they do it in the
+// frame's alpha (unused on the wall), as scratch: the prime sets the wall's alpha to 1 (the light let through); a part standing
+// back (PuppetPart.depth: paler and softer, so the scenery stands back) multiplies it by the light it lets through, so overlapping
+// scenery darkens twice, which reads as one layer in front of another; a near part takes the smaller of it and its own light let
+// through (a min blend), so where two near parts overlap (a leg over the cloak) they never darken twice, and a near puppet hides
+// the scenery behind it, smoothly at its soft edges, with no outline: in front of a tree its shadow is its own darkness, not the
+// tree's on top of it; and the resolve darkens the wall's colour by what is left and sets the alpha back to 1
+// (RenderOrder.puppetPrime .. puppetResolve, before the hands' shadows). Glow parts add their light. Everything can be cut off at
+// the wall's edges (clipToWall), as a shadow theatre's screen cuts off a piece of scenery sliding into the wings. Built when a
+// scene loads; a frame only sets matrices, a few uniforms and one opacity each.
 import {
   AddEquation,
   AdditiveBlending,
   CanvasTexture,
   CustomBlending,
   DoubleSide,
+  DstAlphaFactor,
   Group,
-  MaxEquation,
   Mesh,
   MinEquation,
   OneFactor,
   OneMinusSrcAlphaFactor,
   PlaneGeometry,
   ShaderMaterial,
+  SrcAlphaFactor,
   SRGBColorSpace,
   Vector2,
   Vector3,
@@ -30,7 +33,7 @@ import {
 import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
 import type { ScenePlayer } from '../stage/puppet/scene-player';
 import { isImageArt, PUPPET_ART } from './puppet-art';
-import { puppetPartOrder } from './pure/render-order';
+import { puppetPartOrder, RenderOrder } from './pure/render-order';
 import type { StagePlane } from './pure/stage-plane';
 
 /** Pixels painted per metre of cut-out as drawn on the wall (scene metres times `scale`), within these bounds. */
@@ -40,6 +43,13 @@ const PX_MAX = 2048;
 /** Lifted off the wall toward the player, metres, and a little more for each later part so they keep their order. */
 const LIFT_M = 0.003;
 const LIFT_STEP_M = 0.0002;
+/** The prime and the resolve lie over the whole wall this far off it: in front of the wall, behind every part. */
+const WASH_LIFT_M = 0.0015;
+/**
+ * A near puppet's shadow keeps this much of its opacity (the light's, DEFAULT_SHADOW_OPACITY's 0.88 at full): 0.65 leaves about 43 %
+ * of the wall's light in it, so the kids read as shadows on the paper, not holes in it.
+ */
+const NEAR_SHADOW_STRENGTH = 0.65;
 
 // vWall: where the fragment is on the wall, metres from the story's centre (the quad's centre plus its two axes), for the clip.
 const VERTEX = /* glsl */ `
@@ -60,7 +70,7 @@ uniform vec2 clip;
 varying vec2 vWall;`;
 const CLIP_TEST = /* glsl */ `if (abs(vWall.x) > clip.x || abs(vWall.y) > clip.y) discard;`;
 
-// The shadow as a brightness the wall is clamped down to (min blend): 1 - alpha, so an opacity of 0.88 leaves 12 % of the light.
+// A near shadow: the light it lets through, 1 - alpha (an opacity of 0.88 leaves 12 %), into the frame's alpha by a min blend.
 const SHADOW_FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float opacity;
@@ -70,10 +80,11 @@ void main() {
   ${CLIP_TEST}
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(vec3(1.0 - a), 1.0);
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0 - a);
 }`;
 
-// A shadow standing back: black over the wall at its alpha, so it takes the same share of the light however dim the wall is.
+// A shadow standing back: takes its share (its alpha) of the light however dim the wall is. Its blend multiplies the frame's
+// alpha by 1 - alpha and leaves the colour; the resolve applies it.
 const FAR_SHADOW_FRAGMENT = /* glsl */ `
 uniform sampler2D map;
 uniform float opacity;
@@ -84,6 +95,14 @@ void main() {
   float a = texture2D(map, vUv).a * opacity;
   if (a < 0.003) discard;
   gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+}`;
+
+// The prime and the resolve: the whole wall, alpha 1 (their blends do the rest).
+const WASH_FRAGMENT = /* glsl */ `
+${CLIP}
+void main() {
+  ${CLIP_TEST}
+  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 }`;
 
 // A glow: its tint added onto the wall at its alpha (additive), as the torch's light is.
@@ -131,6 +150,11 @@ export class PuppetView {
   scale = 1;
   /** Half the wall's width and height, metres from the story's centre: nothing is drawn past them. Shared by every piece. */
   private readonly clip = new Vector2(NO_CLIP, NO_CLIP);
+  /** The prime and the resolve (see the top of the file), while a scene is loaded; their axes. */
+  private prime: Mesh | null = null;
+  private resolve: Mesh | null = null;
+  private readonly washA = new Vector2();
+  private readonly washB = new Vector2();
 
   /** Cuts the puppets off at the wall's edges: `halfWidth` and `halfHeight` metres from the story's centre. */
   clipToWall(halfWidth: number, halfHeight: number): void {
@@ -151,6 +175,7 @@ export class PuppetView {
       if (!part.art) return;
       const glow = part.look === 'glow';
       const depth = glow ? 0 : depths[i];
+      const far = depths[i] > 0;
       // Where it draws: a glow standing back (the window's light) goes under the near puppets with the far shadows.
       const order = puppetPartOrder(glow, depths[i], i);
       const canvas = document.createElement('canvas');
@@ -203,11 +228,19 @@ export class PuppetView {
           vertexShader: VERTEX,
           fragmentShader: GLOW_FRAGMENT,
           transparent: true,
-          blending: AdditiveBlending,
           depthWrite: false,
           side: DoubleSide,
           toneMapped: false,
         });
+        if (far) {
+          // Added light that leaves the frame's alpha alone: the scenery's darkening is being kept there.
+          material.blending = CustomBlending;
+          material.blendEquation = AddEquation;
+          material.blendSrc = SrcAlphaFactor;
+          material.blendDst = OneFactor;
+          material.blendSrcAlpha = ZeroFactor;
+          material.blendDstAlpha = OneFactor;
+        } else material.blending = AdditiveBlending;
       } else if (depth > 0) {
         material = new ShaderMaterial({
           uniforms,
@@ -216,9 +249,10 @@ export class PuppetView {
           transparent: true,
           blending: CustomBlending,
           blendEquation: AddEquation,
+          // The colour is kept; the alpha is multiplied by the light let through (the resolve applies it).
           blendSrc: ZeroFactor,
-          blendDst: OneMinusSrcAlphaFactor,
-          blendSrcAlpha: OneFactor,
+          blendDst: OneFactor,
+          blendSrcAlpha: ZeroFactor,
           blendDstAlpha: OneMinusSrcAlphaFactor,
           depthWrite: false,
           side: DoubleSide,
@@ -231,10 +265,13 @@ export class PuppetView {
           fragmentShader: SHADOW_FRAGMENT,
           transparent: true,
           blending: CustomBlending,
-          blendEquation: MinEquation,
-          blendEquationAlpha: MaxEquation,
-          blendSrc: OneFactor,
+          // The colour is kept; the alpha is the smaller of it and the light this lets through (the resolve applies it).
+          blendEquation: AddEquation,
+          blendSrc: ZeroFactor,
           blendDst: OneFactor,
+          blendEquationAlpha: MinEquation,
+          blendSrcAlpha: OneFactor,
+          blendDstAlpha: OneFactor,
           depthWrite: false,
           side: DoubleSide,
           toneMapped: false,
@@ -257,7 +294,7 @@ export class PuppetView {
         py: pivot[1],
         mirror: part.mirror ? -1 : 1,
         glow,
-        strength: depthStrength(depth),
+        strength: glow ? 1 : far ? depthStrength(depth) : NEAR_SHADOW_STRENGTH,
         material,
         texture,
         centre,
@@ -265,6 +302,40 @@ export class PuppetView {
         axisB,
       });
     });
+    // The prime sets the wall's alpha to 1 for the shadows to darken; the resolve darkens the colour by it, alpha back to 1. Every
+    // view has its own (the friend's hand is drawn while no memory is): where two are drawn, the second resolve changes nothing.
+    this.prime = this.wash(RenderOrder.puppetPrime, OneFactor);
+    this.resolve = this.wash(RenderOrder.puppetResolve, DstAlphaFactor);
+  }
+
+  /** A quad over the whole wall (the clip) that writes alpha 1 and multiplies the colour by `dst` (1: kept; the alpha: darkened). */
+  private wash(order: number, dst: typeof OneFactor | typeof DstAlphaFactor): Mesh {
+    const material = new ShaderMaterial({
+      uniforms: {
+        centre: { value: new Vector2(0, 0) },
+        axisA: { value: this.washA },
+        axisB: { value: this.washB },
+        clip: { value: this.clip },
+      },
+      vertexShader: VERTEX,
+      fragmentShader: WASH_FRAGMENT,
+      transparent: true,
+      blending: CustomBlending,
+      blendEquation: AddEquation,
+      blendSrc: ZeroFactor,
+      blendDst: dst,
+      blendSrcAlpha: OneFactor,
+      blendDstAlpha: ZeroFactor,
+      depthWrite: false,
+      side: DoubleSide,
+      toneMapped: false,
+    });
+    const mesh = new Mesh(PuppetView.quad, material);
+    mesh.matrixAutoUpdate = false;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = order;
+    this.group.add(mesh);
+    return mesh;
   }
 
   /**
@@ -279,6 +350,23 @@ export class PuppetView {
       u = stage.up,
       n = stage.normal,
       o = stage.origin;
+    if (this.prime && this.resolve) {
+      const w = 2 * this.clip.x,
+        h = 2 * this.clip.y,
+        l = WASH_LIFT_M;
+      this.washA.set(w, 0);
+      this.washB.set(0, h);
+      // prettier-ignore
+      this.prime.matrix.set(
+        w * r[0], h * u[0], n[0], o[0] + n[0] * l,
+        w * r[1], h * u[1], n[1], o[1] + n[1] * l,
+        w * r[2], h * u[2], n[2], o[2] + n[2] * l,
+        0, 0, 0, 1,
+      );
+      this.prime.matrixWorldNeedsUpdate = true;
+      this.resolve.matrix.copy(this.prime.matrix);
+      this.resolve.matrixWorldNeedsUpdate = true;
+    }
     for (let k = 0; k < this.pieces.length; k++) {
       const p = this.pieces[k];
       const b = p.part * POSE_STRIDE;
@@ -330,6 +418,12 @@ export class PuppetView {
     }
     this.pieces = [];
     this.scene = null;
+    for (const m of [this.prime, this.resolve]) {
+      if (!m) continue;
+      this.group.remove(m);
+      (m.material as Material).dispose();
+    }
+    this.prime = this.resolve = null;
   }
 }
 

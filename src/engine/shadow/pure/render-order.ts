@@ -17,11 +17,17 @@ export interface Pass {
 export const RenderOrder = {
   /** The paper and its painted scenery (one shader). */
   paper: 1,
+  /** Sets the wall's alpha to 1, for the scenery to keep its darkening in (see puppet-view.ts). */
+  puppetPrime: 1.4,
   /**
    * The puppet scenery that stands back (PuppetPart.depth > 0: rooms, trees, the gate, the window and its light): under every
    * near puppet and the hands, so a character is always in front of it.
    */
   scenery: 1.5,
+  /** The near puppets: over the scenery and hiding it (see puppet-view.ts), before the resolve. */
+  puppetNear: 1.6,
+  /** Darkens the wall by the puppets' shadows (kept in the frame's alpha till here), and sets its alpha back to 1. */
+  puppetResolve: 1.7,
   /** The black shadows of the hands. */
   shadow: 2,
   /** The candle's dust and light shaft, and the in-VR title. */
@@ -49,18 +55,21 @@ export const PUPPET_PART_STEP = 0.0001;
 /**
  * Where a puppet part draws (puppet-view.ts). A part standing back (`depth` > 0), shadow or glow, goes in the scenery layer, under
  * the near puppets and the hands: a far shadow darkens what is under it and a glow lights it, so scenery drawn over a character
- * would show through the character's shadow (a tree in front of the boy, the window's light on him). Near shadows lie with the
- * hands' shadows and near glows (the torch, the fireflies) are light on top of them. Within a layer, list order (`index`).
+ * would show through the character's shadow (a tree in front of the boy, the window's light on him). Near shadows come next,
+ * under the hands' shadows, and near glows (the torch, the fireflies) are light on top of them. Within a layer, list order (`index`).
  */
 export function puppetPartOrder(glow: boolean, depth: number, index: number): number {
-  const layer = depth > 0 ? RenderOrder.scenery : glow ? RenderOrder.sprite : RenderOrder.shadow;
+  const layer = depth > 0 ? RenderOrder.scenery : glow ? RenderOrder.sprite : RenderOrder.puppetNear;
   return layer + index * PUPPET_PART_STEP;
 }
 
 /** The layers as a list, for the inspector and the governor. */
 export const PASSES: readonly Pass[] = [
   { id: 'paper', order: RenderOrder.paper, optional: false },
+  { id: 'puppet-prime', order: RenderOrder.puppetPrime, optional: false },
   { id: 'scenery', order: RenderOrder.scenery, optional: false },
+  { id: 'puppet-near', order: RenderOrder.puppetNear, optional: false },
+  { id: 'puppet-resolve', order: RenderOrder.puppetResolve, optional: false },
   { id: 'shadow', order: RenderOrder.shadow, optional: false },
   { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },

@@ -353,8 +353,7 @@ async function start(): Promise<void> {
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
   // The friend's hand: a painted shadow of a hand making the shape (friend-puppet.ts), drawn as a puppet of its own and played
-  // by time. As dark as the memories' puppets: a puppet darkens the wall down to 1 - opacity (a min blend), so a fainter one
-  // vanishes on the dim wall.
+  // by time. As dark as the memories' puppets: a puppet leaves 1 - opacity of the wall's light (puppet-view.ts).
   const friendView = new PuppetView();
   friendView.scale = STORY_SCALE;
   // The friend's hand rises from below the wall, its arm running off the bottom: the wall's edge cuts it off, as it does the puppets.

@@ -2,7 +2,7 @@ import { EFFECTS } from './quality-governor';
 import { describe, expect, it } from 'vitest';
 import { partDepths } from '../../stage/puppet/puppet-scene';
 import { STORY_STAGE } from '../../stage/story/story-stage';
-import { PASSES, puppetPartOrder, RenderOrder, validatePasses } from './render-order';
+import { PASSES, PUPPET_PART_STEP, puppetPartOrder, RenderOrder, validatePasses } from './render-order';
 
 describe('the render order', () => {
   it('is sound: every layer has its own name, they are in drawing order, and the fade is last', () => {
@@ -52,8 +52,17 @@ describe("a puppet part's layer", () => {
     expect(puppetPartOrder(false, 0.6, 0)).toBeGreaterThan(RenderOrder.paper);
   });
 
-  it('keeps near shadows with the hands, near glows on top, and list order within a layer', () => {
-    expect(Math.floor(puppetPartOrder(false, 0, 5))).toBe(RenderOrder.shadow);
+  it('primes the wall before the scenery, draws the near puppets after it, and resolves them all before the hands', () => {
+    const last = STORY_STAGE.parts.length - 1;
+    expect(RenderOrder.puppetPrime).toBeGreaterThan(RenderOrder.paper);
+    expect(RenderOrder.puppetPrime).toBeLessThan(puppetPartOrder(false, 0.6, 0));
+    expect(puppetPartOrder(true, 0.6, last)).toBeLessThan(puppetPartOrder(false, 0, 0));
+    expect(RenderOrder.puppetNear + last * PUPPET_PART_STEP).toBeLessThan(RenderOrder.puppetResolve);
+    expect(RenderOrder.puppetResolve).toBeLessThan(RenderOrder.shadow);
+  });
+
+  it('keeps near shadows in their layer, near glows on top, and list order within a layer', () => {
+    expect(Math.floor(puppetPartOrder(false, 0, 5) * 10)).toBe(RenderOrder.puppetNear * 10);
     expect(puppetPartOrder(true, 0, 0)).toBeGreaterThan(puppetPartOrder(false, 0, 140));
     expect(puppetPartOrder(false, 0.5, 3)).toBeLessThan(puppetPartOrder(false, 0.3, 4));
   });
