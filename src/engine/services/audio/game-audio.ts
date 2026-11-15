@@ -58,6 +58,12 @@ export class GameAudio {
     this.player.playAt(id, this.at.x, this.at.y, this.at.z);
   }
 
+  /** A soft footstep (0 or 1, the two alternated) from the stage point (`sx`, `sy`) on `stage`: a story scene's cue. */
+  storyStep(variant: number, stage: StagePlane, sx = 0, sy = 0): void {
+    stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
+    this.player.playAt(variant === 1 ? Sound.Step1 : Sound.Step0, this.at.x, this.at.y, this.at.z);
+  }
+
   /** The candle lifted or set down, from the flame (`flame` is its scene position). Call with the frame's two flags. */
   candleMoved(pickedUp: boolean, placed: boolean, flame: ArrayLike<number>): void {
     if (pickedUp) this.player.playAt(Sound.Lift, flame[0], flame[1], flame[2]);

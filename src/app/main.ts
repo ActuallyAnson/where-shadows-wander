@@ -57,6 +57,7 @@ import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { SleepHint } from '../engine/stage/story/sleep-hint';
+import { LightHush } from '../engine/stage/story/light-hush';
 import { IgnitionHold } from '../engine/stage/ignition';
 import { writeCoverHand } from '../engine/hands/cover-hand';
 import { GhostHandView } from '../engine/render/ghost-hand-view';
@@ -310,6 +311,8 @@ async function start(): Promise<void> {
   /** A child's hand, as the drawn gloves are. */
   const GHOST_HAND_SCALE = 0.8;
   const SLEEP_WORD = 'goodnight';
+  /** How far the room's light dips while the ghost hand has the flame covered (sleep-hint.ts `dip`), as the fort went dark. */
+  const GHOST_DIP = 0.35;
   /**
    * Before the candle is first lit, the moon's light is this many times its night level (below 1: darker than the night, so
    * the waiting candle's small pool of light stands out more; above 1: lighter). Once the candle catches it eases to the night
@@ -339,11 +342,16 @@ async function start(): Promise<void> {
   let storyStarted = false;
   /** The player's hand shadow: faint while a memory plays, full when the story waits for a hand shape. */
   const handPresence = new HandPresence();
+  // Scene 2's hush (docs/STORY.md): while the girl's hand is over the torch, the room's candle light is dimmed with it.
+  const lightHush = new LightHush();
   const onStoryCue = (cue: Cue) => {
     if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
     else if (cue.kind === 'mood') {
       if (cue.mood in CANDLE_MOODS) candleMood.to(cue.mood as CandleMoodName, cue.seconds);
     } else if (cue.kind === 'storm') storm.strikeNow(cue.thunderAfter, 1);
+    else if (cue.kind === 'step')
+      gameAudio.storyStep(cue.variant, storyFrame, cue.x, cue.y); // from where it is in the story
+    else if (cue.kind === 'hush') lightHush.to(cue.level, cue.seconds);
     else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
   const story = new StoryDirector(STORY_SCRIPT, onStoryCue);
@@ -1667,8 +1675,14 @@ async function start(): Promise<void> {
         lanternLight.boost = guide.boost;
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
-        // The candle's light on the room: shaded by a hand near the flame; at the end, dimming from where the cover left it.
-        const roomLight = ending.active ? endLightFrom * ending.candle : candleView.occlusion;
+        // The candle's light on the room: shaded by a hand near the flame, hushed with the torch in scene 2 (a skipped or
+        // stopped memory puts it back), and dipping under scene 7's ghost hand (last frame's); at the end, dimming from where
+        // the cover left it.
+        if (!story.memory?.playing) lightHush.reset();
+        else lightHush.update(paused ? 0 : step);
+        const roomLight = ending.active
+          ? endLightFrom * ending.candle
+          : candleView.occlusion * lightHush.level * (1 - GHOST_DIP * sleepHint.dip);
         stageView.applyLight(lanternLight.light, cameraQuat, roomLight, candleView.flamePosition, step);
         world.camera.getWorldPosition(settingsHead);
         stageView.setHead(settingsHead);

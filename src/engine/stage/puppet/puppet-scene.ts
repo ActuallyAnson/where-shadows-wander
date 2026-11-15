@@ -93,11 +93,18 @@ export interface Wobble {
 }
 
 /**
- * Something that happens at a moment: a note of the lullaby, a line written on the wall, the candle's light changing mood, or
- * lightning in the room's window with its thunder after it.
+ * Something that happens at a moment: a note of the lullaby, a line written on the wall, the candle's light changing mood,
+ * lightning in the room's window with its thunder after it, a footstep, or the room's candle hushed with the memory's light.
  */
 export type Cue =
   | { readonly t: number; readonly kind: 'note'; readonly note: number }
+  /** A soft footstep (one of two, alternated), from the stage point (`x`, `y`). */
+  | { readonly t: number; readonly kind: 'step'; readonly variant: 0 | 1; readonly x: number; readonly y: number }
+  /**
+   * The room's candle light eases to `level` (1 its own, less hushed) over `seconds`, as a light in the memory is covered and
+   * uncovered (scene 2's torch): the memory's light reaches the room.
+   */
+  | { readonly t: number; readonly kind: 'hush'; readonly level: number; readonly seconds: number }
   /** Lightning now (the room's window flashes), and its thunder `thunderAfter` seconds later. */
   | { readonly t: number; readonly kind: 'storm'; readonly thunderAfter: number }
   /** The candle's light eases into `mood` (a name from story/candle-mood.ts) over `seconds` (its default if unset). */

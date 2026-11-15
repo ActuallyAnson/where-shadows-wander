@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLAP_S,
   CYCLE_S,
   DOWN_S,
+  GATHER_S,
   FAINT,
   HIGH_M,
   HINT_DELAY_S,
@@ -47,6 +49,26 @@ describe('SleepHint', () => {
     expect(h.ghost).toBeCloseTo(FAINT);
     run(h, CYCLE_S - DOWN_S - 0.2);
     expect(h.ghost).toBe(0); // resting between covers
+  });
+
+  it('claps down quick, the way she hushed the torch: the descent is far faster than the lift', () => {
+    const h = new SleepHint();
+    run(h, HINT_DELAY_S + GATHER_S);
+    const poised = h.lift;
+    run(h, CLAP_S);
+    expect(h.lift).toBeCloseTo(LOW_M, 2);
+    expect(poised - h.lift).toBeGreaterThan(0.05);
+    expect(CLAP_S).toBeLessThan(0.4);
+  });
+
+  it('dips the room’s light while it has the flame covered, and not while it gathers or rests', () => {
+    const h = new SleepHint();
+    run(h, HINT_DELAY_S + GATHER_S * 0.5);
+    expect(h.dip).toBe(0);
+    run(h, GATHER_S * 0.5 + CLAP_S + 0.3);
+    expect(h.dip).toBe(1);
+    run(h, CYCLE_S - DOWN_S - 0.5);
+    expect(h.dip).toBe(0);
   });
 
   it('grows stronger if the wait goes on', () => {

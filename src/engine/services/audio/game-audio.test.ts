@@ -128,6 +128,15 @@ describe('GameAudio weather', () => {
     expect(rec.plays.map((p) => [p.id, p.x, p.y, p.z])).toEqual([[Sound.Thunder, -1.9, 1.45, -0.8]]);
   });
 
+  it('plays a story footstep from its point on the wall, alternating the two steps', () => {
+    const { audio, rec, stage } = setup();
+    audio.storyStep(0, stage, 0.5, -0.1);
+    audio.storyStep(1, stage, 0.5, -0.1);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Step0, Sound.Step1]);
+    expect(rec.plays[0].x).toBeCloseTo(0.5);
+    expect(rec.plays[0].y).toBeCloseTo(0.9);
+  });
+
   it('plays the covers from the lap', () => {
     const { audio, rec } = setup();
     audio.covers([0, 0.7, -0.45]);

@@ -558,6 +558,37 @@ function beam(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.fill();
 }
 
+function doorLight(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A door left ajar (scene 2's hush): a thin upright line of light, soft at its sides and fading towards the top, and at its
+  // foot a faint wedge of light thrown across the floor towards the left, into the room.
+  const foot = h * 0.88;
+  const line = g.createLinearGradient(0, 0, w, 0);
+  line.addColorStop(0.6, 'rgba(255,255,255,0)');
+  line.addColorStop(0.8, 'rgba(255,255,255,1)');
+  line.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = line;
+  g.fillRect(w * 0.6, 0, w * 0.4, foot);
+  g.save();
+  g.globalCompositeOperation = 'destination-out';
+  const top = g.createLinearGradient(0, 0, 0, foot);
+  top.addColorStop(0, 'rgba(0,0,0,0.85)');
+  top.addColorStop(0.4, 'rgba(0,0,0,0)');
+  g.fillStyle = top;
+  g.fillRect(0, 0, w, foot);
+  g.restore();
+  const floor = g.createLinearGradient(w, 0, 0, 0);
+  floor.addColorStop(0, 'rgba(255,255,255,0.55)');
+  floor.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = floor;
+  g.beginPath();
+  g.moveTo(w * 0.86, foot);
+  g.lineTo(w * 0.74, foot);
+  g.lineTo(0, h);
+  g.lineTo(w, h);
+  g.closePath();
+  g.fill();
+}
+
 // The friend's hands (docs/STORY.md, "How a memory starts"): the shadow a child's hand casts making each shape, painted the way
 // the old shadow-puppet plates draw them, so it reads at once. The fingers that move (a rabbit's ears) are parts of their own.
 
@@ -997,6 +1028,7 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   box,
   blanket,
   beam,
+  'door-light': doorLight,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */
