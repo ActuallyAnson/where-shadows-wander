@@ -26,6 +26,16 @@ describe('remembering the switches (no address needed)', () => {
     expect(loadTesting(st).flicker).toBeNull();
   });
 
+  it('remembers covering the flame to end the story only when it is plainly on', () => {
+    const s = new Map<string, string>();
+    const st = { getItem: (k: string) => s.get(k) ?? null, setItem: (k: string, v: string) => void s.set(k, v) };
+    expect(loadTesting(st).coverEnds).toBe(false);
+    s.set(TESTING_KEY, JSON.stringify({ coverEnds: true }));
+    expect(loadTesting(st).coverEnds).toBe(true);
+    s.set(TESTING_KEY, JSON.stringify({ coverEnds: 'yes' }));
+    expect(loadTesting(st).coverEnds).toBe(false);
+  });
+
   const store = () => {
     const m = new Map<string, string>();
     return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m };
@@ -42,6 +52,7 @@ describe('remembering the switches (no address needed)', () => {
           record,
           menu: 'pause',
           flicker: joints ? 0 : null,
+          coverEnds: !joints,
         };
         expect(saveTesting(o, s)).toBe(true);
         expect(loadTesting(s)).toEqual(o);
@@ -62,6 +73,7 @@ describe('remembering the switches (no address needed)', () => {
       record: 'off',
       menu: 'off',
       flicker: null,
+      coverEnds: false,
     });
     expect(loadTesting(null)).toEqual(DEFAULT_TESTING);
     const throwing = {

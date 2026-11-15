@@ -238,6 +238,8 @@ async function start(): Promise<void> {
   // The lantern's flicker: the developer overlay's test flicker (0..1, 0 is steady) overrides it for testing; the default is
   // gentler under reduced motion.
   let flickerTest = DEBUG_TOOLS ? loadTesting().flicker : null;
+  /** A test switch (the developer overlay): covering the lit flame plays the end at any point, not only in scene 7. */
+  let coverEndsTest = DEBUG_TOOLS ? loadTesting().coverEnds : false;
   const flickerParam = flickerTest ?? NaN;
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lanternLight = new LanternLightModel({
@@ -1155,6 +1157,11 @@ async function start(): Promise<void> {
           settings.hold('flicker', false);
         }
       },
+      coverEnds: () => coverEndsTest,
+      setCoverEnds: (on) => {
+        coverEndsTest = on;
+        saveTesting({ ...loadTesting(), coverEnds: on });
+      },
       errorCount: () => diagnostics.errorCount,
       lastError: () => diagnostics.lastError,
       openRoomEditor: () => {
@@ -1431,7 +1438,11 @@ async function start(): Promise<void> {
           titleLighter.visible = false;
           if (sessionState === 'playing') {
             if (candleView.isCovered && story.sleep()) fallAsleep();
-            else if (candleView.isCovered) {
+            else if (candleView.isCovered && coverEndsTest) {
+              // The test switch: the end, wherever the story is.
+              stopStory();
+              fallAsleep();
+            } else if (candleView.isCovered) {
               sessionState = 'paused';
               candleView.lit = false;
               candleView.resetCover();

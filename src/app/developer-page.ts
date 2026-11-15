@@ -25,6 +25,9 @@ export interface DeveloperPageHooks {
   /** The lantern's test flicker (null: the player's setting). */
   flicker(): FlickerChoice;
   setFlicker(choice: FlickerChoice): void;
+  /** Whether covering the lit flame plays the end at any point of the story (a test switch). */
+  coverEnds(): boolean;
+  setCoverEnds(on: boolean): void;
   /** Errors caught on the page so far, and the newest one. */
   errorCount(): number;
   lastError(): string | null;
@@ -74,6 +77,13 @@ export function developerPage(h: DeveloperPageHooks): ExtraPageItems {
         help: 'Overrides the player setting: steady for screenshots, or a fixed amount.',
         text: () => flickerText(h.flicker()),
         press: () => h.setFlicker(nextChoice(FLICKER_CHOICES, h.flicker())),
+      },
+      {
+        id: 'cover-ends',
+        label: 'Covering ends the story (test)',
+        help: 'Covering the lit flame plays the end (the candle going out, the blinks, the credits) at any point, not only in scene 7. Off, it pauses as usual.',
+        text: () => (h.coverEnds() ? 'ON' : 'off'),
+        press: () => h.setCoverEnds(!h.coverEnds()),
       },
       {
         id: 'errors',

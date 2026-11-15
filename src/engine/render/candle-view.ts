@@ -457,9 +457,9 @@ export class CandleView {
       this.lightOcclusion = 1.0;
     }
 
-    // Dual-hand cupping or single-hand hovering to extinguish flame and pause
+    // Dual-hand cupping or single-hand hovering to extinguish flame and pause (not while it is already going out, at the end)
     let coveringFlame = false;
-    if (this._lit) {
+    if (this._lit && !this.outActive) {
       // 1. Check dual-hand cupping (both hands around or above flame)
       if (leftTracked && rightTracked) {
         const dflx = this.leftPalm[0] - fx;

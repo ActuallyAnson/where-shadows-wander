@@ -7,6 +7,7 @@ function fake() {
     lab: false,
     rec: null as RecorderState | null,
     flicker: null as FlickerChoice,
+    coverEnds: false,
     errors: [] as string[],
     recorded: [] as boolean[],
     editor: 0,
@@ -21,6 +22,8 @@ function fake() {
     },
     flicker: () => state.flicker,
     setFlicker: (c) => (state.flicker = c),
+    coverEnds: () => state.coverEnds,
+    setCoverEnds: (on) => (state.coverEnds = on),
     errorCount: () => state.errors.length,
     lastError: () => state.errors.at(-1) ?? null,
     openRoomEditor: () => state.editor++,
@@ -31,10 +34,11 @@ function fake() {
 }
 
 describe('developerPage', () => {
-  it('is one page of at most six buttons, titled Developer', () => {
+  // It is drawn only in the overlay on the page (developer-overlay.ts), which has no row limit; seven keeps it short.
+  it('is one page of at most seven buttons, titled Developer', () => {
     const { page } = fake();
     expect(page.title).toBe(DEVELOPER_PAGE_TITLE);
-    expect(page.items.length).toBeLessThanOrEqual(6);
+    expect(page.items.length).toBeLessThanOrEqual(7);
   });
 
   it('shows and hides the Hand Lab', () => {
@@ -56,6 +60,16 @@ describe('developerPage', () => {
     expect(item('record-free').text()).toBe('Saved: again');
     item('record-shapes').press();
     expect(state.recorded).toEqual([false, true]);
+  });
+
+  it('switches covering the flame to end the story on and off', () => {
+    const { state, item } = fake();
+    expect(item('cover-ends').text()).toBe('off');
+    item('cover-ends').press();
+    expect(state.coverEnds).toBe(true);
+    expect(item('cover-ends').text()).toBe('ON');
+    item('cover-ends').press();
+    expect(state.coverEnds).toBe(false);
   });
 
   it('cycles the test flicker through the setting, steady and fixed amounts', () => {

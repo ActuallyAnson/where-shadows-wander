@@ -24,6 +24,8 @@ export interface TestingOptions {
   menu: MenuChoice;
   /** The lantern's flicker for testing (a steady light for screenshots); read when the page starts. */
   flicker: FlickerChoice;
+  /** Covering the lit flame plays the end at any point of the story, not only in scene 7 (to test the end). */
+  coverEnds: boolean;
 }
 
 export const DEFAULT_TESTING: Readonly<TestingOptions> = {
@@ -33,6 +35,7 @@ export const DEFAULT_TESTING: Readonly<TestingOptions> = {
   record: 'off',
   menu: 'off',
   flicker: null,
+  coverEnds: false,
 };
 
 export const RECORD_CHOICES: readonly RecordChoice[] = ['off', 'free', 'shapes'];
@@ -73,6 +76,7 @@ export function loadTesting(storage: TestingStorage | null = browserStorage()): 
       menu: (MENU_CHOICES as readonly string[]).includes(raw.menu ?? '') ? (raw.menu as MenuChoice) : 'off',
       flicker:
         typeof raw.flicker === 'number' && Number.isFinite(raw.flicker) ? Math.min(Math.max(raw.flicker, 0), 1) : null,
+      coverEnds: raw.coverEnds === true,
     };
   } catch {
     return { ...DEFAULT_TESTING };
