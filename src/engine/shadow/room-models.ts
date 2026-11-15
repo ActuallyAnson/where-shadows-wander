@@ -83,9 +83,27 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     size: [1.2, 1.2],
     replaces: 'rug',
   },
-  // A chair in front of the window, facing into the room, and a plant just this side of the window.
-  { id: 'chair', ids: ['chair', 'chaircushion'], at: [-1.45, 0, -0.8], size: [0.4, 0.4], yaw: Math.PI / 2 },
-  { id: 'plant', ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [-1.75, 0, 0.05], size: [0.35, 0.4] },
+  // His desk under the window, against the left wall (1.2 m long, its top 0.61 m up), and its chair pulled up to it, its back
+  // to the bed (0.98 m high). On the desk, a mug of pencils at the near-the-stage end and a globe at the other.
+  { id: 'desk', ids: ['desk'], at: [-1.71, 0, -0.8], size: [1.2, 0.56], yaw: Math.PI / 2 },
+  { id: 'chair', ids: ['deskchair'], at: [-1.2, 0, -0.8], size: [0.42, 0.46], yaw: -Math.PI / 2 },
+  { id: 'pencils', ids: ['penciljar'], at: [-1.82, 0.607, -1.22], size: [0.08, 0.08], yaw: Math.PI / 2 },
+  { id: 'globe', ids: ['globe'], at: [-1.8, 0.607, -0.42], size: [0.17, 0.15], yaw: Math.PI / 2 + 0.5 },
+  // Curtains either side of the window, from above it to just over the desk (1.55 m long; the window is z -1.35..-0.25).
+  { id: 'curtains', ids: ['curtains'], at: [-1.9, 0.8, -0.8], size: [1.24, 0.18], yaw: Math.PI / 2 },
+  // A small wardrobe in the corner behind his left shoulder, against the left wall (1.23 m high), and the room's door on the
+  // back wall between it and the bed (1.05 x 1.89 m), the moving boxes just inside it.
+  { id: 'closet', ids: ['closet'], at: [-1.81, 0, 0.18], size: [0.64, 0.36], yaw: Math.PI / 2 },
+  { id: 'door', ids: ['door'], at: [-1.06, 0, ROOM_BACK_WALL_Z - 0.1], size: [1.05, 0.2], yaw: Math.PI },
+  // A nightstand by the bed's head on the right (0.37 m high) with a small plant on it, his slippers on the rug beside the bed,
+  // his schoolbag dropped by the bookcase, and a coat stand against the right wall under the hill picture (1.25 m high).
+  { id: 'nightstand', ids: ['nightstand'], at: [0.7, 0, 0.3], size: [0.42, 0.42], yaw: Math.PI },
+  { id: 'plant', ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [0.7, 0.365, 0.3], size: [0.13, 0.14] },
+  { id: 'slippers', ids: ['slippers'], at: [0.78, 0.004, -0.1], size: [0.24, 0.28], yaw: Math.PI / 2 },
+  { id: 'bag', ids: ['backpack'], at: [1.1, 0, 0.34], size: [0.3, 0.24], yaw: Math.PI + 0.2 },
+  { id: 'coat-stand', ids: ['coatrack'], at: [1.76, 0, -0.42], size: [0.44, 0.44] },
+  // The light in the ceiling (2.5 m), over the middle of the room, unlit: it hangs 0.67 m, high above the stage wall's view.
+  { id: 'ceiling-light', ids: ['ceilinglight'], at: [0, 2.5 - 0.67, -0.45], size: [0.4, 0.4] },
 
   // Her keepsakes, on top of the bookcase (1.32 m up), behind the player's right shoulder: half seen in the dark at first, and
   // found by the last of the candle in scene 7 (docs/STORY.md). The jar she gave him on the firefly night (0.17 m tall, its lid
@@ -93,12 +111,12 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   { id: 'jar', ids: ['glassjar'], at: [1.5, 1.32, 0.3], size: [0.11, 0.11] },
   { id: 'torch', ids: ['flashlight'], at: [1.72, 1.32, 0.28], size: [0.07, 0.2], yaw: -Math.PI / 2 + 0.3 },
   // He has just moved in (the prologue's boxes): a stack of taped boxes in the corner ahead on the right (0.68 m high), by the
-  // pictures; behind his left shoulder, beside the bed's head, an open box half unpacked and a flat one with folded blankets on
+  // pictures; behind his left shoulder, in front of the door, an open box half unpacked and a flat one with folded blankets on
   // it (its top 0.235 m up, the blankets 0.11 m high).
   { id: 'boxes', ids: ['cardboardboxstack'], at: [1.7, 0, -1.2], size: [0.55, 0.4], yaw: -Math.PI / 2 },
-  { id: 'box-open', ids: ['cardboardboxopen'], at: [-0.85, 0, 0.32], size: [0.42, 0.25], yaw: 0.25 },
-  { id: 'box-flat', ids: ['cardboardboxflat'], at: [-1.35, 0, 0.34], size: [0.45, 0.34], yaw: Math.PI },
-  { id: 'blankets', ids: ['blanketsfolded'], at: [-1.35, 0.235, 0.34], size: [0.4, 0.27], yaw: Math.PI + 0.1 },
+  { id: 'box-open', ids: ['cardboardboxopen'], at: [-0.8, 0, 0.17], size: [0.42, 0.25], yaw: 0.25 },
+  { id: 'box-flat', ids: ['cardboardboxflat'], at: [-1.3, 0, 0.15], size: [0.45, 0.34], yaw: Math.PI },
+  { id: 'blankets', ids: ['blanketsfolded'], at: [-1.3, 0.235, 0.15], size: [0.4, 0.27], yaw: Math.PI + 0.1 },
   // A toy fox (her shape, the second he learns) on the rug, by the boxes, looking at the bed (0.32 m nose to tail).
   { id: 'fox', ids: ['toyfox'], at: [1.35, 0, -0.8], size: [0.1, 0.32], yaw: -1.07 },
 ];

@@ -80,7 +80,7 @@ const SHELVES_OUT = 0.1;
 const HUNG: readonly ({ readonly wall: '+x' | '-x' | 'back'; readonly along: number; readonly y: number } | null)[] = [
   { wall: '-x', along: -1.05, y: 1.45 }, // the bird and the moon, over the bed
   { wall: '-x', along: -0.2, y: 1.6 }, // the hill, over the bed's foot
-  { wall: 'back', along: -1.2, y: 1.35 }, // the shelf of books, boat and lamp, on the back wall left of the bed's head
+  { wall: 'back', along: 0.76, y: 1.35 }, // the shelf of books, boat and lamp, on the back wall right of the bed's head (the door is left of it)
   null, // the jar and plant shelf
 ];
 /** How deep the bookcase is, front to wall. */
@@ -159,7 +159,7 @@ const GLOWS: readonly GlowSpec[] = [
   {
     wonder: 0,
     follows: 'shelf',
-    at: [-1.2, 1.45, ROOM_BACK_WALL_Z - 0.13],
+    at: [0.76, 1.45, ROOM_BACK_WALL_Z - 0.13],
     size: [0.5, 0.5],
     facing: 'z',
     colour: [1, 0.72, 0.36],

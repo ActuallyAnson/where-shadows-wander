@@ -30,13 +30,17 @@ When a recording replaces a sound made in code, add a row for each file here: wh
 
 ## 3D models
 
-The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. Most are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); the gloves are [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and the jar, the torch, the fox and the blankets [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), and those must keep their credit. The CC0 ones need no attribution, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSETS.md`).
+The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. Most are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); the gloves are [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and the jar, the torch, the fox, the blankets and the slippers [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), and those must keep their credit. The CC0 ones need no attribution, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSETS.md`).
 
 | Model | Made by | Source | Licence |
 |---|---|---|---|
-| `bedSingle.glb`, `bookcaseOpen.glb`, `books.glb`, `sideTable.glb`, `lampRoundTable.glb`, `rugRound.glb`, `bear.glb`, `chair.glb`, `pottedPlant.glb` (Furniture Kit 2.0) | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
+| `bedSingle.glb`, `bookcaseOpen.glb`, `books.glb`, `sideTable.glb`, `lampRoundTable.glb`, `rugRound.glb`, `bear.glb`, `pottedPlant.glb` (Furniture Kit 2.0) | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
 | `cardboardBoxOpen.glb` ("Cardboard Box Open"), the open box beside the bed's head | Kenney | https://poly.pizza/m/i1lr4yJFY0 | CC0 1.0 |
 | `cardboardBoxStack.glb` and `cardboardBoxFlat.glb` ("Cardboard Boxes"), the stack of moving boxes and the flat box under the blankets | Quaternius | https://poly.pizza/m/V9KbWC8Vd6 , https://poly.pizza/m/bs6ikOeTrR | CC0 1.0 |
+| `coatRack.glb` ("Coat Rack Standing"), the coat stand by the right wall | Kenney | https://poly.pizza/m/8jXUm32dKW | CC0 1.0 |
+| `nightstand.glb` ("Night Stand"), `closet.glb` ("Closet"), `desk.glb` ("Desk"), `deskChair.glb` ("Chair"), `curtains.glb` ("Curtains Double"), `door.glb` ("Door"), `backpack.glb` ("Backpack"), `ceilingLight.glb` ("Light Ceiling") | Quaternius | https://poly.pizza/m/7cobkfclNv , https://poly.pizza/m/BHEVb1DIuH , https://poly.pizza/m/V86Go2rlnq , https://poly.pizza/m/iMNqRzPwwe , https://poly.pizza/m/kkeII96j9N , https://poly.pizza/m/a948jjnuaL , https://poly.pizza/m/vF7TuXCPDH , https://poly.pizza/m/NNlnaiDJIh | CC0 1.0 |
+| `pencilJar.glb` ("Mug With Office Tool") and `globe.glb` ("Globe"), on the desk | CreativeTrio | https://poly.pizza/m/4jSgnM5WWk , https://poly.pizza/m/Y4Dof9b2p5 | CC0 1.0 |
+| `slippers.glb` ("Slippers"), his slippers beside the bed | J-Toastie, via Poly Pizza | https://poly.pizza/m/2wR1M99UwP | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `glassJar.glb` ("Glass Jar"), the jar she gave him, on the bookcase | Jarlan Perez, via Poly Pizza | https://poly.pizza/m/8dGz3QaoAG- | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `flashlight.glb` ("Time Hotel 7.07"), her torch, on the bookcase (changes: the body recoloured from black to a faded red) | S. Paul Michael, via Poly Pizza | https://poly.pizza/m/8EnRYLQkHLn | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `toyFox.glb` ("Fox"), the toy fox on the rug (changes: texture resized from 2048 px PNG to 512 px JPEG) | Poly by Google, via Poly Pizza | https://poly.pizza/m/10u8FYPC5Br | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |

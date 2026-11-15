@@ -65,15 +65,26 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `bedSingle.glb` | The bed he sits up in | Final |
 | `bookcaseOpen.glb` | Bookcase on the right wall | Final |
 | `rugRound.glb` | Round rug | Final |
-| `chair.glb` | Chair by the window | Final |
-| `pottedPlant.glb` | Potted plant | Final |
+| `pottedPlant.glb` | A small potted plant on the nightstand | Final |
 | `glassJar.glb` | The jar she gave him, lid on, on top of the bookcase (piece `jar`): half seen in scene 1, the last of the candle finds it in scene 7 | Final: "Glass Jar" by Jarlan Perez (CC BY 3.0) |
 | `flashlight.glb` | Her torch from the night they met, lying beside the jar (piece `torch`) | Final: "Time Hotel 7.07" by S. Paul Michael (CC BY 3.0), body recoloured from black to faded red so it shows in the dark |
 | `cardboardBoxStack.glb` | A stack of taped moving boxes in the front right corner, by the pictures (piece `boxes`): he has just moved in | Final: Quaternius (CC0) |
-| `cardboardBoxOpen.glb` | An open box, half unpacked, beside the bed's head on the left (piece `box-open`) | Final: Kenney (CC0) |
+| `cardboardBoxOpen.glb` | An open box, half unpacked, just inside the door, left of the bed's head (piece `box-open`) | Final: Kenney (CC0) |
 | `cardboardBoxFlat.glb` | A flat box beside it, under the folded blankets (piece `box-flat`) | Final: Quaternius (CC0) |
 | `blanketsFolded.glb` | Folded blankets on the flat box (piece `blankets`), a nod to the blanket fort | Final: "Blankets" by Poly by Google (CC BY 3.0). 19k triangles, the heaviest model; simplify if the frame budget needs it |
 | `toyFox.glb` | A toy fox on the rug by the boxes, looking at the bed (piece `fox`); her shape | Final: "Fox" by Poly by Google (CC BY 3.0). Texture cut from 2048 px PNG to 512 px JPEG (1 MB to 100 KB) |
+| `desk.glb` | His desk under the window, against the left wall (piece `desk`) | Final: "Desk" by Quaternius (CC0) |
+| `deskChair.glb` | The desk's chair, pulled up to it, its back to the bed (piece `chair`); replaced Kenney's `chair.glb` (removed 15 Nov) | Final: "Chair" by Quaternius (CC0) |
+| `pencilJar.glb` | A mug of pencils, scissors and a ruler on the desk (piece `pencils`) | Final: "Mug With Office Tool" by CreativeTrio (CC0) |
+| `globe.glb` | A globe on the desk (piece `globe`) | Final: "Globe" by CreativeTrio (CC0) |
+| `curtains.glb` | Curtains either side of the window, down to just over the desk (piece `curtains`) | Final: "Curtains Double" by Quaternius (CC0) |
+| `closet.glb` | A small wardrobe in the back left corner (piece `closet`) | Final: "Closet" by Quaternius (CC0) |
+| `door.glb` | The room's door, on the back wall left of the bed's head (piece `door`); the moving boxes stand just inside it | Final: "Door" by Quaternius (CC0) |
+| `nightstand.glb` | The nightstand right of the bed's head, the plant on it (piece `nightstand`); the painted shelf moved above it to make room for the door | Final: "Night Stand" by Quaternius (CC0) |
+| `slippers.glb` | His slippers on the rug beside the bed (piece `slippers`) | Final: "Slippers" by J-Toastie (CC BY 3.0) |
+| `backpack.glb` | His schoolbag, dropped between the nightstand and the bookcase (piece `bag`) | Final: "Backpack" by Quaternius (CC0) |
+| `coatRack.glb` | A coat stand against the right wall, under the hill picture (piece `coat-stand`) | Final: "Coat Rack Standing" by Kenney (CC0) |
+| `ceilingLight.glb` | The ceiling light, unlit, over the middle of the room (piece `ceiling-light`) | Final: "Light Ceiling" by Quaternius (CC0) |
 | `hands/glove-left.glb`, `hands/glove-right.glb` | Glove hands (setting) | Final |
 | `hands/cartoon-glove-left.glb`, `hands/cartoon-glove-right.glb` | Cartoon glove hands (setting) | Final |
 
@@ -110,16 +121,16 @@ Keep everything off the wall ahead and out of the space between the candle and t
 
 | Model | Status |
 |---|---|
-| Nightstand (or place `sideTable.glb`) with an alarm clock | Needed |
-| Wardrobe | Needed |
-| Desk and desk chair, with a pencil jar or a globe | Needed |
+| Nightstand (or place `sideTable.glb`) with an alarm clock | Partly, 15 Nov: `nightstand.glb`; no alarm clock yet |
+| Wardrobe | Done 15 Nov: `closet.glb` |
+| Desk and desk chair, with a pencil jar or a globe | Done 15 Nov: `desk.glb`, `deskChair.glb`, `pencilJar.glb`, `globe.glb` |
 | Toy chest, and a few loose toys (blocks, a toy car, a ball) | Needed |
-| Curtains for the window, partly open | Needed |
-| The room's door, with coat hooks and a school bag | Needed |
-| Slippers by the bed | Needed |
+| Curtains for the window, partly open | Done 15 Nov: `curtains.glb` |
+| The room's door, with coat hooks and a school bag | Done 15 Nov: `door.glb`, `coatRack.glb` (a standing coat rack, by the bookcase, not by the door: no room there), `backpack.glb` |
+| Slippers by the bed | Done 15 Nov: `slippers.glb` |
 | Crayon drawings on a side wall | Needed (could be drawn in code) |
 | String lights (unlit) | Needed |
-| Ceiling lamp (off) | Needed |
+| Ceiling lamp (off) | Done 15 Nov: `ceilingLight.glb` |
 
 ### Needed: props to pick up and throw (planned)
 
@@ -154,7 +165,7 @@ Small and light-looking, placed within a seated reach (the tray, the quilt, the 
 
 | Source | Licence | Look | Notes |
 |---|---|---|---|
-| [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) | CC0 | Low-poly, flat colours | **Start here.** About 140 pieces: beds, bookcases, tables, lamps, rugs, plants, toys. One zip with `.glb` files. Unzip to `asset-inbox/kenney-furniture/`. The room already uses five of them. |
+| [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) | CC0 | Low-poly, flat colours | **Start here.** About 140 pieces: beds, bookcases, tables, lamps, rugs, plants, toys. One zip with `.glb` files. Unzip to `asset-inbox/kenney-furniture/`. The room uses several of them. |
 | [Kenney 3D kits](https://kenney.nl/assets?category=3D) | CC0 | Low-poly | The rest of Kenney's 3D packs. |
 | [Quaternius](https://quaternius.com) | CC0 | Low-poly, softer | Furniture, house interior and medieval or village packs. Take the glTF/GLB version where offered. |
 | [Poly Haven models](https://polyhaven.com/models) | CC0 | Realistic scans | Furniture, candles, books, wooden props. Download **1k** textures in **glTF** format, or the files are far too big. |
