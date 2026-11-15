@@ -22,6 +22,7 @@ A seated, hands-only WebXR story for the Meta VR Start Developer Competition 202
 - No `Math.random()` without a seeded generator where results must be repeatable.
 - Tests sit next to the code (`thing.ts` + `thing.test.ts`) and run in Node with Vitest.
 - There is only one three.js: IWSDK's `super-three` fork. Never add a second copy.
+- All text files use LF (`\n`) line endings (enforced via `.gitattributes` and `.prettierrc.json`).
 
 ## Names and credits
 
