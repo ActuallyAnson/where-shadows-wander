@@ -7,6 +7,7 @@ import {
   FRIEND_IN_S,
   FRIEND_OUT_S,
   HANDOFF_S,
+  MIRROR_REACH_M,
   StoryDirector,
   validateStory,
   type StoryScene,
@@ -422,5 +423,60 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     }
     expect(d.waitingForSleep).toBe(true);
     expect(d.sleep()).toBe(true);
+  });
+
+  describe('a hand that copies the player’s first (FriendBeat.mirror)', () => {
+    const mirrored: StoryScene[] = [
+      { id: 'm', beats: [{ kind: 'friend', shape: 'rabbit', x: -0.3, y: 0.1, mirror: 2 }] },
+    ];
+    const inPlace = FRIEND_DELAY_S + FRIEND_IN_S + 0.1;
+
+    it('rises open, follows the player’s hand and makes the shape it makes, then shows its own', () => {
+      const d = new StoryDirector(mirrored);
+      d.start();
+      expect(d.friendPuppet).toBe('flat');
+      run(d, inPlace);
+      expect(d.mirroring).toBe(true);
+      expect(d.friendShowing).toBe(false);
+      d.follow(0.2, 0.1, null);
+      d.update(0.05);
+      d.follow(0.3, 0.15, 'fox');
+      run(d, 1);
+      expect(d.friendDX).toBeCloseTo(0.1, 2);
+      expect(d.friendDY).toBeCloseTo(0.05, 2);
+      expect(d.friendPuppet).toBe('fox');
+      expect(d.friendShapeT).toBeLessThan(1.1); // it formed the fox afresh
+      d.follow(0.3, 0.15, 'fist'); // no painted fist: an open hand
+      run(d, 0.5);
+      expect(d.friendPuppet).toBe('flat');
+      run(d, 1);
+      expect(d.mirroring).toBe(false);
+      expect(d.friendShowing).toBe(true);
+      expect(d.friendPuppet).toBe('rabbit');
+      run(d, 4);
+      expect(Math.abs(d.friendDX)).toBeLessThan(0.001);
+    });
+
+    it('only counts the time it has a hand to copy, and keeps within reach of its place', () => {
+      const d = new StoryDirector(mirrored);
+      d.start();
+      run(d, inPlace + 10);
+      expect(d.mirroring).toBe(true);
+      d.follow(0, 0, null);
+      d.update(0.05);
+      d.follow(2, -2, null);
+      run(d, 1);
+      expect(d.friendDX).toBeCloseTo(MIRROR_REACH_M, 3);
+      expect(d.friendDY).toBeCloseTo(-MIRROR_REACH_M, 3);
+      expect(d.mirroring).toBe(true);
+    });
+
+    it('takes the shape it waits for even while still copying', () => {
+      const d = new StoryDirector(mirrored);
+      d.start();
+      run(d, inPlace);
+      expect(d.mirroring).toBe(true);
+      expect(d.commit('rabbit')).toBe(true);
+    });
   });
 });

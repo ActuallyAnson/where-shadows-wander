@@ -49,6 +49,10 @@ export class LanternLightModel {
     flicker: 0,
   };
   readonly settings: FlickerSettings;
+  /** 0..1: how much the flicker is calmed for now, on top of the setting (the story's shape guide steadies the flame). */
+  steady = 0;
+  /** Extra brightness for now, as a share (0.1 is 10 % brighter): the flame burns up as the player nears a shape. */
+  boost = 0;
   private level = 0;
   private lastT = NaN;
 
@@ -80,9 +84,9 @@ export class LanternLightModel {
       l.position[1] = position[1];
       l.position[2] = position[2];
     }
-    const f = flicker(t, this.seed) * s.amplitude;
+    const f = flicker(t, this.seed) * s.amplitude * (1 - Math.min(Math.max(this.steady, 0), 1));
     l.flicker = f;
-    l.intensity = this.level * (1 + f * s.intensityDepth);
+    l.intensity = this.level * (1 + f * s.intensityDepth) * (1 + Math.max(this.boost, 0));
     const warm = Math.max(0, -f) * s.warmthDepth; // a dip in brightness also reddens the flame
     for (let i = 0; i < 3; i++) l.color[i] = Math.min(1, Math.max(0, AMBER[i] * (1 - warm * WARM_SHIFT[i])));
   }

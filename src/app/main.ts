@@ -56,7 +56,9 @@ import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
 import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
-import { FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
+import { FORM_S, FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
+import { ShapeGuide } from '../engine/stage/story/shape-guide';
+import { SHAPES, type Shape } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
 import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
@@ -330,6 +332,24 @@ async function start(): Promise<void> {
   // The friend's hand rises from below the wall, its arm running off the bottom: the wall's edge cuts it off, as it does the puppets.
   friendView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const friendPlayers = new Map<PuppetScene, ScenePlayer>();
+  // The shape guide (shape-guide.ts): while her hand waits, a faint ghost of her shape follows the player's shadow (an outline
+  // for it to fill), the candle steadies and brightens as the player's hand nears the shape, and her hand leans toward theirs
+  // while they hold it.
+  const guide = new ShapeGuide();
+  const guideView = new PuppetView();
+  guideView.scale = STORY_SCALE;
+  guideView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
+  const guidePlayers = new Map<PuppetScene, ScenePlayer>();
+  /** The ghost's painted hand: her shape's, kept while the ghost fades after she is copied. */
+  let guideScene: PuppetScene | null = null;
+  /** The ghost's strength at its faintest and what closeness adds: lighter than the player's shadow, so the shadow covers it. */
+  const GUIDE_FAINT = 0.2;
+  const GUIDE_CLOSE = 0.12;
+  /** Which hand the story follows this frame (the one nearest her shape, or else any with a shadow), and where its shadow is. */
+  const HAND_SIDES = ['left', 'right'] as const;
+  let followHand: 'left' | 'right' | null = null;
+  let followX = NaN;
+  let followY = NaN;
   // The candle's mood (candle-mood.ts): the story opens rainy and gloomy, the candle's light blue-grey; a scene can ask for
   // another (StoryScene.candle) and the light eases into it.
   const candleMood = new CandleMoodBlend();
@@ -341,6 +361,7 @@ async function start(): Promise<void> {
     storyTitle.clear();
     storyLine.clear();
     story.start(scene);
+    guide.reset();
     // Started part-way (a checkpoint), the light is already the scene's.
     const mood = STORY_SCRIPT[scene]?.candle;
     if (scene > 0 && mood) candleMood.snap(mood);
@@ -349,6 +370,7 @@ async function start(): Promise<void> {
   const stopStory = () => {
     storyWait = -1;
     story.stop();
+    guide.reset();
     storyTitle.clear();
     storyLine.clear();
     puppets.hide();
@@ -376,6 +398,7 @@ async function start(): Promise<void> {
     bedroomView.group,
     shadowRenderer.mesh,
     friendView.group,
+    guideView.group,
     puppets.group,
     storyTitle.group,
     storyLine.group,
@@ -1437,14 +1460,54 @@ async function start(): Promise<void> {
               const o = JOINT['middle-finger-phalanx-proximal'] * 2;
               if (story.commit(e.shape, sh.active ? sh.joints[o] : NaN, sh.active ? sh.joints[o + 1] : NaN)) break;
             }
+          // The hand the story follows: while her hand waits on a shape, the one nearer to making it; else any with a shadow.
+          const target = story.waitingForShape ? story.friendShape : null;
+          const ti = target === null ? -1 : SHAPES.indexOf(target);
+          let margin = -Infinity;
+          let hold = 0;
+          followHand = null;
+          for (const side of HAND_SIDES) {
+            if (!projector.shadows[side].active) continue;
+            const m = ti >= 0 ? shapes[side].margins[ti] : -Infinity;
+            if (followHand === null || m > margin) {
+              followHand = side;
+              margin = m;
+            }
+            const st = shapes[side].state;
+            if (target !== null)
+              hold = Math.max(hold, st.committed === target ? 1 : st.candidate === target ? st.progress : 0);
+          }
+          followX = followY = NaN;
+          let followShape: Shape | null = null;
+          if (followHand !== null) {
+            const sh = projector.shadows[followHand];
+            // The ghost of a flat hand stands on its wrist, the others are placed by the middle of the hand.
+            const wristAnchored = story.friendPuppet === 'flat' || story.friendPuppet === 'wave';
+            const o = JOINT[wristAnchored && !story.mirroring ? 'wrist' : 'middle-finger-phalanx-proximal'] * 2;
+            followX = sh.joints[o];
+            followY = sh.joints[o + 1];
+            followShape = shapes[followHand].state.committed;
+          }
+          story.follow(followX, followY, followShape);
           story.update(storyStep);
+          guide.update(
+            storyStep,
+            story.friendShowing,
+            margin,
+            hold,
+            followX,
+            followY,
+            story.friendX + story.friendDX,
+            story.friendY,
+          );
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
+          if (friendScene && story.friendShowing) guideScene = friendScene;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
-            fp.offset[0] = story.friendX;
-            fp.offset[1] = story.friendY - story.friendDrop;
+            fp.offset[0] = story.friendX + story.friendDX + guide.leanX;
+            fp.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
             fp.seek(friendSceneTime(story.friendShapeT));
             friendView.load(friendScene);
             friendView.update(
@@ -1453,6 +1516,24 @@ async function start(): Promise<void> {
               shadowsVisible ? shadowRenderer.baseOpacity * story.friendOpacity * candleView.occlusion : 0,
             );
           } else friendView.hide();
+          // The ghost of her shape on the player's shadow: an outline for it to fill.
+          if (guideScene && guide.presence > 0.001) {
+            let gp = guidePlayers.get(guideScene);
+            if (!gp) {
+              guidePlayers.set(guideScene, (gp = new ScenePlayer(guideScene)));
+              gp.seek(friendSceneTime(FORM_S)); // the shape made, held still
+            }
+            gp.offset[0] = guide.x;
+            gp.offset[1] = guide.y;
+            gp.seek(friendSceneTime(FORM_S));
+            guideView.load(guideScene);
+            const strength = (GUIDE_FAINT + GUIDE_CLOSE * guide.closeness) * guide.presence;
+            guideView.update(
+              gp,
+              storyFrame,
+              shadowsVisible ? shadowRenderer.baseOpacity * strength * candleView.occlusion : 0,
+            );
+          } else guideView.hide();
           const memory = story.memory;
           if (memory) {
             puppets.load(memory.scene);
@@ -1522,6 +1603,9 @@ async function start(): Promise<void> {
         }
       }
       try {
+        // The shape guide: the flame steadies and burns up as the player's hand nears her shape.
+        lanternLight.steady = guide.steady;
+        lanternLight.boost = guide.boost;
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
         stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
@@ -1548,7 +1632,8 @@ async function start(): Promise<void> {
           if (askedMood) candleMood.to(askedMood);
         }
         candleMood.update(step);
-        candleLight.setColour(candleMood.light[0], candleMood.light[1], candleMood.light[2]);
+        const glow = 1 + guide.boost;
+        candleLight.setColour(candleMood.light[0] * glow, candleMood.light[1] * glow, candleMood.light[2] * glow);
         stageView.setTint(candleMood.wall[0], candleMood.wall[1], candleMood.wall[2]);
         candleView.setMoodTint(candleMood.flame[0], candleMood.flame[1], candleMood.flame[2]);
         candleLight.bakeIfDirty(world.renderer, world.scene);
@@ -1677,6 +1762,7 @@ async function start(): Promise<void> {
         story,
         puppets,
         friendView,
+        guide,
         /** Plays the story from scene `scene` of story-script.ts (0, scene 2, by default; the candle must be lit to see it). */
         playStory: (scene = 0) => startStory(scene),
         /** Jumps to scene `index` of story-script.ts (0 is scene 2), lighting the candle if need be; `play` copies its shape. */

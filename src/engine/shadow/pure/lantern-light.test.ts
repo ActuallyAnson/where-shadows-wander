@@ -77,6 +77,17 @@ describe('lantern light', () => {
     }
   });
 
+  it('steady calms the flicker and boost burns brighter, for now, over the setting', () => {
+    const m = new LanternLightModel();
+    m.steady = 1;
+    m.boost = 0.2;
+    for (let i = 0; i <= 3 * FPS; i++) {
+      m.update(i / FPS, at, true);
+      if (i > FPS) expect(m.light.intensity).toBeCloseTo(1.2, 6);
+    }
+    expect(m.settings.amplitude).toBe(1); // the setting itself is left alone
+  });
+
   it('flickers within the configured depth and keeps colours in 0..1', () => {
     const m = new LanternLightModel();
     let lo = Infinity;

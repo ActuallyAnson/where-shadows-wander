@@ -9,6 +9,7 @@ import type { Shape } from '../../hands/shapes';
 import { POSE_STRIDE, type Cue, type PuppetScene } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
 import type { CandleMoodName } from './candle-mood';
+import { FRIEND_PUPPETS } from './friend-puppet';
 
 /** The friend's hand shows `shape`, its shadow at `x`, `y` (metres right and up from the wall's centre), and waits. */
 export interface FriendBeat {
@@ -22,6 +23,12 @@ export interface FriendBeat {
   readonly out?: number;
   /** How it goes once copied: lowered out of sight below the wall (the default), or fading where it is (scene 6's goodbye). */
   readonly leave?: 'lower' | 'fade';
+  /**
+   * Seconds her hand copies the player's before it shows the shape (the first time only, so the player learns that hands answer
+   * hands): it rises open, follows the player's hand about and makes any shape the player makes, and only after this long with a
+   * hand to copy does it make its own. Default 0: it shows the shape at once.
+   */
+  readonly mirror?: number;
 }
 
 /** A memory plays: `scene` from `start` (default 0) to `end` (default its length) seconds, e.g. one chapter of it. */
@@ -75,6 +82,11 @@ export const FRIEND_OUT_S = 1.8;
 export const FRIEND_FROM_Y = -0.95;
 /** Seconds into its rise the friend's hand starts to form its shape, so it comes up loose and makes the shape as it arrives. */
 export const FRIEND_FORM_AT_S = 1.3;
+/** How far her copying hand follows the player's from its place, stage metres each way, and how closely (seconds behind). */
+export const MIRROR_REACH_M = 0.3;
+const MIRROR_TAU_S = 0.15;
+/** How long it takes her hand to drift back to its place once it stops copying, seconds (a time constant). */
+const MIRROR_HOME_TAU_S = 0.45;
 /** Seconds a memory's `from` puppet takes to travel from the player's shadow to its own place. */
 export const HANDOFF_S = 1.6;
 
@@ -118,6 +130,9 @@ export class StoryDirector {
   friendT = 0;
   friendX = 0;
   friendY = 0;
+  /** Where her hand is away from its place while it copies the player's (FriendBeat.mirror), stage metres. */
+  friendDX = 0;
+  friendDY = 0;
   /** The memory on the wall, or null: playing, or (once it has ended) holding its last picture until the next one. */
   memory: ScenePlayer | null = null;
   private readonly players = new Map<PuppetScene, ScenePlayer>();
@@ -125,6 +140,15 @@ export class StoryDirector {
   private friendWait = 0;
   private friendOut = FRIEND_OUT_S;
   private friendFades = false;
+  /** Seconds of copying left (FriendBeat.mirror), where the player's hand was when the copying took it up, and the player now. */
+  private mirrorLeft = 0;
+  private mirrorOX = NaN;
+  private mirrorOY = NaN;
+  private playerX = NaN;
+  private playerY = NaN;
+  private playerShape: Shape | null = null;
+  /** Her hand's clock (friendT) when it began forming the shape it shows. */
+  private formAt = FRIEND_FORM_AT_S;
   private waitLeft = -1;
   private sleepWaiting = false;
   private handoffS = HANDOFF_S;
@@ -157,6 +181,26 @@ export class StoryDirector {
   /** Whether the friend's hand is waiting for the player to copy its shape. */
   get waitingForShape(): boolean {
     return this.waiting;
+  }
+
+  /** Whether the friend's hand is copying the player's (FriendBeat.mirror) rather than waiting on its own shape yet. */
+  get mirroring(): boolean {
+    return this.waiting && this.mirrorLeft > 0;
+  }
+
+  /** Whether the friend's hand is in place and showing the shape it waits for: risen, not copying, not yet copied. */
+  get friendShowing(): boolean {
+    return this.waiting && this.friendShape !== null && this.friendLevel >= 1 && this.mirrorLeft <= 0;
+  }
+
+  /**
+   * Where the player's hand shadow is on the wall (NaN, NaN without one) and the shape it holds (committed), if any: what the
+   * friend's hand copies while it mirrors. Once per frame, before update.
+   */
+  follow(x: number, y: number, shape: Shape | null): void {
+    this.playerX = x;
+    this.playerY = y;
+    this.playerShape = shape;
   }
 
   /** Whether the story is at its end, waiting for the player to cover the flame (a sleep beat). */
@@ -230,6 +274,8 @@ export class StoryDirector {
     this.friendShape = null;
     this.friendPuppet = null;
     this.friendLevel = 0;
+    this.friendDX = this.friendDY = 0;
+    this.mirrorLeft = 0;
     this.handoffPart = -1;
     this.waitLeft = -1;
     this.sleepWaiting = false;
@@ -265,6 +311,8 @@ export class StoryDirector {
         else {
           this.friendT += dt;
           this.friendLevel = Math.min(1, this.friendLevel + dt / FRIEND_IN_S);
+          if (this.mirrorLeft > 0 && this.friendLevel >= 1) this.copyPlayer(dt);
+          else this.easeHome(dt);
         }
       } else {
         this.friendT += dt;
@@ -292,6 +340,47 @@ export class StoryDirector {
     m.update(dt);
   }
 
+  /** Her hand copies the player's: follows it about, makes the shape it makes; when the time is up, it shows its own. */
+  private copyPlayer(dt: number): void {
+    const tracked = Number.isFinite(this.playerX) && Number.isFinite(this.playerY);
+    let tx = 0,
+      ty = 0;
+    if (tracked) {
+      if (!Number.isFinite(this.mirrorOX)) {
+        this.mirrorOX = this.playerX;
+        this.mirrorOY = this.playerY;
+      }
+      const r = MIRROR_REACH_M;
+      tx = Math.min(r, Math.max(-r, this.playerX - this.mirrorOX));
+      ty = Math.min(r, Math.max(-r, this.playerY - this.mirrorOY));
+      this.mirrorLeft -= dt;
+    } else this.mirrorOX = this.mirrorOY = NaN;
+    const k = 1 - Math.exp(-dt / MIRROR_TAU_S);
+    this.friendDX += (tx - this.friendDX) * k;
+    this.friendDY += (ty - this.friendDY) * k;
+    const s = this.playerShape;
+    const want = this.mirrorLeft <= 0 ? this.ownPuppet : tracked && s !== null && s in FRIEND_PUPPETS ? s : 'flat';
+    if (want !== this.friendPuppet) {
+      this.friendPuppet = want;
+      this.formAt = this.friendT;
+    }
+  }
+
+  /** Once it has stopped copying, her hand drifts back to its own place. */
+  private easeHome(dt: number): void {
+    if (this.friendDX === 0 && this.friendDY === 0) return;
+    const k = 1 - Math.exp(-dt / MIRROR_HOME_TAU_S);
+    this.friendDX -= this.friendDX * k;
+    this.friendDY -= this.friendDY * k;
+    if (Math.abs(this.friendDX) < 1e-5 && Math.abs(this.friendDY) < 1e-5) this.friendDX = this.friendDY = 0;
+  }
+
+  /** The friend beat's own painted hand (FriendBeat.puppet, or its shape). */
+  private get ownPuppet(): string {
+    const b = this.beat;
+    return b?.kind === 'friend' ? (b.puppet ?? b.shape) : 'flat';
+  }
+
   /** Whether the friend's hand is going, once copied, by fading where it is (FriendBeat.leave). */
   private get friendFading(): boolean {
     return this.friendFades && !this.waiting;
@@ -311,7 +400,7 @@ export class StoryDirector {
 
   /** Seconds into the friend's hand's shape (friend-puppet.ts's scene time): it forms the shape as it arrives. */
   get friendShapeT(): number {
-    return this.friendT - FRIEND_FORM_AT_S;
+    return this.friendT - this.formAt;
   }
 
   private next(): void {
@@ -345,7 +434,12 @@ export class StoryDirector {
       // The memory before it, if any, stays on the wall while the hand waits.
       this.waiting = true;
       this.friendShape = b.shape;
-      this.friendPuppet = b.puppet ?? b.shape;
+      this.mirrorLeft = b.mirror ?? 0;
+      this.mirrorOX = this.mirrorOY = NaN;
+      this.friendDX = this.friendDY = 0;
+      this.formAt = FRIEND_FORM_AT_S;
+      // Copying first, it comes up as an open hand.
+      this.friendPuppet = this.mirrorLeft > 0 ? 'flat' : (b.puppet ?? b.shape);
       this.friendOut = b.out ?? FRIEND_OUT_S;
       this.friendX = b.x;
       this.friendY = b.y;
