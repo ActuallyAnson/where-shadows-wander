@@ -2,8 +2,8 @@
 // (docs/STORY.md, "How a memory starts"). While her hand waits it reads how near the player's hand is to her shape (the
 // classifier's margin on it) and how far into the hold it is, and gives back:
 // - `closeness`, 0..1, eased: the candle steadies and brightens with it (warmer, colder);
-// - `presence` and `x`, `y`: a faint ghost of her shape that stands still beside her hand, toward the middle of the wall, where
-//   his matching hand would go: an outline to fill (the parts a shadow put over it leaves uncovered still show). It does not
+// - `presence` and `x`, `y`: a faint outline of her shape (ghost-outline.ts: a line round it, mirrored to face her hand) that
+//   stands still beside her hand, toward the middle of the wall, where his matching hand would go: a frame to fill. It does not
 //   follow the player's shadow: a projected shadow can swing a long way for a small move (a hand behind the flame), and the
 //   ghost went with it. The shape is recognised anywhere on the wall; the outline is only a place to aim.
 // - `hold`, 0..1, and `leanX`, `leanY`: once the shape is recognised and held, her hand leans a little toward the player's,

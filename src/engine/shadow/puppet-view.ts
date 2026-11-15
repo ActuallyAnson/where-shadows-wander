@@ -32,7 +32,7 @@ import {
 } from '@iwsdk/core';
 import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
 import type { ScenePlayer } from '../stage/puppet/scene-player';
-import { isImageArt, PUPPET_ART } from './puppet-art';
+import { isImageArt, PUPPET_ART, type PuppetPainter } from './puppet-art';
 import { puppetPartOrder, RenderOrder } from './pure/render-order';
 import type { StagePlane } from './pure/stage-plane';
 
@@ -148,6 +148,8 @@ export class PuppetView {
   private static readonly quad = new PlaneGeometry(1, 1);
   /** How many wall metres one scene metre is: scenes are written for the 1.6 by 1 m stage and drawn bigger (STORY_SCALE). */
   scale = 1;
+  /** Art painted in code elsewhere (ghost-outline.ts's baked outlines), looked up by name before PUPPET_ART. */
+  extraArt: Readonly<Record<string, PuppetPainter>> = {};
   /** Half the wall's width and height, metres from the story's centre: nothing is drawn past them. Shared by every piece. */
   private readonly clip = new Vector2(NO_CLIP, NO_CLIP);
   /** The prime and the resolve (see the top of the file), while a scene is loaded; their axes. */
@@ -197,7 +199,7 @@ export class PuppetView {
         img.onerror = () => console.warn(`puppet ${part.id}: could not load ${part.art}`);
         img.src = part.art;
       } else {
-        const paint = PUPPET_ART[part.art];
+        const paint = this.extraArt[part.art] ?? PUPPET_ART[part.art];
         if (!paint) console.warn(`puppet ${part.id}: no art called ${part.art}`);
         else if (g && blurPx < 0.5) paint(g, canvas.width, canvas.height);
         else if (g) {

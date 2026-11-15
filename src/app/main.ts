@@ -53,6 +53,7 @@ import { FrameInspector } from './frame-inspector';
 import { HandTrailView } from '../engine/shadow/hand-trail-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
+import { GhostOutlines } from '../engine/shadow/ghost-outline';
 import { PuppetView } from '../engine/shadow/puppet-view';
 import { SkipTouch } from '../engine/shadow/pure/skip-touch';
 import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
@@ -363,19 +364,21 @@ async function start(): Promise<void> {
   const friendOutView = new PuppetView();
   friendOutView.scale = STORY_SCALE;
   friendOutView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
-  // The shape guide (shape-guide.ts): while her hand waits, a faint ghost of her shape stands beside it (an outline to fill,
-  // where his matching hand would go), the candle steadies and brightens as the player's hand nears the shape, and her hand
-  // leans toward theirs while they hold it.
+  // The shape guide (shape-guide.ts): while her hand waits, a faint outline of her shape stands beside it, mirrored to face
+  // hers (ghost-outline.ts: where his matching hand would go), the candle steadies and brightens as the player's hand nears
+  // the shape, and her hand leans toward theirs while they hold it.
   const guide = new ShapeGuide();
+  const ghostOutlines = new GhostOutlines();
   const guideView = new PuppetView();
   guideView.scale = STORY_SCALE;
+  guideView.extraArt = ghostOutlines.art;
   guideView.clipToWall(ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
   const guidePlayers = new Map<PuppetScene, ScenePlayer>();
   /** The ghost's painted hand: her shape's, kept while the ghost fades after she is copied. */
   let guideScene: PuppetScene | null = null;
-  /** The ghost's strength at its faintest and what closeness adds: lighter than the player's shadow, so the shadow covers it. */
-  const GUIDE_FAINT = 0.2;
-  const GUIDE_CLOSE = 0.12;
+  /** The outline's strength at its faintest and what closeness adds: a thin line, so darker than the old filled ghost was. */
+  const GUIDE_FAINT = 0.35;
+  const GUIDE_CLOSE = 0.15;
   /** Which hand the story follows this frame (the one nearest her shape, or else any with a shadow), and where its shadow is. */
   const HAND_SIDES = ['left', 'right'] as const;
   let followHand: 'left' | 'right' | null = null;
@@ -1598,17 +1601,16 @@ async function start(): Promise<void> {
             friendOutView.load(outScene);
             friendOutView.update(op, storyFrame, friendLight * story.friendSwapOut);
           } else friendOutView.hide();
-          // The ghost of her shape beside her hand: an outline for the player's shadow to fill.
+          // The outline of her shape beside her hand, facing it: a frame for the player's shadow to fill.
           if (guideScene && guide.presence > 0.001) {
-            let gp = guidePlayers.get(guideScene);
-            if (!gp) {
-              guidePlayers.set(guideScene, (gp = new ScenePlayer(guideScene)));
-              gp.seek(friendSceneTime(FORM_S)); // the shape made, held still
-            }
+            // Her shape as made, held still (baked once per shape).
+            const outline = ghostOutlines.get(guideScene, friendSceneTime(FORM_S));
+            let gp = guidePlayers.get(outline);
+            if (!gp) guidePlayers.set(outline, (gp = new ScenePlayer(outline)));
             gp.offset[0] = guide.x;
             gp.offset[1] = guide.y;
-            gp.seek(friendSceneTime(FORM_S));
-            guideView.load(guideScene);
+            gp.seek(0);
+            guideView.load(outline);
             const strength = (GUIDE_FAINT + GUIDE_CLOSE * guide.closeness) * guide.presence;
             guideView.update(
               gp,
