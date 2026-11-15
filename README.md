@@ -9,7 +9,7 @@ A seated, hands-only virtual reality story about grief and comfort. A boy who ha
 - [The story](docs/STORY.md): the seven scenes of the night, one at a time
 - [Architecture](docs/ARCHITECTURE.md): layers, one frame, modules, frame budget
 - [Performance](docs/PERFORMANCE.md): how it is measured and the numbers so far
-- [UI style](docs/UI-STYLE.md) and [asset sources](docs/ASSET-SOURCES.md) (shipped assets are credited in [CREDITS.md](CREDITS.md))
+- [UI style](docs/UI-STYLE.md) and [assets](docs/ASSETS.md) (shipped assets are credited in [CREDITS.md](CREDITS.md))
 - [Competition reference](docs/COMPETITION.md): rules, dates, judging criteria and useful links
 - [Architecture decisions](docs/adr/): ADR 0016 is the current direction; 0006, 0007, 0013 and 0014 are superseded. The [IWSDK spike](docs/spikes/iwsdk-spike.md) is the evidence for ADRs 0001 and 0002.
 

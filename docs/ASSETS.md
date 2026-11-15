@@ -1,9 +1,9 @@
-# Asset tracker
+# Assets
 
-Every sound, piece of music, model and font the game has, uses as a stand-in, or still needs. Update a row when its status changes.
+Every sound, piece of music, model and font the game has, uses as a stand-in, or still needs, and how to get new ones in. Update a row when its status changes.
 
 - [`CREDITS.md`](../CREDITS.md) records who made each shipped file and its licence. Add a row there whenever a file goes in.
-- [`ASSET-SOURCES.md`](ASSET-SOURCES.md) covers where to download, the size budgets and how a file gets into the game.
+- [Getting new assets](#getting-new-assets) covers where to download, the size budgets and how a file gets into the game. Check the competition's rule on third-party assets in [`COMPETITION.md`](COMPETITION.md) before relying on anything that is not CC0.
 
 **Status:** **Final** = a real file that is in the game. **Placeholder** = in the game, but made in code; replace it. **Needed** = the story or the room asks for it and nothing exists yet. **Unused** = in the repo but nothing plays or shows it. **Drop** = left over from the puzzle game (deleted 11 Nov); remove it.
 
@@ -128,3 +128,58 @@ Keep everything off the wall ahead and out of the space between the candle and t
 |---|---|---|
 | `src/ui/title-screen/fonts/cinzel-decorative-*` | Title lettering (Cinzel Decorative, SIL OFL 1.1) | Final |
 | `src/ui/menu-panel/fonts/cinzel-latin-400-normal.woff2` | Pause and end screens (Cinzel, SIL OFL 1.1) | Final |
+
+## Getting new assets
+
+### Workflow
+
+1. Download into `asset-inbox/` at the top of the repo, one folder per download, with whatever came with it. `asset-inbox/` is git-ignored, so raw files are never committed and do not count against the asset budgets.
+2. For anything not from Kenney, Quaternius or Poly Haven, add a `source.txt` to its folder with the page URL, the author, and the licence (for example `CC-BY 4.0, by <author>`).
+3. Pick what is used and shrink it to fit the budget. A model becomes a single `.glb` in `src/assets/models/` (the file name sets its asset id: `bedSingle.glb` is `bedsingle`). A sound becomes `src/assets/audio/sfx/<name>.ogg` and music goes in `src/assets/audio/music/`, named as in the tables above.
+4. Add a row for it to `CREDITS.md`, and update its status here.
+
+### Where to download
+
+#### Models
+
+| Source | Licence | Look | Notes |
+|---|---|---|---|
+| [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit) | CC0 | Low-poly, flat colours | **Start here.** About 140 pieces: beds, bookcases, tables, lamps, rugs, plants, toys. One zip with `.glb` files. Unzip to `asset-inbox/kenney-furniture/`. The room already uses five of them. |
+| [Kenney 3D kits](https://kenney.nl/assets?category=3D) | CC0 | Low-poly | The rest of Kenney's 3D packs. |
+| [Quaternius](https://quaternius.com) | CC0 | Low-poly, softer | Furniture, house interior and medieval or village packs. Take the glTF/GLB version where offered. |
+| [Poly Haven models](https://polyhaven.com/models) | CC0 | Realistic scans | Furniture, candles, books, wooden props. Download **1k** textures in **glTF** format, or the files are far too big. |
+| [Poly Pizza](https://poly.pizza) | Mixed CC0 and CC-BY | Low-poly | Note the licence and page link for each CC-BY model so it can be credited. |
+| [Sketchfab, downloadable](https://sketchfab.com/search?features=downloadable&type=models) | Varies per model | Anything | Needs a login. Note each model's licence. Download "glTF" or "GLB". |
+
+#### Textures
+
+| Source | Licence | Notes |
+|---|---|---|
+| [ambientCG](https://ambientcg.com) | CC0 | Wood planks, wallpaper, fabric, plaster. **1K-JPG** is enough. |
+| [Poly Haven textures](https://polyhaven.com/textures) | CC0 | The same kind of thing, at 1k. |
+
+#### Sounds and music
+
+| Source | Licence | Notes |
+|---|---|---|
+| [Kenney audio](https://kenney.nl/assets?category=Audio) | CC0 | UI clicks and small effects. |
+| [Freesound](https://freesound.org) | Mixed CC0, CC BY, CC BY-NC | Rain, thunder, cloth, matches, laughter. Filter the search to CC0 or CC BY; never take an NC sound. Needs a login. |
+| [OpenGameArt](https://opengameart.org) | Mixed | Music and effects. Check each file's licence. |
+| [Pixabay sounds and music](https://pixabay.com/sound-effects/) | Pixabay licence (free, no attribution) | Not CC; read its terms against `COMPETITION.md` before using. |
+
+### What a file needs
+
+- **Format (models).** `.glb` is best. `.gltf` with its textures is fine (it is converted to `.glb` before it ships, since loose `.gltf` files are not loaded). `.fbx` or `.obj` will do if that is all there is.
+- **Size.** Each shipped model must be at most 500 KB, each texture 512 KB, each sound effect 300 KB and each music file 1.5 MB (`src/engine/services/assets/budgets.mjs`). Prefer low-poly models with small or no textures.
+- **Format (audio).** `.ogg` (Vorbis), mono for effects, about 96 to 128 kbps. Loops must join their own start without a click.
+- **Licence.** In order of preference:
+
+  | Licence | Use it? |
+  |---|---|
+  | CC0 | Yes, the safest choice |
+  | CC BY | Very likely fine. Credit the author in `CREDITS.md` |
+  | CC BY-SA | Allowed, but "share alike" can extend to our changes. Best avoided |
+  | Any NC (non-commercial) | Avoid: a competition with cash prizes could count as commercial use |
+  | Any ND (no derivatives) | Avoid: rescaling or recolouring a model would break it |
+
+- **Style.** Keep to one look so the room hangs together: low-poly (Kenney, Quaternius) or realistic (Poly Haven), not a mix. Low-poly is lighter on Quest and suits the storybook mood.
