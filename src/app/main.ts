@@ -126,6 +126,12 @@ const launch = loadLaunch(DEBUG_TOOLS);
 const desk = isDeskMode(launch.mode);
 /** The longest the headset waits on black for the title to go, should the title never say it has. */
 const SESSION_BLACK_FALLBACK_S = 4;
+/**
+ * Where the bed tray (and the candle in its middle) stands from the eyes, metres: how far ahead, and how far below. Near and low
+ * (15 Nov 2026; it was 0.45 ahead, 0.5 below), so a relaxed hand is already past the flame and casts without reaching out.
+ */
+const TRAY_AHEAD_M = 0.38;
+const TRAY_BELOW_EYES_M = 0.55;
 
 /** The rate the browser will run audio at, so the sounds made ahead are made at it (a mismatch would waste them). */
 function audioContextRate(): number {
@@ -570,7 +576,7 @@ async function start(): Promise<void> {
   /** Where mock hands go: the rig placeRig last placed (made with the Hand Lab). */
   let deskFrame: DeskFrame | null = null;
   let badPoseReported = false;
-  let headY = 1.2; // the eye height the rig was last placed for; the candle's table is 0.45 m below it
+  let headY = 1.2; // the eye height the rig was last placed for; the tray is TRAY_BELOW_EYES_M below it
   /** Places the stage and lantern for a head at `head` facing `yaw`. Returns false, placing nothing, if the pose is not usable. */
   const placeRig = (head: ArrayLike<number>, yaw: number): boolean => {
     // A head pose that is not finite would make StageFrame throw, and a throw in the frame loop would stop every later frame.
@@ -597,11 +603,11 @@ async function start(): Promise<void> {
     bedroomView.place(head, yaw, stageDist > 0.5 ? stageDist : 2.0);
     roomDressing.place(stageDist > 0.5 ? stageDist : 2.0, bedroomView.playerZ());
 
-    // Position bed tray and lap blanket across player's lap
-    const trayDist = 0.45;
-    const trayX = head[0] - Math.sin(yaw) * trayDist;
-    const trayY = Math.max(0.4, head[1] - 0.5);
-    const trayZ = head[2] - Math.cos(yaw) * trayDist;
+    // Position bed tray and lap blanket across player's lap. The candle stands in the tray's middle, so this is where the light
+    // is: near and low, so that hands held in a relaxed way in front of the body are already past the flame and cast.
+    const trayX = head[0] - Math.sin(yaw) * TRAY_AHEAD_M;
+    const trayY = Math.max(0.4, head[1] - TRAY_BELOW_EYES_M);
+    const trayZ = head[2] - Math.cos(yaw) * TRAY_AHEAD_M;
     bedTray.place(trayX, trayY, trayZ, yaw);
     candleLight.rebake(); // the room and the tray moved: their shadows are cast again
     candleLight.aimAt(stage.origin); // its light is thrown at the wall the shadows play on
@@ -1346,7 +1352,7 @@ async function start(): Promise<void> {
       }
       if (rigPlaced) {
         try {
-          const candleAction = candleView.updateInteraction(hands.hands, step, headY - 0.45);
+          const candleAction = candleView.updateInteraction(hands.hands, step, headY - TRAY_BELOW_EYES_M + 0.05);
           if (candleAction.justPickedUp || candleAction.justPlaced)
             gameAudio.candleMoved(candleAction.justPickedUp, candleAction.justPlaced, candleView.flamePosition);
           if (candleAction.state === 'held' || candleAction.justPlaced) {

@@ -55,8 +55,12 @@ function createQuiltTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
 /** The lap pieces' ids in the layout file's `lap` section. */
 export const LAP_PIECE_IDS = ['tray', 'quilt', 'candle'] as const;
 
-/** Where the candle stands when the layout file says nothing, in the tray's space: in the middle, on its top. */
-const CANDLE_DEFAULT: Placement = placement([0, 0.01, 0]);
+/**
+ * Where the candle stands when the layout file says nothing, in the tray's space: on its top, centred across it and on its near
+ * half (+z is toward the player), its saucer at the near rim. Hands cast only once they are in front of the flame, so the nearer
+ * it is, the less the player has to reach.
+ */
+const CANDLE_DEFAULT: Placement = placement([0, 0.01, 0.05]);
 
 /** Where the code puts the quilt when the layout file says nothing: its shape is already in the tray's space (QUILT_*). */
 const QUILT_DEFAULT: Placement = placement([0, 0, 0]);

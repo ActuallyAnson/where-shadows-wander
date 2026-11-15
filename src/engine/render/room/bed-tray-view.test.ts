@@ -43,9 +43,10 @@ describe('BedTrayView', () => {
 
     const out = new Float64Array(3);
     view.getCandleSaucerPosition(out);
-    expect(out[0]).toBeCloseTo(0.1, 4);
+    // The candle stands 5 cm toward the player from the tray's middle, turned with the tray.
+    expect(out[0]).toBeCloseTo(0.1 + 0.05 * Math.sin(0.2), 4);
     expect(out[1]).toBeCloseTo(0.71, 4);
-    expect(out[2]).toBeCloseTo(-0.5, 4);
+    expect(out[2]).toBeCloseTo(-0.5 + 0.05 * Math.cos(0.2), 4);
   });
 
   it('puts the tray and the quilt where the layout says, and the candle on the tray wherever it is', () => {
@@ -63,7 +64,7 @@ describe('BedTrayView', () => {
     const out = new Float64Array(3);
     view.getCandleSaucerPosition(out);
     expect(out[1]).toBeCloseTo(0.74, 6);
-    expect(out[2]).toBeCloseTo(-0.52, 6);
+    expect(out[2]).toBeCloseTo(-0.52 + 0.05, 6);
   });
 
   it("stands the candle where the layout says, in the tray's space, so it goes with the tray", () => {

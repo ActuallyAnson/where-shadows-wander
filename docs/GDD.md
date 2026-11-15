@@ -92,6 +92,8 @@ The stage is a plain, pale patch of the bedroom wall at the foot of the bed, abo
 
 A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The candle flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably.
 
+What the candle's place does decide is where the hands start to cast: only a hand in front of the flame casts, fading in over its first 8 cm. So the candle stands near and low (15 Nov 2026): the tray 0.38 m ahead of the eyes and 0.55 m below them, the candle on its near half, the flame about 0.33 m ahead. A hand casts from about 0.33 m ahead and fully from about 0.41 m, so hands held relaxed in front of the body, forearms forward, already cast without reaching (before, they had to pass 0.45 m and were full only past 0.53 m). Tune it with `TRAY_AHEAD_M` and `TRAY_BELOW_EYES_M` in `main.ts` and the candle's spot on the tray (`CANDLE_DEFAULT` in `bed-tray-view.ts`, or the room editor).
+
 ## The story
 
 The story is told on the wall in shadow puppets. A boy has recently lost his best friend. He wakes in the night, lights the candle, remembers their time together through the shadow play, and at the end he can sleep again.
