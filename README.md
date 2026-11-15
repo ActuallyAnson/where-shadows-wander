@@ -25,3 +25,13 @@ npm run build        # production build in dist/
 ```
 
 Then open https://localhost:8081/ and press **BEGIN**. To test without a headset, press **🛠 Dev**, then **Hand Lab panel**. On a headset, we develop on a Pico and confirm on a Quest ([ADR 0003](docs/adr/0003-pico-as-stand-in-test-device.md)). The details of each are in [Getting started](docs/getting-started.md).
+
+## Credits
+
+Made by:
+
+- Anson Teng ([@ActuallyAnson](https://github.com/ActuallyAnson))
+- Lim Zhen Eu Damon ([@Requlish](https://github.com/Requlish))
+- Nyove ([@Nyoveee](https://github.com/Nyoveee))
+
+Third-party models and fonts, with their authors and licences, are listed in [CREDITS.md](CREDITS.md). Built with Meta's [Immersive Web SDK](https://github.com/facebook/immersive-web-sdk).
