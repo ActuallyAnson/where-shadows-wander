@@ -58,6 +58,7 @@ export class ShapeGuide {
    * @param ax where the player's shadow is (NaN with no hand): only her lean goes toward it
    * @param fx where her hand is, without the lean
    * @param gx where the outline stands when the scene sets it (FriendBeat.guide); NaN: beside her hand
+   * @param showOutline whether the outline itself should fade in (false omits the ghost outline while keeping lean/steady/boost)
    */
   update(
     dt: number,
@@ -70,13 +71,15 @@ export class ShapeGuide {
     fy: number,
     gx = NaN,
     gy = NaN,
+    showOutline = true,
   ): void {
     if (!(dt > 0)) return;
     const tracked = Number.isFinite(ax) && Number.isFinite(ay);
     const on = active && tracked;
-    this.presence = active
-      ? Math.min(1, this.presence + dt / PRESENCE_IN_S)
-      : Math.max(0, this.presence - dt / PRESENCE_OUT_S);
+    this.presence =
+      active && showOutline
+        ? Math.min(1, this.presence + dt / PRESENCE_IN_S)
+        : Math.max(0, this.presence - dt / PRESENCE_OUT_S);
     this.closeness = ease(this.closeness, active ? closenessOf(margin) : 0, dt, CLOSE_TAU);
     const h = active ? Math.min(1, Math.max(0, hold)) : 0;
     this.hold = ease(this.hold, h, dt, h > this.hold ? HOLD_UP_TAU : HOLD_DOWN_TAU);

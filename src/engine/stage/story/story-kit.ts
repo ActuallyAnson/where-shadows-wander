@@ -251,7 +251,7 @@ export function stepTracks(
   const tracks: Track[] = [
     { part: `${id}-leg-back`, prop: 'angle', keys: swingKeys(t0, t1, gait.stride, gait.legs, 0, 0, 1) },
     { part: `${id}-leg-front`, prop: 'angle', keys: swingKeys(t0, t1, gait.stride, gait.legs, 0, 0, -1) },
-    { part: id, prop: 'y', keys: bobKeys(t0, t1, gait.stride / 2, y, gait.lift) },
+    { part: id, prop: 'y', keys: bobKeys(t0, t1, gait.stride, y, gait.lift) },
   ];
   if (o.girl)
     tracks.push({

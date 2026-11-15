@@ -2,7 +2,7 @@
 // A screen is a page of up to six rows (a name, a value between arrows) and a footer (next page, reset, back). Positions are
 // fractions of the square screen (u across from the left, v down from the top). Plain TypeScript: no three.js, no canvas.
 import { SETTING_SPECS, type SettingSpec, type Settings } from '../../engine/services/settings/settings';
-import { formatValue, PAGES, pageButtonText, stepValue, nextValue } from './markup';
+import { formatValue, PAGES, SETTING_PAGES, pageButtonText, stepValue, nextValue } from './markup';
 
 export const ROW0_V = 0.42;
 /** 4.6 cm apart at the screen's real size (0.56 m), so a fingertip poke is not precise work. */
@@ -50,7 +50,7 @@ export function pageCount(extra: readonly ExtraPageItems[]): number {
 }
 
 export function pageTitle(page: number, extra: readonly ExtraPageItems[]): string {
-  return page < PAGES.length ? 'Settings' : extra[page - PAGES.length].title;
+  return page < SETTING_PAGES.length ? SETTING_PAGES[page].category : extra[page - SETTING_PAGES.length].title;
 }
 
 export function footerLabels(page: number, extra: readonly ExtraPageItems[]): readonly [string, string, string] {

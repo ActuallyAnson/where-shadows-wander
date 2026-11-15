@@ -313,6 +313,8 @@ const wobbles: Wobble[] = [
 const cues: Cue[] = [
   { t: 0.05, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: FLASH_S, kind: 'storm', thunderAfter: STORM_THUNDER_AFTER_S },
+  // He pulls the blanket over his head after the thunder.
+  { t: HIDE_S, kind: 'sound', sound: 'blanket', x: BOY_X, y: FLOOR_Y },
   // Her torch clicks on as she sets it down between them.
   { t: CLICK_S, kind: 'sound', sound: 'click', x: (FRIEND_X + BOY_X) / 2, y: FLOOR_Y },
   // She throws the blanket up off him: a soft whoosh of cloth as the fort comes down.

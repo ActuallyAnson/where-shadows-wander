@@ -8,6 +8,7 @@ import {
   FOOTER_V,
   hitAt,
   pageCount,
+  pageTitle,
   pressedValue,
   ROW_PITCH_V,
   rowsFor,
@@ -16,13 +17,14 @@ import {
   type ExtraPageItems,
 } from './screen-model';
 
-const rows = rowsFor(0, DEFAULT_SETTINGS, []);
+const rows = rowsFor(2, DEFAULT_SETTINGS, []);
 
 describe('settings screen model', () => {
-  it('shows every setting on exactly one page', () => {
+  it('shows every setting on exactly one page, titled Basic or Advanced', () => {
     const all = PAGES.flatMap((_, p) => rowsFor(p, DEFAULT_SETTINGS, []).map((r) => r.id));
     expect(new Set(all).size).toBe(all.length);
     expect(all.length).toBe(14);
+    expect(PAGES.map((_, p) => pageTitle(p, []))).toEqual(['Basic', 'Basic', 'Advanced']);
   });
 
   it('makes each row and footer button at least 4 cm tall to poke', () => {
@@ -34,19 +36,21 @@ describe('settings screen model', () => {
     expect(hitAt(rows, 0.6, rowV(0))).toBe(0);
     expect(hitAt(rows, 0.88, rowV(0))).toBe(1);
     expect(hitAt(rows, VALUE_U, rowV(0))).toBe(-1);
-    const toggle = rowsFor(0, DEFAULT_SETTINGS, [])[5];
+    const basicPressRows = rowsFor(1, DEFAULT_SETTINGS, []);
+    const toggle = basicPressRows[2];
     expect(toggle.kind).toBe('press');
-    expect(hitAt(rows, VALUE_U, rowV(5))).toBe(11);
+    expect(hitAt(basicPressRows, VALUE_U, rowV(2))).toBe(5);
     expect(hitAt(rows, 0.2, rowV(0))).toBe(-1); // the name is not a button
     expect(hitAt(rows, FOOTER_U[2], FOOTER_V)).toBe(FOOTER_CODE + 2);
     expect(hitAt(rows, 0.5, 0.2)).toBe(-1);
   });
 
   it('steps a number on its grid and clamps it, and flips a toggle', () => {
-    const up = pressedValue(rows[0], 1, DEFAULT_SETTINGS)!;
+    const toleranceRow = rows.find((r) => r.id === 'tolerance')!;
+    const up = pressedValue(toleranceRow, 1, DEFAULT_SETTINGS)!;
     expect(up).toEqual({ key: 'tolerance', value: 1.5 });
-    expect(pressedValue(rows[0], 0, DEFAULT_SETTINGS)).toEqual({ key: 'tolerance', value: 1 }); // already the minimum
-    const flick = rows[4];
+    expect(pressedValue(toleranceRow, 0, DEFAULT_SETTINGS)).toEqual({ key: 'tolerance', value: 1 }); // already the minimum
+    const flick = rows.find((r) => r.id === 'flicker')!;
     expect(pressedValue(flick, 1, DEFAULT_SETTINGS)!.key).toBe('flicker');
   });
 
@@ -56,6 +60,7 @@ describe('settings screen model', () => {
       { title: 'Debug', items: [{ id: 'a', label: 'A', help: 'h', text: () => 'on', press: () => hits++ }] },
     ];
     expect(pageCount(extra)).toBe(PAGES.length + 1);
+    expect(pageTitle(PAGES.length, extra)).toBe('Debug');
     const r = rowsFor(PAGES.length, DEFAULT_SETTINGS, extra);
     expect(r).toHaveLength(1);
     expect(r[0].value).toBe('on');

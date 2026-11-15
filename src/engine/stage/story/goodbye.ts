@@ -114,27 +114,34 @@ const parts: PuppetPart[] = [
   hand('girl'),
 ];
 
+/** Unzoomed distance each kid steps back as the arms begin to lower so their wrists swing clear of the midline without clipping. */
+const PART_STEP = 0.036;
+
 /**
- * The hands' place as the arms swing from `from` to `to` (radians forward of up) over `t0`..`t1`, eased, sampled closely so
- * each hand stays at the end of its arm (the arm turns; the hand, linearly between samples, follows its arc).
+ * The hands' and kids' places as the arms swing from `from` to `to` (radians forward of up) over `t0`..`t1`, eased and
+ * sampled closely so each hand stays at the end of its arm while each kid eases back just ahead of the forward arc of the arm.
  */
-function swing(t0: number, t1: number, from: number, to: number): { arm: Key[]; x: Key[]; y: Key[] } {
+function swing(t0: number, t1: number, from: number, to: number): { arm: Key[]; x: Key[]; y: Key[]; pull: Key[] } {
   const arm: Key[] = [];
   const x: Key[] = [];
   const y: Key[] = [];
-  const n = 12;
+  const pull: Key[] = [];
+  const n = 16;
   const [fx, fy] = wristFromFeet(from);
   for (let i = 0; i <= n; i++) {
     const k = i / n;
     const e = k * k * (3 - 2 * k);
+    const pk = Math.min(1, k / 0.55);
+    const stepBack = PART_STEP * (pk * pk * (3 - 2 * pk));
     const a = from + (to - from) * e;
     const [wx, wy] = wristFromFeet(a);
     const t = t0 + (t1 - t0) * k;
     arm.push([t, a]);
-    x.push([t, PALM_FACE_DX - (wx - fx)]);
+    x.push([t, PALM_FACE_DX - (wx - fx) + stepBack]);
     y.push([t, -PALM_MID_DY + (wy - fy)]);
+    pull.push([t, stepBack]);
   }
-  return { arm, x, y };
+  return { arm, x, y, pull };
 }
 const parting = swing(PART_S, PART_S + PART_LEN_S, REACH, PARTED);
 
@@ -188,6 +195,11 @@ const tracks: Track[] = [
           ];
     return [
       { part: `goodbye-${who}`, prop: 'opacity', keys: [[KIDS_S, 0], [KIDS_S + KIDS_LEN_S, 1, 'smooth'], ...fades] },
+      {
+        part: `goodbye-${who}`,
+        prop: 'x',
+        keys: parting.pull.map(([t, d]): Key => [t, -side * BOY_FEET[0] + side * d]),
+      },
       // The front arm reaching to the touch, then coming down as the palms part.
       {
         part: `goodbye-${who}-arm-front`,

@@ -3,8 +3,8 @@
 // and text only; it stays out of the way until opened.
 import type { Settings } from '../../engine/services/settings/settings';
 import type { SettingsStore } from '../../engine/services/settings/settings-store';
-import { PAGES } from './markup';
-import { pressedValue, rowsFor, type Row } from './screen-model';
+import { SETTING_PAGES, type SettingCategory } from './markup';
+import { pressedValue, rowsFor } from './screen-model';
 
 const STYLE_ID = 'wsw-settings-page-style';
 const CSS = `
@@ -12,6 +12,8 @@ const CSS = `
 .wsw-sp.wsw-open{display:flex}
 .wsw-sp-box{width:min(560px,92vw);padding:4vmin 3vmin;box-sizing:border-box}
 .wsw-sp h2{margin:0 0 1vmin;text-align:center;font-weight:400;letter-spacing:.3em;font-size:clamp(20px,4vmin,32px)}
+.wsw-sp h3{margin:2.2vmin 0 .6vmin;font-weight:400;letter-spacing:.22em;font-size:clamp(12px,2vmin,15px);color:#ffd89a;text-transform:uppercase}
+.wsw-sp h3:first-child{margin-top:0}
 .wsw-sp-help{min-height:2.6em;text-align:center;font-size:clamp(12px,2vmin,15px);color:#8d97a8;margin:0 0 1.5vmin}
 .wsw-sp-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;border-bottom:1px solid rgba(170,179,196,.15)}
 .wsw-sp-name{font-size:clamp(14px,2.4vmin,18px);color:#b6beca}
@@ -62,37 +64,45 @@ export function createSettingsPage(store: SettingsStore, parent: HTMLElement = d
   el.append(box);
   parent.append(el);
 
-  // Every setting, on one scrolling page (the in-room screen needs pages; a window does not).
-  const rows = (): Row[] => PAGES.flatMap((_, p) => rowsFor(p, store.value as Readonly<Settings>, []));
+  // Every setting, on one scrolling page grouped by category (the in-room screen needs pages; a window does not).
   const draw = (): void => {
     list.replaceChildren();
-    for (const row of rows()) {
-      const r = document.createElement('div');
-      r.className = 'wsw-sp-row';
-      const name = document.createElement('span');
-      name.className = 'wsw-sp-name';
-      name.textContent = row.label;
-      const ctl = document.createElement('div');
-      ctl.className = 'wsw-sp-ctl';
-      const val = document.createElement('span');
-      val.className = 'wsw-sp-val';
-      val.textContent = row.value;
-      const apply = (code: number) => {
-        const change = pressedValue(row, code, store.value as Readonly<Settings>);
-        if (change) store.set(change.key, change.value as never);
-      };
-      if (row.kind === 'step')
-        ctl.append(
-          make('−', () => apply(0)),
-          val,
-          make('+', () => apply(1)),
-        );
-      else ctl.append(make(row.value, () => apply(1)));
-      r.addEventListener('pointerenter', () => (help.textContent = row.help));
-      r.addEventListener('focusin', () => (help.textContent = row.help));
-      r.append(name, ctl);
-      list.append(r);
-    }
+    let lastCategory: SettingCategory | undefined;
+    SETTING_PAGES.forEach((def, pageIndex) => {
+      if (def.category !== lastCategory) {
+        const heading = document.createElement('h3');
+        heading.textContent = def.category;
+        list.append(heading);
+        lastCategory = def.category;
+      }
+      for (const row of rowsFor(pageIndex, store.value as Readonly<Settings>, [])) {
+        const r = document.createElement('div');
+        r.className = 'wsw-sp-row';
+        const name = document.createElement('span');
+        name.className = 'wsw-sp-name';
+        name.textContent = row.label;
+        const ctl = document.createElement('div');
+        ctl.className = 'wsw-sp-ctl';
+        const val = document.createElement('span');
+        val.className = 'wsw-sp-val';
+        val.textContent = row.value;
+        const apply = (code: number) => {
+          const change = pressedValue(row, code, store.value as Readonly<Settings>);
+          if (change) store.set(change.key, change.value as never);
+        };
+        if (row.kind === 'step')
+          ctl.append(
+            make('−', () => apply(0)),
+            val,
+            make('+', () => apply(1)),
+          );
+        else ctl.append(make(row.value, () => apply(1)));
+        r.addEventListener('pointerenter', () => (help.textContent = row.help));
+        r.addEventListener('focusin', () => (help.textContent = row.help));
+        r.append(name, ctl);
+        list.append(r);
+      }
+    });
   };
   store.subscribe(() => {
     if (page.isOpen) draw();

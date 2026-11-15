@@ -1576,6 +1576,7 @@ async function start(): Promise<void> {
             story.friendY,
             story.guideX,
             story.guideY,
+            story.friendGuide,
           );
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;

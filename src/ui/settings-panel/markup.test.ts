@@ -7,6 +7,7 @@ import {
   METRES_PER_PX,
   nextValue,
   PAGES,
+  SETTING_PAGES,
   pageButtonText,
   settingsMarkup,
   stepValue,
@@ -34,6 +35,17 @@ describe('settingsMarkup', () => {
     expect([...all].sort()).toEqual(SETTING_SPECS.map((s) => s.key).sort());
     for (const p of PAGES) expect(p.length).toBeLessThanOrEqual(6);
     PAGES.forEach((_, n) => expect(text).toContain(`id="${ids.page(n)}"`));
+  });
+
+  it('categorises volume controls under Basic and shadow adjustments under Advanced', () => {
+    const byCategory = (cat: 'Basic' | 'Advanced') =>
+      SETTING_PAGES.filter((p) => p.category === cat).flatMap((p) => p.keys);
+    expect(byCategory('Basic')).toEqual(
+      expect.arrayContaining(['volumeMaster', 'volumeMusic', 'volumeEffects', 'volumeAmbience', 'hand', 'captions']),
+    );
+    expect(byCategory('Advanced')).toEqual(
+      expect.arrayContaining(['shadowSize', 'sharpen', 'flicker', 'tolerance', 'holdTime']),
+    );
   });
 
   it('has a page button that names where it goes', () => {
