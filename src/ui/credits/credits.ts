@@ -51,6 +51,7 @@ export const CREDITS: readonly CreditLine[] = [
   line('small', "Children's Toys Laughing by f-r-a-g-i-l-e (CC0)"),
   line('small', 'Torch Click 2 by BenjaminNelan (CC0)'),
   line('small', 'Thunder clip by csengeri (CC0)'),
+  line('small', 'Yawn 2 by OwlStorm (CC0)'),
   line('small', 'All from freesound.org'),
   line('gap'),
   line('heading', 'Lettering'),
