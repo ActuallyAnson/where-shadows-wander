@@ -134,6 +134,8 @@ export class CandleView {
   private cooldownTimer = 0;
   private pickupDwellTimer = 0;
   private lightOcclusion = 1.0;
+  /** The point light at the last update as a share of a clear, uncovered flame's (for beginGoingOut). */
+  private lastLightShare = 1;
   /**
    * The end (scene 7): covering the flame puts it out for good, so it shows that instead of the pause's ring: the flame
    * shrinks and its light dims as the cover goes on, and a hand begins to dim it from further away.
@@ -143,6 +145,14 @@ export class CandleView {
   matchNear = 0;
   /** Sleep mode has sized the flame (put back when it ends). */
   private sleepScaled = false;
+  /**
+   * The end, after the flame was covered (ending-timeline.ts): 0 .. 1, how far it has gone out. From beginGoingOut the flame
+   * shrinks from the size it had under the hand to nothing and its light dims with it; a hand no longer covers or uncovers it.
+   */
+  goingOut = 0;
+  private outActive = false;
+  private outScale = 1;
+  private outLight = 1;
   /** The story's mood on the candle itself (setMoodTint): multiplies the flame's colour and the light on the wax. */
   private readonly moodTint = new Float64Array([1, 1, 1]);
 
@@ -315,6 +325,27 @@ export class CandleView {
   /** Progress (0.0 to 1.0) of the 3-second palm cover hold toward triggering pause. */
   get coverProgress(): number {
     return Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
+  }
+
+  /** The end: the flame starts going out from how it looks now (call as the cover is committed, before resetCover's next update). */
+  beginGoingOut(): void {
+    this.outActive = true;
+    this.goingOut = 0;
+    this.outScale = this.flame.mesh.scale.x;
+    // Its light now as a share of a clear flame's (the sleep cover had already dimmed it).
+    this.outLight = Math.max(0, Math.min(1, this.lastLightShare));
+  }
+
+  /** Back to an ordinary candle (a jump back into the story, or a new session). */
+  endGoingOut(): void {
+    this.outActive = false;
+    this.goingOut = 0;
+    this.flame.mesh.scale.setScalar(1);
+  }
+
+  /** Whether the end's going out is under way. */
+  get isGoingOut(): boolean {
+    return this.outActive;
   }
 
   /** Resets cover timer, progress gauge, and covered flag. */
@@ -645,6 +676,10 @@ export class CandleView {
    * Zero per-frame allocations.
    */
   update(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+    if (this.outActive) {
+      this.updateGoingOut(light, cameraQuaternion);
+      return;
+    }
     if (!this._lit) {
       if (this._ignitionProgress > 0) {
         // Igniting: fire slowly grows from small spark (0.06) to full flame (1.0)
@@ -697,6 +732,27 @@ export class CandleView {
       this.sleepScaled = false;
       this.flame.mesh.scale.setScalar(1);
     }
+    const clear = light.lit ? light.intensity * 1.5 : 0;
+    this.lastLightShare = clear > 1e-4 ? this.pointLight.intensity / clear : 0;
+  }
+
+  /** The end: the flame shrinks to nothing and its light dims with it; once out, no wick glow asks to be lit again. */
+  private updateGoingOut(light: Readonly<LanternLight>, cameraQuaternion: Readonly<Quaternion>): void {
+    const g = this.goingOut <= 0 ? 0 : this.goingOut >= 1 ? 1 : this.goingOut;
+    const left = 1 - g;
+    this.wickIndicator.visible = false;
+    this.coverProgressMesh.visible = false;
+    if (!this._lit || left <= 0.01) {
+      this.flame.mesh.visible = false;
+      this.pointLight.intensity = 0;
+      return;
+    }
+    this.flame.mesh.visible = true;
+    this.flame.update(light, cameraQuaternion);
+    // A guttering flame drops in height faster than its light goes: sqrt keeps a small bead to the end.
+    this.flame.mesh.scale.setScalar(Math.max(0.04, this.outScale * Math.sqrt(left)));
+    this.setPointLightColour(light);
+    this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.outLight * left;
   }
 
   /** The unlit wick's glow: a slow pulse, brighter, bigger and quicker as the match comes near. */

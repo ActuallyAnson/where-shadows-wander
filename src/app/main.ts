@@ -42,6 +42,8 @@ import { FADE_IN_S } from '../engine/xr/hand-fade';
 import { FadeView } from '../engine/shadow/fade-view';
 import { WakeView } from '../engine/shadow/wake-view';
 import { WakeTimeline } from '../engine/stage/wake-timeline';
+import { EndingTimeline } from '../engine/stage/ending-timeline';
+import { CreditsView } from '../ui/credits/credits-view';
 import { Storm } from '../engine/stage/storm';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
@@ -293,7 +295,7 @@ async function start(): Promise<void> {
     bedroomLayout.layout,
   );
   void placedModels.load(candleLight);
-  /** asleep: the story's end (scene 7): the flame covered, the candle out, the view gone to black. */
+  /** asleep: the story's end (scene 7): the flame covered, then the end plays (fallAsleep: the candle out, the blinks, credits). */
   type SessionState = 'title_vr' | 'playing' | 'paused' | 'asleep';
   let sessionState: SessionState = 'title_vr';
   // Lighting the candle with the match (ignition.ts): its progress, and how near the match is so the wick can answer it.
@@ -523,7 +525,13 @@ async function start(): Promise<void> {
     wake.start();
   };
   launcherHooks.titleGone = startWake;
-  world.scene.add(fade.group, wakeView.group);
+  // The end (docs/STORY.md, "Sleep"; ending-timeline.ts): once the flame is covered for good the candle goes out slowly, his
+  // eyes close in a few heavy blinks (the wake's lids, backwards), the credits roll over the black, and the session ends.
+  const ending = new EndingTimeline();
+  const credits = new CreditsView();
+  /** The candle's light on the room as the flame was covered (its occlusion then); the end dims it from there to nothing. */
+  let endLightFrom = 1;
+  world.scene.add(fade.group, wakeView.group, credits.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
@@ -778,7 +786,8 @@ async function start(): Promise<void> {
       return 'Skipped to the end of the memory.';
     },
     status: () => {
-      if (sessionState === 'asleep') return 'Asleep: the end.';
+      if (sessionState === 'asleep')
+        return ending.active ? `Asleep: the end, ${ending.time.toFixed(1)} s in.` : 'Asleep: the end is over.';
       if (sessionState === 'title_vr') return 'Not started: the candle is not lit.';
       if (!story.playing) return storyWait >= 0 ? 'The story starts in a moment.' : 'The story is not playing.';
       const sc = story.scenes[story.sceneIndex];
@@ -1064,7 +1073,7 @@ async function start(): Promise<void> {
       stopStory();
       storyStarted = false;
       wake.finish();
-      wakeView.hide();
+      cancelEnding();
     });
     guard('sessionend: diagnostics', () => diagnostics.sessionEnded());
     guard('sessionend: capabilities', () => capabilities.sessionEnded());
@@ -1190,15 +1199,26 @@ async function start(): Promise<void> {
     gameAudio.candleIgnited(candleView.flamePosition);
     if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
   };
-  /** Scene 7's end (docs/STORY.md, "Sleep"): the flame covered for good. The candle goes out, the rain eases, and it fades to black. */
-  const SLEEP_FADE_S = 7;
+  /**
+   * Scene 7's end (docs/STORY.md, "Sleep"): the flame covered for good. The end plays from here (ending-timeline.ts, driven in
+   * the frame): the candle goes out slowly, the eyes close, the credits roll, and the session ends.
+   */
   const fallAsleep = () => {
     sessionState = 'asleep';
-    candleView.lit = false;
+    endLightFrom = candleView.occlusion;
+    candleView.beginGoingOut();
     candleView.resetCover();
-    audio.mixer.setLift(Bus.Ambience, 0.35);
-    audio.mixer.setLift(Bus.Music, 0);
-    fade.fadeTo(1, SLEEP_FADE_S);
+    ending.start();
+    credits.prepare();
+  };
+  /** Leaves the end where it is, for a jump back into the story or a new session: the candle, lids, credits and sound as normal. */
+  const cancelEnding = () => {
+    ending.stop();
+    candleView.endGoingOut();
+    credits.hide();
+    wakeView.hide();
+    audio.mixer.setDip(Bus.Ambience, 1);
+    audio.mixer.setDip(Bus.Music, 1);
   };
   /**
    * Dev (the Hand Lab's Story tab, `__wsw.jumpTo`): plays the story from scene `index` of story-script.ts, the picture before it
@@ -1214,6 +1234,7 @@ async function start(): Promise<void> {
       fade.setBlack(false);
       igniteCandle();
     } else if (sessionState !== 'playing') {
+      cancelEnding();
       wallPauseView.hide();
       fade.setBlack(false);
       sessionState = 'playing';
@@ -1272,6 +1293,24 @@ async function start(): Promise<void> {
         world.camera.getWorldPosition(fadeHead);
         world.camera.getWorldQuaternion(wakeHead);
         wakeView.update(wake.lid, wake.text, fadeHead, wakeHead, wake.friend);
+      }
+      if (ending.active) {
+        // The end (fallAsleep): it holds still while the headset's menu is up, like the rest of the game.
+        ending.update(paused ? 0 : step);
+        world.camera.getWorldPosition(fadeHead);
+        world.camera.getWorldQuaternion(wakeHead);
+        wakeView.update(ending.lid, 0, fadeHead, wakeHead, 0);
+        candleView.goingOut = 1 - ending.candle;
+        if (ending.out) candleView.lit = false; // the flame is gone: its sound stops and the room's light draws in
+        audio.mixer.setDip(Bus.Ambience, ending.rain);
+        audio.mixer.setDip(Bus.Music, ending.music);
+        if (ending.creditsStart) {
+          world.camera.getWorldDirection(settingsLook);
+          credits.place(fadeHead, settingsLook.x, settingsLook.z);
+        }
+        credits.update(ending.credits, ending.creditsShowing, ending.thanks);
+        // All over: back to the title page (the session's end puts everything back for the next one).
+        if (ending.done) void world.renderer.xr.getSession()?.end();
       }
       const shadowsVisible = candleView.lit && sessionState === 'playing';
       timings.begin(SLOT.read);
@@ -1617,20 +1656,24 @@ async function start(): Promise<void> {
         lanternLight.boost = guide.boost;
         lanternLight.update(clock, rigPlaced ? candleView.flamePosition : null, candleView.lit);
         world.camera.getWorldQuaternion(cameraQuat);
-        stageView.applyLight(lanternLight.light, cameraQuat, candleView.occlusion, candleView.flamePosition, step);
+        // The candle's light on the room: shaded by a hand near the flame; at the end, dimming from where the cover left it.
+        const roomLight = ending.active ? endLightFrom * ending.candle : candleView.occlusion;
+        stageView.applyLight(lanternLight.light, cameraQuat, roomLight, candleView.flamePosition, step);
         world.camera.getWorldPosition(settingsHead);
         stageView.setHead(settingsHead);
-        bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? candleView.occlusion : 0);
+        bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? roomLight : 0);
         // Waiting to be lit, the candle holds a small, bright pool of light round itself, to draw the eye to it.
         roomDressing.waiting = sessionState === 'title_vr';
         // The storm moves on only in the story (not on the title, not paused); its flash lights the window.
         storm.update(sessionState === 'playing' ? step : 0);
         roomDressing.lightning = storm.flash;
-        roomDressing.update(lanternLight.light, candleView.lit ? candleView.occlusion : 0, candleView.flamePosition);
+        roomDressing.update(lanternLight.light, candleView.lit ? roomLight : 0, candleView.flamePosition);
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
         // back when the flame is covered (the pause).
         roomDressing.spread(candleView.lit, step);
-        if (sessionState !== 'title_vr' && moonLift !== 1) {
+        if (ending.active)
+          moonLift = ending.moon; // the end: the moon dims as he falls asleep, as it rose when the candle caught
+        else if (sessionState !== 'title_vr' && moonLift !== 1) {
           const settle = (step * Math.abs(START_MOON_LIFT - 1)) / MOON_SETTLE_S;
           moonLift = moonLift > 1 ? Math.max(1, moonLift - settle) : Math.min(1, moonLift + settle);
         }
@@ -1798,6 +1841,15 @@ async function start(): Promise<void> {
         candleMood: (mood: CandleMoodName, seconds?: number) => candleMood.to(mood, seconds),
         /** As if the player's hand had committed `shape` (e.g. 'rabbit') with its shadow at x, y on the wall. */
         commitShape: (shape: Parameters<StoryDirector['commit']>[0], x = 0.1, y = 0.05) => story.commit(shape, x, y),
+        /** Plays the end now (the candle going out, the blinks, the credits, back to the title), the story stopped. */
+        playEnding: () => {
+          if (sessionState !== 'playing') return 'Light the candle first (and not while paused or already asleep).';
+          stopStory();
+          fallAsleep();
+          return 'The end is playing.';
+        },
+        ending,
+        credits,
         /** Plays scene 1's waking (the blinks) again. */
         playWake: () => {
           wake.finish();
