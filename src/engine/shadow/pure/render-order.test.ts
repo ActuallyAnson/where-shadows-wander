@@ -1,6 +1,8 @@
 import { EFFECTS } from './quality-governor';
 import { describe, expect, it } from 'vitest';
-import { PASSES, RenderOrder, validatePasses } from './render-order';
+import { partDepths } from '../../stage/puppet/puppet-scene';
+import { STORY_STAGE } from '../../stage/story/story-stage';
+import { PASSES, puppetPartOrder, RenderOrder, validatePasses } from './render-order';
 
 describe('the render order', () => {
   it('is sound: every layer has its own name, they are in drawing order, and the fade is last', () => {
@@ -40,5 +42,33 @@ describe('the render order', () => {
       ]),
     ).toEqual(expect.arrayContaining([expect.stringContaining('is not above')]));
     expect(validatePasses([{ id: 'a', order: 1, optional: false }])).toContain('the fade is not the last layer');
+  });
+});
+
+describe("a puppet part's layer", () => {
+  it('puts what stands back, shadow or glow, under the hands and every near puppet', () => {
+    expect(puppetPartOrder(false, 0.6, 140)).toBeLessThan(RenderOrder.shadow);
+    expect(puppetPartOrder(true, 0.6, 140)).toBeLessThan(puppetPartOrder(false, 0, 0));
+    expect(puppetPartOrder(false, 0.6, 0)).toBeGreaterThan(RenderOrder.paper);
+  });
+
+  it('keeps near shadows with the hands, near glows on top, and list order within a layer', () => {
+    expect(Math.floor(puppetPartOrder(false, 0, 5))).toBe(RenderOrder.shadow);
+    expect(puppetPartOrder(true, 0, 0)).toBeGreaterThan(puppetPartOrder(false, 0, 140));
+    expect(puppetPartOrder(false, 0.5, 3)).toBeLessThan(puppetPartOrder(false, 0.3, 4));
+  });
+
+  it('draws every character in the story in front of all the scenery, though later chapters add scenery after the kids', () => {
+    const depths = partDepths(STORY_STAGE);
+    let highestScenery = -Infinity;
+    let lowestNear = Infinity;
+    STORY_STAGE.parts.forEach((p, i) => {
+      if (!p.art) return;
+      const order = puppetPartOrder(p.look === 'glow', depths[i], i);
+      if (depths[i] > 0) highestScenery = Math.max(highestScenery, order);
+      else lowestNear = Math.min(lowestNear, order);
+    });
+    expect(highestScenery).toBeLessThan(lowestNear);
+    expect(highestScenery).toBeLessThan(RenderOrder.shadow);
   });
 });

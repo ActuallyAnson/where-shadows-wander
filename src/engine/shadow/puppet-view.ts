@@ -30,7 +30,7 @@ import {
 import { depthBlur, depthStrength, partDepths, POSE_STRIDE, type PuppetScene } from '../stage/puppet/puppet-scene';
 import type { ScenePlayer } from '../stage/puppet/scene-player';
 import { isImageArt, PUPPET_ART } from './puppet-art';
-import { RenderOrder } from './pure/render-order';
+import { puppetPartOrder } from './pure/render-order';
 import type { StagePlane } from './pure/stage-plane';
 
 /** Pixels painted per metre of cut-out as drawn on the wall (scene metres times `scale`), within these bounds. */
@@ -151,6 +151,8 @@ export class PuppetView {
       if (!part.art) return;
       const glow = part.look === 'glow';
       const depth = glow ? 0 : depths[i];
+      // Where it draws: a glow standing back (the window's light) goes under the near puppets with the far shadows.
+      const order = puppetPartOrder(glow, depths[i], i);
       const canvas = document.createElement('canvas');
       canvas.width = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.w * PX_PER_M * this.scale)));
       canvas.height = Math.min(PX_MAX, Math.max(PX_MIN, Math.round(part.h * PX_PER_M * this.scale)));
@@ -241,8 +243,8 @@ export class PuppetView {
       const mesh = new Mesh(PuppetView.quad, material);
       mesh.matrixAutoUpdate = false;
       mesh.frustumCulled = false;
-      // Shadows lie on the wall with the hands' shadows; the glows are light on top of them.
-      mesh.renderOrder = (glow ? RenderOrder.sprite : RenderOrder.shadow) + i * 0.0001;
+      // The scenery under everything near; near shadows with the hands' shadows; near glows are light on top of them.
+      mesh.renderOrder = order;
       mesh.visible = false;
       this.group.add(mesh);
       const pivot = part.pivot ?? [0.5, 0.5];
