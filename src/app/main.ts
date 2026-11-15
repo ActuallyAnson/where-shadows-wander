@@ -54,6 +54,10 @@ import { SkipTouch } from '../engine/shadow/pure/skip-touch';
 import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
+import { SleepHint } from '../engine/stage/story/sleep-hint';
+import { IgnitionHold } from '../engine/stage/ignition';
+import { writeCoverHand } from '../engine/hands/cover-hand';
+import { GhostHandView } from '../engine/render/ghost-hand-view';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
 import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
 import { FORM_S, FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
@@ -286,7 +290,16 @@ async function start(): Promise<void> {
   /** asleep: the story's end (scene 7): the flame covered, the candle out, the view gone to black. */
   type SessionState = 'title_vr' | 'playing' | 'paused' | 'asleep';
   let sessionState: SessionState = 'title_vr';
-  let ignitionHoldTimer = 0;
+  // Lighting the candle with the match (ignition.ts): its progress, and how near the match is so the wick can answer it.
+  const ignition = new IgnitionHold();
+  // The end (sleep-hint.ts): a ghost hand comes down over the candle to show that covering it is what's wanted now, growing
+  // stronger if the wait goes on, and after a long wait one word on the wall.
+  const sleepHint = new SleepHint();
+  const ghostHand = new GhostHandView();
+  const ghostFrame = createHandFrame('right');
+  /** A child's hand, as the drawn gloves are. */
+  const GHOST_HAND_SCALE = 0.8;
+  const SLEEP_WORD = 'goodnight';
   /**
    * Before the candle is first lit, the moon's light is this many times its night level (below 1: darker than the night, so
    * the waiting candle's small pool of light stands out more; above 1: lighter). Once the candle catches it eases to the night
@@ -405,6 +418,7 @@ async function start(): Promise<void> {
     captionLine.group,
     handTrail.group,
     candleView.group,
+    ghostHand.object,
     titleLighter.group,
     bedTray.group,
     ambientLight,
@@ -1034,7 +1048,7 @@ async function start(): Promise<void> {
     });
     guard('sessionend: state', () => {
       sessionState = 'title_vr';
-      ignitionHoldTimer = 0;
+      ignition.reset();
       moonLift = START_MOON_LIFT;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
@@ -1160,7 +1174,8 @@ async function start(): Promise<void> {
   /** Lights the candle: the room warms and the hands' shadows come onto the wall. */
   const igniteCandle = () => {
     sessionState = 'playing';
-    ignitionHoldTimer = 0;
+    ignition.reset();
+    candleView.matchNear = 0;
     candleView.ignitionProgress = 0;
     roomDressing.ignition = 0;
     candleView.lit = true;
@@ -1350,35 +1365,23 @@ async function start(): Promise<void> {
           titleLighter.update(heldHand.frame, cameraQuat, clock);
 
           // Only the matchstick's flame lights the candle: a bare hand near the wick does not.
-          let handTouchingWick = false;
+          let matchDistance = Infinity;
           if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
-            const lfx = titleLighter.flamePosition[0];
-            const lfy = titleLighter.flamePosition[1];
-            const lfz = titleLighter.flamePosition[2];
-            const cfx = candleView.flamePosition[0];
-            const cfy = candleView.flamePosition[1];
-            const cfz = candleView.flamePosition[2];
-            const dlx = lfx - cfx,
-              dly = lfy - cfy,
-              dlz = lfz - cfz;
-            if (dlx * dlx + dly * dly + dlz * dlz < 0.15 * 0.15) {
-              handTouchingWick = true;
-            }
+            const dlx = titleLighter.flamePosition[0] - candleView.flamePosition[0];
+            const dly = titleLighter.flamePosition[1] - candleView.flamePosition[1];
+            const dlz = titleLighter.flamePosition[2] - candleView.flamePosition[2];
+            matchDistance = Math.sqrt(dlx * dlx + dly * dly + dlz * dlz);
           }
           // The room editor has no hands: its room is lit, as the editor needs to see it.
-          if (!handTouchingWick && desk) handTouchingWick = true;
+          if (desk) matchDistance = 0;
+          const caught = ignition.update(step, matchDistance);
+          // The wick brightens and the match's flame leans to it as it comes near, before it is close enough to catch.
+          candleView.matchNear = ignition.near;
+          titleLighter.setLean(candleView.flamePosition, ignition.near);
+          candleView.ignitionProgress = ignition.progress;
+          roomDressing.ignition = ignition.progress; // the room starts to glow as the wick is held
 
-          if (handTouchingWick) {
-            ignitionHoldTimer = Math.min(3.0, ignitionHoldTimer + step);
-          } else {
-            ignitionHoldTimer = Math.max(0.0, ignitionHoldTimer - step * 2.0);
-          }
-
-          const ignitionProgress = ignitionHoldTimer / 3.0;
-          candleView.ignitionProgress = ignitionProgress;
-          roomDressing.ignition = ignitionProgress; // the room starts to glow as the wick is held
-
-          if (ignitionHoldTimer >= 3.0) igniteCandle();
+          if (caught) igniteCandle();
         } else {
           titleLighter.visible = false;
           if (sessionState === 'playing') {
@@ -1639,6 +1642,24 @@ async function start(): Promise<void> {
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the rain holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
+        // The end: covering the flame puts it out (no pause ring), and a ghost hand shows that it is what's wanted now.
+        const sleepWait = sessionState === 'playing' && story.waitingForSleep;
+        candleView.sleepMode = sleepWait;
+        sleepHint.update(paused ? 0 : step, sleepWait, 1 - candleView.occlusion, candleView.coverProgress);
+        if (sleepHint.sayWord) storyLine.say(SLEEP_WORD, 0, 6);
+        if (sleepHint.ghost > 0) {
+          // Its fingers point away from the player, toward the wall.
+          const fl = candleView.flamePosition;
+          writeCoverHand(
+            fl,
+            sleepHint.lift,
+            fl[0] - settingsHead.x,
+            fl[2] - settingsHead.z,
+            ghostFrame,
+            GHOST_HAND_SCALE,
+          );
+        }
+        ghostHand.update(ghostFrame, sleepHint.ghost);
         candleView.update(lanternLight.light, cameraQuat);
       } catch (e) {
         failures.report('lighting', e);

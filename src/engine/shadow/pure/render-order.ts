@@ -36,6 +36,11 @@ export const RenderOrder = {
   ring: 5,
   /** The room's wonders (lamp, bunting, pictures, globe, window). */
   wonder: 6,
+  /**
+   * The ghost hand that comes down over the candle at the end (sleep-hint.ts). It writes depth for itself only (so it reads as
+   * one soft shape, not overlapping capsules), so it draws after everything it could be seen against.
+   */
+  ghost: 7,
   /** The fade to black, over everything. */
   fade: 1000,
 } as const;
@@ -64,6 +69,7 @@ export const PASSES: readonly Pass[] = [
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
   { id: 'trail', order: RenderOrder.trail, optional: true },
   { id: 'ring', order: RenderOrder.ring, optional: true },
+  { id: 'ghost', order: RenderOrder.ghost, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },
 ];
 

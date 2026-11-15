@@ -14,6 +14,9 @@
 //   - Palm Covering & Deliberate Pause: hovering a palm over the flame displays a radial progress ring filling
 //     clockwise over 3.0 seconds before extinguishing the candle and pausing.
 //   - In-Game Lock: locks candle in place once gameplay starts.
+//   - Sleep mode (the end, scene 7): covering puts the candle out instead of pausing, so there is no pause ring; the flame
+//     shrinks and its light dims as the cover goes on, and a hand starts to dim it from further off.
+//   - Match near (the start): the wick's glow brightens, grows and quickens as the matchstick comes near it.
 //
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
 import {
@@ -39,6 +42,11 @@ import type { LanternLight } from '../shadow/pure/lantern-light';
 export type CandleInteractionState = 'placed' | 'held' | 'placing';
 
 export const COVER_PAUSE_DURATION_S = 3.0;
+/** How far from the flame (m) a hand starts to dim it: in play, and at the end (sleep mode), where it answers from further off. */
+const OCCLUDE_REACH_M = 0.16;
+const SLEEP_OCCLUDE_REACH_M = 0.3;
+/** Closer than this (m) a hand smothers the light completely. */
+const OCCLUDE_FULL_M = 0.04;
 
 const COVER_RING_VERT = /* glsl */ `
   varying vec2 vUv;
@@ -126,6 +134,15 @@ export class CandleView {
   private cooldownTimer = 0;
   private pickupDwellTimer = 0;
   private lightOcclusion = 1.0;
+  /**
+   * The end (scene 7): covering the flame puts it out for good, so it shows that instead of the pause's ring: the flame
+   * shrinks and its light dims as the cover goes on, and a hand begins to dim it from further away.
+   */
+  sleepMode = false;
+  /** The start: 0 .. 1, how near the matchstick is to the wick (ignition.ts); the wick's glow answers it. */
+  matchNear = 0;
+  /** Sleep mode has sized the flame (put back when it ends). */
+  private sleepScaled = false;
   /** The story's mood on the candle itself (setMoodTint): multiplies the flame's colour and the light on the wax. */
   private readonly moodTint = new Float64Array([1, 1, 1]);
 
@@ -400,9 +417,10 @@ export class CandleView {
       minFlameDist = Math.min(minFlameDist, Math.sqrt(dfrx * dfrx + dfry * dfry + dfrz * dfrz));
     }
 
-    if (minFlameDist < 0.16) {
-      // Smoothly ramp from 0.0 (smothered at <= 4cm) to 1.0 (clear at >= 16cm)
-      const t = Math.max(0.0, Math.min(1.0, (minFlameDist - 0.04) / 0.12));
+    const reach = this.sleepMode ? SLEEP_OCCLUDE_REACH_M : OCCLUDE_REACH_M;
+    if (minFlameDist < reach) {
+      // Smoothly ramp from 0.0 (smothered at <= 4cm) to 1.0 (clear at the reach)
+      const t = Math.max(0.0, Math.min(1.0, (minFlameDist - OCCLUDE_FULL_M) / (reach - OCCLUDE_FULL_M)));
       this.lightOcclusion = t * t * (3 - 2 * t);
     } else {
       this.lightOcclusion = 1.0;
@@ -646,6 +664,7 @@ export class CandleView {
 
         // Wick indicator fades as flame grows
         this.wickIndicator.visible = this._ignitionProgress < 0.6;
+        this.pulseWick();
         return;
       }
 
@@ -653,9 +672,7 @@ export class CandleView {
       this.coverProgressMesh.visible = false;
       this.pointLight.intensity = 0;
       this.wickIndicator.visible = true;
-      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.007);
-      this.wickIndicatorMaterial.opacity = 0.4 + 0.55 * pulse;
-      this.wickIndicator.scale.setScalar(0.85 + 0.35 * pulse);
+      this.pulseWick();
       return;
     }
 
@@ -669,6 +686,26 @@ export class CandleView {
     if (this._isCovered) {
       this.flame.mesh.scale.setScalar(0.4);
     }
+    if (this.sleepMode) {
+      // Going out, not pausing: no ring; the flame bows under a near hand and shrinks, and its light dims, as the cover goes on.
+      const cover = this.coverProgress;
+      this.coverProgressMesh.visible = false;
+      this.flame.mesh.scale.setScalar((1 - 0.75 * cover) * (0.55 + 0.45 * this.lightOcclusion));
+      this.pointLight.intensity *= 1 - 0.8 * cover;
+      this.sleepScaled = true;
+    } else if (this.sleepScaled) {
+      this.sleepScaled = false;
+      this.flame.mesh.scale.setScalar(1);
+    }
+  }
+
+  /** The unlit wick's glow: a slow pulse, brighter, bigger and quicker as the match comes near. */
+  private pulseWick(): void {
+    const near = this.matchNear;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * (0.007 + 0.009 * near));
+    const opacity = 0.4 + 0.55 * pulse;
+    this.wickIndicatorMaterial.opacity = opacity + (1 - opacity) * near * 0.8;
+    this.wickIndicator.scale.setScalar((0.85 + 0.35 * pulse) * (1 + 0.7 * near));
   }
 
   private setPointLightColour(light: Readonly<LanternLight>): void {

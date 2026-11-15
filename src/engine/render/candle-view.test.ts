@@ -301,6 +301,48 @@ describe('CandleView', () => {
     expect(candle.coverProgress).toBe(0);
   });
 
+  it('at the end (sleep mode) shows going out, not the pause ring, and answers a hand from further off', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    candle.setLocked(true);
+    const cameraQuat = new Quaternion(0, 0, 0, 1);
+    const light: LanternLight = {
+      position: new Float64Array([0, 1, 0]),
+      lit: true,
+      intensity: 1.0,
+      color: new Float32Array([1.0, 0.6, 0.2]),
+      flicker: 0,
+    };
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+    right.tracked = false;
+    const ring = candle.group.children[9];
+
+    // 22 cm above the flame: out of reach in play, already dimming it at the end.
+    setPalm(left, 0, 0.845 + 0.22, -0.4);
+    candle.updateInteraction({ left, right }, 0.016);
+    expect(candle.occlusion).toBe(1);
+    candle.sleepMode = true;
+    candle.updateInteraction({ left, right }, 0.016);
+    expect(candle.occlusion).toBeLessThan(1);
+
+    // Covering it: no ring, and the flame shrinks and its light dims as the cover goes on.
+    setHandJointsDown(left, 0.0, 0.89, -0.4);
+    candle.updateInteraction({ left, right }, 0.3);
+    candle.update(light, cameraQuat);
+    const early = candle.flame.mesh.scale.x;
+    candle.updateInteraction({ left, right }, 2.0);
+    candle.update(light, cameraQuat);
+    expect(ring.visible).toBe(false);
+    expect(candle.flame.mesh.scale.x).toBeLessThan(early);
+
+    // Out of sleep mode the flame is its own size again.
+    candle.sleepMode = false;
+    candle.resetCover();
+    candle.update(light, cameraQuat);
+    expect(candle.flame.mesh.scale.x).toBe(1);
+  });
+
   it('detects two-handed cupping to trigger deliberate pause', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
