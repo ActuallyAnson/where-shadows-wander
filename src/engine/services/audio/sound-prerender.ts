@@ -1,35 +1,23 @@
-// Renders the placeholder sounds ahead of time, off the main thread, so that the first time the game plays one (a lullaby note,
-// the footsteps) the engine finds it ready instead of stopping the frame loop to synthesise it (on a headset's CPU that is tens
+// Renders the placeholder sounds ahead of time, off the main thread, so that the first time the game plays one (the footsteps) the engine finds it ready instead of stopping the frame loop to synthesise it (on a headset's CPU that is tens
 // of milliseconds for each sound). A sound with a real file is left out: its file is used, not its placeholder. The sounds most
 // needed first are done first. If workers are not available the pool does the same work on the main thread, a sound at a time as
 // the page idles, so nothing is worse than before. Plain TypeScript: the pool is passed in.
 import type { TaskPool } from '../workers/task-pool';
 import { storePrerendered } from './placeholder-sounds';
 import type { RenderedSound, RenderJob } from './sound-render-job';
-import { Sound, SOUND_COUNT, type SoundId } from './sounds';
+import { Sound, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
 /** The sounds in the order they are likely to be wanted: the room's loops, the opening's sounds, then the rest. */
-export const PRERENDER_ORDER: readonly SoundId[] = [
-  Sound.Crackle,
-  Sound.Rain,
-  Sound.Ignite,
-  Sound.Tick,
-  Sound.Press,
-  Sound.Note0,
-  Sound.Note1,
-  Sound.Note2,
-  Sound.Note3,
-  Sound.Note4,
-];
+export const PRERENDER_ORDER: readonly SoundId[] = [Sound.Crackle, Sound.Rain, Sound.Ignite, Sound.Tick, Sound.Press];
 
 /** A short wait that lets the browser draw a frame. */
 const framePause = () => new Promise<void>((resolve) => setTimeout(resolve, 12));
 
-/** Every sound once, the likely-first ones first, leaving out those in `skip` (the ones with a file). */
+/** Every sound once, the likely-first ones first, leaving out those in `skip` (the ones with a file) and those with no placeholder. */
 export function prerenderList(skip: ReadonlySet<SoundId> = new Set()): SoundId[] {
   const list: SoundId[] = [...PRERENDER_ORDER];
   for (let i = 0; i < SOUND_COUNT; i++) if (!list.includes(i as SoundId)) list.push(i as SoundId);
-  return list.filter((s) => !skip.has(s));
+  return list.filter((s) => !skip.has(s) && !SOUND_DEFS[s].fileOnly);
 }
 
 /**

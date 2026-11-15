@@ -3,7 +3,8 @@ import { renderPlaceholder, THUNDER_S } from './placeholder-sounds';
 import { Sound, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
 const SR = 48000;
-const all = Array.from({ length: SOUND_COUNT }, (_, i) => i as SoundId);
+// The music has no placeholder (it waits for its file), so it is left out.
+const all = Array.from({ length: SOUND_COUNT }, (_, i) => i as SoundId).filter((id) => !SOUND_DEFS[id].fileOnly);
 
 describe('renderPlaceholder', () => {
   it.each(all)(
@@ -29,7 +30,7 @@ describe('renderPlaceholder', () => {
   it('keeps each sound short enough for a one-shot, and the candle loop at six seconds', () => {
     expect(renderPlaceholder(Sound.Rustle, SR).length / SR).toBeLessThan(0.5);
     expect(renderPlaceholder(Sound.Thump, SR).length / SR).toBeLessThan(0.5);
-    expect(renderPlaceholder(Sound.Note0, SR).length / SR).toBeLessThan(2);
+    expect(renderPlaceholder(Sound.Release, SR).length / SR).toBeLessThan(2);
     expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(6);
   });
 
@@ -80,7 +81,7 @@ describe('renderPlaceholder', () => {
   });
 
   it('dies away: the last tenth of a one-shot is much quieter than the first', () => {
-    for (const id of [Sound.Rustle, Sound.Thump, Sound.Note0, Sound.Tick, Sound.Press, Sound.Lost] as const) {
+    for (const id of [Sound.Rustle, Sound.Thump, Sound.Release, Sound.Tick, Sound.Press, Sound.Lost] as const) {
       const s = renderPlaceholder(id, SR);
       const tenth = Math.floor(s.length / 10);
       const rms = (from: number) => Math.sqrt(s.slice(from, from + tenth).reduce((t, x) => t + x * x, 0) / tenth);
@@ -89,6 +90,6 @@ describe('renderPlaceholder', () => {
   });
 
   it('scales with the sample rate', () => {
-    expect(renderPlaceholder(Sound.Note0, 24000).length).toBe(renderPlaceholder(Sound.Note0, 48000).length / 2);
+    expect(renderPlaceholder(Sound.Rustle, 24000).length).toBe(renderPlaceholder(Sound.Rustle, 48000).length / 2);
   });
 });

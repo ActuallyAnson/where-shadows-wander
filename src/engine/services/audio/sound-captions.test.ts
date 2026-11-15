@@ -27,9 +27,9 @@ function setup(on = true, accepts = true) {
 describe('CaptioningPlayer', () => {
   it('captions the notable sounds and plays every sound as usual', () => {
     const { player, played, shown } = setup();
-    player.playAt(Sound.Note2, 0, 0, 0);
-    expect(shown).toEqual(['[a music-box note]']);
-    expect(played).toEqual([Sound.Note2]);
+    player.playAt(Sound.Thunder, 0, 0, 0);
+    expect(shown).toEqual(['[thunder, far off]']);
+    expect(played).toEqual([Sound.Thunder]);
   });
 
   it('says nothing for the busy shape sounds, when captions are off, or when the sound did not play', () => {

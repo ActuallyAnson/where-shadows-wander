@@ -346,8 +346,7 @@ async function start(): Promise<void> {
   // Scene 2's hush (docs/STORY.md): while the girl's hand is over the torch, the room's candle light is dimmed with it.
   const lightHush = new LightHush();
   const onStoryCue = (cue: Cue) => {
-    if (cue.kind === 'note') gameAudio.storyNote(cue.note, stage, 0.42, 0.38);
-    else if (cue.kind === 'mood') {
+    if (cue.kind === 'mood') {
       if (cue.mood in CANDLE_MOODS) candleMood.to(cue.mood as CandleMoodName, cue.seconds);
     } else if (cue.kind === 'storm') storm.strikeNow(cue.thunderAfter, 1);
     else if (cue.kind === 'step')
@@ -1751,6 +1750,8 @@ async function start(): Promise<void> {
         gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
         roomDressing.windowPoint(windowAt);
         gameAudio.setRain(true, windowAt);
+        // The music, from the candle's lighting through the end (its fall and return there are the ending's dips on Bus.Music).
+        gameAudio.setMusic(sessionState !== 'title_vr');
         // The storm's thunder, and the one in the black that wakes him (scene 1).
         if (storm.thunder || wake.thunder) gameAudio.thunder(windowAt);
         if (wake.covers) gameAudio.covers(saucerPos); // he sits up: the covers slide, at his lap

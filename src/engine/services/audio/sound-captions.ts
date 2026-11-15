@@ -1,17 +1,10 @@
 // Captions for the sounds that matter to the story, for players who cannot hear them: a small bracketed line such as
-// "[a music-box note]" when one plays, if the Captions setting is on. The shape sounds (rustle, thump) and the loops are
+// "[footsteps outside]" when one plays, if the Captions setting is on. The shape sounds (rustle, thump) and the loops are
 // left out: they happen all the time and the hands already show what they did.
 import type { SoundPlayer } from './game-audio';
 import { Sound, type SoundId } from './sounds';
 
-const NOTE = '[a music-box note]';
-
 export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
-  [Sound.Note0]: NOTE,
-  [Sound.Note1]: NOTE,
-  [Sound.Note2]: NOTE,
-  [Sound.Note3]: NOTE,
-  [Sound.Note4]: NOTE,
   [Sound.Ignite]: '[a match strikes]',
   [Sound.Thunder]: '[thunder, far off]',
   [Sound.Covers]: '[bedclothes rustle]',

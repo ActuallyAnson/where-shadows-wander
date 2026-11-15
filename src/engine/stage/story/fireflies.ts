@@ -509,16 +509,6 @@ const wobbles: Wobble[] = [
   { part: 'walk-friend-torso', prop: 'angle', amp: 0.01, period: 3.4 },
 ];
 
-const cues: Cue[] = [
-  { t: 0.1, kind: 'note', note: 0 },
-  { t: RISE_S, kind: 'note', note: 2 },
-  { t: GATHER_S, kind: 'note', note: 1 },
-  { t: GATHER_S + 4 * GATHER_EVERY_S, kind: 'note', note: 2 },
-  { t: RELEASE_S, kind: 'note', note: 3 },
-  { t: RELEASE_S + RELEASE_GROUP_S, kind: 'note', note: 4 },
-  { t: HANDOVER_S, kind: 'note', note: 1 },
-  { t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 },
-  { t: RAISE_S, kind: 'note', note: 2 },
-];
+const cues: Cue[] = [{ t: PARK_OUT_S, kind: 'mood', mood: 'morning', seconds: 6 }];
 
 export const FIREFLIES: Chapter = { id: 'fireflies', length: FIREFLIES_LENGTH_S, parts, tracks, wobbles, cues };

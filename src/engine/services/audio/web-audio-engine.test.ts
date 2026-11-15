@@ -109,7 +109,7 @@ describe('unlocking', () => {
       },
     });
     engine.unlock();
-    expect(engine.playAt(Sound.Note0, 0, 0, 0)).toBe(false);
+    expect(engine.playAt(Sound.Ignite, 0, 0, 0)).toBe(false);
     expect(() => engine.update(POSE)).not.toThrow();
   });
 
@@ -169,8 +169,8 @@ describe('playing', () => {
     };
     engine.unlock();
     expect(made).toHaveLength(0);
-    engine.playAt(Sound.Note0, 0, 0, 0);
-    engine.playAt(Sound.Note0, 0, 0, 0);
+    engine.playAt(Sound.Ignite, 0, 0, 0);
+    engine.playAt(Sound.Ignite, 0, 0, 0);
     expect(made).toHaveLength(1);
   });
 
@@ -196,7 +196,7 @@ describe('playing', () => {
   it('does not use up the gap when no voice was free for the sound', () => {
     const { engine, ctx } = make({ voices: 1 });
     engine.unlock();
-    expect(engine.playAt(Sound.Note0, 0, 0, 0)).toBe(true); // priority 3 holds the only voice
+    expect(engine.playAt(Sound.Ignite, 0, 0, 0)).toBe(true); // priority 3 holds the only voice
     ctx.currentTime += 1;
     expect(engine.playAt(Sound.Rustle, 0, 0, 0)).toBe(false);
     expect(engine.stats.noVoice).toBe(1);
@@ -339,6 +339,25 @@ describe('the crackle loop', () => {
     engine.unlock();
     engine.update(POSE);
     expect(loops(ctx)).toHaveLength(0);
+  });
+});
+
+describe('the music', () => {
+  it('waits, silent, for its file, then loops flat into the music bus', () => {
+    const { engine, ctx } = make();
+    engine.unlock();
+    engine.setLoop(Sound.Music, true, 0, 0, 0);
+    engine.update(POSE);
+    expect(ctx.sources).toHaveLength(0);
+    expect(engine.playAt(Sound.Music, 0, 0, 0)).toBe(false);
+    engine.setBuffer(Sound.Music, ctx.createBuffer(1, 100) as unknown as AudioBuffer);
+    engine.update(POSE);
+    expect(loops(ctx)).toHaveLength(1);
+    expect(loops(ctx)[0].started).toBe(true);
+    // No panner between: the voice's gain goes straight to the bus, so it is the same wherever the head turns.
+    expect(ctx.gains[ctx.gains.length - 1].connected).toBe(BUS_GAIN(ctx, Bus.Music));
+    engine.moveLoop(Sound.Music, 1, 2, 3);
+    expect(ctx.panners.some((p) => p.positionX.value === 1)).toBe(false);
   });
 });
 

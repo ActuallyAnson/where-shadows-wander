@@ -193,14 +193,8 @@ const tracks: Track[] = [
 
 const wobbles: Wobble[] = [];
 
-/** The tune thins out: a note as they wave, one as the friend waves alone, one as the park comes back, then none. */
-const cues: Cue[] = [
-  { t: WAVE_S, kind: 'note', note: 2 },
-  { t: PART_S, kind: 'note', note: 1 },
-  { t: WAVE2_S + 0.6, kind: 'note', note: 1 },
-  { t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 },
-  { t: PARK_BACK_S + 1, kind: 'note', note: 0 },
-];
+/** The light lowers as they leave the gate. */
+const cues: Cue[] = [{ t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 }];
 
 export const LAST_ORDINARY_DAY: Chapter = {
   id: 'last-ordinary-day',

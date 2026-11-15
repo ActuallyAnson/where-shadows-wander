@@ -34,8 +34,16 @@ describe('SOUND_DEFS', () => {
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame and the rain', () => {
-    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'rain']);
+  it('loops only the flame, the rain and the music', () => {
+    expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual(['crackle', 'rain', 'music']);
+  });
+
+  it('plays the music flat on the music bus, and only from its file', () => {
+    const music = SOUND_DEFS[Sound.Music];
+    expect(music.bus).toBe(Bus.Music);
+    expect(music.flat).toBe(true);
+    expect(music.fileOnly).toBe(true);
+    expect(SOUND_DEFS.filter((d) => d.flat || d.fileOnly).map((d) => d.name)).toEqual(['music']);
   });
 
   it('keeps the first sounds where they were: rustle and thump on effects, the crackle on ambience', () => {

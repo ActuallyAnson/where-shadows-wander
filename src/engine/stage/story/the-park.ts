@@ -386,16 +386,10 @@ const wobbles: Wobble[] = [
   ...PARK_TREES.map((t, i): Wobble => ({ part: t.id, prop: 'angle', amp: 0.006, period: 4.1 + i * 0.7, phase: i })),
 ];
 
-/** Notes as the fox lands and pounces, as they become the kids, as they tumble, and one as the firefly comes. */
+/** The light warms as the park comes in, and turns to dusk. */
 const cues: Cue[] = [
-  { t: 0.1, kind: 'note', note: 1 },
-  { t: POUNCE_S, kind: 'note', note: 3 },
   { t: PARK_IN_S, kind: 'mood', mood: 'warm', seconds: 4 },
-  { t: CHANGE_S, kind: 'note', note: 4 },
-  { t: FRIEND_FALL_S + 0.3, kind: 'note', note: 2 },
-  { t: LAUGH_S, kind: 'note', note: 3 },
   { t: DUSK_S, kind: 'mood', mood: 'dusk', seconds: 6 },
-  { t: FIREFLY_S + 1, kind: 'note', note: 0 },
 ];
 
 export const THE_PARK: Chapter = { id: 'the-park', length: THE_PARK_LENGTH_S, parts, tracks, wobbles, cues };

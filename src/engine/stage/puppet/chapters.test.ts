@@ -17,7 +17,7 @@ const first: Chapter = {
       ],
     },
   ],
-  cues: [{ t: 1, kind: 'note', note: 1 }],
+  cues: [{ t: 1, kind: 'step', variant: 0, x: 1, y: 0 }],
 };
 const second: Chapter = {
   id: 'second',
@@ -41,7 +41,7 @@ const second: Chapter = {
       ],
     },
   ],
-  cues: [{ t: 0.5, kind: 'note', note: 2 }],
+  cues: [{ t: 0.5, kind: 'step', variant: 0, x: 2, y: 0 }],
 };
 
 describe('joinChapters', () => {
@@ -107,7 +107,7 @@ describe('ScenePlayer stretches', () => {
   it('fires only the cues inside the stretch it plays', () => {
     const p = new ScenePlayer(scene);
     const heard: number[] = [];
-    p.startAt(at.second.start, at.second.end, (c) => c.kind === 'note' && heard.push(c.note));
+    p.startAt(at.second.start, at.second.end, (c) => c.kind === 'step' && heard.push(c.x));
     for (let i = 0; i < 40; i++) p.update(0.1);
     expect(heard).toEqual([2]);
   });

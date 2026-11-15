@@ -13,12 +13,6 @@ export const CRACKLE_S = 6;
 /** How loud the candle is rendered (the others peak at 0.8): it is a quiet bed, not an event. */
 const CRACKLE_PEAK = 0.35;
 
-/**
- * The lullaby's five notes, in Hz: C5 D5 E5 G5 A5, a rising run of the pentatonic scale (A minor, F, C and G all fit it), so a
- * few of them alone sound like the start of a tune.
- */
-export const LULLABY_HZ: readonly number[] = [523.25, 587.33, 659.25, 783.99, 880];
-
 /** How loud each sound is rendered (it peaks here). A loop is a quiet bed, not an event, so it is lower. */
 const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Rustle]: 0.8,
@@ -29,16 +23,12 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Ignite]: 0.8,
   [Sound.Release]: 0.8,
   [Sound.Lost]: 0.8,
-  [Sound.Note0]: 0.8,
-  [Sound.Note1]: 0.8,
-  [Sound.Note2]: 0.8,
-  [Sound.Note3]: 0.8,
-  [Sound.Note4]: 0.8,
   [Sound.Step0]: 0.6,
   [Sound.Step1]: 0.6,
   [Sound.Rain]: 0.35,
   [Sound.Thunder]: 0.8,
   [Sound.Covers]: 0.8,
+  [Sound.Music]: 0.8,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -51,12 +41,6 @@ export function renderPlaceholder(id: SoundId, sampleRate: number): Float32Array
 
 function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
   switch (id) {
-    case Sound.Note0:
-    case Sound.Note1:
-    case Sound.Note2:
-    case Sound.Note3:
-    case Sound.Note4:
-      return musicBoxNote(sr, LULLABY_HZ[id - Sound.Note0]);
     case Sound.Step0:
       return footstep(sr, 0);
     case Sound.Step1:
@@ -83,6 +67,9 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
       return letGo(sr);
     case Sound.Lost:
       return lost(sr);
+    case Sound.Music:
+      // Never played (it waits for its file: SoundDef.fileOnly), so its stand-in is a moment of silence.
+      return new Float32Array(Math.floor(sr * 0.05));
     default: {
       const unreachable: never = id;
       throw new Error(`no placeholder for sound ${String(unreachable)}`);
@@ -117,29 +104,6 @@ function thump(sr: number): Float32Array<ArrayBuffer> {
     const t = i / sr;
     phase += (TAU * (45 + 65 * Math.exp(-t * 18))) / sr;
     out[i] = Math.sin(phase) * Math.exp(-t * 11) + (rnd() * 2 - 1) * 0.15 * Math.exp(-t * 90);
-  }
-  return out;
-}
-
-/**
- * One music-box note: a bright pluck with a touch of the inharmonic partials a small tuned comb has, ringing out for just under
- * two seconds. The same shape for every note, so the five make one voice.
- */
-function musicBoxNote(sr: number, hz: number): Float32Array<ArrayBuffer> {
-  const n = Math.floor(sr * 1.9);
-  const out = new Float32Array(n);
-  const partials: readonly (readonly [number, number, number])[] = [
-    [1, 1, 2.6],
-    [2.76, 0.38, 4.5],
-    [5.4, 0.16, 8],
-    [8.93, 0.06, 14],
-  ];
-  for (let i = 0; i < n; i++) {
-    const t = i / sr;
-    let s = 0;
-    for (let k = 0; k < partials.length; k++)
-      s += Math.sin(TAU * hz * partials[k][0] * t) * partials[k][1] * Math.exp(-t * partials[k][2]);
-    out[i] = s * Math.min(1, t / 0.0015);
   }
   return out;
 }

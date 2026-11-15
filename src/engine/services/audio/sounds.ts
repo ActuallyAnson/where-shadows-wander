@@ -18,21 +18,17 @@ export const Sound = {
   Release: 6,
   /** Tracking was lost for too long. */
   Lost: 7,
-  /** The lullaby's five music-box notes (a rising pentatonic phrase): the story's cues. */
-  Note0: 8,
-  Note1: 9,
-  Note2: 10,
-  Note3: 11,
-  Note4: 12,
   /** Footsteps outside (scene 2's hush): two soft steps, alternated. */
-  Step0: 13,
-  Step1: 14,
+  Step0: 8,
+  Step1: 9,
   /** Rain outside, on the window and the roof, a loop (ambience): the night's constant bed. */
-  Rain: 15,
+  Rain: 10,
   /** Thunder far off, low and muffled by the distance and the walls: now and then, after a flash in the window (storm.ts). */
-  Thunder: 16,
+  Thunder: 11,
   /** The bedclothes as he sits up in bed (scene 1, as his eyes open): a soft slide of heavy cloth. */
-  Covers: 17,
+  Covers: 12,
+  /** The music: one track, looped, from the candle's lighting to the end (src/assets/audio/music/music.ogg). */
+  Music: 13,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -50,6 +46,10 @@ export interface SoundDef {
   /** Panner distance model: full volume inside `refDistance` metres, rolling off to `maxDistance`. */
   readonly refDistance: number;
   readonly maxDistance: number;
+  /** Not placed in the room: played straight into its bus, the same in both ears wherever the head turns (the music). */
+  readonly flat?: boolean;
+  /** Plays only from its file: until the file has loaded it is silent, and it has no placeholder (the music). */
+  readonly fileOnly?: boolean;
 }
 
 export const SOUND_DEFS: readonly SoundDef[] = [
@@ -134,56 +134,6 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     maxDistance: 8,
   },
   {
-    name: 'note0',
-    bus: Bus.Effects,
-    gain: 0.65,
-    loop: false,
-    priority: 3,
-    minGapS: 0.05,
-    refDistance: 1.5,
-    maxDistance: 12,
-  },
-  {
-    name: 'note1',
-    bus: Bus.Effects,
-    gain: 0.65,
-    loop: false,
-    priority: 3,
-    minGapS: 0.05,
-    refDistance: 1.5,
-    maxDistance: 12,
-  },
-  {
-    name: 'note2',
-    bus: Bus.Effects,
-    gain: 0.65,
-    loop: false,
-    priority: 3,
-    minGapS: 0.05,
-    refDistance: 1.5,
-    maxDistance: 12,
-  },
-  {
-    name: 'note3',
-    bus: Bus.Effects,
-    gain: 0.65,
-    loop: false,
-    priority: 3,
-    minGapS: 0.05,
-    refDistance: 1.5,
-    maxDistance: 12,
-  },
-  {
-    name: 'note4',
-    bus: Bus.Effects,
-    gain: 0.65,
-    loop: false,
-    priority: 3,
-    minGapS: 0.05,
-    refDistance: 1.5,
-    maxDistance: 12,
-  },
-  {
     name: 'step0',
     bus: Bus.Effects,
     gain: 0.45,
@@ -235,6 +185,19 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     // From the lap: close.
     refDistance: 1,
     maxDistance: 6,
+  },
+  {
+    name: 'music',
+    bus: Bus.Music,
+    gain: 0.5,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    // Flat, so the distances are not used.
+    refDistance: 1,
+    maxDistance: 1,
+    flat: true,
+    fileOnly: true,
   },
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */

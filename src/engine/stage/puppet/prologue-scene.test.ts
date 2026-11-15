@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { POSE_STRIDE, validateScene, type Cue } from './puppet-scene';
-import { EMBER_S, PATH_Y, PROLOGUE_SCENE, WALK_TO_S, WISP_OUT_EVERY_S, WISP_OUT_FROM_S } from './prologue-scene';
+import { POSE_STRIDE, validateScene } from './puppet-scene';
+import { EMBER_S, PATH_Y, PROLOGUE_SCENE, WALK_TO_S, WISP_OUT_FROM_S } from './prologue-scene';
 import { ScenePlayer } from './scene-player';
 
 const index = (id: string) => PROLOGUE_SCENE.parts.findIndex((p) => p.id === id);
@@ -11,15 +11,7 @@ describe('the prologue', () => {
     expect(validateScene(PROLOGUE_SCENE)).toEqual([]);
   });
 
-  it('plays the falling notes as the lights go out, then the first note alone with the ember', () => {
-    const notes = (PROLOGUE_SCENE.cues ?? []).filter((c): c is Extract<Cue, { kind: 'note' }> => c.kind === 'note');
-    expect(notes.map((c) => c.note)).toEqual([4, 3, 2, 1, 0, 0]);
-    expect(notes[0].t).toBeCloseTo(WISP_OUT_FROM_S);
-    expect(notes[4].t).toBeCloseTo(WISP_OUT_FROM_S + 4 * WISP_OUT_EVERY_S);
-    expect(notes[5].t).toBe(EMBER_S);
-  });
-
-  it('puts each light out with its note, last sleeper first', () => {
+  it('puts each light out, last sleeper first', () => {
     const p = new ScenePlayer(PROLOGUE_SCENE);
     p.seek(5);
     for (let i = 0; i < 5; i++) expect(pose(p, `wisp-${i}`, 4)).toBeGreaterThan(0.5);

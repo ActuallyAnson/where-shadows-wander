@@ -11,7 +11,7 @@ Last checked: 15 Nov 2026.
 
 ## Sound effects
 
-Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
+Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`; every sound effect has a recording now. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
 
 ### In the game now (replace these first)
 
@@ -26,21 +26,20 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `thump` | A soft, low thump | A hand shape is accepted | Final: "Deck of Cards, Thump on Table" by designerschoice (CC BY 4.0), one thump, 0.32 s |
 | `release` | A soft letting-go | A shape is let go | Final: "Slide release (PSX Horror SFX Free)" by heyheytheree (CC BY 4.0), cut to 0.3 s and softened |
 | `lost` | A soft sigh, a breath going out; gentle, not an alarm | Hand tracking lost for too long | Final: "ManSighMovement" by bennychico11 (CC BY 4.0), cut to 1.4 s |
-| `note0` to `note4` | Five music-box notes: C5, D5, E5, G5, A5 | The lullaby notes in the prologue | Placeholder |
 | `tick` | A tiny tick | A fingertip reaches a menu item | Final: "Button hover" by Fachii (CC0) |
 | `press` | A soft click | A menu item is pressed | Final: "UI Button Press" by el_boss (CC0), cut to 0.18 s |
 | `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). Final: "Footsteps - Stone, Rock, Concrete, Cement" by SecureSubset (CC0), two of its steps, low-passed to sound beyond a door. Stone, not wood: swap if a wooden-floor take turns up |
 
 ### Removed
 
-On 15 Nov 2026 the sounds nothing played were removed from `sounds.ts` and `placeholder-sounds.ts`: `hum` (the room tone; the rain is the room's sound now), `clock`, `wind` (the rain recording has wind in it), `chime`, and the puzzle game's `twinkle`, `hop`, `snowtick` and `creak`. Git history has them. `lift` and `set` (the candle picked up and set down) went earlier the same day, with picking up the candle: it stays on the tray, so the light never moves.
+On 15 Nov 2026 the sounds nothing played were removed from `sounds.ts` and `placeholder-sounds.ts`: `hum` (the room tone; the rain is the room's sound now), `clock`, `wind` (the rain recording has wind in it), `chime`, and the puzzle game's `twinkle`, `hop`, `snowtick` and `creak`. Git history has them. `lift` and `set` (the candle picked up and set down) went earlier the same day, with picking up the candle: it stays on the tray, so the light never moves. Later that day the lullaby's five music-box notes (`note0` to `note4`, made in code) went too, with the story's `note` cues: one music track plays through the game instead (see Music).
 
 ### Sounds the story needs that don't exist
 
 | Sound | Where (see `STORY.md`) | Status |
 |---|---|---|
 | Children's laughter | Scene 3 (they lie in the grass laughing); its absence in scene 5 is part of the loss | Needed |
-| Torch clicking on | The prologue, when she sets the torch down. A lullaby note plays there now. | Needed |
+| Torch clicking on | The prologue, when she sets the torch down. Nothing plays there now (a lullaby note did until 15 Nov). | Needed |
 | Far thunder inside the memory | Scene 3, listed as "still to do" | Needed (could reuse `thunder`) |
 | Breathing slowing, or a small yawn | Scene 7, as he falls asleep | Needed |
 | Rain easing off | Scene 7 | Done by fading `rain` as he falls asleep (the ending turns the ambience down, `ending-timeline.ts`); a lighter take would still help |
@@ -49,8 +48,11 @@ On 15 Nov 2026 the sounds nothing played were removed from `sounds.ts` and `plac
 
 | Name | What it is | Status |
 |---|---|---|
-| `music` | A 24 s loop of sine pads and music-box notes, made in code | Removed 15 Nov 2026: it was never started. No music plays in the game now. The music bus and its volume setting are kept, and the ending already turns that bus down with the candle and back up softly under the credits (`ending-timeline.ts`), so the lullaby will follow it once it is wired |
-| The lullaby | One music-box melody through the whole story: fuller in scenes 2 to 4, thinning in 5, a single note in 6, silent in 7 (`STORY.md`, "The music"). Best delivered as layers or stems so it can thin out. Keep it in a key the five notes fit, or replace the notes to match. | Needed |
+The music is one file, `src/assets/audio/music/music.ogg` (Sound `music` in `sounds.ts`). It plays flat (not placed in the room, so the same in both ears) on the music bus, and only from its file: until the file has loaded it is silent, and it has no placeholder. It is kept out of IWSDK's asset manifest (`src/app/assets.ts`) so it is decoded once, not twice.
+
+| Name | What it is | When it plays | Status |
+|---|---|---|---|
+| `music` | One quiet, bittersweet orchestral track (guitar, pads), looped | From the candle's lighting to the end: turned down under the pause menu, out with the candle as he falls asleep, back softly under the credits (`ending-timeline.ts`) | Final: "Emotional Mysterious Music" ("I Got Lost") by Migfus20 (CC BY 4.0), the whole 4:41 track, mono, 1.4 MB. Tune its level (`gain` in `sounds.ts`) by ear on a headset |
 
 ## 3D models
 

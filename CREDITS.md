@@ -2,11 +2,11 @@
 
 ## Sounds
 
-Thirteen sounds are recordings from freesound.org (below). The game's other sounds (the lullaby's five music-box notes) are made in code by `src/engine/services/audio/placeholder-sounds.ts`, which also makes a stand-in for each recorded sound, played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
+Every sound, and the music, is a recording from freesound.org (below). `src/engine/services/audio/placeholder-sounds.ts` makes a stand-in in code for each recorded sound (not the music), played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
 
 | Sound | Made by | Source | Licence |
 |---|---|---|---|
-| The other sounds | `placeholder-sounds.ts` (this project) | This repository | Made by the project; intended CC0 1.0 (to confirm) |
+| The stand-ins for the sounds | `placeholder-sounds.ts` (this project) | This repository | Made by the project; intended CC0 1.0 (to confirm) |
 | `src/assets/audio/sfx/thunder.ogg`, the far thunder ("Huge Thunder Crack [XY]"; changes: cut to 7 s, mixed to mono, low-passed to sound far off, faded, level adjusted) | -CASK- on freesound.org | https://freesound.org/s/732993/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | `src/assets/audio/sfx/rain.ogg`, the rain ("rain wind city 40m 002 220519_0361.wav"; changes: a 24 s stretch made into a seamless loop, mixed to mono, low end cut, level adjusted). The author asks to be credited with freesound.org and a link to https://freesound.org/people/klankbeeld/ , not to be used in stock material, and for the raw file not to be shared: keep the download in `asset-inbox/` only | klankbeeld on freesound.org (https://freesound.org/people/klankbeeld/) | https://freesound.org/s/635443/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | `src/assets/audio/sfx/covers.ogg`, the bedclothes as he sits up ("Bed sheets (SoundAction 104)"; changes: cut to 3.5 s, low end cut, faded, level adjusted) | alexarje on freesound.org | https://freesound.org/s/863082/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
@@ -19,6 +19,12 @@ Thirteen sounds are recordings from freesound.org (below). The game's other soun
 | `src/assets/audio/sfx/press.ogg`, a menu item pressed ("UI Button Press"; changes: cut to 0.18 s, mixed to mono, faded, level adjusted) | el_boss on freesound.org | https://freesound.org/s/788611/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/step0.ogg` and `step1.ogg`, a grown-up's footsteps outside the fort in scene 2's hush ("Footsteps - Stone, Rock, Concrete, Cement"; changes: two of its steps cut out, 0.58 s each, low-passed to sound beyond a door, faded, level adjusted) | SecureSubset on freesound.org | https://freesound.org/s/813622/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/lost.ogg`, a soft sigh when hand tracking is lost ("ManSighMovement.aif"; changes: converted from AIFF, cut to 1.4 s, mixed to mono, low end cut, faded, level adjusted) | bennychico11 on freesound.org | https://freesound.org/s/44423/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+
+## Music
+
+| Music | Made by | Source | Licence |
+|---|---|---|---|
+| `src/assets/audio/music/music.ogg`, the music through the whole game ("Emotional Mysterious Music", titled "I Got Lost" in its description; changes: mixed to mono, the silence at the end trimmed, level raised, re-encoded smaller; looped in the game) | Migfus20 on freesound.org (https://freesound.org/people/Migfus20/) | https://freesound.org/s/683270/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 When a recording replaces a sound made in code, add a row for each file here: what it is, who made it, where it came from (a link), and its licence (CC0 or another that allows use in a game). Do not add a file whose licence is not recorded here.
 

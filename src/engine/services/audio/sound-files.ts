@@ -1,10 +1,10 @@
-// Real sound files in place of the placeholders made in code. A file in src/assets/audio/sfx named after a sound
-// (thunder.ogg is Sound.Thunder, by SOUND_DEFS[].name) replaces that sound once it is fetched and decoded; until then,
+// Real sound files in place of the placeholders made in code. A file in src/assets/audio/sfx (or music) named after a sound
+// (thunder.ogg is Sound.Thunder, music/music.ogg is Sound.Music, by SOUND_DEFS[].name) replaces that sound once it is fetched and decoded; until then,
 // or if it fails, the placeholder plays. Plain TypeScript: the fetch and the decoder are passed in.
 import { assetIdOf } from '../assets/budgets.mjs';
 import { SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
-const SFX_FILE = /(^|\/)assets\/audio\/sfx\/[^/]+\.(ogg|opus|mp3|m4a|wav)$/;
+const SFX_FILE = /(^|\/)assets\/audio\/(sfx|music)\/[^/]+\.(ogg|opus|mp3|m4a|wav)$/;
 
 /** The sounds that have a file, with its URL, from the asset files (source path → URL). A file named after no sound is left out. */
 export function soundFiles(files: Readonly<Record<string, string>>): { sound: SoundId; url: string }[] {

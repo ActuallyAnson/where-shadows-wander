@@ -1,6 +1,6 @@
 // A puppet scene: a short piece of shadow theatre on the wall (docs/adr/0016-story-shadow-theatre.md). Cut-out parts hang from
 // each other at pivots (a leg from a hip, a lantern from a staff), keyframed tracks move them, wobbles keep them alive, and cues
-// at marked moments play a note or write a line on the wall. Plain data: a scene is written as a constant (prologue-scene.ts)
+// at marked moments write a line on the wall, change the light or make a sound. Plain data: a scene is written as a constant (prologue-scene.ts)
 // and played by ScenePlayer. Coordinates are stage metres from the wall's centre (x right, y up); angles are radians,
 // counter-clockwise as the player sees the wall.
 
@@ -93,11 +93,10 @@ export interface Wobble {
 }
 
 /**
- * Something that happens at a moment: a note of the lullaby, a line written on the wall, the candle's light changing mood,
+ * Something that happens at a moment: a line written on the wall, the candle's light changing mood,
  * lightning in the room's window with its thunder after it, a footstep, or the room's candle hushed with the memory's light.
  */
 export type Cue =
-  | { readonly t: number; readonly kind: 'note'; readonly note: number }
   /** A soft footstep (one of two, alternated), from the stage point (`x`, `y`). */
   | { readonly t: number; readonly kind: 'step'; readonly variant: 0 | 1; readonly x: number; readonly y: number }
   /**

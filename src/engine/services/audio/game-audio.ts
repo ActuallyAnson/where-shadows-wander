@@ -1,6 +1,6 @@
 // The game's audio events: what makes which sound, and where it seems to come from. Shape events make a paper
 // rustle (recognised) and a thump (committed) at the hand's shadow on the wall; the candle whooshes when lit and
-// crackles from the flame while it burns, and sounds when lifted or set down.
+// crackles from the flame while it burns; the rain and the music are beds under it all.
 // Talks to a SoundPlayer (the Web Audio engine), so it is testable with a recording fake.
 import type { Handedness } from '../../hands/hand';
 import type { HandShadow } from '../../hands/hand-shadow';
@@ -17,13 +17,12 @@ export interface SoundPlayer {
 
 /** Sounds from the wall come from this far in front of it, metres, so they are not inside the paper. */
 const WALL_LIFT_M = 0.05;
-/** The lullaby's notes, lowest first. */
-const NOTES: readonly SoundId[] = [Sound.Note0, Sound.Note1, Sound.Note2, Sound.Note3, Sound.Note4];
 
 export class GameAudio {
   private readonly at = { x: 0, y: 0, z: 0 };
   private flameLit = false;
   private raining = false;
+  private music = false;
 
   constructor(private readonly player: SoundPlayer) {}
 
@@ -50,14 +49,6 @@ export class GameAudio {
     }
   }
 
-  /** One of the lullaby's five notes (0 lowest .. 4), from the stage point (`sx`, `sy`) on `stage`: a story scene's cue. */
-  storyNote(index: number, stage: StagePlane, sx = 0, sy = 0): void {
-    const id = NOTES[index];
-    if (id === undefined) return;
-    stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
-    this.player.playAt(id, this.at.x, this.at.y, this.at.z);
-  }
-
   /** A soft footstep (0 or 1, the two alternated) from the stage point (`sx`, `sy`) on `stage`: a story scene's cue. */
   storyStep(variant: number, stage: StagePlane, sx = 0, sy = 0): void {
     stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
@@ -77,6 +68,12 @@ export class GameAudio {
     if (on !== this.raining) this.player.setLoop(Sound.Rain, on, at.x, at.y, at.z);
     else if (on) this.player.moveLoop(Sound.Rain, at.x, at.y, at.z);
     this.raining = on;
+  }
+
+  /** Call every frame: the music plays while `on` (it is flat, so it has no place in the room), once its file has loaded. */
+  setMusic(on: boolean): void {
+    if (on !== this.music) this.player.setLoop(Sound.Music, on, 0, 0, 0);
+    this.music = on;
   }
 
   /** Thunder far off, from the window's side (`at`, its world position). */

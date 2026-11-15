@@ -1,6 +1,7 @@
 // Plain Web Audio for the game's sounds (the choice and its reasons are in docs/adr/0008-audio.md).
 //
 //   one-shot sources -> voice gain -> panner (HRTF) -> bus gain (music | effects | ambience) -> master -> output
+//   a flat sound (the music) -> its own gain -> bus gain -> ...      (no panner: the same in both ears)
 //
 // Browsers keep audio locked until a user gesture, so the context is made on the first gesture (or when a
 // headset session starts) and sounds asked for before that are dropped, except a loop, which waits. Playing a
@@ -26,8 +27,10 @@ interface Voice {
   readonly gain: GainNode;
   readonly panner: PannerNode;
   source: AudioBufferSourceNode | null;
-  /** The bus the panner is connected to, or -1. */
+  /** The bus the panner (or, for a flat voice, the gain) is connected to, or -1. */
   bus: number;
+  /** Not placed in the room: the gain goes straight to the bus and the panner is unused. */
+  readonly flat: boolean;
 }
 
 /** What `attachSessionUnlock` needs from an XRSession. */
@@ -171,6 +174,7 @@ export class AudioEngine {
       return false;
     }
     const def = SOUND_DEFS[id];
+    if (def.fileOnly && !this.overrides[id]) return false; // silent until its file is in
     const slot = this.pool.acquire(def.priority, now);
     if (slot < 0) {
       this.stats.noVoice++;
@@ -240,7 +244,9 @@ export class AudioEngine {
     const ctx = this.context;
     if (!ctx || ctx.state !== 'running' || this.loops[id]?.source) return;
     const def = SOUND_DEFS[id];
-    const voice = this.makeVoice(ctx);
+    // A sound with no placeholder waits for its file; it stays wanted, so `update` starts it once the file is set.
+    if (def.fileOnly && !this.overrides[id]) return;
+    const voice = this.makeVoice(ctx, def.flat === true);
     this.loops[id] = voice;
     const p = this.loopPos;
     this.route(voice, def.bus, def.gain, def.refDistance, def.maxDistance, p[id * 3], p[id * 3 + 1], p[id * 3 + 2]);
@@ -274,6 +280,7 @@ export class AudioEngine {
     p[i] = x;
     p[i + 1] = y;
     p[i + 2] = z;
+    if (voice.flat) return;
     const t = this.context!.currentTime;
     voice.panner.positionX.setTargetAtTime(x, t, GLIDE_S);
     voice.panner.positionY.setTargetAtTime(y, t, GLIDE_S);
@@ -393,14 +400,15 @@ export class AudioEngine {
     return buffer;
   }
 
-  private makeVoice(ctx: AudioContext): Voice {
+  private makeVoice(ctx: AudioContext, flat = false): Voice {
     const gain = ctx.createGain();
     const panner = ctx.createPanner();
+    if (flat) return { gain, panner, source: null, bus: -1, flat };
     panner.panningModel = 'HRTF';
     panner.distanceModel = 'inverse';
     panner.rolloffFactor = 1;
     gain.connect(panner);
-    return { gain, panner, source: null, bus: -1 };
+    return { gain, panner, source: null, bus: -1, flat };
   }
 
   private route(
@@ -414,12 +422,14 @@ export class AudioEngine {
     z: number,
   ): void {
     if (voice.bus !== bus) {
-      voice.panner.disconnect();
-      voice.panner.connect(this.busNodes[bus]);
+      const out = voice.flat ? voice.gain : voice.panner;
+      out.disconnect();
+      out.connect(this.busNodes[bus]);
       voice.bus = bus;
     }
     voice.gain.gain.cancelScheduledValues(0);
     voice.gain.gain.value = gain;
+    if (voice.flat) return;
     voice.panner.refDistance = refDistance;
     voice.panner.maxDistance = maxDistance;
     voice.panner.positionX.value = x;

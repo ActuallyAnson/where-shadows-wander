@@ -34,9 +34,9 @@ const arm: PuppetScene = {
     },
   ],
   cues: [
-    { t: 0, kind: 'note', note: 0 },
-    { t: 0.5, kind: 'note', note: 1 },
-    { t: 1.5, kind: 'note', note: 2 },
+    { t: 0, kind: 'step', variant: 0, x: 0, y: 0 },
+    { t: 0.5, kind: 'step', variant: 0, x: 1, y: 0 },
+    { t: 1.5, kind: 'step', variant: 0, x: 2, y: 0 },
   ],
 };
 
@@ -74,7 +74,7 @@ describe('ScenePlayer', () => {
     const heard: number[] = [];
     let done = 0;
     p.start(
-      (c: Cue) => c.kind === 'note' && heard.push(c.note),
+      (c: Cue) => c.kind === 'step' && heard.push(c.x),
       () => done++,
     );
     expect(heard).toEqual([0]);
@@ -87,7 +87,7 @@ describe('ScenePlayer', () => {
   it('holds still with a zero step, and a skip drops the cues to come', () => {
     const p = new ScenePlayer(arm);
     const heard: number[] = [];
-    p.start((c) => c.kind === 'note' && heard.push(c.note));
+    p.start((c) => c.kind === 'step' && heard.push(c.x));
     p.update(0);
     expect(p.time).toBe(0);
     p.skip();

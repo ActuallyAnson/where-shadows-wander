@@ -20,7 +20,7 @@ const memory: PuppetScene = {
   length: 3,
   parts: [{ id: 'rabbit', art: 'rabbit', w: 0.1, h: 0.1, x: 0.1, y: 0.2 }],
   tracks: [],
-  cues: [{ t: 1, kind: 'note', note: 1 }],
+  cues: [{ t: 1, kind: 'step', variant: 0, x: 1, y: 0 }],
 };
 const story: StoryScene[] = [
   {
@@ -53,7 +53,7 @@ describe('StoryDirector', () => {
 
   it('moves on only for the shape it shows, then the hand lowers away as the memory plays', () => {
     const heard: number[] = [];
-    const d = new StoryDirector(story, (c: Cue) => c.kind === 'note' && heard.push(c.note));
+    const d = new StoryDirector(story, (c: Cue) => c.kind === 'step' && heard.push(c.x));
     d.start();
     run(d, 4);
     expect(d.commit('fox')).toBe(false);
@@ -131,8 +131,8 @@ describe('StoryDirector', () => {
         },
       ],
       cues: [
-        { t: 1, kind: 'note', note: 1 },
-        { t: 3, kind: 'note', note: 3 },
+        { t: 1, kind: 'step', variant: 0, x: 1, y: 0 },
+        { t: 3, kind: 'step', variant: 0, x: 3, y: 0 },
       ],
     };
     const heard: number[] = [];
@@ -147,7 +147,7 @@ describe('StoryDirector', () => {
           ],
         },
       ],
-      (c) => c.kind === 'note' && heard.push(c.note),
+      (c) => c.kind === 'step' && heard.push(c.x),
     );
     d.start();
     run(d, 2.3);

@@ -122,7 +122,7 @@ The night is told as one continuous puppet show in seven scenes: waking, four me
 - **The player moves it on with a shape.** Between scenes the story waits for a named hand shape (for example a rabbit, or a flat hand), and the next scene plays when that shape commits.
 - **No failure.** The story waits for as long as it takes; how it helps a player who is stuck is to be designed. A grieving boy cannot get remembering wrong.
 - **The prologue comes back** as the waking scene at the start.
-- **Ready for it:** the fade to black (now used when the title is left), poke to skip, and the sound palette (the music-box notes, the rain and thunder).
+- **Ready for it:** the fade to black (now used when the title is left), poke to skip, and the sound palette (the music, the rain and thunder).
 
 Planned, not built, each with its own ADR when it is: a cut-out puppet format (parts, pivots, keyframes), a caster that renders the puppets from the flame onto the wall, a scene player with markers for captions and sounds, and a story graph (play a scene, wait for a shape, play the next).
 
@@ -171,7 +171,7 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 - **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, and its crackle. The candle can't be picked up (15 Nov 2026): it stays on the tray, so the light the shadows are cast from never moves.
 
-- **For the story:** the sounds made in code that nothing played (a chime, the room tone, a clock, wind and placeholder music) were removed on 15 Nov 2026; the music-box notes, the rain and the thunder are the palette, and anything new a scene needs is listed in `docs/ASSETS.md`. The music should be quiet and bittersweet: the music-box notes suit memories from childhood, and the night ends in near silence as he falls asleep.
+- **For the story:** the sounds made in code that nothing played (a chime, the room tone, a clock, wind and placeholder music) were removed on 15 Nov 2026; the music, the rain and the thunder are the palette, and anything new a scene needs is listed in `docs/ASSETS.md`. The music is quiet and bittersweet: one track ("I Got Lost" by Migfus20, 15 Nov) under the whole story, and the night ends in near silence as he falls asleep.
 
 ## Technical design
 

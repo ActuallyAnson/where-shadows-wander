@@ -3,15 +3,16 @@ import { loadSoundFiles, soundFiles } from './sound-files';
 import { Sound } from './sounds';
 
 describe('soundFiles', () => {
-  it('matches files in audio/sfx to sounds by name', () => {
+  it('matches files in audio/sfx and audio/music to sounds by name', () => {
     const files = {
       '../assets/audio/sfx/thunder.ogg': '/t.ogg',
       '../assets/audio/sfx/Rain.ogg': '/r.ogg',
       '../assets/audio/sfx/not-a-sound.ogg': '/x.ogg',
-      '../assets/audio/music/thunder.ogg': '/m.ogg',
+      '../assets/audio/music/music.ogg': '/m.ogg',
       '../assets/models/thunder.glb': '/g.glb',
     };
     expect(soundFiles(files)).toEqual([
+      { sound: Sound.Music, url: '/m.ogg' },
       { sound: Sound.Rain, url: '/r.ogg' },
       { sound: Sound.Thunder, url: '/t.ogg' },
     ]);

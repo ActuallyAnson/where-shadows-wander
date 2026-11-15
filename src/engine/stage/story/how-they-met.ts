@@ -450,21 +450,13 @@ const tracks: Track[] = [
   },
 ];
 
-/**
- * The lullaby's first note as the rabbit comes off the player's hand, and as the boy's rabbit comes right; two as they laugh;
- * one as the friend's hand goes up again.
- */
+/** The hush: a grown-up's footsteps outside the fort, and the room's candle dimmed with the torch while they pass. */
 const cues: Cue[] = [
-  { t: 0.1, kind: 'note', note: 0 },
-  { t: RIGHT_S + 0.1, kind: 'note', note: 2 },
-  { t: LAUGH_S, kind: 'note', note: 3 },
-  { t: LAUGH_S + 0.6, kind: 'note', note: 4 },
   // The hush: footsteps coming, the room's candle dimmed with the torch, footsteps going, the light back.
   ...STEPS_IN.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
   { t: HUSH_S + H_CLAP, kind: 'hush', level: HUSH_LEVEL, seconds: HUSH_DOWN_S },
   ...STEPS_OUT.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
   { t: HUSH_S + H_LIFT, kind: 'hush', level: 1, seconds: HUSH_UP_S },
-  { t: ASK_S + 0.6, kind: 'note', note: 1 },
 ];
 
 export const HOW_THEY_MET: Chapter = {

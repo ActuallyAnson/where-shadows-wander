@@ -37,7 +37,7 @@ const WISP_COLOURS: readonly (readonly [number, number, number])[] = [
   [0.45, 0.95, 0.78],
   [0.72, 0.9, 1],
 ];
-/** The ember lights in the lantern at this moment, with the lullaby's first note. */
+/** The ember lights in the lantern at this moment. */
 export const EMBER_S = 12.2;
 export const PROLOGUE_LENGTH_S = 21.5;
 /** The whole scene fades off the wall over its last seconds. */
@@ -217,10 +217,7 @@ const wobbles: Wobble[] = [
   { part: 'body', prop: 'scale', amp: 0.008, period: 3.4 },
 ];
 
-/** The lullaby's notes as the lights go out (4, 3, 2, 1, 0), then the first note once, alone, as the ember lights. */
 const cues: Cue[] = [
-  ...[4, 3, 2, 1, 0].map((note): Cue => ({ t: wispOut(note), kind: 'note', note })),
-  { t: EMBER_S, kind: 'note', note: 0 },
   { t: 13.6, kind: 'line', slot: 'title', text: 'WHERE SHADOWS WANDER', hold: 4.4 },
   { t: 16.2, kind: 'line', slot: 'line', text: 'Help it wake them.', hold: 1.9 },
 ];
