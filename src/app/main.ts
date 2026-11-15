@@ -71,6 +71,7 @@ import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
+import { loadSoundFiles, soundFiles } from '../engine/services/audio/sound-files';
 import { startSoundPrerender } from '../engine/services/audio/sound-prerender';
 import { renderJob, type RenderedSound, type RenderJob } from '../engine/services/audio/sound-render-job';
 import { TaskPool, type WorkerLike } from '../engine/services/workers/task-pool';
@@ -466,6 +467,16 @@ async function start(): Promise<void> {
   (whenIdle ? whenIdle.bind(window) : (fn: () => void) => void setTimeout(fn, 2000))(() => {
     void startSoundPrerender(soundPool, audioContextRate()).then(() => soundPool.dispose());
   });
+  // Real sound files (src/assets/audio/sfx/<name>.ogg) replace their placeholders once decoded (sound-files.ts).
+  if (typeof OfflineAudioContext !== 'undefined') {
+    const decoder = new OfflineAudioContext(1, 1, audioContextRate());
+    void loadSoundFiles(
+      soundFiles(assetFiles),
+      (url) => fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${r.status} ${url}`)))),
+      (bytes) => decoder.decodeAudioData(bytes),
+      (sound, buffer) => audio.setBuffer(sound, buffer),
+    );
+  }
   const gameAudio = new GameAudio(
     new CaptioningPlayer(
       audio,

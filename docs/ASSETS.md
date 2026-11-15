@@ -11,17 +11,15 @@ Last checked: 15 Nov 2026.
 
 ## Sound effects
 
-All 29 sounds are made in code by `src/engine/services/audio/placeholder-sounds.ts`; there are no audio files yet. Each is defined in `src/engine/services/audio/sounds.ts`, and its name is the file name a real one will have (`src/assets/audio/sfx/<name>.ogg`).
-
-> **Not wired yet:** nothing loads files from `src/assets/audio/` into the engine (`WebAudioEngine.setBuffer` is never called), so a file dropped in there is ignored until that is built.
+Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`. Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
 
 ### In the game now (replace these first)
 
 | Name | What it should sound like | When it plays | Status |
 |---|---|---|---|
-| `thunder` | Far-off thunder, low and muffled by distance and walls, about 6 s | Wakes him in scene 1; after the window flashes; the prologue's storm | Placeholder |
-| `rain` | Steady rain on the window and roof, seamless loop | All night, from the window's side | Placeholder |
-| `covers` | A soft slide of heavy bedclothes | He sits up in bed (scene 1) | Placeholder |
+| `thunder` | Far-off thunder, low and muffled by distance and walls, about 6 s | Wakes him in scene 1; after the window flashes; the prologue's storm | Final: "Huge Thunder Crack [XY]" by -CASK- (CC BY 4.0), cut to 7 s and low-passed |
+| `rain` | Steady rain on the window and roof, seamless loop | All night, from the window's side | Final: "rain wind city 40m 002" by klankbeeld (CC BY 4.0; credit freesound.org too, never share the raw file), a 24 s loop |
+| `covers` | A soft slide of heavy bedclothes | He sits up in bed (scene 1) | Final: "Bed sheets (SoundAction 104)" by alexarje (CC BY 4.0), cut to 3.5 s |
 | `ignite` | A match struck, then a flame catching | Lighting the candle; BEGIN on the title screen | Placeholder |
 | `crackle` | A quiet candle flame, seamless loop | While the candle is lit | Placeholder |
 | `lift` | The candle picked up off the tray | Moving the candle | Placeholder |
