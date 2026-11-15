@@ -77,14 +77,14 @@ describe('BedroomView', () => {
 
   it("stands the room so the player's spot is under the head, with the front wall the stage's distance ahead of it", () => {
     const layout = emptyRoomLayout();
-    layout.room.player = placement([0.5, 0, 0.3]);
+    layout.room.player = placement([0.5, 0, 0.05]);
     const v = new BedroomView(layout);
     v.place([1, 1.2, 2], Math.PI / 2, 2.0);
     v.group.updateMatrixWorld(true);
     const spot = v.playerSpot.getWorldPosition(new Vector3());
     expect(spot.x).toBeCloseTo(1, 6);
     expect(spot.z).toBeCloseTo(2, 6);
-    expect(v.frontWallMesh.position.z).toBeCloseTo(0.3 - 2.02, 6);
+    expect(v.frontWallMesh.position.z).toBeCloseTo(0.05 - 2.02, 6);
   });
 
   it("keeps the player's spot inside the room", () => {

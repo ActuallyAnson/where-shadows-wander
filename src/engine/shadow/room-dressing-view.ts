@@ -47,7 +47,7 @@ import {
 } from './room-art';
 import { RenderOrder } from './pure/render-order';
 import { plasterNormals } from './pure/plaster-bump';
-import { ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
+import { ROOM_BACK_WALL_Z, ROOM_DEPTH_M, ROOM_MID_Z, ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
 import { CANDLE_REACH_M, type CandleBump, type CandleLight } from './candle-light';
 import type { StandIn } from './room-models';
 import { placementOr, type RoomLayout } from '../stage/room-layout';
@@ -73,13 +73,14 @@ const FLASH_PATCH = 2.5;
 const PICTURES_OUT = 0.03;
 const SHELVES_OUT = 0.1;
 /**
- * Where each cluster of WALL_THINGS hangs (by its index there): on the right wall (`-x`, facing into the room) or the left (`+x`),
- * its middle at (z, y) metres, or `null` to leave it out. None hangs on the wall behind the stage, which is kept clear for play.
+ * Where each cluster of WALL_THINGS hangs (by its index there): on the right wall (`-x`, facing into the room), the left (`+x`) or
+ * the back wall behind the player (`back`), its middle `along` that wall (z on a side wall, x on the back) and `y` up, metres, or
+ * `null` to leave it out. None hangs on the wall behind the stage, which is kept clear for play.
  */
-const HUNG: readonly ({ readonly wall: '+x' | '-x'; readonly z: number; readonly y: number } | null)[] = [
-  { wall: '-x', z: -1.05, y: 1.45 }, // the bird and the moon, over the bed
-  { wall: '-x', z: -0.2, y: 1.6 }, // the hill, over the bed's foot
-  { wall: '+x', z: 0.8, y: 1.35 }, // the shelf of books, boat and lamp, on the left wall behind the window
+const HUNG: readonly ({ readonly wall: '+x' | '-x' | 'back'; readonly along: number; readonly y: number } | null)[] = [
+  { wall: '-x', along: -1.05, y: 1.45 }, // the bird and the moon, over the bed
+  { wall: '-x', along: -0.2, y: 1.6 }, // the hill, over the bed's foot
+  { wall: 'back', along: -1.2, y: 1.35 }, // the shelf of books, boat and lamp, on the back wall left of the bed's head
   null, // the jar and plant shelf
 ];
 /** How deep the bookcase is, front to wall. */
@@ -154,8 +155,15 @@ interface GlowSpec {
  * and the pictures hang on the side walls (HUNG); the wall behind the stage is bare, for the story. `wall` is (x, y, lift in metres off the paper).
  */
 const GLOWS: readonly GlowSpec[] = [
-  // The lamp on the shelf (left wall, HUNG[2]), the moon and the hill (right wall, HUNG[0] and HUNG[1]).
-  { wonder: 0, follows: 'shelf', at: [-1.875, 1.45, 0.55], size: [0.5, 0.5], facing: '+x', colour: [1, 0.72, 0.36] },
+  // The lamp on the shelf (back wall, HUNG[2]), the moon and the hill (right wall, HUNG[0] and HUNG[1]).
+  {
+    wonder: 0,
+    follows: 'shelf',
+    at: [-1.2, 1.45, ROOM_BACK_WALL_Z - 0.13],
+    size: [0.5, 0.5],
+    facing: 'z',
+    colour: [1, 0.72, 0.36],
+  },
   {
     wonder: 2,
     follows: 'picture-moon',
@@ -172,13 +180,13 @@ const GLOWS: readonly GlowSpec[] = [
     facing: '-x',
     colour: [0.5, 0.65, 1],
   },
-  // The bookcase (room-models.ts: its open front at x 1.61, 1.32 m high).
+  // The bookcase (room-models.ts: against the back wall in the right corner, its open front facing the room, 1.32 m high).
   {
     wonder: 3,
     follows: 'bookcase',
-    at: [1.58, 1.0, 0.55],
+    at: [1.6, 1.0, ROOM_BACK_WALL_Z - 0.41],
     size: [0.42, 0.42],
-    facing: '-x',
+    facing: 'z',
     colour: [0.45, 0.95, 0.75],
   },
   { wonder: 4, follows: 'sill', at: [-1.9, 0.99, -0.71], size: [0.3, 0.3], facing: '+x', colour: [1, 0.7, 0.35] },
@@ -298,27 +306,32 @@ export class RoomDressingView implements EditableSource {
       );
       const m = this.quad(spec.area.w / 256, spec.area.h / 256, this.texture(canvas), true);
       const out = spec.layer === 'shelves' ? SHELVES_OUT : PICTURES_OUT;
-      m.rotation.y = hung.wall === '+x' ? Math.PI / 2 : -Math.PI / 2;
-      m.position.set(hung.wall === '+x' ? -1.995 + out : 1.995 - out, hung.y, hung.z);
+      if (hung.wall === 'back') {
+        m.rotation.y = Math.PI;
+        m.position.set(hung.along, hung.y, ROOM_BACK_WALL_Z - 0.005 - out);
+      } else {
+        m.rotation.y = hung.wall === '+x' ? Math.PI / 2 : -Math.PI / 2;
+        m.position.set(hung.wall === '+x' ? -1.995 + out : 1.995 - out, hung.y, hung.along);
+      }
       this.editable(HUNG_IDS[i]!, m);
       this.things.push(m);
     });
 
     // The same paper and panelling on the two side walls (one material for both).
     const sideTexture = this.texture(paintedCanvas(800, 400, (g, w, h) => paintWall(g, w, h)));
-    const left = this.quad(5, 2.5, sideTexture, false, true, undefined, [20, 10]);
+    const left = this.quad(ROOM_DEPTH_M, 2.5, sideTexture, false, true, undefined, [4 * ROOM_DEPTH_M, 10]);
     left.rotation.y = Math.PI / 2;
-    left.position.set(-1.995, 1.25, -0.4);
+    left.position.set(-1.995, 1.25, ROOM_MID_Z);
     left.renderOrder = WALL_ORDER;
-    const right = this.quad(5, 2.5, sideTexture, false, true, left, [20, 10]);
+    const right = this.quad(ROOM_DEPTH_M, 2.5, sideTexture, false, true, left, [4 * ROOM_DEPTH_M, 10]);
     right.rotation.y = -Math.PI / 2;
-    right.position.set(1.995, 1.25, -0.4);
+    right.position.set(1.995, 1.25, ROOM_MID_Z);
     right.renderOrder = WALL_ORDER;
     // The wall behind the player: the same paper as the wall behind the stage (same size), facing into the room, a hair in front
-    // of Damon's plain back wall (z 1.85).
+    // of Damon's plain back wall (ROOM_BACK_WALL_Z), against the bed's headboard.
     const back = this.quad(4, 2.5, wallTexture, false, true, undefined, [16, 10]);
     back.rotation.y = Math.PI;
-    back.position.set(0, 1.25, 1.845);
+    back.position.set(0, 1.25, ROOM_BACK_WALL_Z - 0.005);
     back.renderOrder = WALL_ORDER;
     // The walls all face into the room, so they are one-sided: from inside nothing changes, and from outside (the room editor's
     // views) the near walls drop away and the room can be seen into, like Damon's own walls, floor and ceiling.
@@ -537,7 +550,7 @@ export class RoomDressingView implements EditableSource {
     });
     this.bumps.set(left.material as MeshBasicMaterial, {
       map: this.plaster,
-      repeat: [5 / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
+      repeat: [ROOM_DEPTH_M / PLASTER_TILE_M, 2.5 / PLASTER_TILE_M],
     });
     // The props that stand in the candle's light.
     this.casters.push(...this.things, caseBox, ...bed);

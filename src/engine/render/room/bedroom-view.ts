@@ -23,7 +23,7 @@ import {
 import type { BufferGeometry, Material, Quaternion } from '@iwsdk/core';
 import { mergeBoxes } from '../../shadow/merge-boxes';
 import type { LanternLight } from '../../shadow/pure/lantern-light';
-import { ROOM_WALL_BEHIND_STAGE_M } from '../../stage/stage-frame';
+import { ROOM_BACK_WALL_Z, ROOM_DEPTH_M, ROOM_MID_Z, ROOM_WALL_BEHIND_STAGE_M } from '../../stage/stage-frame';
 import type { CandleLight } from '../../shadow/candle-light';
 import { placement, placementOr, type RoomLayout } from '../../stage/room-layout';
 import { applyPlacement, type EditablePiece, type EditableSource } from '../../shadow/room-placement';
@@ -35,7 +35,7 @@ export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['tin-can', 'player'];
  * How far the player's spot may be from the room's middle (m): on x, inside the side walls; on z, from where the front wall
  * (which keeps the stage's distance ahead of the player) would pass the far end of the room's walls, to short of the back wall.
  */
-export const PLAYER_SPOT_LIMITS = { x: 1.6, zMin: -0.85, zMax: 1.4 } as const;
+export const PLAYER_SPOT_LIMITS = { x: 1.6, zMin: -0.85, zMax: ROOM_BACK_WALL_Z - 0.45 } as const;
 
 export const MOONLIGHT_COLOR = 0x4a6a9d;
 export const NIGHT_AMBIENT = 0x141d2e;
@@ -85,7 +85,7 @@ function createFloorTexture(customCanvas?: HTMLCanvasElement): CanvasTexture {
   texture.colorSpace = SRGBColorSpace;
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
-  texture.repeat.set(2, 4);
+  texture.repeat.set(2, (4 * ROOM_DEPTH_M) / 5); // the planks keep their size (4 repeats were drawn for 5 m)
   return texture;
 }
 
@@ -132,31 +132,31 @@ export class BedroomView implements EditableSource {
     // 1. Floor with Baked Plank Seams (Zero Z-Fighting, No Flickering)
     // -------------------------------------------------------------
     this.floorTexture = createFloorTexture();
-    const floorGeo = new PlaneGeometry(4.0, 5.0);
+    const floorGeo = new PlaneGeometry(4.0, ROOM_DEPTH_M);
     floorGeo.rotateX(-Math.PI / 2);
     this.floorMat = new MeshBasicMaterial({
       map: this.floorTexture,
       color: BASE_FLOOR,
     });
     this.floorMesh = new Mesh(floorGeo, this.floorMat);
-    this.floorMesh.position.set(0, 0, -0.4); // Centered under seated player spanning Z in [-2.9, 2.1]
+    this.floorMesh.position.set(0, 0, ROOM_MID_Z); // from the room's front end to the back wall
     this.register(floorGeo, this.floorMat);
 
     // -------------------------------------------------------------
     // 2. Ceiling & Timber Rafter Crossbeams (Y = 2.5m)
     // -------------------------------------------------------------
-    const ceilingGeo = new PlaneGeometry(4.0, 5.0);
+    const ceilingGeo = new PlaneGeometry(4.0, ROOM_DEPTH_M);
     ceilingGeo.rotateX(Math.PI / 2);
     const ceilingMat = new MeshBasicMaterial({ color: 0x140e0a });
     this.ceilingMesh = new Mesh(ceilingGeo, ceilingMat);
-    this.ceilingMesh.position.set(0, 2.5, -0.4);
+    this.ceilingMesh.position.set(0, 2.5, ROOM_MID_Z);
     this.register(ceilingGeo, ceilingMat);
 
     // Ceiling rafter crossbeams (dark transverse timber beams overhead)
     const rafterGeo = new BoxGeometry(4.0, 0.12, 0.12);
     this.rafterMat = new MeshBasicMaterial({ color: BASE_RAFTER });
     this.register(rafterGeo, this.rafterMat);
-    const rafterZ = [-2.2, -1.4, -0.6, 0.2, 1.0];
+    const rafterZ = [-2.2, -1.4, -0.6, 0.2].filter((z) => z < ROOM_BACK_WALL_Z - 0.1);
     const rafters = new InstancedMesh(rafterGeo, this.rafterMat, rafterZ.length);
     const rafterMatrix = new Matrix4();
     rafterZ.forEach((rz, i) => rafters.setMatrixAt(i, rafterMatrix.makeTranslation(0, 2.44, rz)));
@@ -174,24 +174,24 @@ export class BedroomView implements EditableSource {
     this.materials.push(this.wallMat);
 
     // Left Wall (X = -2.0m)
-    const leftWallGeo = new PlaneGeometry(5.0, 2.5);
+    const leftWallGeo = new PlaneGeometry(ROOM_DEPTH_M, 2.5);
     leftWallGeo.rotateY(Math.PI / 2);
     const leftWall = (this.leftWallMesh = new Mesh(leftWallGeo, this.wallMat));
-    leftWall.position.set(-2.0, 1.25, -0.4);
+    leftWall.position.set(-2.0, 1.25, ROOM_MID_Z);
     this.register(leftWallGeo);
 
     // Right Wall (X = +2.0m)
-    const rightWallGeo = new PlaneGeometry(5.0, 2.5);
+    const rightWallGeo = new PlaneGeometry(ROOM_DEPTH_M, 2.5);
     rightWallGeo.rotateY(-Math.PI / 2);
     const rightWall = (this.rightWallMesh = new Mesh(rightWallGeo, this.wallMat));
-    rightWall.position.set(2.0, 1.25, -0.4);
+    rightWall.position.set(2.0, 1.25, ROOM_MID_Z);
     this.register(rightWallGeo);
 
-    // Back Wall (Z = +1.85m behind the player)
+    // Back Wall, behind the player, against the bed's headboard
     const backWallGeo = new PlaneGeometry(4.0, 2.5);
     backWallGeo.rotateY(Math.PI);
     const backWall = (this.backWallMesh = new Mesh(backWallGeo, this.wallMat));
-    backWall.position.set(0, 1.25, 1.85);
+    backWall.position.set(0, 1.25, ROOM_BACK_WALL_Z);
     this.register(backWallGeo);
 
     // Front Wall Backdrop (Positioned well behind stage at Z = -2.4m, renderOrder -10)

@@ -19,6 +19,7 @@ import { RoomDressingView } from './room-dressing-view';
 import { emptyRoomLayout, placement } from '../stage/room-layout';
 import { applyPlacement } from './room-placement';
 import { CANDLE_REACH_M, CandleLight } from './candle-light';
+import { ROOM_BACK_WALL_Z } from '../stage/stage-frame';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
 function recordingContext(): { g: CanvasRenderingContext2D; calls: () => number } {
@@ -109,15 +110,17 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('keeps the wall behind the stage clear: the pictures hang on the right wall and the shelf on the left, held off them, and their wonders wake there', () => {
+  it('keeps the wall behind the stage clear: the pictures hang on the right wall and the shelf on the back wall, held off them, and their wonders wake there', () => {
     const v = new RoomDressingView();
     v.place(0.75); // the wall at its nearest
     const at = (x: number) => v.group.children.filter((m) => Math.abs(m.position.x - x) < 1e-6);
     expect(at(1.995 - 0.03)).toHaveLength(2); // the two pictures, 3 cm off the right wall
-    expect(at(-1.995 + 0.1)).toHaveLength(1); // the shelf and its keepsakes, 10 cm off the left wall
-    for (const m of [...at(1.965), ...at(-1.895)]) expect(Math.abs(m.rotation.y)).toBeCloseTo(Math.PI / 2, 6);
+    for (const m of at(1.965)) expect(Math.abs(m.rotation.y)).toBeCloseTo(Math.PI / 2, 6);
+    const shelf = v.group.children.filter((m) => Math.abs(m.position.z - (ROOM_BACK_WALL_Z - 0.105)) < 1e-6);
+    expect(shelf).toHaveLength(1); // the shelf and its keepsakes, 10 cm off the back wall, facing into the room
+    expect(Math.abs(shelf[0].rotation.y)).toBeCloseTo(Math.PI, 6);
     const p = new Vector3();
-    expect(v.wakePoint(0, p).x).toBeLessThan(-1.8); // the lamp on the shelf
+    expect(v.wakePoint(0, p).z).toBeGreaterThan(ROOM_BACK_WALL_Z - 0.2); // the lamp on the shelf
     expect(v.wakePoint(2, p).x).toBeGreaterThan(1.8); // the moon picture
     v.dispose();
   });

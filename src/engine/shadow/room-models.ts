@@ -14,6 +14,7 @@ import type { Material, Object3D } from '@iwsdk/core';
 import type { CandleLight } from './candle-light';
 import { toRoomLook } from './room-look';
 import { placement, placementOr, type Placement, type RoomLayout } from '../stage/room-layout';
+import { ROOM_BACK_WALL_Z } from '../stage/stage-frame';
 import { applyPlacement, type EditablePiece, type EditableSource } from './room-placement';
 
 /** A painted piece of RoomDressingView that a model can take the place of. */
@@ -44,8 +45,8 @@ export interface RoomPiece {
 }
 
 /**
- * The furniture, by the room's layout (the player sits at the origin looking down -z; the walls are at x = ±2, and the wall
- * the shadows play on is at least 1.52 m ahead, so nothing stands beyond z = -1.5; the window is on the left wall, z -1.35..-0.25).
+ * The furniture, by the room's layout (the player sits at the origin looking down -z; the walls are at x = ±2, the back wall
+ * at ROOM_BACK_WALL_Z just behind the bed's head, and the wall the shadows play on is at least 1.52 m ahead, so nothing stands beyond z = -1.5; the window is on the left wall, z -1.35..-0.25).
  * Heights noted below follow from each Kenney model's proportions at its size, so a piece standing on another uses that height.
  */
 export const ROOM_PIECES: readonly RoomPiece[] = [
@@ -62,13 +63,14 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     // to the bed's foot; the sheet shows behind them, where they lay.
     hide: ['cover'],
   },
-  // The bookcase on the right wall past the bed's foot, its open side to the room: 0.6 m wide, 1.32 m high.
+  // The bookcase against the back wall in the right corner, beside the bed's head, its open side to the room: 0.6 m wide,
+  // 1.32 m high.
   {
     id: 'bookcase',
     ids: ['bookcaseopen', 'bookcase-open', 'bookcaseclosedwide', 'bookcaseclosed'],
-    at: [1.8, 0, 0.55],
+    at: [1.6, 0, ROOM_BACK_WALL_Z - 0.2],
     size: [0.6, 0.38],
-    yaw: -Math.PI / 2,
+    yaw: Math.PI,
     replaces: 'bookcase',
   },
   // (Nothing stands along the wall ahead: the whole of it is kept clear for the shadows.)

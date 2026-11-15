@@ -28,6 +28,17 @@ export const WALL_CENTRE_BELOW_EYES_M = 0.2;
  */
 export const ROOM_WALL_BEHIND_STAGE_M = 0.02;
 /**
+ * Where the room's back wall stands (z, metres; the player sits at the origin looking down -z): just behind the bed's headboard
+ * (room-models.ts: the bed ends at z 0.5), so the bed stands against it, as a real one would.
+ */
+export const ROOM_BACK_WALL_Z = 0.52;
+/** Where the room's floor, ceiling and side walls end ahead (z, metres): past the front wall wherever the stage puts it. */
+export const ROOM_FRONT_END_Z = -2.9;
+/** The room's depth along z, from its front end to the back wall, metres. */
+export const ROOM_DEPTH_M = ROOM_BACK_WALL_Z - ROOM_FRONT_END_Z;
+/** The z of the middle of the room's depth, metres: where the floor, ceiling and side walls are centred. */
+export const ROOM_MID_Z = (ROOM_BACK_WALL_Z + ROOM_FRONT_END_Z) / 2;
+/**
  * How much bigger the story is drawn than the stage: the memories, the friend's hand and the story's words are written for the
  * 1.6 by 1 m stage and drawn 2.375 times that (3.8 by 2.375 m), 95% of the room's 4 by 2.5 m wall each way. The hands' shadows keep the stage.
  */
