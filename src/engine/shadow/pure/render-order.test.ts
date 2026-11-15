@@ -14,7 +14,7 @@ describe('the render order', () => {
     expect(RenderOrder.shadow).toBeLessThan(RenderOrder.sprite);
     expect(RenderOrder.sprite).toBeLessThan(RenderOrder.trail);
     expect(RenderOrder.trail).toBeLessThan(RenderOrder.ring);
-    expect(RenderOrder.fade).toBeGreaterThan(RenderOrder.wonder);
+    expect(RenderOrder.fade).toBeGreaterThan(RenderOrder.ghost);
   });
 
   it('says which layers may be switched off (the decoration), and never the paper, the shadows or the sprites', () => {

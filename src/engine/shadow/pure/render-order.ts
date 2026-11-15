@@ -34,8 +34,6 @@ export const RenderOrder = {
   trail: 4,
   /** The ring of light when a shape is recognised. */
   ring: 5,
-  /** The room's wonders (lamp, bunting, pictures, globe, window). */
-  wonder: 6,
   /**
    * The ghost hand that comes down over the candle at the end (sleep-hint.ts). It writes depth for itself only (so it reads as
    * one soft shape, not overlapping capsules), so it draws after everything it could be seen against.

@@ -91,7 +91,7 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `pottedPlant.glb` | A small potted plant on the nightstand | Final |
 | `glassJar.glb` | The jar she gave him, lid on, on top of the bookcase (piece `jar`): half seen in scene 1, the last of the candle finds it in scene 7 | Final: "Glass Jar" by Jarlan Perez (CC BY 3.0) |
 | `flashlight.glb` | Her torch from the night they met, lying beside the jar (piece `torch`) | Final: "Time Hotel 7.07" by S. Paul Michael (CC BY 3.0), body recoloured from black to faded red so it shows in the dark |
-| `cardboardBoxStack.glb` | A stack of taped moving boxes in the front right corner, by the pictures (piece `boxes`): he has just moved in | Final: Quaternius (CC0) |
+| `cardboardBoxStack.glb` | A stack of taped moving boxes in the front right corner (piece `boxes`): he has just moved in | Final: Quaternius (CC0) |
 | `cardboardBoxOpen.glb` | An open box, half unpacked, just inside the door, left of the bed's head (piece `box-open`) | Final: Kenney (CC0) |
 | `cardboardBoxFlat.glb` | A flat box beside it, under the folded blankets (piece `box-flat`) | Final: Quaternius (CC0) |
 | `blanketsFolded.glb` | Folded blankets on the flat box (piece `blankets`), a nod to the blanket fort | Final: "Blankets" by Poly by Google (CC BY 3.0). 19k triangles, the heaviest model; simplify if the frame budget needs it |
@@ -103,10 +103,10 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `curtains.glb` | Curtains either side of the window, down to just over the desk (piece `curtains`) | Final: "Curtains Double" by Quaternius (CC0) |
 | `closet.glb` | A small wardrobe in the back left corner (piece `closet`) | Final: "Closet" by Quaternius (CC0) |
 | `door.glb` | The room's door, on the back wall left of the bed's head (piece `door`); the moving boxes stand just inside it | Final: "Door" by Quaternius (CC0) |
-| `nightstand.glb` | The nightstand right of the bed's head, the plant on it (piece `nightstand`); the painted shelf moved above it to make room for the door | Final: "Night Stand" by Quaternius (CC0) |
+| `nightstand.glb` | The nightstand right of the bed's head, the plant on it (piece `nightstand`) | Final: "Night Stand" by Quaternius (CC0) |
 | `slippers.glb` | His slippers on the rug beside the bed (piece `slippers`) | Final: "Slippers" by J-Toastie (CC BY 3.0) |
 | `backpack.glb` | His schoolbag, dropped between the nightstand and the bookcase (piece `bag`) | Final: "Backpack" by Quaternius (CC0) |
-| `coatRack.glb` | A coat stand against the right wall, under the hill picture (piece `coat-stand`) | Final: "Coat Rack Standing" by Kenney (CC0) |
+| `coatRack.glb` | A coat stand against the right wall (piece `coat-stand`) | Final: "Coat Rack Standing" by Kenney (CC0) |
 | `ceilingLight.glb` | The ceiling light, unlit, over the middle of the room (piece `ceiling-light`) | Final: "Light Ceiling" by Quaternius (CC0) |
 | `hands/glove-left.glb`, `hands/glove-right.glb` | Glove hands (setting) | Final |
 | `hands/cartoon-glove-left.glb`, `hands/cartoon-glove-right.glb` | Cartoon glove hands (setting) | Final |
@@ -122,9 +122,31 @@ Kept to dress the room with the room editor: the bear can stand in for a stuffed
 | `sideTable.glb` | Bedside table | Unused |
 | `lampRoundTable.glb` | Small table lamp | Unused |
 
-### Drawn in code (no file)
+### Removed from the room: replace with models
 
-The bed tray, the quilt on his lap, the candle and its flame, the walls, the window with the rain, the shelf, the windowsill, the two pictures (`picture-hill`, `picture-moon`), the moonlight patch on the floor, the tin can, and all of the puppets and scenery on the wall (`src/engine/shadow`, `src/engine/render`, `src/engine/stage/puppet`). The shelf's "wonders" glows are left over from the puzzle game.
+On 15 Nov 2026 the room's props that were drawn in code were taken out, because the room looked cluttered and they did not match the low-poly models around them. Git history has them (`room-art.ts`, `room-dressing-view.ts`, `bedroom-view.ts`). Bring back only the ones the room needs, as `.glb` files, one at a time, and look at the room in the headset after each. A model goes in as a `RoomPiece` in `room-models.ts` or is placed with the room editor.
+
+| What was there | Where it was | Replace with | Status |
+|---|---|---|---|
+| Two framed pictures: a bird and the moon, and a hill under stars (pieces `picture-moon`, `picture-hill`) | Right wall, over the bed and the bed's foot | One or two picture-frame models, or a frame with a small image texture. A hill of stars echoes scene 6 | Needed (optional) |
+| A wall shelf of books, a toy boat and a small lamp (piece `shelf`) | Back wall, above the nightstand, right of the bed's head | A wall-shelf model; `books.glb` and `lampRoundTable.glb` (in the repo, unused) could stand on it | Needed (optional) |
+| Things on the windowsill: a potted fern, a paper bird on two books, an unlit candle stub (piece `sill`) | The window's sill, left wall | Probably not needed: the desk with its pencils and globe is under the window now | Needed (optional) |
+| A tin can with a wooden spoon in it (piece `tin-can`) | On the floor by the bed | Nothing: a leftover from the old winter-cottage room | Not needed |
+| A painted bed, bookcase and rug, shown only until their models loaded | Where `bedSingle.glb`, `bookcaseOpen.glb` and `rugRound.glb` stand | Nothing: the models are the bed, bookcase and rug | Not needed |
+| Five "wonder" glows (the shelf's lamp, the pictures, the bookcase, the window) | Over those props | Nothing: left over from the puzzle game, never lit | Not needed |
+
+### Still drawn in code
+
+These stay because the room or the story stops working without them. Each could be swapped for a model or texture later, but none has to be.
+
+| What | Code | Why it stays | Status |
+|---|---|---|---|
+| The candle, its flame, and the tray it stands on | `src/engine/render/candle-view.ts`, `src/engine/render/room/bed-tray-view.ts` | The candle is the game's one light: it is lit, covered and smothered by the hands, so it is drawn and animated in code | Placeholder: a candle-and-tray model would need to keep the flame in code |
+| The quilt on his lap (`paintQuilt`) | `bed-tray-view.ts`, `room-art.ts` | It covers the bed model's own cover (hidden): he has just sat up | Placeholder: a rumpled-quilt model could replace it |
+| The walls (plaster and panelling), floor, ceiling and rafters | `room-art.ts` (`paintWall`), `bedroom-view.ts` | The room's shell; the wall ahead is the stage | Placeholder: ambientCG or Poly Haven textures (plaster, wood planks) would replace the painted ones |
+| The window: frame, the night outside in four sliding layers, the curtains inside it, two layers of rain, and the lightning flashes | `room-dressing-view.ts`, `room-art.ts` (`paintNight`, `paintRain`), `bedroom-view.ts` | The storm wakes him in scene 1; the rain and flashes play all night | Placeholder: a window-frame model; keep the outside and the rain in code |
+| The moonlight's patch on the floor (piece `moon-patch`) | `room-art.ts` (`paintMoonPatch`) | The window's light; it brightens with each flash | Placeholder (it is light, not a prop) |
+| The puppets and scenery on the wall | `src/engine/shadow/puppet-art.ts` | See below | Final (they are the game's art) |
 
 The puppets' cut-outs are painted by `src/engine/shadow/puppet-art.ts` (`PUPPET_ART`): the kids (`kid`, `kid-head`, `kid-torso`, `girl-head`, `girl-torso`, `ponytail`, `arm`, `leg`), the friend's hands (`friend-rabbit`, `friend-ear`, `friend-fox`, `friend-cup`, `friend-palm`, `friend-arm`, `side-hand`), the animals (`rabbit`, `fox`, `lump`), the places (`fort`, `blanket`, `window`, `pane`, `box`, `leafy-tree`, `autumn-tree`, `leaf`, `grass`, `hill`, `school-gate`), the lights (`torch`, `beam`, `orb`, `jar`, and `door-light`, the line of light from a door ajar in scene 2's hush, added 15 Nov), and the old prologue's `castle`, `hills`, `tree`, `cloak`, `hood`, `staff` and `lantern` (used only by the old `src/engine/stage/puppet/prologue-scene.ts`, which nothing plays; drop with it). All are made in code and owe nothing to anyone.
 
@@ -151,7 +173,7 @@ Keep everything off the wall ahead and out of the space between the candle and t
 | Curtains for the window, partly open | Done 15 Nov: `curtains.glb` |
 | The room's door, with coat hooks and a school bag | Done 15 Nov: `door.glb`, `coatRack.glb` (a standing coat rack, by the bookcase, not by the door: no room there), `backpack.glb` |
 | Slippers by the bed | Done 15 Nov: `slippers.glb` |
-| Crayon drawings on a side wall | Needed (could be drawn in code) |
+| Crayon drawings on a side wall | Needed (a framed picture model with a drawing as its texture) |
 | String lights (unlit) | Needed |
 | Ceiling lamp (off) | Done 15 Nov: `ceilingLight.glb` |
 

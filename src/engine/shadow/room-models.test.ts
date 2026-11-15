@@ -5,20 +5,14 @@ import { readBedroomLayout } from './bedroom-layout';
 import { defaultPlacement, ROOM_PIECES, RoomModels } from './room-models';
 
 describe('RoomModels', () => {
-  it('places nothing and hides no painted piece when no model file is there', async () => {
-    const hidden: string[] = [];
-    const models = new RoomModels(
-      () => false,
-      (part) => void hidden.push(part),
-    );
+  it('places nothing when no model file is there', async () => {
+    const models = new RoomModels(() => false);
     const candle = new CandleLight();
     expect(await models.load(candle)).toBe(0);
     expect(models.group.children).toHaveLength(0);
-    expect(hidden).toEqual([]);
     candle.dispose();
   });
-  it('lists the bed, the bookcase and the rug as replacing their painted stand-ins, with asset ids as the manifest names them', () => {
-    expect(ROOM_PIECES.filter((p) => p.replaces).map((p) => p.replaces)).toEqual(['bed', 'bookcase', 'rug']);
+  it('names every asset id as the manifest does', () => {
     for (const p of ROOM_PIECES) for (const id of p.ids) expect(id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
   });
   it('gives every piece a layout id, and keeps every default inside the room, short of the nearest the wall ahead can come', () => {

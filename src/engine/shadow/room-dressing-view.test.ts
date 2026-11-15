@@ -1,25 +1,10 @@
 import { FrontSide, Mesh, MeshBasicMaterial, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
-import {
-  castShadow,
-  paintBookcase,
-  paintMoonPatch,
-  paintNight,
-  paintQuilt,
-  paintRug,
-  paintSill,
-  paintRain,
-  paintWall,
-  paintWallThings,
-  paintWood,
-} from './room-art';
-import { RenderOrder } from './pure/render-order';
+import { castShadow, paintMoonPatch, paintNight, paintQuilt, paintRain, paintWall } from './room-art';
 import { RoomDressingView } from './room-dressing-view';
 import { emptyRoomLayout, placement } from '../stage/room-layout';
-import { applyPlacement } from './room-placement';
 import { CANDLE_REACH_M, CandleLight } from './candle-light';
-import { ROOM_BACK_WALL_Z } from '../stage/stage-frame';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
 function recordingContext(): { g: CanvasRenderingContext2D; calls: () => number } {
@@ -47,20 +32,14 @@ describe('room art painters', () => {
   it.each([
     ['wall', (g: CanvasRenderingContext2D) => paintWall(g, 1024, 640), 60],
     ['side wall', (g: CanvasRenderingContext2D) => paintWall(g, 1280, 640), 60],
-    ['wall pictures', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'pictures'), 40],
-    ['wall shelves', (g: CanvasRenderingContext2D) => paintWallThings(g, 1024, 320, 'shelves'), 40],
-    ['wood', (g: CanvasRenderingContext2D) => paintWood(g, 128, 128), 20],
     ['night sky', (g: CanvasRenderingContext2D) => paintNight(g, 400, 460, 'sky'), 50],
     ['night hills', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'hills'), 30],
     ['night village', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'village'), 30],
     ['night near ground', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'near'), 20],
     ['night curtains', (g: CanvasRenderingContext2D) => paintNight(g, 440, 520, 'curtains'), 20],
-    ['bookcase', (g: CanvasRenderingContext2D) => paintBookcase(g, 400, 720), 100],
     ['quilt', (g: CanvasRenderingContext2D) => paintQuilt(g, 256, 256), 100],
-    ['rug', (g: CanvasRenderingContext2D) => paintRug(g, 512, 360), 100],
     ['rain', (g: CanvasRenderingContext2D) => paintRain(g, 256, 256, 3, 38, 46), 30],
     ['moon patch', (g: CanvasRenderingContext2D) => paintMoonPatch(g, 256, 256), 30],
-    ['sill', (g: CanvasRenderingContext2D) => paintSill(g, 300, 180), 60],
   ])('paints the %s without throwing, and draws a fair amount', (_name, paint, min) => {
     const { g, calls } = recordingContext();
     expect(() => paint(g)).not.toThrow();
@@ -78,9 +57,9 @@ describe('room art painters', () => {
 });
 
 describe('RoomDressingView', () => {
-  it('has the wall, two side walls, the back wall, the four outside layers of the window and curtains with two layers of rain, the sill, the moon patch, the bookcase front and box, the rug, and the two pictures and the shelf on the side walls', () => {
+  it('has the wall, two side walls, the back wall, the four outside layers of the window and curtains with two layers of rain, and the moon patch, and nothing else (the furniture is models)', () => {
     const v = new RoomDressingView();
-    expect(v.group.children).toHaveLength(24); // (no bunting since 13 Nov; the back wall since 13 Nov)
+    expect(v.group.children).toHaveLength(12);
     v.dispose();
   });
 
@@ -110,21 +89,6 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('keeps the wall behind the stage clear: the pictures hang on the right wall and the shelf on the back wall, held off them, and their wonders wake there', () => {
-    const v = new RoomDressingView();
-    v.place(0.75); // the wall at its nearest
-    const at = (x: number) => v.group.children.filter((m) => Math.abs(m.position.x - x) < 1e-6);
-    expect(at(1.995 - 0.03)).toHaveLength(2); // the two pictures, 3 cm off the right wall
-    for (const m of at(1.965)) expect(Math.abs(m.rotation.y)).toBeCloseTo(Math.PI / 2, 6);
-    const shelf = v.group.children.filter((m) => Math.abs(m.position.z - (ROOM_BACK_WALL_Z - 0.105)) < 1e-6);
-    expect(shelf).toHaveLength(1); // the shelf and its keepsakes, 10 cm off the back wall, facing into the room
-    expect(Math.abs(shelf[0].rotation.y)).toBeCloseTo(Math.PI, 6);
-    const p = new Vector3();
-    expect(v.wakePoint(0, p).z).toBeGreaterThan(ROOM_BACK_WALL_Z - 0.2); // the lamp on the shelf
-    expect(v.wakePoint(2, p).x).toBeGreaterThan(1.8); // the moon picture
-    v.dispose();
-  });
-
   it('has one lighting model: the art keeps its own colour, and the candle light glows as it is lit, then burns', () => {
     const v = new RoomDressingView();
     const candle = new CandleLight();
@@ -150,7 +114,7 @@ describe('RoomDressingView', () => {
     candle.dispose();
     v.dispose();
   });
-  it('lights the room with the candle as a light: on where the flame is, off with it out, and its art and props registered', () => {
+  it('lights the room with the candle as a light: on where the flame is, off with it out, and its walls registered', () => {
     const v = new RoomDressingView();
     const candle = new CandleLight();
     const lit: unknown[] = [];
@@ -159,7 +123,7 @@ describe('RoomDressingView', () => {
     candle.cast = (m) => void cast.push(m);
     v.useCandleLight(candle);
     expect(lit).toContain(v.wall.material);
-    expect(cast.length).toBeGreaterThanOrEqual(8); // the pictures and shelves, the bookcase and the bed's four parts
+    expect(cast).toEqual([]); // nothing painted stands in the light: the models cast the shadows
     v.update(light(true, 1), 1, [0, 1.2, -1.9]);
     expect(candle.uniforms.uCandleIntensity.value).toBeGreaterThan(0.5);
     expect(candle.uniforms.uCandlePos.value.z).toBeCloseTo(-1.9, 5);
@@ -227,43 +191,10 @@ describe('RoomDressingView', () => {
     candle.dispose();
     v.dispose();
   });
-  it('lights the wonders of the room one by one as the night goes, and puts them out again on a restart', () => {
-    const v = new RoomDressingView();
-    const glow = () => {
-      const mesh = v.group.children.find(
-        (c) =>
-          c.renderOrder === RenderOrder.wonder &&
-          (c as unknown as { geometry: { attributes: { color?: unknown } } }).geometry.attributes.color,
-      ) as unknown as {
-        geometry: { attributes: { color: { array: Float32Array } } };
-      };
-      return Array.from(mesh.geometry.attributes.color.array).reduce((a, b) => a + b, 0);
-    };
-    v.update(light(true, 1), 1, [0, 1.2, -1]);
-    v.tick(0.1);
-    expect(glow()).toBe(0); // nothing is lit yet
-    v.setAwake(1);
-    for (let i = 0; i < 80; i++) v.tick(0.05);
-    const one = glow();
-    expect(one).toBeGreaterThan(0);
-    v.setAwake(3);
-    for (let i = 0; i < 80; i++) v.tick(0.05);
-    const three = glow();
-    expect(three).toBeGreaterThan(one * 1.5);
-    v.setAwake(99); // more than there are: all of them
-    for (let i = 0; i < 200; i++) v.tick(0.05);
-    expect(glow()).toBeGreaterThan(three);
-    v.setAwake(0);
-    for (let i = 0; i < 200; i++) v.tick(0.05);
-    expect(glow()).toBeCloseTo(0, 5);
-    v.setAwake(NaN);
-    v.dispose();
-  });
-
   it('keeps the window and the moonlight on the floor as they are whatever the candle does', () => {
     const v = new RoomDressingView();
     const meshes = v.group.children as unknown as { material: { color: { r: number; g: number; b: number } } }[];
-    const night = meshes[3].material.color;
+    const night = meshes[4].material.color;
     const patch = meshes[11].material.color;
     v.update(light(false), 1);
     const nightDark = { ...night };
@@ -336,25 +267,15 @@ describe('RoomDressingView', () => {
 });
 
 describe('RoomDressingView and the room layout', () => {
-  it('puts the pictures, the shelf, the sill and the moonlight where the layout says, and keeps the children in order', () => {
+  it('puts the moonlight where the layout says, and keeps the children in order', () => {
     const layout = emptyRoomLayout();
-    layout.room['picture-moon'] = placement([1.965, 1.2, -0.9], [0, -90, 0]);
+    layout.room['moon-patch'] = placement([-0.8, 0.008, -0.6], [-90, 0, 0]);
     const v = new RoomDressingView(layout);
-    expect(v.editables().map((p) => p.id)).toEqual(['picture-moon', 'picture-hill', 'shelf', 'sill', 'moon-patch']);
-    const moon = v.editables()[0];
-    expect(moon.object.name).toBe('picture-moon');
-    expect(moon.object.position.y).toBeCloseTo(1.2, 6);
-    expect(moon.fallback.pos).toEqual([1.965, 1.45, -1.05]);
+    expect(v.editables().map((p) => p.id)).toEqual(['moon-patch']);
+    const patch = v.editables()[0];
+    expect(patch.object.name).toBe('moon-patch');
+    expect(patch.object.position.x).toBeCloseTo(-0.8, 6);
+    expect(patch.fallback.pos).toEqual([-0.95, 0.008, -0.8]);
     expect(v.group.children).toHaveLength(new RoomDressingView().group.children.length);
-  });
-
-  it('moves a glow with the piece it is on', () => {
-    const at = new Vector3();
-    const v = new RoomDressingView();
-    const before = v.wakePoint(2, at).clone();
-    const moon = v.editables()[0];
-    applyPlacement(moon.object, placement([1.965, 1.45, -0.75], [0, -90, 0]));
-    v.moved();
-    expect(v.wakePoint(2, at).z - before.z).toBeCloseTo(0.3, 6);
   });
 });

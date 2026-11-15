@@ -1,13 +1,12 @@
 // Child's bedroom background environment in seated VR: a cold winter room with wooden
-// rafters overhead, timber floorboards below, moonlit window to the left, straw pallet bed
-// and tin can on the right, and rustic timber wall framing wrapping around the stage.
+// rafters overhead, timber floorboards below, a moonlit window to the left, and plain walls wrapping around the stage.
+// The furniture is models (room-models.ts).
 //
 // Zero per-frame allocations. All Three.js imports from @iwsdk/core.
 import {
   BoxGeometry,
   CanvasTexture,
   Color,
-  CylinderGeometry,
   DirectionalLight,
   DoubleSide,
   Group,
@@ -29,7 +28,7 @@ import { placement, placementOr, type RoomLayout } from '../../stage/room-layout
 import { applyPlacement, type EditablePiece, type EditableSource } from '../../shadow/room-placement';
 
 /** The bedroom view's pieces the room layout file places (`room` section). */
-export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['tin-can', 'player'];
+export const BEDROOM_VIEW_PIECE_IDS: readonly string[] = ['player'];
 
 /**
  * How far the player's spot may be from the room's middle (m): on x, inside the side walls; on z, from where the front wall
@@ -97,8 +96,6 @@ export class BedroomView implements EditableSource {
   readonly floorMesh: Mesh;
   readonly ceilingMesh: Mesh;
   readonly windowGroup = new Group();
-  readonly strawPalletGroup = new Group();
-  readonly tinCanGroup = new Group();
   /**
    * Where the player sits, in room space (the `player` piece): the room is placed so this spot is under the head. Only its x and
    * z count (the eyes' height is the headset's, and the player always faces the wall ahead). The room editor hangs its headset
@@ -126,7 +123,7 @@ export class BedroomView implements EditableSource {
   private readonly pieces: EditablePiece[] = [];
   private candle: CandleLight | null = null;
 
-  /** @param layout where the tin can stands (the room layout file); its default where it says nothing */
+  /** @param layout where the player sits (the room layout file); its default where it says nothing */
   constructor(layout: Readonly<RoomLayout> | null = null) {
     // -------------------------------------------------------------
     // 1. Floor with Baked Plank Seams (Zero Z-Fighting, No Flickering)
@@ -250,61 +247,13 @@ export class BedroomView implements EditableSource {
 
     this.windowGroup.add(frame, skyMesh, moonWash);
 
-    // -------------------------------------------------------------
-    // 5. Straw Pallet (Bed) on Floor Against Right Wall (X = 1.4m)
-    // -------------------------------------------------------------
-    const palletGeo = new BoxGeometry(0.85, 0.14, 1.65);
-    const palletMat = new MeshBasicMaterial({ color: 0x423522 });
-    const palletMesh = new Mesh(palletGeo, palletMat);
-    palletMesh.position.set(1.4, 0.07, -0.8);
-    this.register(palletGeo, palletMat);
-
-    // Folded quilt blanket on the straw bed
-    const foldedBlanketGeo = new BoxGeometry(0.82, 0.04, 1.15);
-    const foldedBlanketMat = new MeshBasicMaterial({ color: 0x2b3442 });
-    const foldedBlanket = new Mesh(foldedBlanketGeo, foldedBlanketMat);
-    foldedBlanket.position.set(1.4, 0.15, -0.65);
-    this.register(foldedBlanketGeo, foldedBlanketMat);
-
-    // Crude burlap pillow
-    const pillowGeo = new BoxGeometry(0.65, 0.09, 0.35);
-    const pillowMat = new MeshBasicMaterial({ color: 0x4f422e });
-    const pillow = new Mesh(pillowGeo, pillowMat);
-    pillow.position.set(1.4, 0.16, -1.35);
-    this.register(pillowGeo, pillowMat);
-
-    this.strawPalletGroup.add(palletMesh, foldedBlanket, pillow);
-
-    // -------------------------------------------------------------
-    // 6. Reused Tin Can & Wooden Spoon on Floor Near Bed
-    // -------------------------------------------------------------
-    const canGeo = new CylinderGeometry(0.045, 0.045, 0.075, 10, 1, true);
-    const canMat = new MeshBasicMaterial({ color: 0x5a5d62 });
-    const canMesh = new Mesh(canGeo, canMat);
-    canMesh.position.set(0, 0.038, 0);
-    this.register(canGeo, canMat);
-
-    // Whittled wooden spoon tilted in can
-    const spoonGeo = new BoxGeometry(0.016, 0.12, 0.008);
-    spoonGeo.rotateZ(0.35);
-    const spoonMat = new MeshBasicMaterial({ color: 0x6e5238 });
-    const spoonMesh = new Mesh(spoonGeo, spoonMat);
-    spoonMesh.position.set(0.01, 0.07, 0);
-    this.register(spoonGeo, spoonMat);
-
-    this.tinCanGroup.add(canMesh, spoonMesh);
-    this.tinCanGroup.name = 'tin-can';
-    const canDefault = placement([0.95, 0, -0.4]);
-    applyPlacement(this.tinCanGroup, placementOr(layout, 'room', 'tin-can', canDefault));
-    this.pieces.push({ id: 'tin-can', section: 'room', object: this.tinCanGroup, fallback: canDefault });
-
     this.playerSpot.name = 'player';
     const playerDefault = placement([0, 0, 0]);
     applyPlacement(this.playerSpot, placementOr(layout, 'room', 'player', playerDefault));
     this.pieces.push({ id: 'player', section: 'room', object: this.playerSpot, fallback: playerDefault });
 
     // -------------------------------------------------------------
-    // 7. Directional Moonlight (Entering through the Left Window)
+    // 5. Directional Moonlight (Entering through the Left Window)
     // -------------------------------------------------------------
     this.moonlight = new DirectionalLight(MOONLIGHT_COLOR, 0.05);
     this.moonlight.position.set(-2.4, 2.2, -0.8);
@@ -319,15 +268,13 @@ export class BedroomView implements EditableSource {
       backWall,
       this.frontWallMesh,
       this.windowGroup,
-      this.strawPalletGroup,
-      this.tinCanGroup,
       this.playerSpot,
       this.moonlight,
       this.moonlight.target,
     );
   }
 
-  /** The tin can and the player's spot, for the room editor. */
+  /** The player's spot, for the room editor. */
   editables(): readonly EditablePiece[] {
     return this.pieces;
   }

@@ -1,8 +1,6 @@
 // Real 3D furniture and keepsakes for the bedroom (most from Kenney's Furniture Kit, CC0: https://kenney.nl/assets/furniture-kit;
-// the rest credited in CREDITS.md), in place of the
-// painted stand-ins where they exist (the bed, the bookcase, the rug) and as extra pieces round the room. Each piece is a .glb in
-// src/assets/models, loaded when the room is placed; a piece whose file is missing simply is not there (and its painted
-// stand-in stays), so the room never waits on, or breaks for, a model.
+// the rest credited in CREDITS.md). Each piece is a .glb in src/assets/models, loaded when the room is placed; a piece whose
+// file is missing simply is not there, so the room never waits on, or breaks for, a model.
 //
 // Every model's materials become the room's kind (MeshBasicMaterial, its own colour and texture), lit by the candle and the moon
 // (candle-light.ts), and every model casts the candle's shadows. Positions are in RoomDressingView's space (the room: x right,
@@ -17,9 +15,6 @@ import { toRoomLook } from './room-look';
 import { placement, placementOr, type Placement, type RoomLayout } from '../stage/room-layout';
 import { ROOM_BACK_WALL_Z } from '../stage/stage-frame';
 import { applyPlacement, type EditablePiece, type EditableSource } from './room-placement';
-
-/** A painted piece of RoomDressingView that a model can take the place of. */
-export type StandIn = 'bed' | 'bookcase' | 'rug';
 
 /** One piece of furniture: which file, where it stands, and the space it fills. */
 export interface RoomPiece {
@@ -39,8 +34,6 @@ export interface RoomPiece {
    * -π/2 faces -x (out from the right wall), π/2 faces +x (out from the left wall).
    */
   readonly yaw?: number;
-  /** The painted stand-in it replaces, hidden once the model is in (see RoomDressingView.hideStandIn). */
-  readonly replaces?: StandIn;
   /** Parts of the model (by node name) left out: something of the game's own is there instead. */
   readonly hide?: readonly string[];
 }
@@ -59,7 +52,6 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     at: [0, 0, -0.35],
     size: [0.9, 1.7],
     yaw: Math.PI,
-    replaces: 'bed',
     // Its neat cover: the player has just sat up in the bed, under the lap's own rumpled quilt (bed-tray-view.ts), which runs
     // to the bed's foot; the sheet shows behind them, where they lay.
     hide: ['cover'],
@@ -72,16 +64,14 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     at: [1.6, 0, ROOM_BACK_WALL_Z - 0.2],
     size: [0.6, 0.38],
     yaw: Math.PI,
-    replaces: 'bookcase',
   },
   // (Nothing stands along the wall ahead: the whole of it is kept clear for the shadows.)
-  // A round rug beside the bed, between it and the right wall, in place of the painted one (its top 4 mm above the floor).
+  // A round rug beside the bed, between it and the right wall (its top 4 mm above the floor).
   {
     id: 'rug',
     ids: ['ruground', 'rug-round', 'rugrounded'],
     at: [1.2, -0.012, -0.35],
     size: [1.2, 1.2],
-    replaces: 'rug',
   },
   // His desk under the window, against the left wall (1.2 m long, its top 0.61 m up), and its chair pulled up to it, its back
   // to the bed (0.98 m high). On the desk, a mug of pencils at the near-the-stage end and a globe at the other.
@@ -96,7 +86,7 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   { id: 'closet', ids: ['closet'], at: [-1.81, 0, 0.18], size: [0.64, 0.36], yaw: Math.PI / 2 },
   { id: 'door', ids: ['door'], at: [-1.06, 0, ROOM_BACK_WALL_Z - 0.1], size: [1.05, 0.2], yaw: Math.PI },
   // A nightstand by the bed's head on the right (0.37 m high) with a small plant on it, his slippers on the rug beside the bed,
-  // his schoolbag dropped by the bookcase, and a coat stand against the right wall under the hill picture (1.25 m high).
+  // his schoolbag dropped by the bookcase, and a coat stand against the right wall (1.25 m high).
   { id: 'nightstand', ids: ['nightstand'], at: [0.7, 0, 0.3], size: [0.42, 0.42], yaw: Math.PI },
   { id: 'plant', ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [0.7, 0.365, 0.3], size: [0.13, 0.14] },
   { id: 'slippers', ids: ['slippers'], at: [0.78, 0.004, -0.1], size: [0.24, 0.28], yaw: Math.PI / 2 },
@@ -137,12 +127,10 @@ export class RoomModels implements EditableSource {
 
   /**
    * @param has whether a model's asset id is in the manifest (a file in src/assets/models)
-   * @param hideStandIn hides the painted stand-in a model replaces
    * @param layout where the pieces stand (the room layout file); a piece it doesn't list stands at its default
    */
   constructor(
     private readonly has: (id: string) => boolean,
-    private readonly hideStandIn: (part: StandIn) => void,
     private readonly layout: Readonly<RoomLayout> | null = null,
   ) {}
 
@@ -169,7 +157,6 @@ export class RoomModels implements EditableSource {
           const gltf = AssetManager.getGLTF(id);
           if (!gltf) return;
           this.add(gltf.scene, piece, candle);
-          if (piece.replaces) this.hideStandIn(piece.replaces);
           placed++;
         } catch (e) {
           console.warn(`room model "${id}" did not load:`, e);

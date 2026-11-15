@@ -113,10 +113,10 @@ try {
   // --- export ---
   const exported = await w(async () => {
     const ed = window.__wsw.roomEditor;
-    ed.selectId('tin-can');
+    ed.selectId('moon-patch');
     return ed.exportSelected();
   });
-  check('exports a built piece', /Exported exported\/tin-can\.glb/.test(exported), exported);
+  check('exports a built piece', /Exported exported\/moon-patch\.glb/.test(exported), exported);
 
   // --- save and reload: the game loads the placed model through the asset manifest ---
   const saved = await w(() => window.__wsw.roomEditor.save());
@@ -134,7 +134,7 @@ try {
 } finally {
   writeFileSync(LAYOUT, layoutBefore);
   rmSync('src/assets/models/probe-tmp', { recursive: true, force: true });
-  rmSync('src/assets/models/exported/tin-can.glb', { force: true });
+  rmSync('src/assets/models/exported/moon-patch.glb', { force: true });
   try {
     rmdirSync('src/assets/models/exported');
   } catch {

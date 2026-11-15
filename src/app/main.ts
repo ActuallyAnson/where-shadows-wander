@@ -265,27 +265,19 @@ async function start(): Promise<void> {
   for (const p of bedroomLayout.problems) console.warn(`room layout: ${p}`);
   const bedTray = new BedTrayView(bedroomLayout.layout);
   const bedroomView = new BedroomView(bedroomLayout.layout);
-  // The room's painted art (wallpaper, shelves, the night in the window, a bookcase, a rug), over Damon's bare room.
+  // The room's painted art (wallpaper, the night and rain in the window, the moonlight on the floor), over Damon's bare room.
   const roomDressing = new RoomDressingView(bedroomLayout.layout);
   bedroomView.group.add(roomDressing.group);
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
-  bedroomView.strawPalletGroup.visible = false; // the dressing has a fuller bed in its place
   // The candle as a real light for the room: everything in it is lit per pixel by the flame, and the props cast baked shadows.
   const candleLight = new CandleLight();
   roomDressing.useCandleLight(candleLight);
   bedroomView.useCandleLight(candleLight);
   bedTray.useCandleLight(candleLight);
-  // Real furniture (Kenney's Furniture Kit, CC0) wherever its .glb is in src/assets/models; the painted pieces stay where one is not.
-  const roomModels = new RoomModels(
-    (id) => id in assetManifest,
-    (part) => roomDressing.hideStandIn(part),
-    bedroomLayout.layout,
-  );
+  // Real furniture (models credited in CREDITS.md) wherever its .glb is in src/assets/models.
+  const roomModels = new RoomModels((id) => id in assetManifest, bedroomLayout.layout);
   roomDressing.group.add(roomModels.group);
-  // The globe's glow on the bookcase follows the bookcase model wherever the layout puts it.
-  void roomModels.load(candleLight).then(() => {
-    for (const piece of roomModels.editables()) roomDressing.follow(piece);
-  });
+  void roomModels.load(candleLight);
   // Models placed with the room editor (layout entries that name a `model`), loaded through the asset manifest, in the
   // room or on the lap.
   const manifestModels: ModelLoader = async (id) => {

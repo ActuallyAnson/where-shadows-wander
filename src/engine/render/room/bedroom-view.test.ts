@@ -5,17 +5,15 @@ import { emptyRoomLayout, placement } from '../../stage/room-layout';
 import { BedroomView, MOONLIGHT_COLOR, PLAYER_SPOT_LIMITS } from './bedroom-view';
 
 describe('BedroomView', () => {
-  it('constructs room shell, props, and moonlight within budget', () => {
+  it('constructs room shell and moonlight within budget', () => {
     const room = new BedroomView();
 
-    // Group contains main shell, walls, window, pallet, tin can, and moonlight
-    expect(room.group.children.length).toBeGreaterThan(10);
+    // Group contains main shell, walls, window, the player's spot and moonlight
+    expect(room.group.children.length).toBeGreaterThan(8);
     expect(room.floorMesh).toBeDefined();
     expect(room.ceilingMesh).toBeDefined();
     expect(room.frontWallMesh).toBeDefined();
     expect(room.windowGroup.children.length).toBeGreaterThanOrEqual(3); // the merged frame, the sky, the moon wash
-    expect(room.strawPalletGroup.children.length).toBe(3);
-    expect(room.tinCanGroup.children.length).toBe(2);
 
     // Moonlight
     expect(room.moonlight.color.getHex()).toBe(MOONLIGHT_COLOR);
@@ -65,14 +63,8 @@ describe('BedroomView', () => {
     expect(() => room.dispose()).not.toThrow();
   });
 
-  it('stands the tin can where the room layout says (its default by the bed)', () => {
-    expect(new BedroomView().tinCanGroup.position.toArray()).toEqual([0.95, 0, -0.4]);
-    const layout = emptyRoomLayout();
-    layout.room['tin-can'] = placement([1.1, 0, 0.2], [0, 30, 0]);
-    const v = new BedroomView(layout);
-    expect(v.editables().map((p) => p.id)).toEqual(['tin-can', 'player']);
-    expect(v.tinCanGroup.position.toArray()).toEqual([1.1, 0, 0.2]);
-    expect(v.tinCanGroup.rotation.y).toBeCloseTo(Math.PI / 6, 6);
+  it("lists only the player's spot for the room editor", () => {
+    expect(new BedroomView().editables().map((p) => p.id)).toEqual(['player']);
   });
 
   it("stands the room so the player's spot is under the head, with the front wall the stage's distance ahead of it", () => {
@@ -99,8 +91,8 @@ describe('BedroomView', () => {
     const v = new BedroomView();
     let told = 0;
     v.onPlayerMoved = () => told++;
-    const [can, player] = v.editables();
-    v.moved(can);
+    const [player] = v.editables();
+    v.moved();
     v.moved(player);
     expect(told).toBe(1);
   });
