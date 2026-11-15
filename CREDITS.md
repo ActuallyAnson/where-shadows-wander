@@ -30,11 +30,17 @@ When a recording replaces a sound made in code, add a row for each file here: wh
 
 ## 3D models
 
-The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. All of them are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) except the gloves, which are [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and must keep their credit. The CC0 ones need no attribution, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSETS.md`).
+The bedroom's models are in `src/assets/models/` and are loaded by `src/engine/shadow/room-models.ts`. Most are [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); the gloves are [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and the jar, the torch, the fox and the blankets [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), and those must keep their credit. The CC0 ones need no attribution, but it is given here anyway. The raw downloads they were picked from are kept out of the repository (see `docs/ASSETS.md`).
 
 | Model | Made by | Source | Licence |
 |---|---|---|---|
 | `bedSingle.glb`, `bookcaseOpen.glb`, `books.glb`, `sideTable.glb`, `lampRoundTable.glb`, `rugRound.glb`, `bear.glb`, `chair.glb`, `pottedPlant.glb` (Furniture Kit 2.0) | Kenney | https://kenney.nl/assets/furniture-kit | CC0 1.0 |
+| `cardboardBoxOpen.glb` ("Cardboard Box Open"), the open box beside the bed's head | Kenney | https://poly.pizza/m/i1lr4yJFY0 | CC0 1.0 |
+| `cardboardBoxStack.glb` and `cardboardBoxFlat.glb` ("Cardboard Boxes"), the stack of moving boxes and the flat box under the blankets | Quaternius | https://poly.pizza/m/V9KbWC8Vd6 , https://poly.pizza/m/bs6ikOeTrR | CC0 1.0 |
+| `glassJar.glb` ("Glass Jar"), the jar she gave him, on the bookcase | Jarlan Perez, via Poly Pizza | https://poly.pizza/m/8dGz3QaoAG- | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `flashlight.glb` ("Time Hotel 7.07"), her torch, on the bookcase (changes: the body recoloured from black to a faded red) | S. Paul Michael, via Poly Pizza | https://poly.pizza/m/8EnRYLQkHLn | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `toyFox.glb` ("Fox"), the toy fox on the rug (changes: texture resized from 2048 px PNG to 512 px JPEG) | Poly by Google, via Poly Pizza | https://poly.pizza/m/10u8FYPC5Br | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `blanketsFolded.glb` ("Blankets"), the folded blankets on the flat box | Poly by Google, via Poly Pizza | https://poly.pizza/m/5CEwkJvkU9V | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `hands/glove-right.glb`, `hands/glove-left.glb` ("Welding Glove"; changes: rigged to the WebXR hand joints by `scripts/blender/rig-glove.py`, the left hand mirrored from the right, textures resized to 512 px WebP) | vr.district.0 | https://skfb.ly/oQvDI | CC BY 4.0 |
 | `hands/cartoon-glove-right.glb`, `hands/cartoon-glove-left.glb` ("Slap Battles Glove Rig"; changes: its own rig replaced by one on the WebXR hand joints by `scripts/blender/rig-glove.py --profile cartoon`, turned and scaled to metres, the left hand mirrored from the right) | senseiwords203 | https://skfb.ly/oBPuD | CC BY 4.0 |
 

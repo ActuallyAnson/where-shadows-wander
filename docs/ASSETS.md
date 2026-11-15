@@ -56,7 +56,7 @@ The music is one file, `src/assets/audio/music/music.ogg` (Sound `music` in `sou
 
 ## 3D models
 
-Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/room-models.ts` and the layout file `content/rooms/bedroom.json` (moved with the room editor).
+Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/room-models.ts` (`ROOM_PIECES`, each fitted to a footprint, so a model's own units do not matter) and the layout file `content/rooms/bedroom.json` (moved with the room editor).
 
 ### In the game
 
@@ -67,6 +67,13 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `rugRound.glb` | Round rug | Final |
 | `chair.glb` | Chair by the window | Final |
 | `pottedPlant.glb` | Potted plant | Final |
+| `glassJar.glb` | The jar she gave him, lid on, on top of the bookcase (piece `jar`): half seen in scene 1, the last of the candle finds it in scene 7 | Final: "Glass Jar" by Jarlan Perez (CC BY 3.0) |
+| `flashlight.glb` | Her torch from the night they met, lying beside the jar (piece `torch`) | Final: "Time Hotel 7.07" by S. Paul Michael (CC BY 3.0), body recoloured from black to faded red so it shows in the dark |
+| `cardboardBoxStack.glb` | A stack of taped moving boxes in the front right corner, by the pictures (piece `boxes`): he has just moved in | Final: Quaternius (CC0) |
+| `cardboardBoxOpen.glb` | An open box, half unpacked, beside the bed's head on the left (piece `box-open`) | Final: Kenney (CC0) |
+| `cardboardBoxFlat.glb` | A flat box beside it, under the folded blankets (piece `box-flat`) | Final: Quaternius (CC0) |
+| `blanketsFolded.glb` | Folded blankets on the flat box (piece `blankets`), a nod to the blanket fort | Final: "Blankets" by Poly by Google (CC BY 3.0). 19k triangles, the heaviest model; simplify if the frame budget needs it |
+| `toyFox.glb` | A toy fox on the rug by the boxes, looking at the bed (piece `fox`); her shape | Final: "Fox" by Poly by Google (CC BY 3.0). Texture cut from 2048 px PNG to 512 px JPEG (1 MB to 100 KB) |
 | `hands/glove-left.glb`, `hands/glove-right.glb` | Glove hands (setting) | Final |
 | `hands/cartoon-glove-left.glb`, `hands/cartoon-glove-right.glb` | Cartoon glove hands (setting) | Final |
 
@@ -91,11 +98,11 @@ The puppets' cut-outs are painted by `src/engine/shadow/puppet-art.ts` (`PUPPET_
 
 | Model | Why | Status |
 |---|---|---|
-| Glass jar (lid, maybe a string handle) | "The jar the friend gave him" on the shelf, seen in scene 1 and lit by the last of the candle in scene 7 | Needed |
-| Moving boxes, 2 or 3, one open and half unpacked | The prologue shows he has just moved in; the real room can echo it | Needed |
-| Torch / flashlight | Hers, from the night they met, kept on the shelf or nightstand | Needed |
-| Stuffed rabbit (or fox) | The first shapes are the rabbit and the fox | Needed |
-| A blanket over a chair | Echoes the blanket fort in scene 2 | Needed |
+| Glass jar (lid, maybe a string handle) | "The jar the friend gave him" on the shelf, seen in scene 1 and lit by the last of the candle in scene 7 | Done 15 Nov: `glassJar.glb`, on the bookcase |
+| Moving boxes, 2 or 3, one open and half unpacked | The prologue shows he has just moved in; the real room can echo it | Done 15 Nov: `cardboardBoxStack.glb`, `cardboardBoxOpen.glb`, `cardboardBoxFlat.glb` |
+| Torch / flashlight | Hers, from the night they met, kept on the shelf or nightstand | Done 15 Nov: `flashlight.glb`, on the bookcase |
+| Stuffed rabbit (or fox) | The first shapes are the rabbit and the fox | Done 15 Nov: `toyFox.glb` (a fox figure rather than a plush); a rabbit would pair with it |
+| A blanket over a chair | Echoes the blanket fort in scene 2 | Partly, 15 Nov: `blanketsFolded.glb`, folded on a box, not draped over the chair |
 
 ### Needed: a lived-in kid's bedroom
 

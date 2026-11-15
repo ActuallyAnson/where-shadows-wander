@@ -1,4 +1,5 @@
-// Real 3D furniture for the bedroom (Kenney's Furniture Kit, CC0: https://kenney.nl/assets/furniture-kit), in place of the
+// Real 3D furniture and keepsakes for the bedroom (most from Kenney's Furniture Kit, CC0: https://kenney.nl/assets/furniture-kit;
+// the rest credited in CREDITS.md), in place of the
 // painted stand-ins where they exist (the bed, the bookcase, the rug) and as extra pieces round the room. Each piece is a .glb in
 // src/assets/models, loaded when the room is placed; a piece whose file is missing simply is not there (and its painted
 // stand-in stays), so the room never waits on, or breaks for, a model.
@@ -85,6 +86,21 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   // A chair in front of the window, facing into the room, and a plant just this side of the window.
   { id: 'chair', ids: ['chair', 'chaircushion'], at: [-1.45, 0, -0.8], size: [0.4, 0.4], yaw: Math.PI / 2 },
   { id: 'plant', ids: ['pottedplant', 'potted-plant', 'plantsmall1'], at: [-1.75, 0, 0.05], size: [0.35, 0.4] },
+
+  // Her keepsakes, on top of the bookcase (1.32 m up), behind the player's right shoulder: half seen in the dark at first, and
+  // found by the last of the candle in scene 7 (docs/STORY.md). The jar she gave him on the firefly night (0.17 m tall, its lid
+  // on) and her torch from the night they met, lying on its side, its lens turned into the room.
+  { id: 'jar', ids: ['glassjar'], at: [1.5, 1.32, 0.3], size: [0.11, 0.11] },
+  { id: 'torch', ids: ['flashlight'], at: [1.72, 1.32, 0.28], size: [0.07, 0.2], yaw: -Math.PI / 2 + 0.3 },
+  // He has just moved in (the prologue's boxes): a stack of taped boxes in the corner ahead on the right (0.68 m high), by the
+  // pictures; behind his left shoulder, beside the bed's head, an open box half unpacked and a flat one with folded blankets on
+  // it (its top 0.235 m up, the blankets 0.11 m high).
+  { id: 'boxes', ids: ['cardboardboxstack'], at: [1.7, 0, -1.2], size: [0.55, 0.4], yaw: -Math.PI / 2 },
+  { id: 'box-open', ids: ['cardboardboxopen'], at: [-0.85, 0, 0.32], size: [0.42, 0.25], yaw: 0.25 },
+  { id: 'box-flat', ids: ['cardboardboxflat'], at: [-1.35, 0, 0.34], size: [0.45, 0.34], yaw: Math.PI },
+  { id: 'blankets', ids: ['blanketsfolded'], at: [-1.35, 0.235, 0.34], size: [0.4, 0.27], yaw: Math.PI + 0.1 },
+  // A toy fox (her shape, the second he learns) on the rug, by the boxes, looking at the bed (0.32 m nose to tail).
+  { id: 'fox', ids: ['toyfox'], at: [1.35, 0, -0.8], size: [0.1, 0.32], yaw: -1.07 },
 ];
 
 /** The furniture's ids, as the layout file's `room` section names them. */

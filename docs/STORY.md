@@ -84,7 +84,7 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 - **Must make the player feel:** lonely, then a little safer once the light is there.
 - **Built already:** the fade to black, the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
 - **Lighting it (`src/engine/stage/ignition.ts`):** the match's flame held within 15 cm of the wick for 3 s lights it. From 35 cm the wick answers the match: its glow brightens, grows and pulses faster, and the match's flame leans toward it and grows a little. If the match drifts off, the progress holds for 0.8 s and then drains slowly (about a third as fast as it fills), so a shaky hand doesn't have to start again.
-- **To build:** the jar on the shelf, unlit (a placed model in the room).
+- **Built (15 Nov):** the jar (`glassJar.glb`, piece `jar` in `room-models.ts`) stands unlit on top of the bookcase behind the player's right shoulder, her torch lying beside it; moving boxes, folded blankets and a toy fox dress the room.
 - **To try:** whether the friend in the dream reads as a friend and never as a figure to fear (keep it small, soft and brief); `__wsw.playWake()` replays it. A whispered "noo…" was tried in the dark and dropped (it read wrong); the timeline still has a slot for a word. Whether the dream's wave should match the friend's flat hand in scene 6 closely enough to be recognised.
 
 ### 2. How they met
@@ -220,3 +220,4 @@ So that every step leaves a game we could submit:
 - 15 Nov 2026: planned: the hush. In scene 2, footsteps come and the girl claps her hand over the torch until they pass, and the real candle dims with it, so the player learns that a hand over the light means everything waits (covering the candle pauses) without being made to pause. Scene 7's ghost hand covers the flame the same way, so the ending's gesture is one she taught him. A new thread, "A hand over the light".
 - 15 Nov 2026: the hush is built. Scene 2 is 8 s longer; the rabbit scampers off the torch for it and comes back. Scene 7's ghost hand claps down over the flame the way she covered the torch, and the room's light dips under it.
 - 15 Nov 2026: the music-box notes are gone. One music track ("I Got Lost" by Migfus20) plays from the candle's lighting to the end, instead of notes at moments in each scene; it goes out with the candle and returns under the credits.
+- 15 Nov 2026: the jar is in the room, on top of the bookcase with her torch beside it, and moving boxes, folded blankets and a toy fox fill out the room (real models). Scene 7 does not yet aim the last of the candle at the jar.
