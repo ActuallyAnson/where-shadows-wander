@@ -3,7 +3,7 @@ import { renderPlaceholder, THUNDER_S } from './placeholder-sounds';
 import { Sound, SOUND_COUNT, SOUND_DEFS, type SoundId } from './sounds';
 
 const SR = 48000;
-// The music has no placeholder (it waits for its file), so it is left out.
+// The music, the laugh and the yawn have no placeholder (each waits for its file), so they are left out.
 const all = Array.from({ length: SOUND_COUNT }, (_, i) => i as SoundId).filter((id) => !SOUND_DEFS[id].fileOnly);
 
 describe('renderPlaceholder', () => {
@@ -34,10 +34,10 @@ describe('renderPlaceholder', () => {
     expect(renderPlaceholder(Sound.Crackle, SR).length / SR).toBe(6);
   });
 
-  it('keeps every one-shot under two seconds (but the thunder, a long roll), and each loop at six seconds or less', () => {
+  it('keeps every one-shot under two seconds (but the thunders, long rolls), and each loop at six seconds or less', () => {
     for (let id = 0; id < SOUND_COUNT; id++) {
       const s = renderPlaceholder(id as SoundId, SR).length / SR;
-      if (id === Sound.Thunder) expect(s).toBe(THUNDER_S);
+      if (id === Sound.Thunder || id === Sound.Rumble) expect(s).toBe(THUNDER_S);
       else if (SOUND_DEFS[id].loop) expect(s).toBeLessThanOrEqual(6);
       else expect(s).toBeLessThan(2);
     }

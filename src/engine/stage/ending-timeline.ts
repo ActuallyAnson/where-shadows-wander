@@ -14,6 +14,8 @@ export interface EndingScript {
   readonly moonKeys: readonly WakeKey[];
   /** How open the eyes are (1 open .. 0 shut): heavy blinks, each slower, until they stay shut. */
   readonly lidKeys: readonly WakeKey[];
+  /** When he yawns, seconds: as his eyes come back open after the first heavy blink. */
+  readonly yawnAt: number;
   /** The rain's level (1 as it was .. 0 silent): it eases as he sleeps. */
   readonly rainKeys: readonly WakeKey[];
   /** The music's level (1 as it was .. 0 silent): out with the candle, back softly under the credits. */
@@ -56,6 +58,7 @@ export const ENDING_SCRIPT: EndingScript = {
     { t: 15.9, v: 0.35 },
     { t: 17.6, v: 0 }, // asleep
   ],
+  yawnAt: 10.2,
   rainKeys: [
     { t: 0, v: 1 },
     { t: 9, v: 0.45 },
@@ -87,6 +90,7 @@ export class EndingTimeline {
   private t = 0;
   private running = false;
   private outNow = false;
+  private yawnNow = false;
   private creditsNow = false;
   private doneNow = false;
 
@@ -96,13 +100,13 @@ export class EndingTimeline {
   start(): void {
     this.t = 0;
     this.running = true;
-    this.outNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
   }
 
   /** Stops it where it is (a jump back into the story, or the session ending). */
   stop(): void {
     this.running = false;
-    this.outNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
   }
 
   /** Whether it is playing (started and not yet over). */
@@ -116,12 +120,13 @@ export class EndingTimeline {
 
   /** Moves on by `dt` seconds. */
   update(dt: number): void {
-    this.outNow = this.creditsNow = this.doneNow = false;
+    this.outNow = this.yawnNow = this.creditsNow = this.doneNow = false;
     if (!this.running) return;
     const before = this.t;
     this.t += dt > 0 ? dt : 0;
     const s = this.script;
     if (before <= s.outAt && this.t > s.outAt) this.outNow = true;
+    if (before <= s.yawnAt && this.t > s.yawnAt) this.yawnNow = true;
     if (before <= s.creditsAt && this.t > s.creditsAt) this.creditsNow = true;
     if (this.t >= s.endAt) {
       this.t = s.endAt;
@@ -138,6 +143,11 @@ export class EndingTimeline {
   /** True on the one update the flame goes out. */
   get out(): boolean {
     return this.outNow;
+  }
+
+  /** True on the one update he yawns. */
+  get yawn(): boolean {
+    return this.yawnNow;
   }
 
   /** The moon's light now, as a multiple of its night level. */

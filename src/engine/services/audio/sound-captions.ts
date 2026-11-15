@@ -11,6 +11,10 @@ export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
   // Scene 2's hush: a grown-up's footsteps outside the fort.
   [Sound.Step0]: '[footsteps outside]',
   [Sound.Step1]: '[footsteps outside]',
+  [Sound.Laugh]: '[children laughing]',
+  [Sound.Click]: '[a torch clicks on]',
+  [Sound.Rumble]: '[distant thunder]',
+  [Sound.Yawn]: '[a sleepy yawn]',
 };
 
 /** The least time between two captions, seconds, so a run of footsteps does not flood the wall. */

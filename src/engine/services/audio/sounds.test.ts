@@ -43,7 +43,16 @@ describe('SOUND_DEFS', () => {
     expect(music.bus).toBe(Bus.Music);
     expect(music.flat).toBe(true);
     expect(music.fileOnly).toBe(true);
-    expect(SOUND_DEFS.filter((d) => d.flat || d.fileOnly).map((d) => d.name)).toEqual(['music']);
+    expect(SOUND_DEFS.filter((d) => d.flat).map((d) => d.name)).toEqual(['music']);
+  });
+
+  it('plays the voices (the laugh, the yawn) only from their files: made in code they would sound like a machine', () => {
+    expect(SOUND_DEFS.filter((d) => d.fileOnly).map((d) => d.name)).toEqual(['music', 'laugh', 'yawn']);
+  });
+
+  it('plays the far thunder in a memory softer than the room thunder, on ambience', () => {
+    expect(SOUND_DEFS[Sound.Rumble].bus).toBe(Bus.Ambience);
+    expect(SOUND_DEFS[Sound.Rumble].gain).toBeLessThan(SOUND_DEFS[Sound.Thunder].gain);
   });
 
   it('keeps the first sounds where they were: rustle and thump on effects, the crackle on ambience', () => {

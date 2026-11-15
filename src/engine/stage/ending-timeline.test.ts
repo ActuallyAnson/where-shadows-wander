@@ -13,6 +13,20 @@ describe('ENDING_SCRIPT', () => {
     }
   });
 
+  it('yawns once the candle is out, as the eyes come back open after the first heavy blink, before the credits', () => {
+    expect(S.yawnAt).toBeGreaterThan(S.outAt);
+    expect(S.yawnAt).toBeLessThan(S.creditsAt);
+    expect(sampleKeys(S.lidKeys, S.yawnAt)).toBeGreaterThan(0.1);
+    const e = new EndingTimeline();
+    e.start();
+    let yawns = 0;
+    for (let t = 0; t < S.endAt + 1; t += 0.1) {
+      e.update(0.1);
+      if (e.yawn) yawns++;
+    }
+    expect(yawns).toBe(1);
+  });
+
   it('dims the candle slowly from where it was to nothing by the time it goes out', () => {
     expect(sampleKeys(S.candleKeys, 0)).toBe(1);
     expect(sampleKeys(S.candleKeys, S.outAt)).toBe(0);

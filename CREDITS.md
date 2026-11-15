@@ -2,7 +2,7 @@
 
 ## Sounds
 
-Every sound, and the music, is a recording from freesound.org (below). `src/engine/services/audio/placeholder-sounds.ts` makes a stand-in in code for each recorded sound (not the music), played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
+Every sound, and the music, is a recording from freesound.org (below). `src/engine/services/audio/placeholder-sounds.ts` makes a stand-in in code for each recorded sound (not the music, the laughter or the yawn), played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. The team intends them to be CC0 1.0; the repository has no licence file yet, so confirm that choice (and the project's own licence) before submission.
 
 | Sound | Made by | Source | Licence |
 |---|---|---|---|
@@ -18,6 +18,9 @@ Every sound, and the music, is a recording from freesound.org (below). `src/engi
 | `src/assets/audio/sfx/tick.ogg`, a fingertip reaching a menu item ("Button hover.wav"; changes: mixed to mono, faded, level adjusted) | Fachii on freesound.org | https://freesound.org/s/338229/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/press.ogg`, a menu item pressed ("UI Button Press"; changes: cut to 0.18 s, mixed to mono, faded, level adjusted) | el_boss on freesound.org | https://freesound.org/s/788611/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/step0.ogg` and `step1.ogg`, a grown-up's footsteps outside the fort in scene 2's hush ("Footsteps - Stone, Rock, Concrete, Cement"; changes: two of its steps cut out, 0.58 s each, low-passed to sound beyond a door, faded, level adjusted) | SecureSubset on freesound.org | https://freesound.org/s/813622/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `src/assets/audio/sfx/laugh.ogg`, two kids laughing in the memories (scene 2's fort, twice, and scene 3's grass) ("Children's Toys Laughing"; changes: converted from M4A, a 3.3 s stretch cut out, mixed to mono, low end cut, faded, level raised) | f-r-a-g-i-l-e on freesound.org | https://freesound.org/s/483159/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `src/assets/audio/sfx/click.ogg`, her torch clicking on as she sets it down in scene 2's prologue ("Torch Click 2"; changes: mixed to mono, low end cut, faded, level adjusted) | BenjaminNelan on freesound.org | https://freesound.org/s/410360/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `src/assets/audio/sfx/rumble.ogg`, far thunder inside the memory of the fort (scene 2) ("Thunder_clip_from_346585__csengeri__30th-may-2016-thunderstorm-in-pecel-hungary"; changes: converted from MP3, cut to 6.7 s from the roll's start, mixed to mono, high end softened, faded, level adjusted) | csengeri on freesound.org | https://freesound.org/s/875080/ | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `src/assets/audio/sfx/lost.ogg`, a soft sigh when hand tracking is lost ("ManSighMovement.aif"; changes: converted from AIFF, cut to 1.4 s, mixed to mono, low end cut, faded, level adjusted) | bennychico11 on freesound.org | https://freesound.org/s/44423/ | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
 ## Music

@@ -55,6 +55,18 @@ export class GameAudio {
     this.player.playAt(variant === 1 ? Sound.Step1 : Sound.Step0, this.at.x, this.at.y, this.at.z);
   }
 
+  /** A sound in a memory (a story scene's `sound` cue) from the stage point (`sx`, `sy`) on `stage`. */
+  storySound(sound: 'laugh' | 'click' | 'rumble', stage: StagePlane, sx = 0, sy = 0): void {
+    stagePoint(stage, sx, sy, WALL_LIFT_M, this.at);
+    const id = sound === 'laugh' ? Sound.Laugh : sound === 'click' ? Sound.Click : Sound.Rumble;
+    this.player.playAt(id, this.at.x, this.at.y, this.at.z);
+  }
+
+  /** A sleepy yawn as he falls asleep, from his lap (`at`, its world position). */
+  yawn(at: ArrayLike<number>): void {
+    this.player.playAt(Sound.Yawn, at[0], at[1], at[2]);
+  }
+
   /** Call every frame: the crackle plays while the flame is lit, from the flame. `flame` is its scene position. */
   setFlame(lit: boolean, flame: ArrayLike<number>): void {
     if (lit && !this.flameLit) this.player.setLoop(Sound.Crackle, true, flame[0], flame[1], flame[2]);

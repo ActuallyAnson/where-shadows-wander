@@ -5,7 +5,7 @@ import { PRERENDER_ORDER, prerenderList, startSoundPrerender } from './sound-pre
 import { renderJob, type RenderedSound, type RenderJob } from './sound-render-job';
 import { Sound, SOUND_COUNT, SOUND_DEFS } from './sounds';
 
-/** The sounds that have a placeholder: all but the ones that only ever play from their file (the music). */
+/** The sounds that have a placeholder: all but the ones that only ever play from their file (the music, the laugh, the yawn). */
 const PLACEHOLDERS = SOUND_DEFS.filter((d) => !d.fileOnly).length;
 
 describe('sound prerender', () => {
@@ -14,7 +14,9 @@ describe('sound prerender', () => {
     expect(list).toHaveLength(PLACEHOLDERS);
     expect(new Set(list).size).toBe(PLACEHOLDERS);
     expect(list).not.toContain(Sound.Music);
-    expect(PLACEHOLDERS).toBe(SOUND_COUNT - 1);
+    expect(PLACEHOLDERS).toBe(SOUND_COUNT - 3); // the music, the laugh and the yawn
+    expect(list).not.toContain(Sound.Laugh);
+    expect(list).not.toContain(Sound.Yawn);
     expect(list.slice(0, 2)).toEqual([Sound.Crackle, Sound.Rain]);
     for (const s of PRERENDER_ORDER) expect(list).toContain(s);
     const some = prerenderList(new Set([Sound.Rain, Sound.Thunder]));

@@ -310,6 +310,10 @@ const wobbles: Wobble[] = [
 ];
 
 /** The storm: the room's window flashes too, and its thunder follows. */
-const cues: Cue[] = [{ t: FLASH_S, kind: 'storm', thunderAfter: STORM_THUNDER_AFTER_S }];
+const cues: Cue[] = [
+  { t: FLASH_S, kind: 'storm', thunderAfter: STORM_THUNDER_AFTER_S },
+  // Her torch clicks on as she sets it down between them.
+  { t: CLICK_S, kind: 'sound', sound: 'click', x: (FRIEND_X + BOY_X) / 2, y: FLOOR_Y },
+];
 
 export const THE_STORM: Chapter = { id: 'the-storm', length: THE_STORM_LENGTH_S, parts, tracks, wobbles, cues };

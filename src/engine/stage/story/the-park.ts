@@ -389,6 +389,8 @@ const wobbles: Wobble[] = [
 /** The light warms as the park comes in, and turns to dusk. */
 const cues: Cue[] = [
   { t: PARK_IN_S, kind: 'mood', mood: 'warm', seconds: 4 },
+  // They laugh, lying in the grass: the sound that is missing from the later scenes.
+  { t: LAUGH_S, kind: 'sound', sound: 'laugh', x: (FRIEND_CATCH_X + BOY_CAUGHT_X) / 2, y: FLOOR_Y },
   { t: DUSK_S, kind: 'mood', mood: 'dusk', seconds: 6 },
 ];
 

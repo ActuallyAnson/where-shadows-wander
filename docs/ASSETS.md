@@ -11,7 +11,7 @@ Last checked: 15 Nov 2026.
 
 ## Sound effects
 
-Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`; every sound effect has a recording now. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
+Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`, `laugh`, `click`, `rumble`; `yawn` is wired but has no file yet. `laugh` and `yawn` have no placeholder (a voice made in code sounds like a machine): like the music they are `fileOnly`, silent until their file loads. A memory plays a sound with a `sound` cue (`puppet-scene.ts`; the names a cue may use are `StorySound`), from its place on the wall. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
 
 ### In the game now (replace these first)
 
@@ -28,6 +28,10 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `lost` | A soft sigh, a breath going out; gentle, not an alarm | Hand tracking lost for too long | Final: "ManSighMovement" by bennychico11 (CC BY 4.0), cut to 1.4 s |
 | `tick` | A tiny tick | A fingertip reaches a menu item | Final: "Button hover" by Fachii (CC0) |
 | `press` | A soft click | A menu item is pressed | Final: "UI Button Press" by el_boss (CC0), cut to 0.18 s |
+| `laugh` | Two young kids laughing together, warm and unforced | Scene 2: after his rabbit comes right, and the giggles after the hush; scene 3: lying in the grass. Never after scene 3: its absence is part of the loss. Captioned "[children laughing]" | Final: "Children's Toys Laughing" by f-r-a-g-i-l-e (CC0), a 3.3 s stretch. No placeholder (`fileOnly`). The giggles reuse the same take: a shorter, softer giggle would fit them better |
+| `click` | A small torch's switch clicking on | Scene 2's prologue, as she sets her torch down between them. Captioned "[a torch clicks on]" | Final: "Torch Click 2" by BenjaminNelan (CC0), 0.34 s |
+| `rumble` | Far thunder inside a memory: softer than the room's own | Scene 2's fort, while she shows him the rabbit (3.2 s in), from the memory's window. Captioned "[distant thunder]" | Final: a thunder clip from csengeri's "30th May 2016 thunderstorm in Pecel, Hungary" (CC0), 6.7 s. Placeholder: the room thunder's |
+| `yawn` | A small, sleepy child's yawn | The end, 10.2 s after covering the flame, as his eyes come back open after the first heavy blink (`ENDING_SCRIPT.yawnAt`), from his lap. Captioned "[a sleepy yawn]" | Wired, no file: `asset-inbox/new/yawn.wav` has no source or licence recorded, so it is not in the game. Once it is credited, add it as `src/assets/audio/sfx/yawn.ogg` (cut 0.15 to 3.05 s, mono, faded, level raised). No placeholder (`fileOnly`) |
 | `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). Final: "Footsteps - Stone, Rock, Concrete, Cement" by SecureSubset (CC0), two of its steps, low-passed to sound beyond a door. Stone, not wood: swap if a wooden-floor take turns up |
 
 ### Removed
@@ -36,13 +40,32 @@ On 15 Nov 2026 the sounds nothing played were removed from `sounds.ts` and `plac
 
 ### Sounds the story needs that don't exist
 
-| Sound | Where (see `STORY.md`) | Status |
-|---|---|---|
-| Children's laughter | Scene 3 (they lie in the grass laughing); its absence in scene 5 is part of the loss | Needed |
-| Torch clicking on | The prologue, when she sets the torch down. Nothing plays there now (a lullaby note did until 15 Nov). | Needed |
-| Far thunder inside the memory | Scene 3, listed as "still to do" | Needed (could reuse `thunder`) |
-| Breathing slowing, or a small yawn | Scene 7, as he falls asleep | Needed |
-| Rain easing off | Scene 7 | Done by fading `rain` as he falls asleep (the ending turns the ambience down, `ending-timeline.ts`); a lighter take would still help |
+Each would be one more `Sound` in `sounds.ts`; a memory's would be one more name in `StorySound` and a `sound` cue in its chapter. Keep every one quiet and soft: the rain, the candle and the music are the bed, and these sit on top of it. Listed by scene; the ones marked **(high)** would add the most.
+
+| Sound | Where (see `STORY.md`) | Why it helps | Status |
+|---|---|---|---|
+| Children's laughter | Scenes 2 and 3 | | Done: `laugh` |
+| Torch clicking on | Scene 2's prologue | | Done: `click` |
+| Far thunder inside the memory | Scene 2's fort | | Done: `rumble` |
+| A small yawn | Scene 7, as he falls asleep | | Wired as `yawn`; its file waits for a source and licence |
+| A house settling, a gust on the window | Scene 1 and the waits between memories, now and then | Small sounds of the real room at night keep it alive between memories, as the thunder does | Needed: sparse one-shots from the room's walls |
+| Blanket thrown up | Scene 2's prologue, when she throws the blanket up into the fort | A soft cloth whoosh makes the fort's arrival physical | Needed (`covers` could be tried first) |
+| Rabbit hops **(high)** | Scene 2, the puppet rabbit hopping to her hand and down onto the blanket | A tiny soft pat per hop: the first time the player's own shape comes alive, so it should feel real | Needed: one or two very short pats, alternated like the steps |
+| A short, soft giggle | Scene 2, after the hush | The giggles reuse the full laugh now; a quick, stifled giggle (kids trying to be quiet) fits "got away with it" better | Needed |
+| Birdsong and a breeze in leaves **(high)** | Scene 3, the spring park, from the trees sliding in until dusk | The first daylight memory: a change of air from the rainy room says "outside, spring" faster than any picture | Needed: a quiet loop on ambience, only while the park is on the wall |
+| Running feet on grass | Scene 3, the chase | Speed and play: soft thuds, not the stone of `step0` | Needed |
+| Crickets at dusk | Scene 4, the fireflies | Evening, warm and still: it frames the fireflies' quiet | Needed: a quiet loop for the scene |
+| A firefly settling **(high)** | Scene 4, as a firefly lands in the player's cupped shadow, and on the kids' hands | A tiny, soft shimmer (a glassy tink, a breath of chime) rewards the cup and makes the light feel alive | Needed |
+| The jar's lid | Scene 4 if the fireflies go into her jar, or scene 7 as the light finds it | A small glass-and-tin sound ties the jar on the shelf to the memory | Needed |
+| A school bell far off, morning birds | Scene 5, the last ordinary day at the gate | Places the morning and the ordinary routine, so the unanswered wave lands against it | Needed |
+| A gate's latch or creak | Scene 5, the school gate | One small sound for the gate they part at | Needed |
+| Wind on a hill | Scene 6, the goodbye | The wall is almost empty: a thin, gentle wind gives the space around the two hands without filling it | Needed (very quiet) |
+| A soft swell as palm meets palm **(high)** | Scene 6, when the two hands touch | The game's emotional peak: one warm swell (or the music lifting) marks it | Needed, or done with the music's level instead |
+| Candle guttering out **(high)** | Scene 7, as the flame goes out after it is covered | A small "pff" and a fading hiss: the flame really is out, and it was his choice | Needed |
+| Breathing, slow and slowing | Scene 7, under the last blinks and into the black before the credits | The story says "the boy's breathing slows": two or three soft breaths, each longer, say he is asleep without a word | Needed |
+| Quilt pulled up, a head on the pillow | Scene 7, between the candle going out and the blinks | He lies back down: the mirror of `covers` in scene 1, so the night closes as it opened | Needed (`covers` played softer could stand in) |
+| Rain easing off | Scene 7 | | Done by fading `rain` as he falls asleep (`ending-timeline.ts`); a lighter take would still help |
+| Paper scenery sliding | Every scene change, as places slide on or off the wall | A soft, dry slide of card, very quiet: the shadow theatre is made of paper, and the player hears it moved | Needed |
 
 ## Music
 

@@ -29,6 +29,14 @@ export const Sound = {
   Covers: 12,
   /** The music: one track, looped, from the candle's lighting to the end (src/assets/audio/music/music.ogg). */
   Music: 13,
+  /** Two kids laughing together, from the wall (scene 2 after the rabbit and after the hush, scene 3 in the grass). */
+  Laugh: 14,
+  /** Her torch clicking on as she sets it down (scene 2's prologue), from the wall. */
+  Click: 15,
+  /** Far thunder inside a memory (scene 2's fort), from the wall's window side: softer than the room's own thunder. */
+  Rumble: 16,
+  /** A small, sleepy yawn as his eyes grow heavy (the end, after the candle goes out), from his lap. */
+  Yawn: 17,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -197,6 +205,52 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     refDistance: 1,
     maxDistance: 1,
     flat: true,
+    fileOnly: true,
+  },
+  {
+    name: 'laugh',
+    bus: Bus.Effects,
+    gain: 0.5,
+    loop: false,
+    priority: 2,
+    minGapS: 1,
+    refDistance: 1,
+    maxDistance: 8,
+    // Laughter made in code would sound like a machine: until the recording loads, the kids laugh silently.
+    fileOnly: true,
+  },
+  {
+    name: 'click',
+    bus: Bus.Effects,
+    gain: 0.45,
+    loop: false,
+    priority: 1,
+    minGapS: 0.5,
+    refDistance: 0.6,
+    maxDistance: 4,
+  },
+  {
+    name: 'rumble',
+    bus: Bus.Ambience,
+    gain: 0.4,
+    loop: false,
+    priority: 1,
+    minGapS: 4,
+    // From the memory, so from the wall; far off, so about as loud anywhere in the room.
+    refDistance: 3,
+    maxDistance: 20,
+  },
+  {
+    name: 'yawn',
+    bus: Bus.Effects,
+    gain: 0.5,
+    loop: false,
+    priority: 2,
+    minGapS: 4,
+    // His own, from close by (played at his lap, as the covers are).
+    refDistance: 1,
+    maxDistance: 6,
+    // A yawn made in code would sound like a machine: until the recording loads, the end is silent here.
     fileOnly: true,
   },
 ];

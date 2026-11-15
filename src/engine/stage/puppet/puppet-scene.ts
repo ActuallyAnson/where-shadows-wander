@@ -83,6 +83,9 @@ export interface Track {
   readonly keys: readonly Key[];
 }
 
+/** The sounds a memory can make with a `sound` cue (each is a sound of the same name in services/audio/sounds.ts). */
+export type StorySound = 'laugh' | 'click' | 'rumble';
+
 /** A steady sway added on top of the pose: amp * sin(2π t / period + phase). */
 export interface Wobble {
   readonly part: string;
@@ -99,6 +102,8 @@ export interface Wobble {
 export type Cue =
   /** A soft footstep (one of two, alternated), from the stage point (`x`, `y`). */
   | { readonly t: number; readonly kind: 'step'; readonly variant: 0 | 1; readonly x: number; readonly y: number }
+  /** A sound in the memory, from the stage point (`x`, `y`): the kids laughing, her torch clicking on, far thunder. */
+  | { readonly t: number; readonly kind: 'sound'; readonly sound: StorySound; readonly x: number; readonly y: number }
   /**
    * The room's candle light eases to `level` (1 its own, less hushed) over `seconds`, as a light in the memory is covered and
    * uncovered (scene 2's torch): the memory's light reaches the room.

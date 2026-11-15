@@ -29,6 +29,10 @@ const PEAK: Readonly<Record<SoundId, number>> = {
   [Sound.Thunder]: 0.8,
   [Sound.Covers]: 0.8,
   [Sound.Music]: 0.8,
+  [Sound.Laugh]: 0.8,
+  [Sound.Click]: 0.8,
+  [Sound.Rumble]: 0.8,
+  [Sound.Yawn]: 0.8,
 };
 
 /** The samples for `id` at `sampleRate`, mono, peaking at PEAK[id]. A one-shot ends at zero; a loop joins its own start. */
@@ -67,8 +71,14 @@ function generate(id: SoundId, sr: number): Float32Array<ArrayBuffer> {
       return letGo(sr);
     case Sound.Lost:
       return lost(sr);
+    case Sound.Click:
+      return tick(sr); // the torch's switch: a tiny tick will do
+    case Sound.Rumble:
+      return thunder(sr); // the room's thunder, played softer (SOUND_DEFS)
     case Sound.Music:
-      // Never played (it waits for its file: SoundDef.fileOnly), so its stand-in is a moment of silence.
+    case Sound.Laugh:
+    case Sound.Yawn:
+      // Never played (each waits for its file: SoundDef.fileOnly), so the stand-in is a moment of silence.
       return new Float32Array(Math.floor(sr * 0.05));
     default: {
       const unreachable: never = id;

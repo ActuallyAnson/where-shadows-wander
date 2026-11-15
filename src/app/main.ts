@@ -351,6 +351,7 @@ async function start(): Promise<void> {
     } else if (cue.kind === 'storm') storm.strikeNow(cue.thunderAfter, 1);
     else if (cue.kind === 'step')
       gameAudio.storyStep(cue.variant, storyFrame, cue.x, cue.y); // from where it is in the story
+    else if (cue.kind === 'sound') gameAudio.storySound(cue.sound, storyFrame, cue.x, cue.y);
     else if (cue.kind === 'hush') lightHush.to(cue.level, cue.seconds);
     else (cue.slot === 'title' ? storyTitle : storyLine).say(cue.text, 0, cue.hold);
   };
@@ -1321,6 +1322,7 @@ async function start(): Promise<void> {
         wakeView.update(ending.lid, 0, fadeHead, wakeHead, 0);
         candleView.goingOut = 1 - ending.candle;
         if (ending.out) candleView.lit = false; // the flame is gone: its sound stops and the room's light draws in
+        if (ending.yawn) gameAudio.yawn(saucerPos); // his eyes grow heavy: a yawn, from his lap
         audio.mixer.setDip(Bus.Ambience, ending.rain);
         audio.mixer.setDip(Bus.Music, ending.music);
         if (ending.creditsStart) {

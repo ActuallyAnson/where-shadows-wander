@@ -57,3 +57,25 @@ describe('the hush', () => {
     expect(y).toBeCloseTo(RABBIT_REST[1]);
   });
 });
+
+describe('the memories’ sounds', () => {
+  const sounds = (id: keyof typeof STORY_CHAPTER) => {
+    const c = STORY_CHAPTER[id];
+    return (STORY_STAGE.cues ?? [])
+      .filter((q) => q.kind === 'sound' && q.t >= c.start && q.t <= c.end)
+      .map((q) => (q.kind === 'sound' ? q.sound : ''));
+  };
+
+  it('clicks her torch on in the prologue, rolls far thunder and laughs twice in the fort, and laughs in the park', () => {
+    expect(sounds('the-storm')).toEqual(['click']);
+    expect(sounds('how-they-met')).toEqual(['rumble', 'laugh', 'laugh']);
+    expect(sounds('the-park')).toEqual(['laugh']);
+  });
+
+  it('has no laughter after the park: its absence is part of the loss', () => {
+    for (const id of Object.keys(STORY_CHAPTER) as (keyof typeof STORY_CHAPTER)[]) {
+      if (id === 'the-storm' || id === 'how-they-met' || id === 'the-park') continue;
+      expect(sounds(id)).not.toContain('laugh');
+    }
+  });
+});
