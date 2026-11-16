@@ -248,11 +248,18 @@ const wobbles: Wobble[] = [
 ];
 
 /**
- * A warm swell as palm meets palm. The wind from the empty wall goes on; it lifts once, a gust, as she fades, and dies away with
- * him.
+ * The palms swell's length (src/assets/audio/sfx/palms.ogg): two rising swells, the whole source, stretched to end as the
+ * hands come apart. Change it with the file.
+ */
+const PALMS_LEN_S = 7.95;
+
+/**
+ * A warm swell as palm meets palm, held while they stay so: it crests once as the view draws back to show the two kids, and
+ * again as their palms part, ending as the hands come apart. The wind from the empty wall goes on; it lifts once, a gust, as
+ * she fades, and dies away with him.
  */
 const cues: Cue[] = [
-  { t: 0.05, kind: 'sound', sound: 'palms', x: GOODBYE_AT[0], y: GOODBYE_AT[1] },
+  { t: PART_S + PART_LEN_S - PALMS_LEN_S, kind: 'sound', sound: 'palms', x: GOODBYE_AT[0], y: GOODBYE_AT[1] },
   { t: GIRL_GO_S, kind: 'sound', sound: 'gust', x: 0, y: 0 },
   { t: BOY_GO_S + 1, kind: 'bed', bed: null },
 ];

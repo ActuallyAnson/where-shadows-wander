@@ -61,7 +61,7 @@ export const Sound = {
   Wind: 28,
   /** A tiny soft shimmer: a firefly settling in the player's cupped shadow, and on the kids' hands (scene 4). */
   Firefly: 29,
-  /** One warm swell as palm meets palm (scene 6's start): the story's peak. */
+  /** A warm swell from palm meeting palm until the hands part (scene 6): the story's peak. */
   Palms: 30,
   /** A soft, dry slide of card: the paper scenery sliding on or off the wall at a change of place. */
   Slide: 31,
@@ -324,7 +324,7 @@ export const SOUND_DEFS: readonly SoundDef[] = [
   recorded('crickets', 0.3, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.2 }),
   recorded('wind', 0.25, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.5 }),
   recorded('firefly', 0.3, { near: true, minGapS: 0.4 }),
-  recorded('palms', 0.45, { priority: 3, minGapS: 4 }),
+  recorded('palms', 0.85, { priority: 3, minGapS: 4 }),
   recorded('slide', 0.15, { minGapS: 0.5, priority: 0 }),
   recorded('snuff', 0.4, { near: true, priority: 3, minGapS: 4 }),
   recorded('breath', 0.35, { priority: 2, minGapS: 4 }),
