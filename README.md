@@ -2,7 +2,7 @@
 
 A seated, hands-only virtual reality story about grief and comfort. A boy who has recently lost his best friend, a girl, wakes in the night, lights a candle, and goes back through their memories in shadow puppets on his bedroom wall, moving each one on with the shapes of his hands, until he can sleep again.
 
-**Status:** the bedroom, lighting the candle, your hands' shadows on the wall, the shape recogniser, pausing by covering the flame, sound, saves and settings are built. The puzzle game was removed on 11 Nov 2026 ([ADR 0016](docs/adr/0016-story-shadow-theatre.md)); the shadow-puppet story system is next. Built for the Meta VR Start Developer Competition 2026.
+**Status:** the bedroom, lighting the candle, your hands' shadows on the wall, the shape recogniser, pausing by covering the flame, sound, saves and settings are built. The puzzle game was removed ([ADR 0016](docs/adr/0016-story-shadow-theatre.md)); the shadow-puppet story system is next. Built for the Meta VR Start Developer Competition 2026.
 
 - **New here? Start with [Getting started](docs/getting-started.md)**: setup, running, the emulator and Hand Lab, headset testing, recordings, troubleshooting.
 - [Game design document](docs/GDD.md): the premise, the candle and the stage, shapes, art, accessibility, competition fit

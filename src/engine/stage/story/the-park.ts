@@ -1,9 +1,10 @@
 // Scene 3, "The park" (docs/STORY.md): the chapter after the friend's fox. The player's fox lands in the fort, crouches and
 // pounces at the rabbit on the blanket, and the rabbit bolts. They run, the fox after the rabbit, and the fort slides off to the
 // left while the park's trees slide in from the right, the light warming into spring. Mid-run the rabbit and the fox become the
-// two kids, still running, the friend chasing the boy; she catches him, and they tumble over into the grass and lie there
-// laughing. The light goes to dusk, and a single firefly blinks over them; the friend reaches up towards it: the chapter ends on
-// that, and the story holds the picture while the friend's hand shows the cup. Every time is in seconds from the chapter's start.
+// two kids, still running, the friend chasing the boy; she catches him, and, out of breath, they slow to a stop and lie down
+// together in the grass, side by side, looking up. The light goes to dusk and the stars come out, and a single firefly blinks over
+// them; the friend reaches up towards it: the chapter ends on that, and the story holds the picture while the friend's hand shows
+// the cup. Every time is in seconds from the chapter's start.
 import { OFF_WALL_X, slideKeys, type Chapter } from '../puppet/chapters';
 import {
   bobKeys,
@@ -54,15 +55,16 @@ const CATCH_S = 10.6;
 const FRIEND_CATCH_X = -0.13;
 const BOY_CAUGHT_X = -0.02;
 /**
- * ...slows to a stop and sits down hard in the grass, legs shooting out in front, and rolls back onto her back; he stumbles on
- * a few steps, laughing, and does the same just beyond her. Nobody slides, and nobody tips over stiff as a plank.
+ * ...and they slow to a stop, out of breath, and lie down together in the grass: down onto the bottom, legs stretched out in
+ * front, a moment to look up at the sky, and then slowly back onto their backs. He stops a few steps beyond her, a beat after.
+ * Nobody tumbles, slides or tips over stiff as a plank.
  */
 const FRIEND_FALL_S = CATCH_S + 0.35;
-const BOY_FALL_S = CATCH_S + 0.8;
-/** Down onto the bottom (gathering speed), a beat, then back onto the back, the legs kicking up and flopping down. */
-const SIT_LEN_S = 0.3;
-const SAT_BEAT_S = 0.1;
-const ROLL_LEN_S = 0.45;
+const BOY_FALL_S = CATCH_S + 0.65;
+/** Down onto the bottom, easing, a beat looking up, then slowly back onto the back, the legs settling down. */
+const SIT_LEN_S = 0.9;
+const SAT_BEAT_S = 0.6;
+const ROLL_LEN_S = 1.8;
 const FALL_LEN_S = SIT_LEN_S + SAT_BEAT_S + ROLL_LEN_S;
 /** Where each lies (the feet: each lies on their back with the head to the left, the boy's head just past her feet). */
 export const BOY_LIES_X = 0.42;
@@ -74,10 +76,10 @@ const LIE_Y = FLOOR_Y - 0.075;
 const SIT_Y = FLOOR_Y - 0.12;
 /** Where each stops running: the hips drop a little back as they sit. */
 const STOP_FROM_FEET = HIPS_FROM_FEET - 0.03;
-/** They laugh, lying there. */
+/** They lie there, giggling softly. */
 const LAUGH_S = BOY_FALL_S + FALL_LEN_S + 0.2;
 const LAUGH_LEN_S = 3.4;
-/** The sky goes to dusk, and a firefly comes and blinks over them. */
+/** The sky goes to dusk, the stars come out one by one, and a firefly comes and blinks over them. */
 const DUSK_S = LAUGH_S + 1.2;
 const FIREFLY_S = LAUGH_S + LAUGH_LEN_S + 0.8;
 const FIREFLY_LEN_S = 4.2;
@@ -85,6 +87,29 @@ export const FIREFLY_HOVER: readonly [number, number] = [-0.25, 0.15];
 /** The friend reaches up towards it: the chapter ends with her arm up. */
 const REACH_S = FIREFLY_S + FIREFLY_LEN_S + 0.4;
 export const THE_PARK_LENGTH_S = REACH_S + 1.4;
+
+/**
+ * The stars they lie looking at: small, pale and still (a firefly is a green-gold light that wanders and blinks), high in the sky
+ * behind the trees and clear of where the firefly hovers and the friend's cupped hand rises. Scene 4 puts them out at morning.
+ */
+export const STARS: readonly { x: number; y: number; size: number }[] = [
+  { x: -0.66, y: 0.42, size: 0.022 },
+  { x: -0.5, y: 0.31, size: 0.016 },
+  { x: -0.38, y: 0.46, size: 0.02 },
+  { x: -0.12, y: 0.4, size: 0.018 },
+  { x: 0.1, y: 0.47, size: 0.024 },
+  { x: 0.28, y: 0.41, size: 0.016 },
+  { x: 0.46, y: 0.48, size: 0.02 },
+  { x: 0.58, y: 0.37, size: 0.018 },
+  { x: 0.72, y: 0.45, size: 0.022 },
+];
+/** A star's light: cool white. */
+const STAR_TINT: readonly [number, number, number] = [0.82, 0.9, 1];
+/** The stars come out from here, one every so often, each taking a while to come. */
+const STARS_S = DUSK_S + 0.6;
+const STAR_EVERY_S = 0.5;
+const STAR_FADE_S = 2.2;
+export const starId = (i: number): string => `star-${i}`;
 
 /** A running stride for the animals: a bob up at each bound. */
 const RABBIT_STRIDE_S = 0.42;
@@ -101,6 +126,18 @@ export const PARK_TREES: readonly { id: string; x: number; h: number; depth: num
 export const GRASS_W = 2.2;
 
 const parts: PuppetPart[] = [
+  // The stars, behind the park.
+  ...STARS.map((st, i): PuppetPart => ({
+    id: starId(i),
+    art: 'orb',
+    look: 'glow',
+    tint: STAR_TINT,
+    w: st.size,
+    h: st.size,
+    x: st.x,
+    y: st.y,
+    opacity: 0,
+  })),
   // The park, behind everything: the far tree first.
   ...[...PARK_TREES]
     .sort((a, b) => b.depth - a.depth)
@@ -264,22 +301,28 @@ const tracks: Track[] = [
       [REACH_S + 1.0, -1.45, 'smooth'],
     ],
   },
-  // Down they go: onto their bottoms, then back onto their backs. On their backs they laugh: heads tipped back, and a couple
-  // of slow, small heaves, not a shake.
+  // Down they go: onto their bottoms, then slowly back onto their backs, side by side. Their heads tip back to the sky, and a
+  // couple of slow, small heaves as they giggle, not a shake.
   ...fallTracks('run-friend', FRIEND_FALL_S, LAUGH_S + 0.25),
   ...fallTracks('run-boy', BOY_FALL_S, LAUGH_S),
-  // He flings his arms up as he goes down, and they flop back by his sides.
+  // His arms come in to lean back on as he sits, and settle by his sides as he lies back.
   ...(['front', 'back'] as const).map((side): Track => ({
     part: `run-boy-arm-${side}`,
     prop: 'angle',
     keys: [
       [BOY_FALL_S, -STAND_ARM_DOWN],
-      [BOY_FALL_S + SIT_LEN_S, side === 'front' ? -1.3 : -1.6, 'out'],
-      [BOY_FALL_S + FALL_LEN_S + 0.3, LYING_ARM, 'smooth'],
+      [BOY_FALL_S + SIT_LEN_S, side === 'front' ? -2.1 : -2.3, 'smooth'],
+      [BOY_FALL_S + FALL_LEN_S, LYING_ARM, 'smooth'],
     ],
   })),
-  { part: 'run-boy-head', prop: 'angle', keys: laughHead(LAUGH_S) },
-  { part: 'run-friend-head', prop: 'angle', keys: laughHead(LAUGH_S + 0.15) },
+  { part: 'run-boy-head', prop: 'angle', keys: gazeHead(BOY_FALL_S, LAUGH_S) },
+  { part: 'run-friend-head', prop: 'angle', keys: gazeHead(FRIEND_FALL_S, LAUGH_S + 0.15) },
+  // The stars come out as it darkens.
+  ...STARS.map((st, i): Track => ({
+    part: starId(i),
+    prop: 'opacity',
+    keys: fadeKeys(STARS_S + i * STAR_EVERY_S, STAR_FADE_S, 0, 0.85),
+  })),
   // The firefly drifts in from the right, wandering, and comes to hover over them.
   {
     part: 'firefly',
@@ -321,46 +364,43 @@ const tracks: Track[] = [
 ];
 
 /**
- * A running kid falling over backwards from `t0` and lying there laughing from `laughAt`: down onto the bottom, the legs
- * shooting out in front (the root drops), a beat, then the torso rolls back onto the grass (gathering speed, with a small
- * bounce as it lands) while the legs kick up and flop down. The root's x is in the kid's own x track.
+ * A kid stopping and lying down from `t0`, giggling from `laughAt`: easing down onto the bottom, the legs stretched out in front
+ * (the root drops), a beat, then the torso leaning slowly back onto the grass while the legs settle. The root's x is in the
+ * kid's own x track.
  */
 function fallTracks(id: string, t0: number, laughAt: number): Track[] {
   const sat = t0 + SIT_LEN_S;
   const rolls = sat + SAT_BEAT_S;
   const down = rolls + ROLL_LEN_S;
-  const legs = (side: 'front' | 'back', kick: number): Track => ({
+  const legs = (side: 'front' | 'back'): Track => ({
     part: `${id}-leg-${side}`,
     prop: 'angle',
     keys: [
       [t0, 0],
-      [sat, ROLL_BACK - 0.12, 'in'],
+      [sat, ROLL_BACK - 0.12, 'smooth'],
       [rolls, ROLL_BACK - 0.12],
-      [rolls + ROLL_LEN_S * 0.7, ROLL_BACK + kick, 'out'],
-      [down + 0.35, ROLL_BACK, 'in'],
+      [down, ROLL_BACK, 'smooth'],
     ],
   });
   return [
-    legs('back', 0.25),
-    legs('front', 0.4),
+    legs('back'),
+    legs('front'),
     {
       part: `${id}-torso`,
       prop: 'angle',
       keys: [
         [t0, 0],
-        // Sitting down hard, the body pitches a little forward...
-        [sat, -0.12, 'in'],
-        [rolls, -0.12],
-        // ...then over it goes onto its back, bouncing a touch as it lands.
-        [down, ROLL_BACK, 'in'],
-        [down + 0.12, ROLL_BACK - 0.06, 'out'],
-        [down + 0.3, ROLL_BACK, 'smooth'],
+        // Sitting down, the body settles a little forward...
+        [sat, -0.08, 'smooth'],
+        [rolls, -0.08],
+        // ...then it leans slowly back, down onto the grass.
+        [down, ROLL_BACK, 'smooth'],
       ],
     },
     {
       part: id,
       prop: 'y',
-      keys: [[t0, FLOOR_Y], [sat, SIT_Y, 'in'], [rolls, SIT_Y], [down, LIE_Y, 'smooth'], ...laughKeys(laughAt)],
+      keys: [[t0, FLOOR_Y], [sat, SIT_Y, 'smooth'], [rolls, SIT_Y], [down, LIE_Y, 'smooth'], ...laughKeys(laughAt)],
     },
   ];
 }
@@ -370,19 +410,33 @@ function laughKeys(t0: number): Key[] {
   return bobKeys(t0, t0 + 1.8, 0.9, LIE_Y, 0.005);
 }
 
-/** A lying kid's head tipping back as it laughs (it faces right in its own frame, so back is counter-clockwise), and forward again. */
-function laughHead(t0: number): Key[] {
+/**
+ * A kid's head: tipping back to look at the sky as it sits and lies down from `t0` (it faces right in its own frame, so back is
+ * counter-clockwise), tipping back a little more as it giggles from `laughAt`, and forward again.
+ */
+function gazeHead(t0: number, laughAt: number): Key[] {
+  const gaze = t0 + SIT_LEN_S;
   return [
     [t0, 0],
-    [t0 + 0.4, 0.28, 'out'],
-    [t0 + LAUGH_LEN_S, 0.28],
-    [t0 + LAUGH_LEN_S + 0.8, 0, 'smooth'],
+    [gaze + SAT_BEAT_S + ROLL_LEN_S, 0.18, 'smooth'],
+    [laughAt, 0.18],
+    [laughAt + 0.4, 0.28, 'out'],
+    [laughAt + LAUGH_LEN_S, 0.28],
+    [laughAt + LAUGH_LEN_S + 0.8, 0, 'smooth'],
   ];
 }
 
 const wobbles: Wobble[] = [
   // The firefly hovers and blinks; the trees stir.
   ...fireflyWobbles('firefly', 0),
+  // The stars twinkle, softly and each in its own time.
+  ...STARS.map((_, i): Wobble => ({
+    part: starId(i),
+    prop: 'scale',
+    amp: 0.18,
+    period: 2.6 + 0.43 * (i % 5),
+    phase: i * 1.7,
+  })),
   ...PARK_TREES.map((t, i): Wobble => ({ part: t.id, prop: 'angle', amp: 0.006, period: 4.1 + i * 0.7, phase: i })),
 ];
 

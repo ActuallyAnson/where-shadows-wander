@@ -2,7 +2,7 @@
 
 ## Sounds
 
-Every sound, and the music, is a recording from freesound.org (below). `src/engine/services/audio/placeholder-sounds.ts` makes a stand-in in code for most recorded sounds (not the music, the laughter, the yawn, or the story and night sounds added on 15 Nov 2026: the giggle, hop, blanket, running feet, jar, bell, gate, creak, gust, crickets and wind, and those added on 16 Nov: the birds, firefly, palms, paper slide, snuff and breath), played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. Original code and stand-ins in this repository are dedicated under CC0 1.0 Universal (`LICENSE`); third-party recordings, 3D models and fonts below keep their listed licences.
+Every sound, and the music, is a recording from freesound.org (below). `src/engine/services/audio/placeholder-sounds.ts` makes a stand-in in code for most recorded sounds (not the music, the laughter, the yawn, or the story and night sounds: the giggle, hop, blanket, running feet, jar, bell, gate, creak, gust, crickets and wind, and the birds, firefly, palms, paper slide, snuff and breath), played only if its file fails to load. Those contain no recordings and no third-party material, so nothing is owed for them. Original code and stand-ins in this repository are dedicated under CC0 1.0 Universal (`LICENSE`); third-party recordings, 3D models and fonts below keep their listed licences.
 
 | Sound | Made by | Source | Licence |
 |---|---|---|---|

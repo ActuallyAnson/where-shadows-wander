@@ -63,7 +63,7 @@ Four criteria, 25 % each, after a first check of the baseline requirements.
 
 Our entry is a virtual room (see [ADR 0005](adr/0005-virtual-room.md)): it does not use passthrough, scene understanding or anchors, which the judging text names for entries that use them. We lean on hands-first design, the first five minutes, accessibility and polish, and we should ask the organisers how a VR-only entry is scored under Technical implementation.
 
-**Track: Entertainment (decided 15 Nov 2026), framed as immersive storytelling.** We planned for Gaming when the entry was a puzzle game. Since 11 Nov it is a seated shadow-puppet story ([ADR 0016](adr/0016-story-shadow-theatre.md)), a lean-back experience the player moves along with hand shapes. Submission copy should lead with the story and present the hand shapes as how the player takes part in it, not as a game mechanic.
+**Track: Entertainment (decided), framed as immersive storytelling.** We planned for Gaming when the entry was a puzzle game. It is now a seated shadow-puppet story ([ADR 0016](adr/0016-story-shadow-theatre.md)), a lean-back experience the player moves along with hand shapes. Submission copy should lead with the story and present the hand shapes as how the player takes part in it, not as a game mechanic.
 
 ## Requirements that shape the game
 

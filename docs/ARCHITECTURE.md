@@ -83,7 +83,7 @@ The stage is a 2D world on one surface, the fixed virtual wall of the room. `Sta
 
 ## Modules
 
-Since 11 Nov 2026 no folder has an owner: anyone on the team edits any of them.
+No folder has an owner: anyone on the team edits any of them.
 
 | Folder | Pure | Responsibility |
 |---|---|---|
