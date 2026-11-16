@@ -16,89 +16,35 @@ Where Shadows Wander is a seated, hands-only virtual reality story about grief a
 | Session length | To be decided with the story (to measure in playtests) |
 | Audience | Players of short narrative and cozy games; people who play seated, on a couch, desk or plane |
 
-### Direction (5 Oct 2026): a virtual room
+### Direction
 
-The game is set in a **virtual room**, not the player's real one. A candle lights a wall and the player's hands cast shadows on it. We chose this because the art and lighting are then the same for every player, nothing depends on finding a table or wall in the real room, and testing is predictable. The costs are that passthrough is not used (the judging criteria reward passthrough that is purposeful, and scene understanding and anchoring, for entries that use them) and that the player's hands, which they can no longer see, must be drawn. The earlier real-room plan (a tabletop theatre or a real wall, in passthrough) is out of v1 and could return as a second mode: the stage code takes any surface. The passthrough compositing, hand occluder and plane detection already written stay in the repository, switched off for v1.
+#### A virtual room
 
-### Direction (17 Oct 2026): a bedroom at night
+The game is set in a **virtual room**, not the player's real one. A candle lights a wall and the player's hands cast shadows on it. We chose this because the art and lighting are then the same for every player, nothing depends on finding a table or wall in the real room, and testing is predictable. The costs are that passthrough is not used (the judging criteria reward passthrough that is purposeful, and scene understanding and anchoring, for entries that use them) and that the player's hands, which they can no longer see, must be drawn. A real-room mode (a tabletop theatre or a real wall, in passthrough) is out of v1 and could return as a second mode: the stage code takes any surface. The passthrough compositing, hand occluder and plane detection stay in the repository, switched off for v1.
 
-The virtual room is a **kid's bedroom at night**. The kid is a little restless and can't fall asleep, so he sits up in bed and plays with shadows on the wall until he drifts off. The tone is cozy and calm, never scary. The light is a candle on the bed tray, lit with a small flame carried in the right hand.
+#### A bedroom at night
 
-*The bedroom, the night and the candle stay. The reason he is awake, and the tone, changed on 12 Nov 2026 (below).*
+The virtual room is a **kid's bedroom at night**. The tone is cozy and calm, never scary. The light is a candle on the bed tray, lit with a small flame carried in the right hand.
 
-### Direction (11 Nov 2026): a story in shadow puppets
+#### A story in shadow puppets
 
-The game was a physics puzzle: a little traveller walked across the wall and the player's hand shadows became bridges and walls for it. In the headset it felt bland, so the puzzles are gone ([ADR 0016](adr/0016-story-shadow-theatre.md)). What worked was the candle, the room and seeing your own hands' shadows on the wall, and the new direction builds on that.
+The wall shows a story, played as a shadow-puppet theatre ([ADR 0016](adr/0016-story-shadow-theatre.md) has why the earlier puzzle game was dropped). What carries the game is the candle, the room and seeing your own hands' shadows on the wall.
 
 - **The wall shows a story,** played as a shadow-puppet theatre in detail.
 - **The puppets are 2D cut-outs** (silhouette art in parts, with pivots) placed between the candle and the wall and cast from the flame, so their shadows grow, blur and flicker like real ones.
 - **The player moves the story on** by making a named shape with their hands when the story asks for one.
-- **The room, the candle, the hand shadows and the cover-flame pause stay** as they are.
+- **The room, the candle, the hand shadows and the cover-flame pause** are part of the game from the first moment to the last.
 
-### Direction (12 Nov 2026): a night of remembering
+#### A night of remembering
 
-The story now has a premise. The boy has recently lost his best friend. He wakes suddenly in the middle of the night and can't get back to sleep. He lights the candle and, through the shadow play, goes back through the memories they shared. By the end the shadow play lets him rest, and he falls asleep.
+The boy has recently lost his best friend. He wakes suddenly in the middle of the night and can't get back to sleep. He lights the candle and, through the shadow play, goes back through the memories they shared. By the end the shadow play lets him rest, and he falls asleep.
 
 - **The theme is grief and comfort.** The game does not try to fix the loss. It is about the night when remembering stops hurting and starts to help.
-- **The tone is tender and bittersweet, never bleak or frightening.** It stays as warm as the cozy bedroom it replaces, but now there is something underneath.
+- **The tone is tender and bittersweet, never bleak or frightening.** It stays as warm as a cozy bedroom, but there is something underneath.
 - **The shadow play is how he remembers.** Each memory is a scene on the wall, and the hand shapes the player makes are what bring the memories back.
 - **The ending is sleep.** The session ends when the boy can rest, and that is what the game is building towards from its first moment.
 
-The shadow play itself (the scenes, the shapes they ask for, and the puppets) is not final. The sections below say which parts are settled and which are proposals.
-
-### Design pillars
-
-1.  **Your hands are the toolkit.** Every action is a hand shape. Nothing on screen needs to be pointed at or pressed.
-
-2.  **One room, one light, one wall.** A small bedroom built so nothing competes with the shadows: a candle in front of the kid lights the wall, and the wall is the stage.
-
-3.  **Readable at a glance.** Silhouettes, one light source, one surface.
-
-4.  **Short and complete.** Every session ends on a finished moment: the boy falls asleep.
-
-5.  **Gentle with grief.** The loss is felt through absence and memory, never shown. Nothing on the wall should shock or upset the player, and no one is ever made to fail.
-
-## Core experience and setup
-
-The player is the boy, sitting up in bed with a bed tray across their lap after waking in the night. A candle stands on the tray; they light it, reach into its light, and their hand shadows land on the bedroom wall in front of them. The VR title is the moment of waking: the title fades to black, and the room fades in, dark and cold, before the candle is lit.
-
-### The candle
-
-The candle is the game's only light and its pause button. It stands on the bed tray close to the player, so the hands are always between the light and the stage, which is how real shadow puppetry works. Lighting it is the first action of every session; covering the flame pauses the session.
-
-The current behaviour (`src/engine/render/candle-view.ts`, `title-lighter-view.ts`, starting values to tune in the headset):
-
-- **The lighting ritual:** the room starts cold and dark with the title on the wall. The player's right hand carries a small flame. Holding it, or a fingertip, within about 15 cm of the wick for 3 s grows the flame from a spark to full light, warms the room and dissolves the title.
-- **Covering the flame** pauses: one palm hovering just over the flame, or both hands cupped around it, for 3 s. A ring around the flame fills while the hands are there and drains when they leave.
-- **The pause menu** appears on the wall itself (Resume, Settings). A button is chosen by holding a hand's shadow over it for 3 s, or with a pinch.
-
-The session has three states: the VR title, playing (the candle lit, the shadows on), and paused.
-
-### The stage
-
-The stage is a plain, pale patch of the bedroom wall at the foot of the bed, about 2 m in front of the player and about 1.6 m wide (sizes to tune in the headset). It is fixed and known, so there is no surface detection and no fallback: the player gets the same wall every session. The candle stands on the bed tray close to the player, the hands are between the candle and the wall, and the shadows land on the wall.
-
-### The room and the hands
-
-- **The room:** a kid's bedroom, small, warm and mostly dark, lit only by the candle. The bed with its tray and the candle, the bare wall ahead, a few quiet objects (a window with the night outside, a shelf, a rug, a few toys). Anything near the shadow area stays light and low-contrast so the black shadows stay readable. Its layout is edited in the room editor ([ADR 0015](adr/0015-room-layout-file-and-editor.md)). The bed stands against the back wall (`ROOM_BACK_WALL_Z`, 15 Nov 2026); the room stays its current size, about 4 by 2.9 m.
-
-- **Props to pick up and throw (planned, 15 Nov 2026):** small things the player can grab and toss, just for the feel of being there (a pillow, a plush toy, a ball). The room is not made bigger for them: a seated player reaches only about 60 to 70 cm, so they sit within reach, on the tray, the quilt, the bed's edges or a nightstand beside the bed. A prop may cast a shadow on the stage while it is held or in the air, but only for a moment: once thrown it falls to the floor and comes to rest out of the light's path, so nothing stays in front of the story. Never part of a scene's progress, so ignoring them costs nothing.
-
-- **The hands:** in VR the player cannot see their real hands, so the game draws a hand for each tracked hand, following the 25 joints. Rules: always visible while tracked, simple and low-detail rather than realistic, never covering the shadow area, fading out when tracking is lost with a gentle "show me your hands" cue. The shadow is cast from the tracked joints, not from the hand model, so the model can look any way without changing the game.
-
-- **Comfort:** seated, a fixed viewpoint, no locomotion, a steady floor and horizon.
-
-### Light geometry
-
-A physically accurate point light makes shadow size swing wildly with wall distance. Where Shadows Wander fakes it: the projection is blended toward orthographic so a hand always casts a shadow of a fixed, readable size on the stage. The candle flame still flickers and the shadow edges still soften with hand distance, so it feels real without behaving unpredictably.
-
-What the candle's place does decide is where the hands come into focus. A hand behind the flame keeps a dim, blurred shadow (about a third as dark, a 4 cm soft edge: `behindOpacity` and `behindBlurM` in `real-wall.ts`), so it never just vanishes and the player can see where it is; over the first 8 cm in front of the flame it sharpens to a full shadow (15 Nov 2026; before, it vanished). So the candle stands near and low (15 Nov 2026): the tray 0.38 m ahead of the eyes and 0.55 m below them, the candle on its near half, the flame about 0.33 m ahead. A hand comes into focus from about 0.33 m ahead and is full and sharp from about 0.41 m, so hands held relaxed in front of the body, forearms forward, already cast without reaching (before, they had to pass 0.45 m and were full only past 0.53 m). Tune it with `TRAY_AHEAD_M` and `TRAY_BELOW_EYES_M` in `main.ts` and the candle's spot on the tray (`CANDLE_DEFAULT` in `bed-tray-view.ts`, or the room editor).
-
-## The story
-
-The story is told on the wall in shadow puppets. A boy has recently lost his best friend. He wakes in the night, lights the candle, remembers their time together through the shadow play, and at the end he can sleep again.
-
-### Premise (settled 12 Nov 2026)
+### Premise
 
 - **Who:** the boy (the player) and his best friend, a girl, who has recently died. The friend appears only in the memories, as a shadow puppet beside the boy's own puppet. Making her a girl lets the player tell the two kids apart at a glance (her bow, ponytail and dress against his tuft of hair, jumper and shorts). The story calls them best friends and says no more; whether it was anything else is left to the player.
 - **When:** one night, soon after the loss. He wakes suddenly in the dark and can't get back to sleep.
@@ -169,9 +115,9 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 ### Audio
 
-- **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, and its crackle. The candle can't be picked up (15 Nov 2026): it stays on the tray, so the light the shadows are cast from never moves.
+- **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, and its crackle. The candle can't be picked up: it stays on the tray, so the light the shadows are cast from never moves.
 
-- **For the story:** the sounds made in code that nothing played (a chime, the room tone, a clock, wind and placeholder music) were removed on 15 Nov 2026; the music, the rain and the thunder are the palette, and anything new a scene needs is listed in `docs/ASSETS.md`. The music is quiet and bittersweet: one track ("I Got Lost" by Migfus20, 15 Nov) under the whole story, and the night ends in near silence as he falls asleep.
+- **For the story:** the sounds made in code that nothing played (a chime, the room tone, a clock, wind and placeholder music) are gone; the music, the rain and the thunder are the palette, and anything new a scene needs is listed in `docs/ASSETS.md`. The music is quiet and bittersweet: one track ("I Got Lost" by Migfus20) under the whole story, and the night ends in near silence as he falls asleep.
 
 ## Technical design
 
@@ -265,9 +211,9 @@ Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thum
 
 - [ ] Confirm hand tracking in an immersive-vr session on the Quest Browser.
 
-- [ ] Build and play-test each scene in [STORY.md](STORY.md), one at a time (first drafts written 12 Nov).
+- [ ] Build and play-test each scene in [STORY.md](STORY.md), one at a time (every scene is a first draft).
 
-- [ ] The friend: name and age. (Decided 13 Nov: a girl, the boy's best friend, so the two read apart on the wall.)
+- [ ] The friend: name and age. (Decided: a girl, the boy's best friend, so the two read apart on the wall.)
 
 - [ ] What wakes the boy: a dream, a sound, or nothing at all.
 
@@ -362,9 +308,8 @@ Where Shadows Wander is entered in the Entertainment track as immersive storytel
 
 ### Milestones (to 19 Nov)
 
-1.  **Weeks 1–3 (to 22 Oct):** done. The WebXR shell on the Pico, hand shadows on the wall, the shape classifier.
-2.  **Weeks 4–6 (to 11 Nov):** the room, the candle, sound, saves, settings and debug tools. The puzzle game was built and then removed ([ADR 0016](adr/0016-story-shadow-theatre.md)).
-3.  **Now to 19 Nov:** the story system (puppet format, caster, scene player, story graph), the story itself, testing on the Pico and a Quest, the demo video and the submission form.
+1.  **Done:** the WebXR shell on the Pico, hand shadows on the wall, the shape classifier; the room, the candle, sound, saves, settings and debug tools.
+2.  **Now to 19 Nov:** the story system (puppet format, caster, scene player, story graph), the story itself, testing on the Pico and a Quest, the demo video and the submission form.
 
 ### Risks
 

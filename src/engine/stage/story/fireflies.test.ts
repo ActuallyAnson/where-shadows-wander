@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ScenePlayer } from '../puppet/scene-player';
-import { BOY_HAND, FRIEND_HAND, GATHER_S, HANDOVER_S, JAR_HANDED } from './fireflies';
+import { BOY_HAND, FRIEND_HAND, GATHER_S, HANDOVER_S, JAR_HANDED, WALK_LEN_S, WALK_S } from './fireflies';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
 const player = new ScenePlayer(STORY_STAGE);
@@ -33,6 +33,37 @@ describe('fireflies', () => {
     for (let t = HANDOVER_S - 2; t < HANDOVER_S + 2; t += 0.1) {
       expect(Math.abs(at('park-friend-jar', t).angle), `hers at ${t}`).toBeLessThan(0.012);
       expect(Math.abs(at('park-boy-jar', t).angle), `his at ${t}`).toBeLessThan(0.012);
+    }
+  });
+
+  it('walks to school on the spot, their stride matching the pace the ground goes by, so their feet do not skate', () => {
+    // The friend stands where she sat while the grass goes by: her stance foot should move back along the wall as fast as it.
+    const foot = (t: number): number => {
+      const leg = at('walk-friend-leg-front', t);
+      return leg.x + 0.14 * Math.sin(-leg.angle); // a leg is 0.1 * KID_SCALE long
+    };
+    const mid = WALK_S + WALK_LEN_S / 2;
+    const grass = (at('grass', mid + 0.5).x - at('grass', mid - 0.5).x) / 1; // m/s, going left (negative)
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let t = mid - 0.45; t <= mid + 0.45; t += 0.01) {
+      lo = Math.min(lo, foot(t));
+      hi = Math.max(hi, foot(t));
+    }
+    // A foot travels this far back over a half stride (0.45 s), the stance.
+    const stance = (hi - lo) / 0.45;
+    expect(grass).toBeLessThan(0);
+    expect(stance / -grass).toBeGreaterThan(0.9);
+    expect(stance / -grass).toBeLessThan(1.1);
+  });
+
+  it('keeps the kids on the wall all through the walk, with no leaving and coming back', () => {
+    for (let t = WALK_S + 0.5; t < WALK_S + WALK_LEN_S; t += 0.25) {
+      for (const id of ['walk-boy', 'walk-friend']) {
+        const k = at(id, t);
+        expect(k.opacity, `${id} at ${t}`).toBeGreaterThan(0.9);
+        expect(Math.abs(k.x), `${id} at ${t}`).toBeLessThan(0.6);
+      }
     }
   });
 });

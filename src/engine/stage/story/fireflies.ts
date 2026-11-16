@@ -8,7 +8,7 @@
 // light lost in the daylight), leaves falling. At the gate the boy turns round to face the friend, and she raises her hand:
 // the chapter ends on that, and the story holds the picture while the friend's hand waves. Every time is in seconds from the
 // chapter's start.
-import { slideKeys, type Chapter } from '../puppet/chapters';
+import type { Chapter } from '../puppet/chapters';
 import type { Cue, Key, PuppetPart, Track, Wobble } from '../puppet/puppet-scene';
 import {
   ARM_DOWN,
@@ -19,6 +19,7 @@ import {
   STAND_ARM_DOWN,
   STAND_ARM_UP,
   WALK,
+  type Gait,
   fadeKeys,
   firefly,
   fireflyWobbles,
@@ -27,7 +28,7 @@ import {
   standingKid,
   stepTracks,
 } from './story-kit';
-import { FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, LYING_ARM, PARK_FROM_DX, PARK_TREES } from './the-park';
+import { FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, LYING_ARM, PARK_FROM_DX, PARK_TREES, STARS, starId } from './the-park';
 
 /** The firefly sits in the player's cup this long (the handoff), glowing brighter, then goes back to hover over the kids. */
 export const CUP_HOLD_S = 2.6;
@@ -64,20 +65,26 @@ export const HANDOVER_S = GIVE_S + OFFER_LEN_S + 0.3;
 const TAKE_LEN_S = 0.9;
 /** They stand and walk on; the park slides away and the school gate slides in, in a pale morning. */
 const STAND_S = HANDOVER_S + TAKE_LEN_S + 1.4;
-const WALK_S = STAND_S + 0.55;
-const WALK_LEG1_S = 4.05; // 4.5 full WALK strides across the park off the right edge
-const WALK_FRIEND_LAG_S = 0.15;
-const WALK_ENTER_S = WALK_S + 4.35;
-const WALK_LEG2_S = 4.5; // 5 full WALK strides in from the left edge to the gate
-const WALK_FRIEND_LEG2_S = 4.05;
+export const WALK_S = STAND_S + 0.55;
+/**
+ * They walk on the spot while the ground goes by under them, off to the left: the park's grass and trees leave and the school
+ * gate comes in, all at the pace of their stride, so their feet never skate. (The kids themselves barely move on the wall: the boy
+ * drifts the little way from where he sat to where he stops.)
+ */
+export const WALK_LEN_S = 8.85;
+/** The ground picks up its pace, and slows to a stop, over this long (the legs do too). */
+const WALK_RAMP_S = 0.45;
 const PARK_OUT_S = WALK_S;
-const PARK_OUT_LEN_S = 4.0;
-const GATE_IN_S = PARK_OUT_S + 1.4;
-const GATE_IN_LEN_S = 4.0;
-const STOP_S = WALK_ENTER_S + WALK_LEG2_S;
-const FRIEND_STOP_S = WALK_ENTER_S + WALK_FRIEND_LAG_S + WALK_FRIEND_LEG2_S;
+/** The gate comes into view about here (for its sound). */
+const GATE_IN_S = WALK_S + 3.8;
+const STOP_S = WALK_S + WALK_LEN_S;
+/**
+ * The walk's gait: a stride's stance foot goes back 4 * leg * sin(legs) / stride along the ground (a leg is 0.1 * KID_SCALE long),
+ * 0.265 m/s here, which is the pace of the grass under them (GRASS_W over the walk).
+ */
+const WALK_ON: Gait = { ...WALK, legs: 0.44 };
 /** At the gate the boy turns round to face the friend, and she raises her hand. */
-const TURN_S = STOP_S + 0.8;
+const TURN_S = STOP_S + 2.2;
 const TURN_LEN_S = 0.3;
 const RAISE_S = TURN_S + 0.7;
 export const FIREFLIES_LENGTH_S = RAISE_S + 1.6;
@@ -144,9 +151,11 @@ const flyAway = (i: number): [number, number] => [-0.7 + (i * 1.5) / 8 + 0.08 * 
 const gatherAt = (i: number): number => GATHER_S + i * GATHER_EVERY_S;
 const releaseAt = (i: number): number => RELEASE_S + Math.floor(i / 3) * RELEASE_GROUP_S + (i % 3) * 0.35;
 
-/** The leaves falling at the gate as the kids arrive: where each starts, when (after the gate is in), and where it lands. */
+/** The leaves falling at the gate as the kids arrive: where each starts, when (after the ground slows), and where it lands. */
 /** Seconds a leaf takes to fall: they are all down before the friend raises her hand. */
 const LEAF_FALL_S = 2.4;
+/** They start to fall this long before the ground comes to rest. */
+const LEAVES_BEFORE_STOP_S = 1.0;
 export const LEAVES: readonly { x: number; t: number; land: number }[] = [
   { x: -0.5, t: 0.0, land: -0.38 },
   { x: -0.66, t: 0.4, land: -0.7 },
@@ -288,19 +297,19 @@ const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smo
 
 const step = (t: number, to: number): Key => [t, to, 'step'];
 
-/** Merges tracks that animate the same part property across separate time stretches in order. */
-function joinTracks(...batches: readonly Track[][]): Track[] {
-  const bySlot = new Map<string, Track>();
-  for (const batch of batches) {
-    for (const tr of batch) {
-      const k = `${tr.part}.${tr.prop}`;
-      const prev = bySlot.get(k);
-      bySlot.set(k, prev ? { ...prev, keys: [...prev.keys, ...tr.keys] } : tr);
-    }
-  }
-  return [...bySlot.values()];
+/**
+ * Keys for the ground going by to the left, `dist` of it over the walk: it picks up its pace and slows to a stop as the legs do,
+ * and goes at one steady pace between, which is what the stride is made to match.
+ */
+function groundKeys(from: number, dist: number): Key[] {
+  const v = dist / (WALK_LEN_S - WALK_RAMP_S);
+  return [
+    [WALK_S, from],
+    [WALK_S + WALK_RAMP_S, from - (v * WALK_RAMP_S) / 2, 'in'],
+    [STOP_S - WALK_RAMP_S, from - v * (WALK_LEN_S - 1.5 * WALK_RAMP_S), 'linear'],
+    [STOP_S, from - dist, 'out'],
+  ];
 }
-
 /** How bright the firefly in the jar is. */
 const JAR_GLOW = 0.8;
 
@@ -465,40 +474,19 @@ const tracks: Track[] = [
   {
     part: 'walk-boy',
     prop: 'opacity',
-    keys: [
-      ...fadeKeys(STAND_S, CROSS_S, 0, 1),
-      [WALK_S + WALK_LEG1_S - 0.05, 1],
-      [WALK_S + WALK_LEG1_S, 0],
-      step(WALK_ENTER_S, 1),
-      [TURN_S, 1],
-      [TURN_S + TURN_LEN_S, 0],
-    ],
+    keys: [...fadeKeys(STAND_S, CROSS_S, 0, 1), [TURN_S, 1], [TURN_S + TURN_LEN_S, 0]],
   },
-  {
-    part: 'walk-friend',
-    prop: 'opacity',
-    keys: [
-      ...fadeKeys(STAND_S, CROSS_S, 0, 1),
-      [WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S - 0.05, 1],
-      [WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, 0],
-      step(WALK_ENTER_S + WALK_FRIEND_LAG_S, 1),
-    ],
-  },
+  { part: 'walk-friend', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 0, 1) },
   { part: 'walk-boy-arm-front', prop: 'angle', keys: [[0, -1.7]] },
-  ...joinTracks(
-    stepTracks('walk-boy', 1, WALK_S, WALK_S + WALK_LEG1_S, WALK, { armsBusy: 'front' }),
-    stepTracks('walk-boy', 1, WALK_ENTER_S, STOP_S, WALK, { armsBusy: 'front' }),
-    stepTracks('walk-friend', 1, WALK_S + WALK_FRIEND_LAG_S, WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, WALK, {
-      girl: true,
-    }),
-    stepTracks('walk-friend', 1, WALK_ENTER_S + WALK_FRIEND_LAG_S, FRIEND_STOP_S, WALK, { girl: true }),
-  ),
+  // They walk on the spot, the ground going by under them (see WALK_LEN_S): the friend stays where she sat, and the boy drifts
+  // the little way to where he stops.
+  ...stepTracks('walk-boy', 1, WALK_S, STOP_S, WALK_ON, { armsBusy: 'front' }),
+  ...stepTracks('walk-friend', 1, WALK_S, STOP_S, WALK_ON, { girl: true }),
   {
     part: 'walk-boy',
     prop: 'x',
     keys: [
-      ...move(WALK_S, BOY_SIT_X, WALK_S + WALK_LEG1_S, 1.25, 'linear'),
-      step(WALK_ENTER_S, -0.98),
+      [WALK_S, BOY_SIT_X],
       [STOP_S, BOY_GATE_X, 'linear'],
     ],
   },
@@ -506,26 +494,19 @@ const tracks: Track[] = [
     part: 'walk-friend',
     prop: 'x',
     keys: [
-      ...move(WALK_S + WALK_FRIEND_LAG_S, FRIEND_SIT_X, WALK_S + WALK_FRIEND_LAG_S + WALK_LEG1_S, 1.04, 'linear'),
-      step(WALK_ENTER_S + WALK_FRIEND_LAG_S, -1.15),
-      [FRIEND_STOP_S, FRIEND_GATE_X, 'linear'],
+      [WALK_S, FRIEND_SIT_X],
+      [STOP_S, FRIEND_GATE_X, 'linear'],
     ],
   },
-  ...PARK_TREES.map((t): Track => ({
-    part: t.id,
-    prop: 'x',
-    keys: slideKeys(PARK_OUT_S, PARK_OUT_LEN_S, t.x, t.x - PARK_FROM_DX, t.depth, true),
-  })),
-  { part: 'grass', prop: 'x', keys: slideKeys(PARK_OUT_S, PARK_OUT_LEN_S, 0, -GRASS_W, 0.25, true) },
-  { part: 'gate', prop: 'x', keys: slideKeys(GATE_IN_S, GATE_IN_LEN_S, GATE_X + GATE_OFF_DX, GATE_X, GATE_DEPTH) },
-  {
-    part: 'autumn-tree',
-    prop: 'x',
-    keys: slideKeys(GATE_IN_S, GATE_IN_LEN_S, AUTUMN_TREE_X + GATE_OFF_DX, AUTUMN_TREE_X, AUTUMN_TREE_DEPTH),
-  },
-  // Leaves fall from the tree once it is there.
+  ...PARK_TREES.map((t): Track => ({ part: t.id, prop: 'x', keys: groundKeys(t.x, PARK_FROM_DX) })),
+  { part: 'grass', prop: 'x', keys: groundKeys(0, GRASS_W) },
+  // The stars go out with the night, as the morning comes.
+  ...STARS.map((_, i): Track => ({ part: starId(i), prop: 'opacity', keys: fadeKeys(PARK_OUT_S, 3, 0.85, 0) })),
+  { part: 'gate', prop: 'x', keys: groundKeys(GATE_X + GATE_OFF_DX, GATE_OFF_DX) },
+  { part: 'autumn-tree', prop: 'x', keys: groundKeys(AUTUMN_TREE_X + GATE_OFF_DX, GATE_OFF_DX) },
+  // Leaves fall from the tree as the ground comes to rest.
   ...LEAVES.flatMap((l, i): Track[] => {
-    const t0 = GATE_IN_S + GATE_IN_LEN_S + l.t;
+    const t0 = STOP_S - LEAVES_BEFORE_STOP_S + l.t;
     const fall = LEAF_FALL_S;
     return [
       { part: `leaf-${i}`, prop: 'opacity', keys: fadeKeys(t0, 0.4, 0, 1) },

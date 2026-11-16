@@ -1,7 +1,8 @@
 // Scene 6, "Goodbye" (docs/STORY.md): the chapter after the player's flat hand meets the friend's, palm to palm. It starts as
 // exactly the friend's flat hand, face on, where it was; it turns clockwise, and as it turns the view draws back (the whole
 // picture zooms out about the touch): the one hand becomes two, side on, pressed palm to palm, and they are the boy's and the
-// girl's, the two kids seen from the waist up, each reaching out an arm to the touch. They stay so a while. Then their palms
+// girl's, the two kids seen from the waist up, each reaching out an arm to the touch. The kids are there from the first moment,
+// zoomed in so far that the wall's edge cuts nearly all of them off; the view draws back to show them whole. They stay so a while. Then their palms
 // part and their arms come down; she fades away, and he, alone, bows his head and fades too, leaving the wall empty for
 // sleep. Every time is in seconds from the chapter's start.
 import type { Chapter } from '../puppet/chapters';
@@ -55,14 +56,12 @@ const WAIST = KID_SCALE * 0.088;
 const WALL_BOTTOM = -0.52;
 const ZOOM_TO = (GOODBYE_AT[1] - WALL_BOTTOM) / -(BOY_FEET[1] + WAIST);
 
-/** The turn (clockwise, face on to side on) and the zoom out, and the kids coming into view as it draws back. */
+/** The turn (clockwise, face on to side on) and the zoom out, the kids coming into view as it draws back. */
 const TURN_S = 0.1;
 const TURN_LEN_S = 1.6;
 const TURN_FROM = 0.7;
 const ZOOM_S = 0.2;
 const ZOOM_LEN_S = 3.0;
-const KIDS_S = 1.3;
-const KIDS_LEN_S = 1.6;
 /** They stay so, then their palms part... */
 const PART_S = ZOOM_S + ZOOM_LEN_S + 3.2;
 const PART_LEN_S = 1.6;
@@ -96,8 +95,8 @@ const parts: PuppetPart[] = [
   // The whole picture, about the touch: zoomed in at first, drawn back as it turns.
   { id: 'goodbye', art: '', w: 0.01, h: 0.01, x: GOODBYE_AT[0], y: GOODBYE_AT[1], scale: ZOOM_FROM, opacity: 0 },
   // The two kids, waist up (their legs are below the wall), each with the front arm reaching to the touch.
-  ...standingKid('goodbye-boy', BOY_FEET[0], 1, { parent: 'goodbye', y: BOY_FEET[1], opacity: 0 }),
-  ...standingKid('goodbye-girl', -BOY_FEET[0], -1, { parent: 'goodbye', y: BOY_FEET[1], opacity: 0, girl: true }),
+  ...standingKid('goodbye-boy', BOY_FEET[0], 1, { parent: 'goodbye', y: BOY_FEET[1] }),
+  ...standingKid('goodbye-girl', -BOY_FEET[0], -1, { parent: 'goodbye', y: BOY_FEET[1], girl: true }),
   // The hands, which turn: first the one flat hand face on, as the friend's was, then the two side on.
   { id: 'goodbye-pair', art: '', parent: 'goodbye', w: 0.01, h: 0.01, angle: TURN_FROM },
   {
@@ -194,7 +193,7 @@ const tracks: Track[] = [
             [BOY_GO_S + BOY_GO_LEN_S, 0, 'smooth'],
           ];
     return [
-      { part: `goodbye-${who}`, prop: 'opacity', keys: [[KIDS_S, 0], [KIDS_S + KIDS_LEN_S, 1, 'smooth'], ...fades] },
+      { part: `goodbye-${who}`, prop: 'opacity', keys: [[0, 1], ...fades] },
       {
         part: `goodbye-${who}`,
         prop: 'x',
