@@ -47,6 +47,7 @@ import { EndingTimeline } from '../engine/stage/ending-timeline';
 import { CreditsView } from '../ui/credits/credits-view';
 import { NightSounds } from '../engine/stage/night-sounds';
 import { Storm } from '../engine/stage/storm';
+import { LookToStart, looksAtStage } from '../engine/stage/look-to-start';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
@@ -332,9 +333,17 @@ async function start(): Promise<void> {
   const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
   const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
   const storySkip = new SkipTouch();
-  /** Seconds left before the story starts (it waits for the candle's light to spread), or -1: not waiting. */
-  const STORY_AFTER_LIGHT_S = 1.8;
-  let storyWait = -1;
+  /**
+   * Once the candle is lit, the story waits for the player to look up at the wall (lighting it, they look down at the candle),
+   * and the candle's light on the wall swells and settles to draw the eye (look-to-start.ts).
+   */
+  const lookToStart = new LookToStart();
+  /** How much brighter the wall's light is at the top of that call (0.3: a third brighter). */
+  const LOOK_CALL_LIGHT = 0.3;
+  const lookEye = new Vector3();
+  const lookDir = new Vector3();
+  const lookEyeA = new Float64Array(3);
+  const lookDirA = new Float64Array(3);
   let storyStarted = false;
   /** The player's hand shadow: faint while a memory plays, full when the story waits for a hand shape. */
   const handPresence = new HandPresence();
@@ -390,7 +399,7 @@ async function start(): Promise<void> {
   /** The scene whose mood (StoryScene.candle) was last asked for: a scene's mood is eased into once, as it starts. */
   let moodScene = -1;
   const startStory = (scene = 0) => {
-    storyWait = -1;
+    lookToStart.cancel();
     storyStarted = true;
     storyTitle.clear();
     storyLine.clear();
@@ -402,7 +411,7 @@ async function start(): Promise<void> {
     moodScene = story.sceneIndex;
   };
   const stopStory = () => {
-    storyWait = -1;
+    lookToStart.cancel();
     story.stop();
     guide.reset();
     storyTitle.clear();
@@ -818,7 +827,8 @@ async function start(): Promise<void> {
       if (sessionState === 'asleep')
         return ending.active ? `Asleep: the end, ${ending.time.toFixed(1)} s in.` : 'Asleep: the end is over.';
       if (sessionState === 'title_vr') return 'Not started: the candle is not lit.';
-      if (!story.playing) return storyWait >= 0 ? 'The story starts in a moment.' : 'The story is not playing.';
+      if (!story.playing)
+        return lookToStart.waiting ? 'The story starts once the wall is looked at.' : 'The story is not playing.';
       const sc = story.scenes[story.sceneIndex];
       const b = story.beat;
       const doing =
@@ -1226,7 +1236,7 @@ async function start(): Promise<void> {
     candleView.lit = true;
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
-    if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
+    if (!storyStarted) lookToStart.start();
   };
   /**
    * Scene 7's end (docs/STORY.md, "Sleep"): the flame covered for good. The end plays from here (ending-timeline.ts, driven in
@@ -1523,9 +1533,17 @@ async function start(): Promise<void> {
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
           const storyStep = paused || sessionState !== 'playing' ? 0 : step;
-          if (storyWait >= 0 && storyStep > 0) {
-            storyWait -= storyStep;
-            if (storyWait < 0) startStory();
+          if (lookToStart.waiting || lookToStart.pulse > 0) {
+            world.camera.getWorldPosition(lookEye);
+            world.camera.getWorldDirection(lookDir);
+            lookEyeA[0] = lookEye.x;
+            lookEyeA[1] = lookEye.y;
+            lookEyeA[2] = lookEye.z;
+            lookDirA[0] = lookDir.x;
+            lookDirA[1] = lookDir.y;
+            lookDirA[2] = lookDir.z;
+            const looking = looksAtStage(stage, lookEyeA, lookDirA, ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
+            if (lookToStart.update(storyStep, looking)) startStory();
           }
           // A commit of the shape the friend's hand shows moves the story on, its memory starting where the player's shadow is.
           if (storyStep > 0 && story.waitingForShape)
@@ -1706,7 +1724,13 @@ async function start(): Promise<void> {
         const roomLight = ending.active
           ? endLightFrom * ending.candle
           : candleView.occlusion * lightHush.level * (1 - GHOST_DIP * sleepHint.dip);
-        stageView.applyLight(lanternLight.light, cameraQuat, roomLight, candleView.flamePosition, step);
+        stageView.applyLight(
+          lanternLight.light,
+          cameraQuat,
+          roomLight * (1 + LOOK_CALL_LIGHT * lookToStart.pulse),
+          candleView.flamePosition,
+          step,
+        );
         world.camera.getWorldPosition(settingsHead);
         stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? roomLight : 0);
