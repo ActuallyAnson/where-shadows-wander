@@ -181,15 +181,20 @@ describe('StoryDirector', () => {
     expect(d.friendOpacity).toBe(1);
     expect(d.friendDrop).toBeGreaterThan(0);
     expect(d.friendDrop).toBeLessThan(0.2 - FRIEND_FROM_Y);
+    // How far down it still is, for the palm to turn with (0 in place, 1 right down).
+    expect(d.friendLower).toBeGreaterThan(0);
+    expect(d.friendLower).toBeLessThan(1);
     // It comes up loose, and forms its shape as it arrives.
     expect(d.friendShapeT).toBeLessThan(0.1);
     run(d, FRIEND_IN_S);
     expect(d.friendDrop).toBe(0);
+    expect(d.friendLower).toBe(0);
     expect(d.friendShapeT).toBeGreaterThan(0);
     d.commit('fox');
     run(d, FRIEND_OUT_S / 2);
     expect(d.friendOpacity).toBe(1);
     expect(d.friendDrop).toBeGreaterThan(0);
+    expect(d.friendLower).toBeGreaterThan(0);
     run(d, FRIEND_OUT_S);
     expect(d.friendShape).toBeNull();
     expect(d.friendOpacity).toBe(0);

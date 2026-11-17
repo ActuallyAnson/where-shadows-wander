@@ -57,8 +57,8 @@ with black outlines (`PALETTE.high`), and every new screen needs a high-contrast
 
 ## Sound
 
-- Every action has a sound: reach an item (tick), press (a soft click), BEGIN (a match struck), recognise
-  (a paper crinkle), commit (a thump), let go (a soft slide), tracking lost (a soft sigh).
+- Every action has a sound: reach an item (tick), press (a soft click), BEGIN (a match struck), let go of a shape
+  (a soft slide), tracking lost (a soft sigh). Recognising and committing a shape are silent: the wall already shows them.
 - Under it all: the rain on the window and the candle's crackle. No music plays yet. The recordings and
   their credits are listed in `CREDITS.md`.
 - Short, dry, paper or candle themed. Browsers keep audio locked until the first tap, so the very

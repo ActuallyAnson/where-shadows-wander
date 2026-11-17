@@ -51,6 +51,19 @@ describe('ScenePlayer', () => {
     expect(at(p, 0, ANGLE)).toBeCloseTo(Math.PI / 2);
   });
 
+  it('turns a part off its keyed angle with `spin`, and its children with it', () => {
+    const p = new ScenePlayer(arm);
+    p.seek(0);
+    const hand = p.indexOf('hand');
+    const shoulder = p.indexOf('shoulder');
+    expect(hand).toBeGreaterThanOrEqual(0);
+    expect(p.indexOf('nothing')).toBe(-1);
+    const before = p.world[hand * POSE_STRIDE + ANGLE];
+    p.spin[shoulder] = 0.5;
+    p.seek(0);
+    expect(p.world[hand * POSE_STRIDE + ANGLE]).toBeCloseTo(before + 0.5, 6);
+  });
+
   it('carries a child round its parent pivot, scaled with it', () => {
     const p = new ScenePlayer(arm);
     p.seek(0);

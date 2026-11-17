@@ -1,5 +1,5 @@
 // The quality governor: watches how long frames take and, when they keep running over what the display allows, switches off the
-// decoration a step at a time (the rings round a shape, then the paper's painted scenery), then brings it back a step at a time once the frames are comfortably inside budget again. A headset that
+// decoration a step at a time (the paper's painted scenery), then brings it back a step at a time once the frames are comfortably inside budget again. A headset that
 // misses frames makes the wearer sick and hot, so the game keeps its frame rate first and its decoration second.
 //
 // It decides from a window of recent frames, not one: a single slow frame (a texture upload, the system menu) changes nothing. It
@@ -7,15 +7,14 @@
 // down. Plain TypeScript, no allocation after construction, driven by plain numbers, so a test can run a whole session in a loop.
 
 /** The things the governor can switch off, from the first to go to the last. */
-export const EFFECTS = ['ring', 'backdrop'] as const;
+export const EFFECTS = ['backdrop'] as const;
 export type Effect = (typeof EFFECTS)[number];
 
 /** The level at which each effect is off (it is on below that level). Level 0 has everything; the top level has none of these. */
 export const SHED_AT: Readonly<Record<Effect, number>> = {
-  ring: 1,
-  backdrop: 2,
+  backdrop: 1,
 };
-export const MAX_LEVEL = 2;
+export const MAX_LEVEL = 1;
 
 export interface GovernorSettings {
   /** The frame time the display allows, milliseconds (13.9 at 72 Hz). */

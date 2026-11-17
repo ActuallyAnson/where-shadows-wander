@@ -36,8 +36,6 @@ export const RenderOrder = {
   menu: 2.5,
   /** The captions and the lantern's glow (and the story's puppets to come). */
   sprite: 3,
-  /** The ring of light when a shape is recognised. */
-  ring: 5,
   /**
    * The ghost hand that comes down over the candle at the end (sleep-hint.ts). It writes depth for itself only (so it reads as
    * one soft shape, not overlapping capsules), so it draws after everything it could be seen against.
@@ -72,7 +70,6 @@ export const PASSES: readonly Pass[] = [
   { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
-  { id: 'ring', order: RenderOrder.ring, optional: true },
   { id: 'ghost', order: RenderOrder.ghost, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },
 ];

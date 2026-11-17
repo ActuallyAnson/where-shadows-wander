@@ -20,8 +20,8 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `covers` | A soft slide of heavy bedclothes | He sits up in bed (scene 1) | Final: "Bed sheets (SoundAction 104)" by alexarje (CC BY 4.0), cut to 3.5 s |
 | `ignite` | A match struck, then a flame catching | Lighting the candle; BEGIN on the title screen | Final: "match strike 05" by tim.kahn (CC BY 4.0), cut to 1.9 s |
 | `crackle` | A quiet candle flame, seamless loop | While the candle is lit | Final: "fire crackling, fireplace, BBQ" by AlexanderChe (CC0), a 14 s loop |
-| `rustle` | A light, dry paper crinkle | A hand shape is recognised | Final: "Crinkle; Paper" by Crovic (CC0), cut to 0.45 s |
-| `thump` | A soft, low thump | A hand shape is accepted | Final: "Deck of Cards, Thump on Table" by designerschoice (CC BY 4.0), one thump, 0.32 s |
+| `rustle` | A light, dry paper crinkle | Not played: a recognised shape is silent (the sound only distracted); the file is kept | Final: "Crinkle; Paper" by Crovic (CC0), cut to 0.45 s |
+| `thump` | A soft, low thump | Not played: a committed shape is silent (the sound only distracted); the file is kept | Final: "Deck of Cards, Thump on Table" by designerschoice (CC BY 4.0), one thump, 0.32 s |
 | `release` | A soft letting-go | A shape is let go | Final: "Slide release (PSX Horror SFX Free)" by heyheytheree (CC BY 4.0), cut to 0.3 s and softened |
 | `lost` | A soft sigh, a breath going out; gentle, not an alarm | Hand tracking lost for too long | Final: "ManSighMovement" by bennychico11 (CC BY 4.0), cut to 1.4 s |
 | `tick` | A tiny tick | A fingertip reaches a menu item | Final: "Button hover" by Fachii (CC0) |

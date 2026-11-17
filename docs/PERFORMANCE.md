@@ -33,7 +33,7 @@ the opening reel, the finale hall, the cinematic scenes, rewind) no longer exist
 
 | Change | Why | Measured |
 | --- | --- | --- |
-| Quality governor | Drops the extras (prop sketches, rings, ambient, trail, rewards, backdrop) in steps when the frame runs over budget, and brings them back after a calm stretch. Only active in a real headset session. | Top level cut one render from 34 to 24.9 ms (-27%) on the laptop, in one noisy run. |
+| Quality governor | Drops the extras (the paper's painted backdrop) in steps when the frame runs over budget, and brings them back after a calm stretch. Only active in a real headset session. | Top level cut one render from 34 to 24.9 ms (-27%) on the laptop, in one noisy run. |
 | Sound rendering on a worker | All 26 sounds are made off the main thread, room loops first. | About 290 ms of work for all sounds (music about 130 ms), now off the main thread. Not measured on a headset. |
 | Cinematic scenes built on entry | The dusk and hall scenes no longer keep about 35 textures on the GPU while idle. | Expected about 10 MB less texture memory in the room; not yet re-measured. |
 | Texture size cuts | Paper scenery layers 640x360, side walls 800x400. | Texture memory 66.5 to 56.7 MB. |

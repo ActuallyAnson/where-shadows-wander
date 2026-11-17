@@ -499,6 +499,12 @@ export class StoryDirector {
     return (this.friendY - FRIEND_FROM_Y) * (1 - smooth(this.friendLevel));
   }
 
+  /** How far the friend's hand is from being in place, 0..1, as it rises or lowers (0 in place, and while it fades). */
+  get friendLower(): number {
+    if (this.friendShape === null || this.friendFading) return 0;
+    return 1 - smooth(this.friendLevel);
+  }
+
   /** Seconds into the friend's hand's shape (friend-puppet.ts's scene time): it forms the shape as it arrives. */
   get friendShapeT(): number {
     return this.friendT - this.formAt;

@@ -15,17 +15,13 @@ describe('QualityGovernor', () => {
     for (const e of EFFECTS) expect(g.isOn(e)).toBe(true);
   });
 
-  it('sheds a step when frames keep running over, then another, and stops at the top level', () => {
+  it('sheds a step when frames keep running over, and stops at the top level', () => {
     const g = new QualityGovernor();
     run(g, 100, BUDGET * 2); // a window of frames at twice the budget
-    expect(g.level).toBe(1);
-    expect(g.isOn('ring')).toBe(false);
-    expect(g.isOn('backdrop')).toBe(true); // the next step
-    run(g, 200, BUDGET * 2);
-    expect(g.level).toBeGreaterThanOrEqual(2);
-    run(g, 2000, BUDGET * 2);
     expect(g.level).toBe(MAX_LEVEL);
     expect(g.isOn('backdrop')).toBe(false);
+    run(g, 2000, BUDGET * 2);
+    expect(g.level).toBe(MAX_LEVEL);
   });
 
   it('does not react to a few slow frames, a single long hitch, or a pause', () => {
@@ -46,7 +42,7 @@ describe('QualityGovernor', () => {
     run(g, 100, BUDGET * 2);
     run(g, 300, BUDGET * 2);
     const shed = g.level;
-    expect(shed).toBeGreaterThanOrEqual(2);
+    expect(shed).toBe(MAX_LEVEL);
     run(g, 500, BUDGET * 0.7); // not long enough to come back yet
     expect(g.level).toBe(shed);
     run(g, 6000, BUDGET * 0.7);

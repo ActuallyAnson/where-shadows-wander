@@ -96,7 +96,7 @@ describe('the memories’ sounds', () => {
       'doorclose',
       'giggle',
     ]);
-    expect(sounds('the-park')).toEqual(['slide', 'slide', 'run', 'run', 'laugh']);
+    expect(sounds('the-park')).toEqual(['slide', 'slide', 'laugh']);
   });
 
   it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate and lets the firefly go in scene 5, swells and gusts in 6', () => {

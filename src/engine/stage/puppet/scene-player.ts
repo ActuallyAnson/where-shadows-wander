@@ -35,6 +35,12 @@ export class ScenePlayer {
    * this, e.g. to start a puppet where the player's shadow was and ease it home. Read on the next seek or update.
    */
   readonly offset: Float32Array;
+  /**
+   * Added to each part's local angle (1 float a part; zeros unless set): the story turns a part off its keyed angle with this, e.g.
+   * the friend's palm tilting as her hand goes down. Read on the next seek or update.
+   */
+  readonly spin: Float32Array;
+  private readonly index: ReadonlyMap<string, number>;
   private readonly rest: Float32Array;
   // The tracks, flattened: for track i, its part's pose slot, and its keys at keyStart[i] .. keyStart[i + 1].
   private readonly trackSlot: Int32Array;
@@ -66,6 +72,8 @@ export class ScenePlayer {
     this.rest = new Float32Array(n * POSE_STRIDE);
     this.parents = new Int16Array(n);
     this.offset = new Float32Array(n * 2);
+    this.spin = new Float32Array(n);
+    this.index = index;
     scene.parts.forEach((p, i) => {
       this.parents[i] = p.parent === undefined ? -1 : (index.get(p.parent) as number);
       const o = i * POSE_STRIDE;
@@ -187,6 +195,7 @@ export class ScenePlayer {
     for (let i = 0; i < this.parents.length; i++) {
       local[i * POSE_STRIDE] += offset[i * 2];
       local[i * POSE_STRIDE + 1] += offset[i * 2 + 1];
+      local[i * POSE_STRIDE + 2] += this.spin[i];
     }
     const world = this.world;
     for (let i = 0; i < this.parents.length; i++) {
@@ -209,6 +218,11 @@ export class ScenePlayer {
       world[o + 3] = sc * local[o + 3];
       world[o + 4] = world[q + 4] * local[o + 4];
     }
+  }
+
+  /** The index of the part named `id` (for `offset` and `spin`), or -1. Allocates nothing. */
+  indexOf(id: string): number {
+    return this.index.get(id) ?? -1;
   }
 
   private sample(track: number, t: number): number {

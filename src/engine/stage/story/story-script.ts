@@ -18,8 +18,9 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
       // The night they met: alone in his new room in the storm, he hides under his blanket; the girl from down the street comes
       // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
       { kind: 'memory', ...chapter('the-storm') },
-      // Beside the girl, in the empty wall at her left (not between the kids), the friend's hand rises making a rabbit, and waits.
-      { kind: 'friend', shape: 'rabbit', x: -0.5, y: 0.17 },
+      // Beside the girl, in the empty wall at her left (not between the kids), the friend's hand rises making a rabbit, and waits;
+      // the outline of the rabbit stands in the middle of the wall.
+      { kind: 'friend', shape: 'rabbit', x: -0.5, y: 0.17, guide: [0, 0.17] },
       // The player's rabbit becomes the puppet rabbit and hops onto her hand. It ends on her hand raised again.
       { kind: 'memory', from: 'rabbit', ...chapter('how-they-met') },
     ],
@@ -30,7 +31,7 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     candle: 'rainy',
     beats: [
       // In the fort, at the wall's left (clear of the kids and the rabbit on the blanket), the friend's hand rises beyond her puppet's raised one, making a fox: now this one.
-      { kind: 'friend', shape: 'fox', x: -0.5, y: 0.17 },
+      { kind: 'friend', shape: 'fox', x: -0.5, y: 0.17, guide: [0, 0.17] },
       // The player's fox pounces at the rabbit on the blanket, and the chase carries them out of the fort into the park, where
       // they become the two kids, tumble into the grass, and lie there at dusk under a firefly.
       { kind: 'memory', from: 'fox', ...chapter('the-park') },
@@ -53,8 +54,9 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '5 · The last ordinary day',
     candle: 'morning',
     beats: [
-      // At the gate the friend raises her hand, and her hand's shadow rises beside her, waving.
-      { kind: 'friend', shape: 'flat', puppet: 'wave', x: -0.32, y: 0.16 },
+      // At the gate the friend raises her hand, and her hand's shadow rises beside her, waving. The outline stands to the right of the
+      // gate's opening (it spans about x 0.07 to 0.41), so it never covers the door.
+      { kind: 'friend', shape: 'flat', puppet: 'wave', x: -0.32, y: 0.16, guide: [0.58, 0.16] },
       // The boy waves back; they go opposite ways; the friend's second wave goes unseen; the park comes back with one boy.
       { kind: 'memory', ...chapter('last-ordinary-day') },
     ],
