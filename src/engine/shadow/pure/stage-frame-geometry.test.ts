@@ -90,11 +90,21 @@ describe('the real wall with the real-wall shadow settings', () => {
     }
   });
 
-  it('keeps the size steady (within about 10 %) as the hand moves toward and away from the lantern', () => {
-    const widths = [0.3, 0.4, 0.5, 0.6].map(
-      (ahead) => shadowOf(REAL_WALL_SHADOW_SETTINGS, wristAt(0.2, ahead), 90).width,
-    );
-    expect((Math.max(...widths) - Math.min(...widths)) / Math.min(...widths)).toBeLessThan(0.15);
+  it("grows as the hand nears the candle and shrinks as it moves away, as a near light's shadow does", () => {
+    // The candle is about 0.38 m ahead of the eyes: from just past it to arm's length.
+    const aheads = [0.42, 0.5, 0.6, 0.75, 0.9];
+    const widths = aheads.map((ahead) => shadowOf(REAL_WALL_SHADOW_SETTINGS, wristAt(0.2, ahead), 90).width);
+    for (let i = 1; i < widths.length; i++) expect(widths[i]).toBeLessThan(widths[i - 1]);
+    expect(widths[0] / widths[widths.length - 1]).toBeGreaterThan(1.6);
+    expect(widths[0] / widths[widths.length - 1]).toBeLessThan(2.5);
+  });
+
+  it('changes only the size with distance, not where the shadow falls', () => {
+    const centreY = (s: Shadow) => (s.minY + s.maxY) / 2;
+    const scaled = shadowOf(REAL_WALL_SHADOW_SETTINGS, wristAt(0.2, 0.75), 90);
+    const plain = shadowOf({ ...REAL_WALL_SHADOW_SETTINGS, sizeLightBackM: 0 }, wristAt(0.2, 0.75), 90);
+    expect(scaled.width).toBeLessThan(plain.width * 0.85);
+    expect(Math.abs(centreY(scaled) - centreY(plain))).toBeLessThan(0.05);
   });
 
   it('keeps the edge blur to a small share of the shadow, so the gaps between fingers stay open', () => {

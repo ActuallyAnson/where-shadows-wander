@@ -25,6 +25,13 @@ export interface ShadowSettings {
   behindOpacity: number;
   /** The edge blur of a shadow out of focus (behind the candle), metres; it eases to the usual blur as the hand comes into focus. */
   behindBlurM: number;
+  /**
+   * Scales each hand's shadow by its distance from the flame, as a near light does: bigger close to it, smaller further away,
+   * without moving where the shadow falls (that is the blend's job, which keeps shadows near the story's pictures). The size
+   * goes as (SIZE_REF_M + this) / (ahead + this), `ahead` being how far the hand is in front of the flame: this is how far
+   * behind the flame the light seems to sit for size alone. Smaller is stronger; 0 turns it off (the blend's scaling only).
+   */
+  sizeLightBackM: number;
 }
 
 export const DEFAULT_SHADOW_SETTINGS: Readonly<ShadowSettings> = {
@@ -35,9 +42,12 @@ export const DEFAULT_SHADOW_SETTINGS: Readonly<ShadowSettings> = {
   maxBlurM: 0.02,
   behindOpacity: 0,
   behindBlurM: 0,
+  sizeLightBackM: 0,
 };
 /** How far in front of the flame a hand comes fully into focus (its shadow full and sharp), metres. */
 const FOCUS_M = 0.08;
+/** How far in front of the flame a hand casts at its natural size when sizeLightBackM is on (where hands rest), metres. */
+export const SIZE_REF_M = 0.15;
 
 /** Joint pairs for each capsule: the 24 bones (joint to parent), then 4 webs across the palm. */
 // prettier-ignore
@@ -126,16 +136,21 @@ export class ShadowProjector {
       focus = t * t * (3 - 2 * t);
     }
     out.opacity = s.behindOpacity + (1 - s.behindOpacity) * focus;
-    const blurOut = s.behindBlurM * s.size;
+    // Nearer the flame, bigger; further, smaller (a hand behind the flame keeps the size it has at the flame).
+    const sz =
+      s.sizeLightBackM > 0
+        ? (s.size * (SIZE_REF_M + s.sizeLightBackM)) / (Math.max(dAhead, 0) + s.sizeLightBackM)
+        : s.size;
+    const blurOut = s.behindBlurM * sz;
 
     // Shadow size: scale about the palm's shadow (between the middle finger's base and knuckle, where
     // derivePalm puts the palm), so a bigger shadow stays under the hand.
-    if (s.size !== 1) {
+    if (sz !== 1) {
       const cx = (out.joints[PALM_A * 2] + out.joints[PALM_B * 2]) / 2,
         cy = (out.joints[PALM_A * 2 + 1] + out.joints[PALM_B * 2 + 1]) / 2;
       for (let j = 0; j < JOINT_COUNT; j++) {
-        out.joints[j * 2] = cx + (out.joints[j * 2] - cx) * s.size;
-        out.joints[j * 2 + 1] = cy + (out.joints[j * 2 + 1] - cy) * s.size;
+        out.joints[j * 2] = cx + (out.joints[j * 2] - cx) * sz;
+        out.joints[j * 2 + 1] = cy + (out.joints[j * 2 + 1] - cy) * sz;
       }
     }
 
@@ -149,7 +164,7 @@ export class ShadowProjector {
       const r =
         Math.max(((hand.radii[a] || MIN_RADIUS_M) + (hand.radii[b] || MIN_RADIUS_M)) / 2, MIN_RADIUS_M) *
         ((this.mag[a] + this.mag[b]) / 2) *
-        s.size;
+        sz;
       const o = c * CAPSULE_STRIDE;
       const ax = out.joints[a * 2],
         ay = out.joints[a * 2 + 1],
@@ -161,7 +176,7 @@ export class ShadowProjector {
       out.capsules[o + 3] = by;
       out.capsules[o + 4] = r;
       const h = Math.max((this.height[a] + this.height[b]) / 2, 0);
-      const sharp = Math.min(Math.max(h * s.blurPerM, s.minBlurM), s.maxBlurM) * s.size;
+      const sharp = Math.min(Math.max(h * s.blurPerM, s.minBlurM), s.maxBlurM) * sz;
       out.blur[c] = blurOut > sharp ? sharp + (blurOut - sharp) * (1 - focus) : sharp;
       minX = Math.min(minX, ax - r, bx - r);
       maxX = Math.max(maxX, ax + r, bx + r);

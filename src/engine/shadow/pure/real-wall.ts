@@ -6,6 +6,8 @@
 // steady when the WALL distance varies, which it does not here.) The edge blur is capped low: at the default
 // 0.03 per metre every capsule of a hand 1.5 m from the wall gets the 2 cm maximum, 20 % of a shadow's width,
 // and the gaps between fingers close.
+// The blend alone changes a shadow's size only ~25 % across the arm's reach, which reads as no change at all; sizeLightBackM
+// adds a near light's growth on top (about 2x between a hand at the flame and one at arm's length) without moving the shadow.
 // A night light fixed behind the player (the bedroom proposal) would need these re-tuned.
 // A hand behind the candle keeps a dim, blurred shadow (a third as dark, a 4 cm blur): out of focus, not gone, so the player
 // sees where it is and brings it forward into focus.
@@ -17,4 +19,5 @@ export const REAL_WALL_SHADOW_SETTINGS: Partial<ShadowSettings> = {
   maxBlurM: 0.008,
   behindOpacity: 0.35,
   behindBlurM: 0.04,
+  sizeLightBackM: 0.75,
 };
