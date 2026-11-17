@@ -14,7 +14,8 @@ describe('sound prerender', () => {
     expect(list).toHaveLength(PLACEHOLDERS);
     expect(new Set(list).size).toBe(PLACEHOLDERS);
     expect(list).not.toContain(Sound.Music);
-    expect(PLACEHOLDERS).toBe(SOUND_COUNT - 20); // the music, the laugh, the yawn and the seventeen recorded story, night and ending sounds
+    expect(list).not.toContain(Sound.Credits);
+    expect(PLACEHOLDERS).toBe(SOUND_COUNT - 23); // the main and credits music, the laugh, the yawn and the nineteen recorded story, night and ending sounds
     expect(list).not.toContain(Sound.Laugh);
     expect(list).not.toContain(Sound.Yawn);
     expect(list.slice(0, 2)).toEqual([Sound.Crackle, Sound.Rain]);

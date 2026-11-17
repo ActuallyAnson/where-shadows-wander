@@ -150,7 +150,25 @@ describe('GameAudio story beds and night sounds', () => {
     audio.storySound('giggle', stage);
     audio.storySound('hop', stage);
     audio.storySound('bell', stage);
-    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Giggle, Sound.Hop, Sound.Bell]);
+    audio.storySound('dooropen', stage);
+    audio.storySound('doorclose', stage);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Giggle, Sound.Hop, Sound.Bell, Sound.DoorOpen, Sound.DoorClose]);
+  });
+
+  it('switches cleanly between main music, credits BGM, and silence', () => {
+    const { audio, rec } = setup();
+    audio.setMusic(false);
+    audio.setMusic('main');
+    audio.setMusic(true);
+    audio.setMusic('credits');
+    audio.setMusic('credits');
+    audio.setMusic(false);
+    expect(rec.loops.map((l) => [l.id, l.on])).toEqual([
+      [Sound.Music, true],
+      [Sound.Music, false],
+      [Sound.Credits, true],
+      [Sound.Credits, false],
+    ]);
   });
 
   it('starts a bed once, swaps one for the next, and stops it on null', () => {

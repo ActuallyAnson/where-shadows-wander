@@ -9,9 +9,11 @@ describe('soundFiles', () => {
       '../assets/audio/sfx/Rain.ogg': '/r.ogg',
       '../assets/audio/sfx/not-a-sound.ogg': '/x.ogg',
       '../assets/audio/music/music.ogg': '/m.ogg',
+      '../assets/audio/music/credits.ogg': '/c.ogg',
       '../assets/models/thunder.glb': '/g.glb',
     };
     expect(soundFiles(files)).toEqual([
+      { sound: Sound.Credits, url: '/c.ogg' },
       { sound: Sound.Music, url: '/m.ogg' },
       { sound: Sound.Rain, url: '/r.ogg' },
       { sound: Sound.Thunder, url: '/t.ogg' },
