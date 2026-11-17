@@ -130,7 +130,6 @@ These stay because the room or the story stops working without them. Each could 
 | What | Code | Why it stays | Status |
 |---|---|---|---|
 | The candle, its flame, and the tray it stands on | `src/engine/render/candle-view.ts`, `src/engine/render/room/bed-tray-view.ts` | The candle is the game's one light: it is lit, covered and smothered by the hands, so it is drawn and animated in code | Placeholder: a candle-and-tray model would need to keep the flame in code |
-| The quilt on his lap (`paintQuilt`) | `bed-tray-view.ts`, `room-art.ts` | It covers the bed model's own cover (hidden): he has just sat up | Placeholder: a rumpled-quilt model could replace it |
 | The walls (plaster and panelling), floor, ceiling and rafters | `room-art.ts` (`paintWall`), `bedroom-view.ts` | The room's shell; the wall ahead is the stage | Placeholder: ambientCG or Poly Haven textures (plaster, wood planks) would replace the painted ones |
 | The window: frame, the night outside in four sliding layers, the curtains inside it, two layers of rain, and the lightning flashes | `room-dressing-view.ts`, `room-art.ts` (`paintNight`, `paintRain`), `bedroom-view.ts` | The storm wakes him in scene 1; the rain and flashes play all night | Placeholder: a window-frame model; keep the outside and the rain in code |
 | The moonlight through the window | `candle-light.ts` (`setMoonWindow`, `MOON_BEAM`), the opening from `room-dressing-view.ts` | A beam of cool light through the window's opening, cut by its cross bars and shadowed by the curtains and furniture, onto the desk, the chair and the side of the bed; it brightens with each flash and in scene 6 (`goodbye-moon.ts`) | Final (it is light, made in code, not an asset) |
@@ -167,7 +166,7 @@ Keep everything off the wall ahead and out of the space between the candle and t
 
 ### Needed: props to pick up and throw (planned)
 
-Small and light-looking, placed within a seated reach (the tray, the quilt, the bed's edges, a nightstand). See the GDD, "The room and the hands".
+Small and light-looking, placed within a seated reach (the tray, the bed's edges, a nightstand). See the GDD, "The room and the hands".
 
 | Model | Status |
 |---|---|

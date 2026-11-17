@@ -1,7 +1,7 @@
 import { FrontSide, Mesh, MeshBasicMaterial, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
-import { castShadow, paintNight, paintQuilt, paintRain, paintWall } from './room-art';
+import { castShadow, paintNight, paintRain, paintWall } from './room-art';
 import { RoomDressingView } from './room-dressing-view';
 import { CANDLE_REACH_M, CandleLight } from './candle-light';
 
@@ -36,7 +36,6 @@ describe('room art painters', () => {
     ['night village', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'village'), 30],
     ['night near ground', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'near'), 20],
     ['night curtains', (g: CanvasRenderingContext2D) => paintNight(g, 440, 520, 'curtains'), 20],
-    ['quilt', (g: CanvasRenderingContext2D) => paintQuilt(g, 256, 256), 100],
     ['rain', (g: CanvasRenderingContext2D) => paintRain(g, 256, 256, 3, 38, 46), 30],
   ])('paints the %s without throwing, and draws a fair amount', (_name, paint, min) => {
     const { g, calls } = recordingContext();

@@ -491,7 +491,7 @@ export class RoomEditor {
     this.removed.delete(keyOf(piece));
   }
 
-  /** Selects a piece by id (`bed`, or `lap:quilt` for another section), for scripts and tests. */
+  /** Selects a piece by id (`bed`, or `lap:tray` for another section), for scripts and tests. */
   selectId(id: string): boolean {
     const key = id.includes(':') ? id : `room:${id}`;
     const piece = this.pieces().find((p) => keyOf(p) === key) ?? null;

@@ -57,8 +57,7 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     at: [0, 0, -0.35],
     size: [0.9, 1.7],
     yaw: Math.PI,
-    // Its neat cover: the player has just sat up in the bed, under the lap's own rumpled quilt (bed-tray-view.ts), which runs
-    // to the bed's foot; the sheet shows behind them, where they lay.
+    // Its neat cover: the player has just sat up in the bed, so only the sheet shows.
     hide: ['cover'],
   },
   // The bookcase against the back wall in the right corner, beside the bed's head, its open side to the room: 0.6 m wide,

@@ -1,4 +1,4 @@
-// Exports a piece of the room the code builds (the tray, the quilt, the pictures, the tin can...) as a .glb, so it can be
+// Exports a piece of the room the code builds (the tray, the pictures, the tin can...) as a .glb, so it can be
 // placed again from the asset browser or edited in Blender. The piece is copied with its own transform reset (the file is in
 // the piece's own space) and everything glTF cannot hold is left out or named in the warnings.
 //
