@@ -54,7 +54,7 @@ function setHandJointsDown(hand: HandFrame, x: number, y: number, z: number): vo
 }
 
 describe('CandleView', () => {
-  it('builds the group with plate, rim, wax, wick, flame quad, point light, wick glow and pause ring', () => {
+  it('builds the group with plate, rim, wax, wick, flame quad, point light, wick glow and ignition ring', () => {
     const candle = new CandleView();
     expect(candle.group.children).toHaveLength(8);
     expect(candle.pointLight.castShadow).toBe(false);
@@ -117,9 +117,24 @@ describe('CandleView', () => {
     expect(candle.lightIntensity).toBe(0);
   });
 
-  it('detects palm hovering over flame to trigger isCovered pause', () => {
+  it('never counts a cover before the end: covering the flame does not pause the game', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
+    const left = createHandFrame('left');
+    const right = createHandFrame('right');
+    right.tracked = false;
+    setHandJointsDown(left, 0.0, 0.89, -0.4);
+    candle.updateInteraction({ left, right }, 5);
+    expect(candle.coverProgress).toBe(0);
+    expect(candle.isCovered).toBe(false);
+    // The hand still dims the flame's light.
+    expect(candle.occlusion).toBeLessThan(1);
+  });
+
+  it('at the end (sleep mode) detects a palm hovering over the flame as covering it', () => {
+    const candle = new CandleView();
+    candle.place([0, 0.75, -0.4]);
+    candle.sleepMode = true;
     const left = createHandFrame('left');
     const right = createHandFrame('right');
     right.tracked = false;
@@ -186,9 +201,10 @@ describe('CandleView', () => {
     expect(candle.occlusion).toBe(0.0);
   });
 
-  it('deliberately pauses after hovering palm over flame for 3.0 seconds with radial progress', () => {
+  it('at the end, covers the flame after a palm is held over it for 3 s, the hold decaying when it leaves', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
+    candle.sleepMode = true;
     const left = createHandFrame('left');
     const right = createHandFrame('right');
     right.tracked = false;
@@ -223,7 +239,7 @@ describe('CandleView', () => {
     expect(candle.coverProgress).toBe(0);
   });
 
-  it('at the end (sleep mode) shows going out, not the pause ring, and answers a hand from further off', () => {
+  it('at the end (sleep mode) shows going out, not a ring, and answers a hand from further off', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
     const cameraQuat = new Quaternion(0, 0, 0, 1);
@@ -241,6 +257,7 @@ describe('CandleView', () => {
 
     // 22 cm above the flame: out of reach in play, already dimming it at the end.
     setPalm(left, 0, 0.845 + 0.22, -0.4);
+    candle.sleepMode = false;
     candle.updateInteraction({ left, right }, 0.016);
     expect(candle.occlusion).toBe(1);
     candle.sleepMode = true;
@@ -264,9 +281,10 @@ describe('CandleView', () => {
     expect(candle.flame.mesh.scale.x).toBe(1);
   });
 
-  it('detects two-handed cupping to trigger deliberate pause', () => {
+  it('at the end, detects two cupped hands as covering the flame', () => {
     const candle = new CandleView();
     candle.place([0, 0.75, -0.4]);
+    candle.sleepMode = true;
     const left = createHandFrame('left');
     const right = createHandFrame('right');
 

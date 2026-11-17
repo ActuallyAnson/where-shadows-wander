@@ -59,8 +59,8 @@ Each would be one more `Sound` in `sounds.ts`; a memory's would be one more name
 |---|---|---|---|
 | Quilt pulled up, a head on the pillow | Scene 7, between the candle going out and the blinks | He lies back down: the mirror of `covers` in scene 1, so the night closes as it opened | Needed (`covers` played softer could stand in) |
 | Match-near-wick proximity sizzle / warmth hum | Scene 1, while the match approaches and heats the wick (`ignition.ts`) | Gives tactile and low-vision audio feedback during the 3 s ignition hold before `ignite` fires | Needed (improves onboarding and accessibility) |
-| Soft torch-cover pat / muffled cloth thump | Scene 2's hush, when the friend claps her hand over the torch (`H_CLAP`) | Grounds her sudden lunge and deepens the tactile link to covering the candle to pause | Needed |
-| Soft pause hush and relight breath | Scenes 1–6, when the player covers the flame to pause and uncovers it to resume | Confirms the cover-to-pause gesture immediately in audio without breaking the quiet mood | Needed |
+| Soft torch-cover pat / muffled cloth thump | Scene 2's hush, when the friend claps her hand over the torch (`H_CLAP`) | Grounds her sudden lunge and deepens the tactile link to covering the candle at the end | Needed |
+| Soft pause hush and relight breath | When the pause menu opens (the headset's system menu, or the headset taken off) and when Resume relights the candle | Confirms the pause and the return in audio without breaking the quiet mood | Needed |
 | Subtle shape-hold parchment breath / swell | Scenes 2–6, while a recognised shape hold fills before the commit `thump` | Lets players hear the hold progressing toward commit without looking away from their shadow | Needed (accessibility and responsiveness) |
 | Lighter rain loop for sleep easing | Scene 7, cross-faded with `rain` as he falls asleep (`ending-timeline.ts`) | Softens the patter naturally alongside the dimmer room instead of relying on volume dip alone | Needed |
 
