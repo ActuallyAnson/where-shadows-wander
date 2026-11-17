@@ -36,8 +36,6 @@ export const RenderOrder = {
   menu: 2.5,
   /** The captions and the lantern's glow (and the story's puppets to come). */
   sprite: 3,
-  /** The hand's golden trail. */
-  trail: 4,
   /** The ring of light when a shape is recognised. */
   ring: 5,
   /**
@@ -74,7 +72,6 @@ export const PASSES: readonly Pass[] = [
   { id: 'air', order: RenderOrder.air, optional: false },
   { id: 'menu', order: RenderOrder.menu, optional: false },
   { id: 'sprite', order: RenderOrder.sprite, optional: false },
-  { id: 'trail', order: RenderOrder.trail, optional: true },
   { id: 'ring', order: RenderOrder.ring, optional: true },
   { id: 'ghost', order: RenderOrder.ghost, optional: false },
   { id: 'fade', order: RenderOrder.fade, optional: false },

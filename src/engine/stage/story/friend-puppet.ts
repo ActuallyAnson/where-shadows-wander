@@ -182,3 +182,27 @@ export const FRIEND_PUPPETS: Readonly<Record<string, PuppetScene>> = {
   flat: FRIEND_FLAT,
   wave: FRIEND_WAVE,
 };
+
+/**
+ * The shape guide's outline of each shape (shape-guide.ts, ghost-outline.ts): not her painted hand, which is a shadow-puppet
+ * plate and hard to copy, but the plainest hand that makes the shape as it is recognised (shape-ranges.ts), the hand alone.
+ * Rabbit: a V. Fox: a flat hand side on, thumb up. Cup: palm up, cupped. Flat: a flat hand held up. A shape without one has no
+ * outline of its own (her hand's is used).
+ */
+function outline(shape: string, w: number, h: number): PuppetScene {
+  return {
+    id: `outline-${shape}`,
+    length: 1,
+    parts: [
+      { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
+      { id: 'shape', art: `outline-${shape}`, parent: 'hand', w, h },
+    ],
+    tracks: [],
+  };
+}
+export const OUTLINE_SHAPES: Readonly<Record<string, PuppetScene>> = {
+  rabbit: outline('rabbit', 0.17, 0.28),
+  fox: outline('fox', 0.3, 0.18),
+  cup: outline('cup', 0.26, 0.2),
+  flat: outline('flat', 0.2, 0.3),
+};

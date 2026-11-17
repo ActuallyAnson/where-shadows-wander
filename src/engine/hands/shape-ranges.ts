@@ -84,14 +84,15 @@ export const SHAPE_RANGES: Readonly<Record<Shape, ShapeRanges>> = {
   cup: ranges({ minCurl: [0.15, ANY], maxCurl: [-ANY, 0.6], palmStage: [0.5, ANY] }),
   /** Fingers straight and wide. */
   spread: ranges({ meanCurl: [-ANY, 0.19], maxCurl: [-ANY, 0.35], spreadDeg: [25, ANY] }),
-  /** Index and middle up, ring and pinky curled onto the thumb. */
+  /**
+   * Two fingers up, a V: index and middle straight, ring and pinky curled. The thumb can be anywhere: a plain V is a
+   * rabbit's ears, without the shadow-puppet rabbit's thumb pinched onto the ring finger, which is hard for a first shape.
+   */
   rabbit: ranges({
     curlIndex: [-ANY, 0.25],
     curlMiddle: [-ANY, 0.25],
     curlRing: [0.4, ANY],
     curlPinky: [0.4, ANY],
-    tipGapRingPinky: [-ANY, 0.35],
-    tipGapIndex: [0.4, ANY],
   }),
   /**
    * Fingers straight and together, thumb up as an ear (away from the fingers),

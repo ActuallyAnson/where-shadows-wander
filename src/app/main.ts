@@ -23,6 +23,7 @@ import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
+import { JarFireflyView } from '../engine/render/jar-firefly-view';
 import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
@@ -32,7 +33,7 @@ import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
-import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
+import { castPoint, REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import { loadTesting, MENU_CHOICES, nextChoice, saveTesting, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
@@ -41,16 +42,18 @@ import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { createHandFrame, JOINT } from '../engine/hands/hand';
 import { FADE_IN_S } from '../engine/xr/hand-fade';
 import { FadeView } from '../engine/shadow/fade-view';
+import { strayDarkness } from '../engine/shadow/pure/bed-guard';
 import { WakeView } from '../engine/shadow/wake-view';
 import { WakeTimeline } from '../engine/stage/wake-timeline';
 import { EndingTimeline } from '../engine/stage/ending-timeline';
 import { CreditsView } from '../ui/credits/credits-view';
 import { NightSounds } from '../engine/stage/night-sounds';
 import { Storm } from '../engine/stage/storm';
+import { LookToStart, looksAtStage } from '../engine/stage/look-to-start';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
-import { HandTrailView } from '../engine/shadow/hand-trail-view';
+import { ShapeRingView } from '../engine/shadow/shape-ring-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GhostOutlines } from '../engine/shadow/ghost-outline';
@@ -60,17 +63,20 @@ import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { SleepHint } from '../engine/stage/story/sleep-hint';
+import { JarFirefly } from '../engine/stage/story/jar-firefly';
+import { goodbyeMoon } from '../engine/stage/story/goodbye-moon';
+import { STORY_STAGE } from '../engine/stage/story/story-stage';
 import { LightHush } from '../engine/stage/story/light-hush';
 import { IgnitionHold } from '../engine/stage/ignition';
 import { writeCoverHand } from '../engine/hands/cover-hand';
 import { GhostHandView } from '../engine/render/ghost-hand-view';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
 import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
-import { FORM_S, FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
+import { FORM_S, FRIEND_PUPPETS, friendSceneTime, OUTLINE_SHAPES } from '../engine/stage/story/friend-puppet';
 import { ShapeGuide } from '../engine/stage/story/shape-guide';
 import { SHAPES, type Shape } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
-import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { DEFAULT_SHADOW_OPACITY } from '../engine/shadow/hand-shadow-map';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
@@ -231,9 +237,14 @@ async function start(): Promise<void> {
   // friend's hand and the story's words fill most of the wall. The hands' own shadows (and the captions) keep the stage.
   const storyFrame = new StageFrame();
   const lantern = new Float64Array(3);
-  // The wall's shadow settings are in real-wall.ts (blend 0.65, a low edge blur).
+  // Where each hand's shadow falls, as the candle casts it (real-wall.ts): for the story, the shapes' rings and the debug tools.
+  // The shadow itself is drawn by the candle's light (CandleLight.hands, hand-shadow-map.ts).
   const projector = new ShadowProjector(REAL_WALL_SHADOW_SETTINGS);
-  const shadowRenderer = new ShadowRenderer();
+  /** Where the hands' shadows are cast from this frame: behind and above the flame, so they reach the wall (real-wall.ts). */
+  const castFrom = new Float64Array(3);
+  // How dark the hands' shadow is drawn: `baseOpacity` at full (high contrast: 1), and this frame's strength (faint while a
+  // memory plays) and softness (the sharpen effect).
+  const handShadow = { baseOpacity: DEFAULT_SHADOW_OPACITY, strength: 0, softness: 1 };
   // On the room's wall the stage is the middle of the candle's round pool of light, drawn over most of the wall (stage-edge-glsl.ts).
   const lightPoolArea = new Float64Array(4);
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
@@ -256,7 +267,10 @@ async function start(): Promise<void> {
       if (flickerTest === null) lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
     });
   const cameraQuat = new Quaternion();
-  const stageView = new TestStageView();
+  // The candle as a real light for the room: everything in it is lit per pixel by the flame, the props cast baked shadows and
+  // the hands cast theirs every frame.
+  const candleLight = new CandleLight();
+  const stageView = new TestStageView(candleLight.hands);
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
   stageView.mood = 0.4; // the wall's warmth: a still evening (the story may set it later)
   const candleView = new CandleView();
@@ -271,15 +285,16 @@ async function start(): Promise<void> {
   const roomDressing = new RoomDressingView(bedroomLayout.layout);
   bedroomView.group.add(roomDressing.group);
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
-  // The candle as a real light for the room: everything in it is lit per pixel by the flame, and the props cast baked shadows.
-  const candleLight = new CandleLight();
   roomDressing.useCandleLight(candleLight);
   bedroomView.useCandleLight(candleLight);
   bedTray.useCandleLight(candleLight);
   // Real furniture (models credited in CREDITS.md) wherever its .glb is in src/assets/models.
   const roomModels = new RoomModels((id) => id in assetManifest, bedroomLayout.layout);
   roomDressing.group.add(roomModels.group);
-  void roomModels.load(candleLight);
+  // Her firefly, glowing in the jar on his desk until it leaves the jar on the wall in scene 5 (jar-firefly.ts).
+  const jarFirefly = new JarFirefly();
+  const jarFireflyView = new JarFireflyView();
+  void roomModels.load(candleLight).then(() => jarFireflyView.setJar(roomModels.group.getObjectByName('jar') ?? null));
   // Models placed with the room editor (layout entries that name a `model`), loaded through the asset manifest, in the
   // room or on the lap.
   const manifestModels: ModelLoader = async (id) => {
@@ -332,9 +347,17 @@ async function start(): Promise<void> {
   const storyTitle = new StoryLineView({ y: 0.42, width: 0.72 });
   const storyLine = new StoryLineView({ y: 0.3, width: 0.36 });
   const storySkip = new SkipTouch();
-  /** Seconds left before the story starts (it waits for the candle's light to spread), or -1: not waiting. */
-  const STORY_AFTER_LIGHT_S = 1.8;
-  let storyWait = -1;
+  /**
+   * Once the candle is lit, the story waits for the player to look up at the wall (lighting it, they look down at the candle),
+   * and the candle's light on the wall swells and settles to draw the eye (look-to-start.ts).
+   */
+  const lookToStart = new LookToStart();
+  /** How much brighter the wall's light is at the top of that call (0.3: a third brighter). */
+  const LOOK_CALL_LIGHT = 0.3;
+  const lookEye = new Vector3();
+  const lookDir = new Vector3();
+  const lookEyeA = new Float64Array(3);
+  const lookDirA = new Float64Array(3);
   let storyStarted = false;
   /** The player's hand shadow: faint while a memory plays, full when the story waits for a hand shape. */
   const handPresence = new HandPresence();
@@ -390,7 +413,7 @@ async function start(): Promise<void> {
   /** The scene whose mood (StoryScene.candle) was last asked for: a scene's mood is eased into once, as it starts. */
   let moodScene = -1;
   const startStory = (scene = 0) => {
-    storyWait = -1;
+    lookToStart.cancel();
     storyStarted = true;
     storyTitle.clear();
     storyLine.clear();
@@ -402,7 +425,7 @@ async function start(): Promise<void> {
     moodScene = story.sceneIndex;
   };
   const stopStory = () => {
-    storyWait = -1;
+    lookToStart.cancel();
     story.stop();
     guide.reset();
     storyTitle.clear();
@@ -419,19 +442,19 @@ async function start(): Promise<void> {
   const inspector = new FrameInspector(world.renderer.info, governor);
   let governorOn = false;
   let appliedLevel = 0;
-  const handTrail = new HandTrailView();
-  /** What the quality level means: the paper's scenery and the rings are switched by it here; the trail is checked where it is used. */
+  const shapeRing = new ShapeRingView();
+  /** What the quality level means: the paper's scenery and the rings are switched by it here. */
   const applyGovernor = () => {
     appliedLevel = governor.level;
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
-    handTrail.ringsOn = governor.isOn('ring');
+    shapeRing.ringsOn = governor.isOn('ring');
   };
   const wallPauseView = new WallPauseView();
   world.scene.add(
     stageView.group,
     wallPauseView.group,
     bedroomView.group,
-    shadowRenderer.mesh,
+    jarFireflyView.glow.mesh,
     friendView.group,
     friendOutView.group,
     guideView.group,
@@ -439,7 +462,7 @@ async function start(): Promise<void> {
     storyTitle.group,
     storyLine.group,
     captionLine.group,
-    handTrail.group,
+    shapeRing.group,
     candleView.group,
     ghostHand.object,
     titleLighter.group,
@@ -525,7 +548,7 @@ async function start(): Promise<void> {
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
-    shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
+    handShadow.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
   };
   settings.subscribe((key) => {
     if (key === null || key === 'highContrast') applyContrast();
@@ -539,6 +562,8 @@ async function start(): Promise<void> {
   // a word in the dark, and the boy's eyes open on the room in two slow blinks (wake-timeline.ts).
   const fade = new FadeView();
   const fadeHead = new Vector3();
+  // Darkens the view when the player leaves the bed (bed-guard.ts); a layer apart from `fade`, which the story's cuts drive.
+  const strayFade = new FadeView();
   const wake = new WakeTimeline();
   // The rain outside: a constant loop from the window, and now and then a flash there and, after it, far thunder (storm.ts).
   const storm = new Storm();
@@ -563,7 +588,7 @@ async function start(): Promise<void> {
   const credits = new CreditsView();
   /** The candle's light on the room as the flame was covered (its occlusion then); the end dims it from there to nothing. */
   let endLightFrom = 1;
-  world.scene.add(fade.group, wakeView.group, credits.group);
+  world.scene.add(fade.group, strayFade.group, wakeView.group, credits.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
@@ -719,6 +744,7 @@ async function start(): Promise<void> {
   let handVisual: HandVisual = capsuleHands;
   let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
   world.scene.add(handVisual.object);
+  candleLight.hands.setCasters(handVisual.object);
   // One visual per glove, kept once made: a model's bones are posed in place, so it cannot be set up from them again.
   const gloveVisuals = new Map<GloveId, HandVisual>([['plain', capsuleHands]]);
   let gloveId = readGlove();
@@ -729,6 +755,7 @@ async function start(): Promise<void> {
     world.scene.remove(handVisual.object);
     handVisual = next;
     world.scene.add(next.object);
+    candleLight.hands.setCasters(next.object); // the hands the player sees are the ones that cast
   };
   const chooseGlove = (id: GloveId) => {
     gloveId = id;
@@ -818,7 +845,8 @@ async function start(): Promise<void> {
       if (sessionState === 'asleep')
         return ending.active ? `Asleep: the end, ${ending.time.toFixed(1)} s in.` : 'Asleep: the end is over.';
       if (sessionState === 'title_vr') return 'Not started: the candle is not lit.';
-      if (!story.playing) return storyWait >= 0 ? 'The story starts in a moment.' : 'The story is not playing.';
+      if (!story.playing)
+        return lookToStart.waiting ? 'The story starts once the wall is looked at.' : 'The story is not playing.';
       const sc = story.scenes[story.sceneIndex];
       const b = story.beat;
       const doing =
@@ -900,7 +928,6 @@ async function start(): Promise<void> {
       handList,
       projector,
       stage,
-      shadowMesh: shadowRenderer.mesh,
       sharpen,
       lantern: lanternLight,
       candleLight: candleView.pointLight,
@@ -1226,7 +1253,7 @@ async function start(): Promise<void> {
     candleView.lit = true;
     titleLighter.visible = false;
     gameAudio.candleIgnited(candleView.flamePosition);
-    if (!storyStarted) storyWait = STORY_AFTER_LIGHT_S;
+    if (!storyStarted) lookToStart.start();
   };
   /**
    * Scene 7's end (docs/STORY.md, "Sleep"): the flame covered for good. The end plays from here (ending-timeline.ts, driven in
@@ -1315,6 +1342,13 @@ async function start(): Promise<void> {
       if (fade.alpha > 0 || fade.fading) {
         world.camera.getWorldPosition(fadeHead);
         fade.update(step, fadeHead);
+      }
+      // Seated play: a head that stands up or walks off the bed spot sees the view go dark, and clear again when it returns.
+      // Not at the desk (the camera is the desktop's), and not while the rig is yet to be placed from a real head.
+      if (!desk && rigPlaced && rigCalibratedFromHead) {
+        world.camera.getWorldPosition(fadeHead);
+        strayFade.setLevel(strayDarkness(fadeHead.x, fadeHead.y, fadeHead.z, lastHead[0], lastHead[1], lastHead[2]));
+        strayFade.update(step, fadeHead);
       }
       if (wake.playing) {
         wake.update(step);
@@ -1485,13 +1519,11 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         try {
-          shadowRenderer.mesh.visible = shadowsVisible;
-          projector.update(hands.hands, stage, candleView.flamePosition);
+          projector.update(hands.hands, stage, castPoint(stage, candleView.flamePosition, castFrom));
           if (!paused) {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-            handTrail.onShapeEvents(shapes.events, projector.shadows);
+            shapeRing.onShapeEvents(shapes.events, projector.shadows);
           }
-          shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           // Full when the story calls for a hand (or none is playing, or a menu needs it); faint while a memory plays.
           // High contrast keeps it fully solid throughout.
           const handCalled =
@@ -1500,31 +1532,33 @@ async function start(): Promise<void> {
             (story.waitingForShape && story.friendOpacity > 0) ||
             story.waitingForSleep;
           const handLevel = settings.value.highContrast ? 1 : handPresence.update(step, handCalled, story.handHidden);
-          shadowRenderer.update(
-            projector.shadows,
-            stage,
-            sharpen.look,
-            shadowsVisible ? candleView.occlusion * handLevel : 0,
-          );
-          // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
-          if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;
-          handTrail.update(
+          // The hands' shadow is cast by the candle (drawn after the hands are posed, below): how dark it is, and how soft (a
+          // recognised shape sharpens it). The candle's own dimming (a hand near the flame) is the light's, so not counted here.
+          // The debug tools' shadow switch (Alt+1) holds it hidden.
+          const shadowOn = shadowsVisible && !(debug && !debug.controller.systems.shadow);
+          handShadow.strength = shadowOn ? handShadow.baseOpacity * handLevel : 0;
+          handShadow.softness = Math.min(sharpen.look.left.blurScale, sharpen.look.right.blurScale);
+          shapeRing.update(
             paused ? 0 : step,
             stage,
-            projector.shadows,
-            shadowsVisible && governor.isOn('trail')
-              ? shadowRenderer.baseOpacity * candleView.occlusion * handLevel
-              : 0,
+            shadowsVisible ? handShadow.baseOpacity * candleView.occlusion * handLevel : 0,
           );
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
-          const lineOpacity =
-            shadowsVisible && !menu.group.visible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
+          const lineOpacity = shadowsVisible && !menu.group.visible ? handShadow.baseOpacity * candleView.occlusion : 0;
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
           const storyStep = paused || sessionState !== 'playing' ? 0 : step;
-          if (storyWait >= 0 && storyStep > 0) {
-            storyWait -= storyStep;
-            if (storyWait < 0) startStory();
+          if (lookToStart.waiting || lookToStart.pulse > 0) {
+            world.camera.getWorldPosition(lookEye);
+            world.camera.getWorldDirection(lookDir);
+            lookEyeA[0] = lookEye.x;
+            lookEyeA[1] = lookEye.y;
+            lookEyeA[2] = lookEye.z;
+            lookDirA[0] = lookDir.x;
+            lookDirA[1] = lookDir.y;
+            lookDirA[2] = lookDir.z;
+            const looking = looksAtStage(stage, lookEyeA, lookDirA, ROOM_WALL_WIDTH_M / 2, ROOM_WALL_HEIGHT_M / 2);
+            if (lookToStart.update(storyStep, looking)) startStory();
           }
           // A commit of the shape the friend's hand shows moves the story on, its memory starting where the player's shadow is.
           if (storyStep > 0 && story.waitingForShape)
@@ -1580,10 +1614,12 @@ async function start(): Promise<void> {
           );
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
-          if (friendScene && story.friendShowing) guideScene = friendScene;
+          // The outline is the shape's plain hand, the way it is recognised, not her puppet hand (OUTLINE_SHAPES).
+          if (friendScene && story.friendShowing)
+            guideScene = (story.friendShape !== null ? OUTLINE_SHAPES[story.friendShape] : undefined) ?? friendScene;
           // How dark her hand's shadow is; how much of it is there (fading, changing shape) goes in separately, so a fading hand
           // covers the scenery less rather than paling over it (PuppetView.update).
-          const friendLight = shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
+          const friendLight = shadowsVisible ? handShadow.baseOpacity * candleView.occlusion : 0;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
@@ -1619,7 +1655,7 @@ async function start(): Promise<void> {
             guideView.update(
               gp,
               storyFrame,
-              shadowsVisible ? shadowRenderer.baseOpacity * strength * candleView.occlusion : 0,
+              shadowsVisible ? handShadow.baseOpacity * strength * candleView.occlusion : 0,
               guide.presence,
             );
           } else guideView.hide();
@@ -1705,7 +1741,13 @@ async function start(): Promise<void> {
         const roomLight = ending.active
           ? endLightFrom * ending.candle
           : candleView.occlusion * lightHush.level * (1 - GHOST_DIP * sleepHint.dip);
-        stageView.applyLight(lanternLight.light, cameraQuat, roomLight, candleView.flamePosition, step);
+        stageView.applyLight(
+          lanternLight.light,
+          cameraQuat,
+          roomLight * (1 + LOOK_CALL_LIGHT * lookToStart.pulse),
+          candleView.flamePosition,
+          step,
+        );
         world.camera.getWorldPosition(settingsHead);
         stageView.setHead(settingsHead);
         bedroomView.update(lanternLight.light, cameraQuat, candleView.lit ? roomLight : 0);
@@ -1757,6 +1799,15 @@ async function start(): Promise<void> {
         }
         ghostHand.update(ghostFrame, sleepHint.ghost);
         candleView.update(lanternLight.light, cameraQuat);
+        const shown = story.memory;
+        jarFirefly.update(
+          paused ? 0 : step,
+          shown !== null && shown.scene === STORY_STAGE ? shown.time : null,
+          sessionState === 'title_vr',
+        );
+        jarFireflyView.update(jarFirefly.glow, jarFirefly.x, jarFirefly.y, jarFirefly.z, cameraQuat);
+        // Scene 6: the moon's light through the window brightens on the desk and the bed as the palms meet (goodbye-moon.ts).
+        candleLight.setMoonBeamLift(goodbyeMoon(shown !== null && shown.scene === STORY_STAGE ? shown.time : null));
       } catch (e) {
         failures.report('lighting', e);
       }
@@ -1809,6 +1860,14 @@ async function start(): Promise<void> {
           !paused,
           handEye,
         );
+        // The hands as posed this frame cast their shadow from the flame onto the room (hand-shadow-map.ts).
+        candleLight.hands.update(
+          world.renderer,
+          world.scene,
+          rigPlaced && candleView.lit ? castPoint(stage, candleView.flamePosition, castFrom) : null,
+          handShadow.strength,
+          handShadow.softness,
+        );
         timings.end(SLOT.handVisual);
       } catch (e) {
         failures.report('hands drawing', e);
@@ -1850,12 +1909,12 @@ async function start(): Promise<void> {
         menu,
         showMenu,
         stageView,
-        shadowRenderer,
+        handShadow,
         captionLine,
         soundPool,
         governor,
         inspector,
-        handTrail,
+        shapeRing,
         openSettings,
         shapes,
         gestures,

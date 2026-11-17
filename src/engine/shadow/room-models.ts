@@ -8,8 +8,8 @@
 //
 // Where each piece stands comes from the room layout file (content/rooms/bedroom.json, src/engine/stage/room-layout.ts) under
 // the piece's `id`; `at` and `yaw` below are the defaults when the file has no entry. The layout's scale multiplies the fitted size.
-import { AssetManager, Box3, Group, Vector3 } from '@iwsdk/core';
-import type { Material, Object3D } from '@iwsdk/core';
+import { AssetManager, Box3, Group, Matrix4, Mesh, Vector3 } from '@iwsdk/core';
+import type { BufferGeometry, Material, Object3D } from '@iwsdk/core';
 import type { CandleLight } from './candle-light';
 import { toRoomLook } from './room-look';
 import { placement, placementOr, type Placement, type RoomLayout } from '../stage/room-layout';
@@ -36,6 +36,11 @@ export interface RoomPiece {
   readonly yaw?: number;
   /** Parts of the model (by node name) left out: something of the game's own is there instead. */
   readonly hide?: readonly string[];
+  /**
+   * Its two halves (either side of its middle, across its width) drawn this far further apart (m each), what lies across the
+   * middle stretching to meet them: the curtains drawn back from the window, their rod as long as they need.
+   */
+  readonly part?: number;
 }
 
 /**
@@ -52,9 +57,6 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
     at: [0, 0, -0.35],
     size: [0.9, 1.7],
     yaw: Math.PI,
-    // Its neat cover: the player has just sat up in the bed, under the lap's own rumpled quilt (bed-tray-view.ts), which runs
-    // to the bed's foot; the sheet shows behind them, where they lay.
-    hide: ['cover'],
   },
   // The bookcase against the back wall in the right corner, beside the bed's head, its open side to the room: 0.6 m wide,
   // 1.32 m high.
@@ -79,8 +81,9 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   { id: 'chair', ids: ['deskchair'], at: [-1.2, 0, -0.8], size: [0.42, 0.46], yaw: -Math.PI / 2 },
   { id: 'pencils', ids: ['penciljar'], at: [-1.82, 0.607, -1.22], size: [0.08, 0.08], yaw: Math.PI / 2 },
   { id: 'globe', ids: ['globe'], at: [-1.8, 0.607, -0.42], size: [0.17, 0.15], yaw: Math.PI / 2 + 0.5 },
-  // Curtains either side of the window, from above it to just over the desk (1.55 m long; the window is z -1.35..-0.25).
-  { id: 'curtains', ids: ['curtains'], at: [-1.9, 0.8, -0.8], size: [1.24, 0.18], yaw: Math.PI / 2 },
+  // Curtains either side of the window, from above it to just over the desk (1.55 m long; the window is z -1.35..-0.25), drawn
+  // back so the moon shines in through the middle of the window onto the desk and the floor (candle-light.ts).
+  { id: 'curtains', ids: ['curtains'], at: [-1.9, 0.8, -0.8], size: [1.24, 0.18], yaw: Math.PI / 2, part: 0.12 },
   // A small wardrobe in the corner behind his left shoulder, against the left wall (1.23 m high), and the room's door on the
   // back wall between it and the bed (1.05 x 1.89 m), the moving boxes just inside it.
   { id: 'closet', ids: ['closet'], at: [-1.81, 0, 0.18], size: [0.64, 0.36], yaw: Math.PI / 2 },
@@ -95,10 +98,11 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   // The light in the ceiling (2.5 m), over the middle of the room, unlit: it hangs 0.67 m, high above the stage wall's view.
   { id: 'ceiling-light', ids: ['ceilinglight'], at: [0, 2.5 - 0.67, -0.45], size: [0.4, 0.4] },
 
-  // Her keepsakes, on top of the bookcase (1.32 m up), behind the player's right shoulder: half seen in the dark at first, and
-  // found by the last of the candle in scene 7 (docs/STORY.md). The jar she gave him on the firefly night (0.17 m tall, its lid
-  // on) and her torch from the night they met, lying on its side, its lens turned into the room.
-  { id: 'jar', ids: ['glassjar'], at: [1.5, 1.32, 0.3], size: [0.11, 0.11] },
+  // The jar she gave him on the firefly night (0.17 m tall, its lid on), on his desk between the pencils and the globe, under
+  // the window: her firefly glows in it (jar-firefly-view.ts) until it leaves the jar on the wall in scene 5 (docs/STORY.md).
+  { id: 'jar', ids: ['glassjar'], at: [-1.64, 0.607, -0.66], size: [0.11, 0.11] },
+  // Her torch from the night they met, on top of the bookcase (1.32 m up), behind the player's right shoulder, lying on its
+  // side, its lens turned into the room.
   { id: 'torch', ids: ['flashlight'], at: [1.72, 1.32, 0.28], size: [0.07, 0.2], yaw: -Math.PI / 2 + 0.3 },
   // He has just moved in (the prologue's boxes): a stack of taped boxes in the corner ahead on the right (0.68 m high), by the
   // pictures; behind his left shoulder, in front of the door, an open box half unpacked and a flat one with folded blankets on
@@ -188,6 +192,7 @@ export class RoomModels implements EditableSource {
     box.setFromObject(model);
     const centre = box.getCenter(new Vector3());
     model.position.set(-centre.x, -box.min.y, -centre.z);
+    if (piece.part) drawApart(holder, model, piece.part);
     const fallback = defaultPlacement(piece);
     this.group.add(holder);
     applyPlacement(holder, placementOr(this.layout, 'room', piece.id, fallback));
@@ -197,4 +202,31 @@ export class RoomModels implements EditableSource {
   dispose(): void {
     for (const m of this.materials) m.dispose();
   }
+}
+
+/**
+ * Moves every point of `model` either side of its holder's middle (x = 0, across its width) `by` metres further out, so its
+ * halves stand further apart and whatever spans the middle stretches. The holder must not be placed yet (its space is the
+ * fitted model's). The meshes get their own copies of their geometry.
+ */
+function drawApart(holder: Object3D, model: Object3D, by: number): void {
+  holder.updateMatrixWorld(true);
+  const p = new Vector3();
+  const inverse = new Matrix4();
+  model.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    const geometry = (o.geometry as BufferGeometry).clone();
+    const position = geometry.getAttribute('position');
+    inverse.copy(o.matrixWorld).invert();
+    for (let i = 0; i < position.count; i++) {
+      p.fromBufferAttribute(position, i).applyMatrix4(o.matrixWorld);
+      p.x += Math.sign(p.x) * by;
+      p.applyMatrix4(inverse);
+      position.setXYZ(i, p.x, p.y, p.z);
+    }
+    position.needsUpdate = true;
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    o.geometry = geometry;
+  });
 }

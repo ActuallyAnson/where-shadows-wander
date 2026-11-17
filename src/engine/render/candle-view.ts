@@ -187,7 +187,7 @@ export class CandleView {
     this.flame.mesh.position.set(0, 0.095, 0);
 
     // 6. Dynamic Scene Light: PointLight at wick tip (Y ≈ 0.095m)
-    // VR constraint: castShadow = false (shadow puppetry silhouettes are rendered separately by ShadowRenderer)
+    // VR constraint: castShadow = false (the hands' shadows are cast by CandleLight.hands, hand-shadow-map.ts)
     this.pointLight = new PointLight(0xffeedd, 1.2, 3.5, 2.0);
     this.pointLight.position.set(0, 0.095, 0);
     this.pointLight.castShadow = false;

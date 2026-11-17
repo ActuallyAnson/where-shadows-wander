@@ -60,14 +60,14 @@ const ZOOM_TO = (GOODBYE_AT[1] - WALL_BOTTOM) / -(BOY_FEET[1] + WAIST);
 const TURN_S = 0.1;
 const TURN_LEN_S = 1.6;
 const TURN_FROM = 0.7;
-const ZOOM_S = 0.2;
-const ZOOM_LEN_S = 3.0;
+export const ZOOM_S = 0.2;
+export const ZOOM_LEN_S = 3.0;
 /** They stay so, then their palms part... */
 const PART_S = ZOOM_S + ZOOM_LEN_S + 3.2;
 const PART_LEN_S = 1.6;
 /** ...she fades away... */
-const GIRL_GO_S = PART_S + PART_LEN_S + 0.8;
-const GIRL_GO_LEN_S = 4.0;
+export const GIRL_GO_S = PART_S + PART_LEN_S + 0.8;
+export const GIRL_GO_LEN_S = 4.0;
 /** ...and he bows his head, and fades too. */
 const BOW_S = GIRL_GO_S + GIRL_GO_LEN_S + 0.6;
 const BOY_GO_S = BOW_S + 1.6;

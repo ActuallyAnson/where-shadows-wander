@@ -1,6 +1,6 @@
-import { DataTexture, MeshBasicMaterial } from '@iwsdk/core';
+import { DataTexture, MeshBasicMaterial, Object3D } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
-import { BUMP_STRENGTH, CandleLight } from './candle-light';
+import { BUMP_STRENGTH, CandleLight, MOON_BEAM, MOON_FLASH } from './candle-light';
 
 /** A shader as three hands onBeforeCompile one: just the chunks the patch looks for. */
 function fakeShader() {
@@ -47,6 +47,21 @@ describe('CandleLight.light', () => {
     map.dispose();
     candle.dispose();
   });
+
+  it("takes the hands' shadows (shared uniforms), unless asked not to, under its own program", () => {
+    const candle = new CandleLight();
+    const wall = new MeshBasicMaterial();
+    const glove = new MeshBasicMaterial();
+    candle.light(wall);
+    candle.light(glove, undefined, false);
+    const w = patched(wall);
+    expect(w.fragmentShader).toContain('#define CANDLE_HANDS');
+    expect(w.uniforms.uHandStrength).toBe(candle.hands.uniforms.uHandStrength);
+    expect(w.uniforms.uHandMap).toBe(candle.hands.uniforms.uHandMap);
+    expect(patched(glove).fragmentShader).not.toContain('#define CANDLE_HANDS');
+    expect(glove.customProgramCacheKey()).not.toBe(wall.customProgramCacheKey());
+    candle.dispose();
+  });
 });
 
 describe('CandleLight.fullBright', () => {
@@ -61,6 +76,39 @@ describe('CandleLight.fullBright', () => {
     expect(s.uniforms.uFullBright.value).toBe(1);
     candle.fullBright = false;
     expect(s.uniforms.uFullBright.value).toBe(0);
+    candle.dispose();
+  });
+});
+
+describe('CandleLight and the moon through the window', () => {
+  it('has no beam until it has a window, then the night beam, scaled by the moon, the story and the lightning', () => {
+    const candle = new CandleLight();
+    expect(candle.moonBeam.b).toBe(0);
+    const window = new Object3D();
+    window.position.set(-1.995, 1.45, -0.8);
+    candle.setMoonWindow(window, 0.84, 1.08);
+    expect(candle.moonBeam.b).toBeCloseTo(MOON_BEAM.b, 6);
+    candle.setMoon(0.5); // the ending: the moon sinks
+    expect(candle.moonBeam.b).toBeCloseTo(MOON_BEAM.b * 0.5, 6);
+    candle.setMoon(1);
+    candle.setMoonBeamLift(2); // scene 6
+    expect(candle.moonBeam.b).toBeCloseTo(MOON_BEAM.b * 2, 6);
+    candle.setMoonBeamLift(1);
+    candle.setMoonFlash(1);
+    expect(candle.moonBeam.b).toBeCloseTo(MOON_BEAM.b * (1 + MOON_FLASH), 6);
+    candle.setMoonFlash(0);
+    expect(candle.moonBeam.b).toBeCloseTo(MOON_BEAM.b, 6);
+    candle.dispose();
+  });
+
+  it('lights every lit material by the beam too, through shared uniforms', () => {
+    const candle = new CandleLight();
+    const m = new MeshBasicMaterial();
+    candle.light(m);
+    const s = patched(m);
+    expect(s.fragmentShader).toContain('vec3 moon = uMoonLight + moonBeam(n, nl);');
+    expect(s.uniforms.uMoonBeam).toBe(candle.uniforms.uMoonBeam);
+    expect(s.uniforms.uMoonShadow).toBe(candle.uniforms.uMoonShadow);
     candle.dispose();
   });
 });

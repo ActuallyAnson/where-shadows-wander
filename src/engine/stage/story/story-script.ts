@@ -18,10 +18,8 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
       // The night they met: alone in his new room in the storm, he hides under his blanket; the girl from down the street comes
       // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
       { kind: 'memory', ...chapter('the-storm') },
-      // Beside the girl, in the empty wall at her left (not between the kids), the friend's hand rises open. For a few seconds it
-      // copies the player's hand (follows it about, makes the shapes it makes), so the player learns that hands answer hands;
-      // then it makes a rabbit of its own, and waits.
-      { kind: 'friend', shape: 'rabbit', x: -0.5, y: 0.17, mirror: 5 },
+      // Beside the girl, in the empty wall at her left (not between the kids), the friend's hand rises making a rabbit, and waits.
+      { kind: 'friend', shape: 'rabbit', x: -0.5, y: 0.17 },
       // The player's rabbit becomes the puppet rabbit and hops onto her hand. It ends on her hand raised again.
       { kind: 'memory', from: 'rabbit', ...chapter('how-they-met') },
     ],

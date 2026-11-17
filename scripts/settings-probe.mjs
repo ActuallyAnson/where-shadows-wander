@@ -114,7 +114,7 @@ check(
     const m = w.stageView.paper.material;
     return (
       w.stageView.highContrast &&
-      w.shadowRenderer.baseOpacity === 1 &&
+      w.handShadow.baseOpacity === 1 &&
       m.opacity === 1 &&
       m.color.r === 1 &&
       m.color.g === 1 &&

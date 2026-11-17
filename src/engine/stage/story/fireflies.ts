@@ -4,8 +4,8 @@
 // glow with them. They open their hands and let them go, a few at a time, up and away over the top of the wall; all but the
 // first, the player's, which lingers over them. They sit up in the grass, turned to each other; the friend takes out a jar,
 // the lingering firefly comes down into it, and she holds it out to the boy, glowing, and he takes it into his lap. They stand
-// and walk on; the park slides off to the left and a school gate slides in from the right in a pale autumn morning (the jar's
-// light lost in the daylight), leaves falling. At the gate the boy turns round to face the friend, and she raises her hand:
+// and walk on; the park slides off to the left and a school gate slides in from the right in a pale autumn morning (the firefly
+// still glowing in the jar, softer in the daylight), leaves falling. At the gate the boy turns round to face the friend, and she raises her hand:
 // the chapter ends on that, and the story holds the picture while the friend's hand waves. Every time is in seconds from the
 // chapter's start.
 import type { Chapter } from '../puppet/chapters';
@@ -248,6 +248,7 @@ const parts: PuppetPart[] = [
     opacity: 0,
     depth: 0,
   },
+  jarGlow('park-jar', 0.45 * 0.075, 0.12),
   // The fireflies from the grass.
   ...FLIES.flatMap((f, i) => firefly(`fly-${i}`, f.x, -0.2, 0.06)),
   // The walk to school: the kids again, the boy carrying the jar.
@@ -276,6 +277,7 @@ const parts: PuppetPart[] = [
     x: -0.05,
     y: 0.11,
   },
+  jarGlow('walk-boy-back-jar', 0.42 * JAR_H, 0.08),
   ...standingKid('walk-friend-back', FRIEND_GATE_X, -1, { opacity: 0, girl: true }),
   // The leaves.
   ...LEAVES.map((l, i): PuppetPart => ({
@@ -310,8 +312,9 @@ function groundKeys(from: number, dist: number): Key[] {
     [STOP_S, from - dist, 'out'],
   ];
 }
-/** How bright the firefly in the jar is. */
-const JAR_GLOW = 0.8;
+/** How bright the firefly in the jar is: at night, and in the morning light (softer, but still there). */
+export const JAR_GLOW = 0.8;
+const JAR_MORNING_GLOW = 0.55;
 
 /**
  * A sitting kid's arm moving through `keys` (radians from straight up, forward), and the jar in its hand turned the other way
@@ -459,8 +462,8 @@ const tracks: Track[] = [
     ],
   },
   { part: 'park-boy-jar-glow', prop: 'opacity', keys: [[0, JAR_GLOW]] },
-  // They stand and walk on, the boy with the jar, as the park slides away under them; in the morning light the jar's glow
-  // can no longer be seen.
+  // They stand and walk on, the boy with the jar, as the park slides away under them; in the morning light the firefly in the
+  // jar glows softer, but it is still there (it leaves the jar in scene 5).
   { part: 'park-boy', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 1, 0) },
   { part: 'park-friend', prop: 'opacity', keys: fadeKeys(STAND_S, CROSS_S, 1, 0) },
   {
@@ -468,9 +471,10 @@ const tracks: Track[] = [
     prop: 'opacity',
     keys: [
       [PARK_OUT_S, JAR_GLOW],
-      [PARK_OUT_S + 6.5, 0, 'smooth'],
+      [PARK_OUT_S + 6.5, JAR_MORNING_GLOW, 'smooth'],
     ],
   },
+  { part: 'walk-boy-back-jar-glow', prop: 'opacity', keys: [[0, JAR_MORNING_GLOW]] },
   {
     part: 'walk-boy',
     prop: 'opacity',

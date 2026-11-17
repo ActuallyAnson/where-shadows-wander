@@ -20,7 +20,7 @@ describe('QualityGovernor', () => {
     run(g, 100, BUDGET * 2); // a window of frames at twice the budget
     expect(g.level).toBe(1);
     expect(g.isOn('ring')).toBe(false);
-    expect(g.isOn('trail')).toBe(true); // the next step
+    expect(g.isOn('backdrop')).toBe(true); // the next step
     run(g, 200, BUDGET * 2);
     expect(g.level).toBeGreaterThanOrEqual(2);
     run(g, 2000, BUDGET * 2);

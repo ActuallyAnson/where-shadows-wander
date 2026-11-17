@@ -74,6 +74,18 @@ describe('shape ranges', () => {
       expect(classify('fox', 'right', { roll, pitch: 0, yaw: 0 }), `fox rolled ${roll}`).not.toBe('fox');
   });
 
+  it('a plain V, the thumb left loose or tucked, is a rabbit', () => {
+    for (const t of [
+      { curl: 0.1, abductDeg: 40 },
+      { curl: 0.6, abductDeg: 10 },
+    ]) {
+      const pose = clonePose(PRESETS.rabbit);
+      pose.thumb = { ...pose.thumb, ...t, pinch: 0 };
+      const f = computeHandFeatures(writeHandPose(pose, W, createHandFrame('right')), features)!;
+      expect(bestShape(f), JSON.stringify(t)).toBe('rabbit');
+    }
+  });
+
   it('a flat hand turned palm-sideways is not flat', () => {
     expect(classify('flat', 'right', { roll: 90, pitch: 0, yaw: 0 })).not.toBe('flat');
   });

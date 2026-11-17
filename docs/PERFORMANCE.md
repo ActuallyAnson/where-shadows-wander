@@ -19,8 +19,7 @@ a headset**. Nothing has been measured on a Pico or a Quest yet.
 ## Guards in `npm run check`
 
 - Per-frame allocation stays under 64 B for the hand reader, the hands status, the hand visual, the audio engine, and
-  the hand trail and bunting views (`*.alloc.test.ts`; the last two are in `room-views.alloc.test.ts`, which was
-  `story-views.alloc.test.ts`), and under 700 B for the whole hand pipeline (`frame-pipeline.alloc.test.ts`). The
+  the shape ring view (`*.alloc.test.ts`; the last is in `room-views.alloc.test.ts`), and under 700 B for the whole hand pipeline (`frame-pipeline.alloc.test.ts`). The
   pipeline test runs the recognizer, gestures and projector for 3,000 frames and also fails if garbage collection runs
   inside the window. It measures about 530 B a frame, which is the engine boxing numbers returned by small helpers; it
   was 6.9 KB until `Math.hypot` (which allocates) was replaced with `Math.sqrt` in the hot paths.

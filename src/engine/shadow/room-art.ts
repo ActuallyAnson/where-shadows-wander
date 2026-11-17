@@ -1,6 +1,6 @@
 // The bedroom's painted art, drawn in code onto canvases (no image files): the wall behind the stage, the night outside the
-// window with its rain, the moonlight on the floor and the quilt on his lap. Each painter fills the whole canvas it is given, once, when the room is made. The colours are
-// mid-tones: room-dressing-view.ts darkens or warms them with the candle, so they read as one lit room.
+// window with its rain, the moonlight on the floor. Each painter fills the whole canvas it is given, once, when the room is
+// made. The colours are mid-tones: room-dressing-view.ts darkens or warms them with the candle, so they read as one lit room.
 
 const TWO_PI = Math.PI * 2;
 
@@ -16,18 +16,6 @@ function rng(seed: number): () => number {
 function rect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string): void {
   g.fillStyle = fill;
   g.fillRect(x, y, w, h);
-}
-
-function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, fill: string): void {
-  g.fillStyle = fill;
-  g.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a = (i * Math.PI) / 5 - Math.PI / 2;
-    const rr = i % 2 === 0 ? r : r * 0.45;
-    g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
-  }
-  g.closePath();
-  g.fill();
 }
 
 /** The room's walls: plain plaster above wooden panelling. No picture rail or bunting: the walls are bare for the story. */
@@ -462,144 +450,4 @@ export function paintRain(
       }
     }
   }
-}
-
-/**
- * The window's moonlight on the floor: a slanted patch of cool light cut by the window's cross bars, soft at the edges.
- * Drawn to be added to the floor, so it is a grey-blue on black.
- */
-export function paintMoonPatch(g: CanvasRenderingContext2D, W: number, H: number): void {
-  g.save();
-  g.scale(W / 256, H / 256);
-  g.fillStyle = '#000';
-  g.fillRect(0, 0, 256, 256);
-  const panes: [number, number][] = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ];
-  for (const [cx, cy] of panes) {
-    // each pane is a parallelogram leaning to the right as it goes down
-    const x0 = 34 + cx * 100,
-      y0 = 30 + cy * 100,
-      w = 88,
-      h = 88,
-      lean = 26;
-    const grad = g.createLinearGradient(0, y0, 0, y0 + h);
-    grad.addColorStop(0, 'rgba(170, 195, 255, 0.95)');
-    grad.addColorStop(1, 'rgba(110, 140, 220, 0.7)');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(x0 + lean, y0);
-    g.lineTo(x0 + lean + w, y0);
-    g.lineTo(x0 + w, y0 + h);
-    g.lineTo(x0, y0 + h);
-    g.closePath();
-    g.fill();
-  }
-  // soften the edges with the browser's blur where it has one, then fade the borders into black
-  const blurred = 'filter' in g;
-  if (blurred) {
-    g.filter = 'blur(7px)';
-    g.globalCompositeOperation = 'lighter';
-    g.drawImage(g.canvas, 0, 0, 256, 256);
-    g.filter = 'none';
-    g.globalCompositeOperation = 'source-over';
-  }
-  const fade = g.createRadialGradient(128, 128, 30, 128, 128, 130);
-  fade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  fade.addColorStop(1, 'rgba(0, 0, 0, 1)');
-  g.fillStyle = fade;
-  g.fillRect(0, 0, 256, 256);
-  g.restore();
-}
-
-const QUILT_COLOURS = ['#25324d', '#2d3e33', '#583a2d', '#604f35', '#3d2b38', '#302b28'];
-
-/**
- * A patchwork quilt (a square canvas, four patches by four, laid out like the bed tray's own): every patch is woven cloth with a
- * small motif (star, diamond, stripes, dots, triangles), puffed in the middle and pinched at the seams, with a dashed thread
- * stitched round it. The colours are the bed tray's own muted ones.
- */
-export function paintQuilt(g: CanvasRenderingContext2D, W: number, H: number): void {
-  const r = rng(97);
-  g.save();
-  g.scale(W / 256, H / 256);
-  const P = 64;
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      const x = col * P;
-      const y = row * P;
-      const base = QUILT_COLOURS[(row * 3 + col * 2 + (row % 2)) % QUILT_COLOURS.length];
-      rect(g, x, y, P, P, base);
-      // woven cloth: fine threads both ways
-      g.fillStyle = 'rgba(255, 235, 200, 0.05)';
-      for (let i = 0; i < P; i += 3) {
-        g.fillRect(x + i, y, 1, P);
-        g.fillRect(x, y + i, P, 1);
-      }
-      // the motif, a shade lighter than the cloth
-      g.fillStyle = 'rgba(255, 235, 200, 0.16)';
-      g.strokeStyle = 'rgba(255, 235, 200, 0.16)';
-      g.lineWidth = 3;
-      const cx = x + P / 2;
-      const cy = y + P / 2;
-      switch ((row + col * 2) % 5) {
-        case 0:
-          star(g, cx, cy, 20, 'rgba(255, 235, 200, 0.18)');
-          break;
-        case 1:
-          g.beginPath();
-          g.moveTo(cx, cy - 20);
-          g.lineTo(cx + 20, cy);
-          g.lineTo(cx, cy + 20);
-          g.lineTo(cx - 20, cy);
-          g.closePath();
-          g.fill();
-          break;
-        case 2:
-          for (let i = 0; i < 4; i++) g.fillRect(x + 12 + i * 12, y + 8, 5, P - 16);
-          break;
-        case 3:
-          for (let i = 0; i < 3; i++) {
-            for (let j = 0; j < 3; j++) {
-              g.beginPath();
-              g.arc(x + 14 + i * 18, y + 14 + j * 18, 3.4, 0, TWO_PI);
-              g.fill();
-            }
-          }
-          break;
-        default:
-          g.beginPath();
-          g.moveTo(x + 6, y + 6);
-          g.lineTo(x + P - 6, y + 6);
-          g.lineTo(x + 6, y + P - 6);
-          g.closePath();
-          g.fill();
-      }
-      // the odd darker tuft of wear
-      if (r() < 0.5) rect(g, x + r() * 40, y + r() * 50, 10 + r() * 14, 2, 'rgba(0, 0, 0, 0.18)');
-      // puffed in the middle, pinched at the seams
-      const puff = g.createRadialGradient(cx - 6, cy - 8, 4, cx, cy, P * 0.72);
-      puff.addColorStop(0, 'rgba(255, 235, 200, 0.2)');
-      puff.addColorStop(0.55, 'rgba(255, 235, 200, 0)');
-      puff.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
-      g.fillStyle = puff;
-      g.fillRect(x, y, P, P);
-      // the dashed thread
-      g.strokeStyle = 'rgba(235, 220, 190, 0.55)';
-      g.lineWidth = 1.2;
-      g.setLineDash([3, 2.5]);
-      g.strokeRect(x + 5, y + 5, P - 10, P - 10);
-      g.setLineDash([]);
-    }
-  }
-  // the seams, dark where the patches are pinched together
-  g.fillStyle = 'rgba(8, 4, 4, 0.55)';
-  for (let i = 1; i < 4; i++) {
-    g.fillRect(i * P - 1.2, 0, 2.4, 256);
-    g.fillRect(0, i * P - 1.2, 256, 2.4);
-  }
-  g.restore();
 }

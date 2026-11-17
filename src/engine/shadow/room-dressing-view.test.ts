@@ -1,9 +1,8 @@
 import { FrontSide, Mesh, MeshBasicMaterial, Vector3 } from '@iwsdk/core';
 import { describe, expect, it } from 'vitest';
 import type { LanternLight } from './pure/lantern-light';
-import { castShadow, paintMoonPatch, paintNight, paintQuilt, paintRain, paintWall } from './room-art';
+import { castShadow, paintNight, paintRain, paintWall } from './room-art';
 import { RoomDressingView } from './room-dressing-view';
-import { emptyRoomLayout, placement } from '../stage/room-layout';
 import { CANDLE_REACH_M, CandleLight } from './candle-light';
 
 /** A 2D context that accepts any call and counts the drawing ones, with gradients that take colour stops. */
@@ -37,9 +36,7 @@ describe('room art painters', () => {
     ['night village', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'village'), 30],
     ['night near ground', (g: CanvasRenderingContext2D) => paintNight(g, 520, 600, 'near'), 20],
     ['night curtains', (g: CanvasRenderingContext2D) => paintNight(g, 440, 520, 'curtains'), 20],
-    ['quilt', (g: CanvasRenderingContext2D) => paintQuilt(g, 256, 256), 100],
     ['rain', (g: CanvasRenderingContext2D) => paintRain(g, 256, 256, 3, 38, 46), 30],
-    ['moon patch', (g: CanvasRenderingContext2D) => paintMoonPatch(g, 256, 256), 30],
   ])('paints the %s without throwing, and draws a fair amount', (_name, paint, min) => {
     const { g, calls } = recordingContext();
     expect(() => paint(g)).not.toThrow();
@@ -191,18 +188,20 @@ describe('RoomDressingView', () => {
     candle.dispose();
     v.dispose();
   });
-  it('keeps the window and the moonlight on the floor as they are whatever the candle does', () => {
+  it('keeps the window and the moonlight through it as they are whatever the candle does', () => {
     const v = new RoomDressingView();
+    const candle = new CandleLight();
+    v.useCandleLight(candle);
     const meshes = v.group.children as unknown as { material: { color: { r: number; g: number; b: number } } }[];
     const night = meshes[4].material.color;
-    const patch = meshes[11].material.color;
     v.update(light(false), 1);
     const nightDark = { ...night };
-    const patchDark = { ...patch };
+    const beamDark = candle.moonBeam.b;
     v.update(light(true, 1), 1);
     expect({ ...night }).toEqual(nightDark);
-    expect({ ...patch }).toEqual(patchDark); // the candle adds light; it never takes the moon's away
+    expect(candle.moonBeam.b).toBe(beamDark); // the candle adds light; it never takes the moon's away
     v.dispose();
+    candle.dispose();
   });
 
   it('slides the far outside layers more than the near ones as the head moves, and never past the painted margin', () => {
@@ -243,21 +242,24 @@ describe('RoomDressingView', () => {
     v.dispose();
   });
 
-  it('brightens the window and the moonlight on the floor with a lightning flash, and lets them go after', () => {
+  it('brightens the window and the moonlight through it with a lightning flash, and lets them go after', () => {
     const v = new RoomDressingView();
+    const candle = new CandleLight();
+    v.useCandleLight(candle);
     const outdoor = (v as unknown as { outdoor: { color: { r: number } }[] }).outdoor;
-    const patch = (v as unknown as { moonPatch: { color: { b: number } } }).moonPatch;
     v.update(light(false));
-    const calm = [outdoor[0].color.r, patch.color.b];
+    const calm = [outdoor[0].color.r, candle.moonBeam.b];
+    expect(calm[1]).toBeGreaterThan(0);
     v.lightning = 1;
     v.update(light(false));
     expect(outdoor[0].color.r).toBeGreaterThan(calm[0] * 2);
-    expect(patch.color.b).toBeGreaterThan(calm[1] * 2);
+    expect(candle.moonBeam.b).toBeGreaterThan(calm[1] * 2);
     v.lightning = 0;
     v.update(light(false));
     expect(outdoor[0].color.r).toBeCloseTo(calm[0]);
-    expect(patch.color.b).toBeCloseTo(calm[1]);
+    expect(candle.moonBeam.b).toBeCloseTo(calm[1]);
     v.dispose();
+    candle.dispose();
   });
 
   it('disposes cleanly', () => {
@@ -266,16 +268,18 @@ describe('RoomDressingView', () => {
   });
 });
 
-describe('RoomDressingView and the room layout', () => {
-  it('puts the moonlight where the layout says, and keeps the children in order', () => {
-    const layout = emptyRoomLayout();
-    layout.room['moon-patch'] = placement([-0.8, 0.008, -0.6], [-90, 0, 0]);
-    const v = new RoomDressingView(layout);
-    expect(v.editables().map((p) => p.id)).toEqual(['moon-patch']);
-    const patch = v.editables()[0];
-    expect(patch.object.name).toBe('moon-patch');
-    expect(patch.object.position.x).toBeCloseTo(-0.8, 6);
-    expect(patch.fallback.pos).toEqual([-0.95, 0.008, -0.8]);
-    expect(v.group.children).toHaveLength(new RoomDressingView().group.children.length);
+describe('RoomDressingView and the moonlight', () => {
+  it('lets the moon in at the window on the left wall, through its opening', () => {
+    const v = new RoomDressingView();
+    expect(v.editables()).toEqual([]);
+    expect(v.moonWindow.parent).toBe(v.group);
+    expect(v.moonWindow.position.x).toBeCloseTo(-1.995, 6);
+    const candle = new CandleLight();
+    expect(candle.moonBeam.b).toBe(0); // no window yet: no beam
+    v.useCandleLight(candle);
+    expect(candle.moonBeam.b).toBeGreaterThan(0);
+    expect(candle.uniforms.uMoonWinHalf.value.x).toBeCloseTo(0.42, 6);
+    v.dispose();
+    candle.dispose();
   });
 });

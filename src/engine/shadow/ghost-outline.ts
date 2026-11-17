@@ -1,7 +1,6 @@
-// The shape guide's ghost as an outline (shape-guide.ts): her painted hand (friend-puppet.ts), posed once as it holds its shape,
-// drawn as one silhouette and turned into a thin line just outside its edge, mirrored left to right so it faces her hand. The
-// parts are joined first, so there is no line where an ear crosses the head or the hand meets the arm: only the shape's own
-// edge. The line lies outside the shape, so a shadow that fills it leaves the line showing, as a frame it fits. Baked into a
+// The shape guide's ghost as an outline (shape-guide.ts): a scene (the shape's plain hand, OUTLINE_SHAPES in friend-puppet.ts),
+// posed once, drawn as one silhouette and turned into a thin line just outside its edge, mirrored left to right so it faces her
+// hand. The parts are joined first, so there is no line where they overlap: only the shape's own edge. The line lies outside the shape, so a shadow that fills it leaves the line showing, as a frame it fits. Baked into a
 // canvas once per shape (on first use); PuppetView draws it as a one-part scene, its art looked up in `art`.
 import type { PuppetScene } from '../stage/puppet/puppet-scene';
 import { POSE_STRIDE } from '../stage/puppet/puppet-scene';

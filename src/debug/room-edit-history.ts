@@ -6,7 +6,7 @@ import { copyPlacement, samePlacement, type Placement } from '../engine/stage/ro
 /** A piece moved: undo puts it at `before`, redo at `after`. */
 export interface MoveEdit {
   readonly kind: 'move';
-  /** The piece's id and section (`room:bed`, `lap:quilt`). */
+  /** The piece's id and section (`room:bed`, `lap:tray`). */
   readonly key: string;
   readonly before: Readonly<Placement>;
   readonly after: Readonly<Placement>;
