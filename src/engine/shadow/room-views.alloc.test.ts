@@ -1,9 +1,10 @@
-// The per-frame calls on the hand trail and the room's bunting must not allocate.
+// The per-frame call on the shape ring must not allocate.
 // Needs `--expose-gc` (vitest.config.ts sets it); skipped without it.
 import { describe, expect, it } from 'vitest';
 import { createHandShadow } from '../hands/hand-shadow';
+import { ShapeEventQueue } from '../hands/shape-events';
 import { bytesPerFrame, gc } from '../testing/alloc-measure';
-import { HandTrailView } from './hand-trail-view';
+import { ShapeRingView } from './shape-ring-view';
 import { createStagePlane } from './pure/stage-plane';
 
 const FRAMES = 3_000;
@@ -22,10 +23,12 @@ function stagePlane() {
   return stage;
 }
 
-describe.skipIf(!gc)('hand trail and bunting allocation', () => {
-  it('HandTrailView.update() allocates nothing with a hand moving', () => {
+describe.skipIf(!gc)('shape ring allocation', () => {
+  it('ShapeRingView.update() allocates nothing while rings open, one after another', () => {
     const stage = stagePlane();
-    const view = new HandTrailView();
+    const view = new ShapeRingView();
+    const events = new ShapeEventQueue(8);
+    events.push('commit', 'right', 'flat', 0, 0, 0);
     const shadows = { left: createHandShadow('left'), right: createHandShadow('right') };
     const sh = shadows.right;
     sh.active = true;
@@ -37,10 +40,11 @@ describe.skipIf(!gc)('hand trail and bunting allocation', () => {
       sh.bounds[1] = -0.05;
       sh.bounds[2] = x + 0.05;
       sh.bounds[3] = 0.05;
-      view.update(DT, stage, shadows, 1);
+      if (frame % 60 === 0) view.onShapeEvents(events, shadows);
+      view.update(DT, stage, 1);
       frame++;
     }, options);
-    console.info(`HandTrailView.update allocates ${bytes.toFixed(1)} B a frame`);
+    console.info(`ShapeRingView.update allocates ${bytes.toFixed(1)} B a frame`);
     expect(bytes).toBeLessThan(BUDGET_BYTES_PER_FRAME);
   }, 60_000);
 });

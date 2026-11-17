@@ -51,7 +51,7 @@ import { LookToStart, looksAtStage } from '../engine/stage/look-to-start';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
-import { HandTrailView } from '../engine/shadow/hand-trail-view';
+import { ShapeRingView } from '../engine/shadow/shape-ring-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GhostOutlines } from '../engine/shadow/ghost-outline';
@@ -428,12 +428,12 @@ async function start(): Promise<void> {
   const inspector = new FrameInspector(world.renderer.info, governor);
   let governorOn = false;
   let appliedLevel = 0;
-  const handTrail = new HandTrailView();
-  /** What the quality level means: the paper's scenery and the rings are switched by it here; the trail is checked where it is used. */
+  const shapeRing = new ShapeRingView();
+  /** What the quality level means: the paper's scenery and the rings are switched by it here. */
   const applyGovernor = () => {
     appliedLevel = governor.level;
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
-    handTrail.ringsOn = governor.isOn('ring');
+    shapeRing.ringsOn = governor.isOn('ring');
   };
   const wallPauseView = new WallPauseView();
   world.scene.add(
@@ -448,7 +448,7 @@ async function start(): Promise<void> {
     storyTitle.group,
     storyLine.group,
     captionLine.group,
-    handTrail.group,
+    shapeRing.group,
     candleView.group,
     ghostHand.object,
     titleLighter.group,
@@ -1499,7 +1499,7 @@ async function start(): Promise<void> {
           projector.update(hands.hands, stage, candleView.flamePosition);
           if (!paused) {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-            handTrail.onShapeEvents(shapes.events, projector.shadows);
+            shapeRing.onShapeEvents(shapes.events, projector.shadows);
           }
           shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           // Full when the story calls for a hand (or none is playing, or a menu needs it); faint while a memory plays.
@@ -1519,13 +1519,10 @@ async function start(): Promise<void> {
           );
           // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
           if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;
-          handTrail.update(
+          shapeRing.update(
             paused ? 0 : step,
             stage,
-            projector.shadows,
-            shadowsVisible && governor.isOn('trail')
-              ? shadowRenderer.baseOpacity * candleView.occlusion * handLevel
-              : 0,
+            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion * handLevel : 0,
           );
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
           const lineOpacity =
@@ -1882,7 +1879,7 @@ async function start(): Promise<void> {
         soundPool,
         governor,
         inspector,
-        handTrail,
+        shapeRing,
         openSettings,
         shapes,
         gestures,
