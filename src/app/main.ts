@@ -42,6 +42,7 @@ import type { StagePlane } from '../engine/shadow/pure/stage-plane';
 import { createHandFrame, JOINT } from '../engine/hands/hand';
 import { FADE_IN_S } from '../engine/xr/hand-fade';
 import { FadeView } from '../engine/shadow/fade-view';
+import { strayDarkness } from '../engine/shadow/pure/bed-guard';
 import { WakeView } from '../engine/shadow/wake-view';
 import { WakeTimeline } from '../engine/stage/wake-timeline';
 import { EndingTimeline } from '../engine/stage/ending-timeline';
@@ -561,6 +562,8 @@ async function start(): Promise<void> {
   // a word in the dark, and the boy's eyes open on the room in two slow blinks (wake-timeline.ts).
   const fade = new FadeView();
   const fadeHead = new Vector3();
+  // Darkens the view when the player leaves the bed (bed-guard.ts); a layer apart from `fade`, which the story's cuts drive.
+  const strayFade = new FadeView();
   const wake = new WakeTimeline();
   // The rain outside: a constant loop from the window, and now and then a flash there and, after it, far thunder (storm.ts).
   const storm = new Storm();
@@ -585,7 +588,7 @@ async function start(): Promise<void> {
   const credits = new CreditsView();
   /** The candle's light on the room as the flame was covered (its occlusion then); the end dims it from there to nothing. */
   let endLightFrom = 1;
-  world.scene.add(fade.group, wakeView.group, credits.group);
+  world.scene.add(fade.group, strayFade.group, wakeView.group, credits.group);
   const settingsPanel = new SettingsScreen(menu, settings, () => debug?.controller.pages() ?? []);
   settingsPanel.onVisibilityChange = (open) => {
     if (!open && sessionState === 'paused') {
@@ -1339,6 +1342,13 @@ async function start(): Promise<void> {
       if (fade.alpha > 0 || fade.fading) {
         world.camera.getWorldPosition(fadeHead);
         fade.update(step, fadeHead);
+      }
+      // Seated play: a head that stands up or walks off the bed spot sees the view go dark, and clear again when it returns.
+      // Not at the desk (the camera is the desktop's), and not while the rig is yet to be placed from a real head.
+      if (!desk && rigPlaced && rigCalibratedFromHead) {
+        world.camera.getWorldPosition(fadeHead);
+        strayFade.setLevel(strayDarkness(fadeHead.x, fadeHead.y, fadeHead.z, lastHead[0], lastHead[1], lastHead[2]));
+        strayFade.update(step, fadeHead);
       }
       if (wake.playing) {
         wake.update(step);

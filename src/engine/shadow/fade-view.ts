@@ -62,6 +62,15 @@ export class FadeView {
     this.apply();
   }
 
+  /** Sets the darkness now (0 clear .. 1 black), without easing, for a fade driven by something else each frame. */
+  setLevel(level: number): void {
+    this.seconds = 0;
+    this.t = 0;
+    this.onDone = null;
+    this.level = level < 0 ? 0 : level > 1 ? 1 : level;
+    this.apply();
+  }
+
   /** Once per frame, with where the head is (world). */
   update(dt: number, head: Readonly<{ x: number; y: number; z: number }>): void {
     if (this.level > 0) this.sphere.position.set(head.x, head.y, head.z);
