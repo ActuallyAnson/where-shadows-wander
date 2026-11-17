@@ -182,7 +182,7 @@ export class HandTrailView {
           live[i] = live[i - 1] * 0.86; // each older point is a little dimmer, and gone when the hand is
         }
       }
-      if (s.active && s.onStage) {
+      if (s.active) {
         x[0] = (s.bounds[0] + s.bounds[2]) / 2;
         y[0] = (s.bounds[1] + s.bounds[3]) / 2;
         live[0] = s.opacity; // as strong as the shadow: faint behind the candle, where the shadow is out of focus

@@ -3,6 +3,10 @@
 // is testable in Node. A hand's `look` (shadow-sharpen.ts) scales only the blur;
 // the capsules themselves (their ends and radius, which the collision solver
 // uses) are copied untouched, so the 50 % edge never moves.
+//
+// A shadow never just vanishes. It is drawn wherever it falls on the quad (the wall's pool of light fades it at its rim, in the
+// shader), not only over the stage rectangle; and when a hand is lost (tracking drops it, or a joint), its last shadow stays
+// where it was and fades out over LOST_FADE_S rather than going in one frame.
 import type { Handedness } from '../../hands/hand';
 import { CAPSULES_PER_HAND, CAPSULE_STRIDE, type HandShadow } from '../../hands/hand-shadow';
 import type { ShadowLook } from './shadow-sharpen';
@@ -17,27 +21,49 @@ export interface ShadowUniformArrays {
   active: Int32Array; // 2
   /** Base opacity plus the hand's sharpen boost, per hand, capped at 1. */
   opacity: Float32Array; // 2
+  /** How much of a lost hand's last shadow is still drawn, per hand: 1 while it is tracked, easing to 0 once it is lost. */
+  held: Float32Array; // 2
+  /** The opacity each hand was last drawn at while tracked, to fade from once it is lost. */
+  lastOpacity: Float32Array; // 2
 }
+
+/** How long a lost hand's last shadow takes to fade out, seconds. */
+export const LOST_FADE_S = 0.35;
 
 const HANDS: readonly Handedness[] = ['left', 'right'];
 const MIN_PAD_M = 0.001;
 
-/** Fills `out` from the shadows; returns whether any hand has a shadow on the stage. */
+/** Fills `out` from the shadows, `dt` seconds after the last call; returns whether any hand has a shadow to draw. */
 export function packShadowUniforms(
   shadows: Readonly<Record<Handedness, HandShadow>>,
   looks: Readonly<Record<Handedness, ShadowLook>> | null,
   baseOpacity: number,
   out: ShadowUniformArrays,
+  dt: number,
 ): boolean {
   let any = false;
   for (let h = 0; h < HANDS.length; h++) {
     const s = shadows[HANDS[h]];
     const look = looks ? looks[HANDS[h]] : null;
-    out.active[h] = s.active && s.onStage && s.opacity > 0.001 ? 1 : 0;
+    if (!s.active) {
+      // Lost: the last shadow's capsules and bounds are still in `out`; fade it where it is.
+      const held = out.held[h] - dt / LOST_FADE_S;
+      out.held[h] = held > 0 ? held : 0;
+      out.active[h] = out.held[h] > 0.001 && out.lastOpacity[h] > 0.001 ? 1 : 0;
+      if (!out.active[h]) continue;
+      any = true;
+      const t = out.held[h];
+      out.opacity[h] = out.lastOpacity[h] * t * t * (3 - 2 * t);
+      continue;
+    }
+    out.held[h] = 1;
+    out.active[h] = s.opacity > 0.001 ? 1 : 0;
+    out.lastOpacity[h] = 0;
     if (!out.active[h]) continue;
     any = true;
     const blurScale = look ? look.blurScale : 1;
     out.opacity[h] = Math.min(1, (baseOpacity + (look ? look.opacityBoost : 0)) * s.opacity);
+    out.lastOpacity[h] = out.opacity[h];
     let maxBlur = 0;
     for (let c = 0; c < CAPSULES_PER_HAND; c++) {
       const o = c * CAPSULE_STRIDE,

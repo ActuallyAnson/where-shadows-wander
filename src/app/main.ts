@@ -1505,6 +1505,7 @@ async function start(): Promise<void> {
             stage,
             sharpen.look,
             shadowsVisible ? candleView.occlusion * handLevel : 0,
+            step,
           );
           // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
           if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;

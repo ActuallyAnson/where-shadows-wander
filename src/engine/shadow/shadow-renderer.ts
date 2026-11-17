@@ -30,6 +30,8 @@ export class ShadowRenderer {
     bounds: new Float32Array(2 * 4),
     active: new Int32Array(2),
     opacity: new Float32Array(2),
+    held: new Float32Array(2),
+    lastOpacity: new Float32Array(2),
   };
   private readonly m = new Matrix4();
   /** Where the candle's pool of light is drawn ([width, height, centre x, centre y], stage metres), or null: just the stage. */
@@ -67,17 +69,21 @@ export class ShadowRenderer {
   }
 
   /**
-   * Call once per frame after the projector.
+   * Call once per frame after the projector, `dt` seconds after the last call (a lost hand's shadow fades out over it).
    * @param looks each hand's sharpen look (shadow-sharpen.ts), or null for plain shadows
    */
   update(
     shadows: Readonly<Record<Handedness, HandShadow>>,
     stage: StagePlane,
-    looks: Readonly<Record<Handedness, ShadowLook>> | null = null,
-    lightOcclusion = 1.0,
+    looks: Readonly<Record<Handedness, ShadowLook>> | null,
+    lightOcclusion: number,
+    dt: number,
   ): void {
     const any =
-      lightOcclusion > 0.001 && packShadowUniforms(shadows, looks, this.baseOpacity * lightOcclusion, this.uniforms);
+      lightOcclusion > 0.001 &&
+      packShadowUniforms(shadows, looks, this.baseOpacity * lightOcclusion, this.uniforms, dt);
+    // With the light out there is no shadow to hold: a hand lost meanwhile must not reappear and fade when it comes back.
+    if (lightOcclusion <= 0.001) this.uniforms.held.fill(0);
     this.mesh.visible = any;
     if (!this.mesh.visible) return;
 

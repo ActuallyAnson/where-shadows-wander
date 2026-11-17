@@ -16,7 +16,7 @@ export interface HandShadow {
   readonly hand: Handedness;
   /** The hand is fully tracked and its shadow was projected this frame. If false, ignore the rest. */
   active: boolean;
-  /** The shadow's bounds overlap the stage rectangle. Capsules are not clipped to the stage. */
+  /** The shadow's bounds overlap the stage rectangle (diagnostics only: the shadow is drawn wherever it falls on the wall). */
   onStage: boolean;
   /** Each joint's centre in stage space: x, y per joint. */
   readonly joints: Float32Array;
