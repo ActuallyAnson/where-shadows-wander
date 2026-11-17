@@ -130,13 +130,15 @@ export const FRIEND_CUP: PuppetScene = {
 /** The flat hand held up: the palm and fingers together, the thumb easing out from its side as it opens. */
 const PALM_W = 0.2;
 const PALM_H = 0.3;
+/** Where the palm's bottom edge is, below the wrist the hand is placed by. */
+const PALM_Y = -0.1;
 const THUMB_IN = 0.15;
 const THUMB_OUT = 0.85;
 const palmParts = (): PuppetScene['parts'] => [
   // Placed by its wrist: the hand rises above the story's x, y.
   { id: 'hand', art: '', w: 0.01, h: 0.01, scale: FRIEND_SCALE },
   arm(0, -0.075, 0.1),
-  { id: 'palm', art: 'friend-palm', parent: 'hand', w: PALM_W, h: PALM_H, pivot: [0.5, 0], x: 0, y: -0.1 },
+  { id: 'palm', art: 'friend-palm', parent: 'hand', w: PALM_W, h: PALM_H, pivot: [0.5, 0], x: 0, y: PALM_Y },
   ear('thumb', -0.045, 0.045, THUMB_OUT, 0.075, 0.045),
 ];
 
@@ -212,6 +214,12 @@ export const OUTLINE_SHAPES: Readonly<Record<string, PuppetScene>> = {
   cup: outline('cup', 0.26, 0.2),
   flat: outline('flat', 0.2, 0.3),
 };
+
+/**
+ * How far above the place of her flat hand (its wrist) the middle of its palm is drawn, stage metres: where the flat outline,
+ * which is drawn about its middle, stands to lie round her palm (scene 6).
+ */
+export const FLAT_PALM_MID_Y = (PALM_Y + PALM_H / 2) * FRIEND_SCALE;
 
 /** How big each shape's outline is drawn, stage metres: its larger side (width or height), for FriendBeat.near. */
 export const OUTLINE_SIZE: Readonly<Record<string, number>> = Object.fromEntries(

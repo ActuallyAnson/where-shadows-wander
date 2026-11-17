@@ -14,7 +14,7 @@ import {
   validateStory,
   type StoryScene,
 } from './story-director';
-import { OUTLINE_SIZE } from './friend-puppet';
+import { FORM_S, FRIEND_FLAT, OUTLINE_SIZE } from './friend-puppet';
 import { STORY_SCRIPT } from './story-script';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
@@ -425,18 +425,40 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     expect(d.handHidden).toBe(false);
   });
 
-  it('reports friendGuide false only when a friend beat asks to hide the outline (goodbye)', () => {
-    const goodbyeIndex = STORY_SCRIPT.findIndex((s) => s.id === 'goodbye');
-    expect(goodbyeIndex).toBeGreaterThan(0);
+  it('reports friendGuide false only when a friend beat asks to hide the outline', () => {
     const d = new StoryDirector(STORY_SCRIPT);
     d.start(0);
-    d.skipMemory();
     expect(d.beat?.kind).toBe('friend');
     expect(d.friendGuide).toBe(true);
+    const hidden = new StoryDirector([
+      { id: 'x', beats: [{ kind: 'friend', shape: 'flat', x: 0, y: 0, guide: false }] },
+    ]);
+    hidden.start();
+    expect(hidden.friendGuide).toBe(false);
+    expect(hidden.guideX).toBeNaN();
+    expect(hidden.guideY).toBeNaN();
+  });
+
+  it('lays the outline in scene 6 round her own palm: the middle of the flat hand as drawn, as it waits', () => {
+    const goodbyeIndex = STORY_SCRIPT.findIndex((s) => s.id === 'goodbye');
+    const d = new StoryDirector(STORY_SCRIPT);
     d.start(goodbyeIndex);
-    expect(d.friendGuide).toBe(false);
-    expect(d.guideX).toBeNaN();
-    expect(d.guideY).toBeNaN();
+    const b = d.beat;
+    if (b?.kind !== 'friend') throw new Error('scene 6 opens on her hand');
+    expect(d.friendGuide).toBe(true);
+    const palm = new ScenePlayer(FRIEND_FLAT);
+    palm.offset[0] = b.x;
+    palm.offset[1] = b.y;
+    palm.seek(FORM_S);
+    const i = palm.partIndex('palm');
+    const part = FRIEND_FLAT.parts[i];
+    // Held upright as it waits, the palm stands on its bottom edge: its middle is half its drawn height above that.
+    expect(palm.world[i * POSE_STRIDE + 2]).toBeCloseTo(0);
+    const midY = palm.world[i * POSE_STRIDE + 1] + (part.h * palm.world[i * POSE_STRIDE + 3]) / 2;
+    expect(d.guideX).toBeCloseTo(palm.world[i * POSE_STRIDE]);
+    expect(d.guideY).toBeCloseTo(midY);
+    // The outline is the palm's own size, so it lies just round it.
+    expect(OUTLINE_SIZE.flat).toBeCloseTo(part.h * palm.world[i * POSE_STRIDE + 3]);
   });
 
   it('plays the whole story, a shape at a time, to sleep', () => {
