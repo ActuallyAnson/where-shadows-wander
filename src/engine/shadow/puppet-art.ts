@@ -1013,6 +1013,61 @@ function sideHand(g: CanvasRenderingContext2D, w: number, h: number): void {
   finger(g, w, h, [0.74, 0.62, 0.84, 0.47, 0.86, 0.4], 0.2);
 }
 
+// The shape guide's outlines (ghost-outline.ts, OUTLINE_SHAPES in friend-puppet.ts): each shape as the plainest hand that
+// makes it, the way the recogniser reads it (shape-ranges.ts), not her shadow-puppet hand. Only the hand, no arm.
+
+function outlineRabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A V seen from the back of the hand: two fingers up and apart (the ears), the others folded into a round palm below.
+  g.beginPath();
+  g.moveTo(0.16 * w, 0.62 * h);
+  g.quadraticCurveTo(0.14 * w, 0.5 * h, 0.3 * w, 0.5 * h);
+  g.lineTo(0.74 * w, 0.5 * h);
+  g.quadraticCurveTo(0.88 * w, 0.52 * h, 0.86 * w, 0.66 * h);
+  g.quadraticCurveTo(0.86 * w, 0.9 * h, 0.5 * w, 0.9 * h);
+  g.quadraticCurveTo(0.18 * w, 0.9 * h, 0.16 * w, 0.62 * h);
+  g.closePath();
+  g.fill();
+  finger(g, w, h, [0.4, 0.56, 0.32, 0.26, 0.26, 0.08], 0.2);
+  finger(g, w, h, [0.6, 0.56, 0.68, 0.26, 0.74, 0.08], 0.2);
+}
+
+function outlineFox(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A flat hand side on, fingers together pointing right (the snout), the thumb standing up behind them (the ear).
+  g.beginPath();
+  g.moveTo(0.06 * w, 0.64 * h);
+  g.quadraticCurveTo(0.06 * w, 0.4 * h, 0.26 * w, 0.4 * h);
+  g.lineTo(0.84 * w, 0.46 * h);
+  g.quadraticCurveTo(0.98 * w, 0.5 * h, 0.96 * w, 0.62 * h);
+  g.quadraticCurveTo(0.94 * w, 0.72 * h, 0.8 * w, 0.74 * h);
+  g.lineTo(0.3 * w, 0.92 * h);
+  g.quadraticCurveTo(0.06 * w, 0.9 * h, 0.06 * w, 0.64 * h);
+  g.closePath();
+  g.fill();
+  finger(g, w, h, [0.24, 0.5, 0.27, 0.26, 0.3, 0.15], 0.13);
+}
+
+function outlineCup(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A hand held palm up and cupped: the bowl, the thumb up at one side and the fingers curled up at the other.
+  g.beginPath();
+  g.moveTo(0.14 * w, 0.4 * h);
+  g.quadraticCurveTo(0.16 * w, 0.9 * h, 0.5 * w, 0.9 * h);
+  g.quadraticCurveTo(0.84 * w, 0.9 * h, 0.86 * w, 0.4 * h);
+  g.lineTo(0.74 * w, 0.4 * h);
+  g.quadraticCurveTo(0.7 * w, 0.64 * h, 0.5 * w, 0.64 * h);
+  g.quadraticCurveTo(0.3 * w, 0.64 * h, 0.26 * w, 0.4 * h);
+  g.closePath();
+  g.fill();
+  // The rims, rounded: the thumb's tip at one side, the fingertips at the other.
+  finger(g, w, h, [0.2, 0.42, 0.2, 0.36], 0.12);
+  finger(g, w, h, [0.8, 0.42, 0.8, 0.34], 0.12);
+}
+
+function outlineFlat(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // A hand held up flat: the palm, the fingers together, the thumb a little out at its side.
+  friendPalmHand(g, w, h);
+  finger(g, w, h, [0.3, 0.6, 0.2, 0.48, 0.16, 0.4], 0.16);
+}
+
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   castle,
   hills,
@@ -1055,17 +1110,10 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   blanket,
   beam,
   'door-light': doorLight,
-};
-
-/**
- * The friend's painted hands without their forearms, by the art name of the whole: the shape guide's outline
- * (ghost-outline.ts) is drawn round these, so it shows only the hand. Her arm ('friend-arm') has no entry: it is left out.
- */
-export const PUPPET_HAND_ONLY: Readonly<Record<string, PuppetPainter>> = {
-  'friend-rabbit': friendRabbitHand,
-  'friend-fox': friendFoxHand,
-  'friend-cup': friendCupHand,
-  'friend-palm': friendPalmHand,
+  'outline-rabbit': outlineRabbit,
+  'outline-fox': outlineFox,
+  'outline-cup': outlineCup,
+  'outline-flat': outlineFlat,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */

@@ -67,7 +67,7 @@ import { writeCoverHand } from '../engine/hands/cover-hand';
 import { GhostHandView } from '../engine/render/ghost-hand-view';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
 import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
-import { FORM_S, FRIEND_PUPPETS, friendSceneTime } from '../engine/stage/story/friend-puppet';
+import { FORM_S, FRIEND_PUPPETS, friendSceneTime, OUTLINE_SHAPES } from '../engine/stage/story/friend-puppet';
 import { ShapeGuide } from '../engine/stage/story/shape-guide';
 import { SHAPES, type Shape } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
@@ -1599,7 +1599,9 @@ async function start(): Promise<void> {
           );
           // The friend's hand, while it shows its shape and while it fades.
           const friendScene = story.friendPuppet !== null ? FRIEND_PUPPETS[story.friendPuppet] : undefined;
-          if (friendScene && story.friendShowing) guideScene = friendScene;
+          // The outline is the shape's plain hand, the way it is recognised, not her puppet hand (OUTLINE_SHAPES).
+          if (friendScene && story.friendShowing)
+            guideScene = (story.friendShape !== null ? OUTLINE_SHAPES[story.friendShape] : undefined) ?? friendScene;
           // How dark her hand's shadow is; how much of it is there (fading, changing shape) goes in separately, so a fading hand
           // covers the scenery less rather than paling over it (PuppetView.update).
           const friendLight = shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
