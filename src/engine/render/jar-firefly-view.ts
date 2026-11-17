@@ -1,5 +1,5 @@
-// The firefly's light in the room's jar on the desk (stage/story/jar-firefly.ts says how bright): a small green-gold glow, a
-// LanternGlow facing the camera, at the jar's middle. It follows the jar wherever the room layout puts it. Nothing allocated
+// The firefly's light in the room's jar on the desk (stage/story/jar-firefly.ts says how bright and where): a small green-gold
+// glow, a LanternGlow facing the camera, wandering about the jar's middle. It follows the jar wherever the room layout puts it. Nothing allocated
 // per frame.
 import { Vector3 } from '@iwsdk/core';
 import type { Object3D, Quaternion } from '@iwsdk/core';
@@ -31,12 +31,15 @@ export class JarFireflyView {
     this.jar = jar;
   }
 
-  /** @param glow how bright, 0..1 (JarFirefly.glow) */
-  update(glow: number, cameraQuaternion: Readonly<Quaternion>): void {
+  /**
+   * @param glow how bright, 0..1 (JarFirefly.glow)
+   * @param x where it is in the jar, metres from its middle, in the jar's own axes (JarFirefly.x, y, z)
+   */
+  update(glow: number, x: number, y: number, z: number, cameraQuaternion: Readonly<Quaternion>): void {
     const jar = this.jar;
     this.glow.mesh.visible = jar !== null && glow > 0.001;
     if (!this.glow.mesh.visible || jar === null) return;
-    this.at.set(0, JAR_MIDDLE_Y, 0);
+    this.at.set(x, JAR_MIDDLE_Y + y, z);
     jar.localToWorld(this.at);
     this.glow.mesh.position.copy(this.at);
     this.light.intensity = glow;

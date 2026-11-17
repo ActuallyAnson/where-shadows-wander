@@ -8,7 +8,30 @@ describe('the firefly in the room’s jar', () => {
     f.update(0.1, null, true);
     f.update(0.1, null, false);
     expect(f.level).toBe(1);
-    expect(f.glow).toBeGreaterThan(0.5);
+    expect(f.glow).toBeGreaterThan(0.2);
+  });
+
+  it('wanders about inside the jar and flashes, never quite going dark', () => {
+    const f = new JarFirefly();
+    let lo = 1;
+    let hi = 0;
+    let travelled = 0;
+    let px = 0;
+    let py = 0;
+    for (let i = 0; i < 1200; i++) {
+      f.update(1 / 60, null, false);
+      expect(Math.hypot(f.x, f.z)).toBeLessThan(0.035);
+      expect(Math.abs(f.y)).toBeLessThan(0.04);
+      travelled += Math.hypot(f.x - px, f.y - py);
+      px = f.x;
+      py = f.y;
+      lo = Math.min(lo, f.glow);
+      hi = Math.max(hi, f.glow);
+    }
+    expect(travelled).toBeGreaterThan(0.1);
+    expect(hi).toBeGreaterThan(0.95);
+    expect(lo).toBeGreaterThan(0.2);
+    expect(lo).toBeLessThan(0.35);
   });
 
   it('leaves in scene 5, when the one on the wall leaves its jar, and stays gone into the end', () => {

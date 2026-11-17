@@ -1794,7 +1794,7 @@ async function start(): Promise<void> {
           shown !== null && shown.scene === STORY_STAGE ? shown.time : null,
           sessionState === 'title_vr',
         );
-        jarFireflyView.update(jarFirefly.glow, cameraQuat);
+        jarFireflyView.update(jarFirefly.glow, jarFirefly.x, jarFirefly.y, jarFirefly.z, cameraQuat);
       } catch (e) {
         failures.report('lighting', e);
       }
