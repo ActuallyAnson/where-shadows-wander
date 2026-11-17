@@ -533,6 +533,19 @@ async function start(): Promise<void> {
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
+  /** The pause menu: the flame goes out, the sound dips and the wall offers Resume. Covering the flame and the headset's system
+   *  menu (or taking the headset off) both land here, so the story is never left running behind the player's back. */
+  const enterPause = () => {
+    sessionState = 'paused';
+    candleView.lit = false;
+    candleView.resetCover();
+    audio.mixer.setLift(Bus.Ambience, 0.15);
+    audio.mixer.setLift(Bus.Music, 0.25);
+    wallPauseView.show();
+  };
+  visibility.subscribe((_state, paused) => {
+    if (paused && sessionState === 'playing') enterPause();
+  });
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
@@ -1506,12 +1519,7 @@ async function start(): Promise<void> {
               stopStory();
               fallAsleep();
             } else if (candleView.isCovered) {
-              sessionState = 'paused';
-              candleView.lit = false;
-              candleView.resetCover();
-              audio.mixer.setLift(Bus.Ambience, 0.15);
-              audio.mixer.setLift(Bus.Music, 0.25);
-              wallPauseView.show();
+              enterPause();
             }
           } else if (sessionState === 'paused') {
             const isControllerTrigger = frame ? controllerPressed(frame) : false;
