@@ -63,6 +63,7 @@ import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { SleepHint } from '../engine/stage/story/sleep-hint';
 import { JarFirefly } from '../engine/stage/story/jar-firefly';
+import { goodbyeMoon } from '../engine/stage/story/goodbye-moon';
 import { STORY_STAGE } from '../engine/stage/story/story-stage';
 import { LightHush } from '../engine/stage/story/light-hush';
 import { IgnitionHold } from '../engine/stage/ignition';
@@ -1795,6 +1796,8 @@ async function start(): Promise<void> {
           sessionState === 'title_vr',
         );
         jarFireflyView.update(jarFirefly.glow, jarFirefly.x, jarFirefly.y, jarFirefly.z, cameraQuat);
+        // Scene 6: the moon's light through the window brightens on the desk and the bed as the palms meet (goodbye-moon.ts).
+        candleLight.setMoonBeamLift(goodbyeMoon(shown !== null && shown.scene === STORY_STAGE ? shown.time : null));
       } catch (e) {
         failures.report('lighting', e);
       }

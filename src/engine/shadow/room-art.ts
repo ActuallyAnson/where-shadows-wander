@@ -464,57 +464,6 @@ export function paintRain(
   }
 }
 
-/**
- * The window's moonlight on the floor: a slanted patch of cool light cut by the window's cross bars, soft at the edges.
- * Drawn to be added to the floor, so it is a grey-blue on black.
- */
-export function paintMoonPatch(g: CanvasRenderingContext2D, W: number, H: number): void {
-  g.save();
-  g.scale(W / 256, H / 256);
-  g.fillStyle = '#000';
-  g.fillRect(0, 0, 256, 256);
-  const panes: [number, number][] = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ];
-  for (const [cx, cy] of panes) {
-    // each pane is a parallelogram leaning to the right as it goes down
-    const x0 = 34 + cx * 100,
-      y0 = 30 + cy * 100,
-      w = 88,
-      h = 88,
-      lean = 26;
-    const grad = g.createLinearGradient(0, y0, 0, y0 + h);
-    grad.addColorStop(0, 'rgba(170, 195, 255, 0.95)');
-    grad.addColorStop(1, 'rgba(110, 140, 220, 0.7)');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(x0 + lean, y0);
-    g.lineTo(x0 + lean + w, y0);
-    g.lineTo(x0 + w, y0 + h);
-    g.lineTo(x0, y0 + h);
-    g.closePath();
-    g.fill();
-  }
-  // soften the edges with the browser's blur where it has one, then fade the borders into black
-  const blurred = 'filter' in g;
-  if (blurred) {
-    g.filter = 'blur(7px)';
-    g.globalCompositeOperation = 'lighter';
-    g.drawImage(g.canvas, 0, 0, 256, 256);
-    g.filter = 'none';
-    g.globalCompositeOperation = 'source-over';
-  }
-  const fade = g.createRadialGradient(128, 128, 30, 128, 128, 130);
-  fade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  fade.addColorStop(1, 'rgba(0, 0, 0, 1)');
-  g.fillStyle = fade;
-  g.fillRect(0, 0, 256, 256);
-  g.restore();
-}
-
 const QUILT_COLOURS = ['#25324d', '#2d3e33', '#583a2d', '#604f35', '#3d2b38', '#302b28'];
 
 /**

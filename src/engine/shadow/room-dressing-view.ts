@@ -1,9 +1,9 @@
 // The bedroom's painted art (room-art.ts) as a few textured quads that go over Damon's bare room without changing it: wallpaper
-// on the walls, the night and the rain in the window, and the moonlight's patch on the floor. Everything else in the room is a model.
+// on the walls, and the night and the rain in the window. Everything else in the room is a model. The moonlight the window lets in
+// is a light (candle-light.ts): this view says where the window is.
 // Its group goes inside BedroomView's group, so it is placed and turned with the room. Candlelight warms it, and in the dark it goes
 // blue and quiet, like the room around it. Textures are drawn once; update() allocates nothing.
 import {
-  AdditiveBlending,
   BufferGeometry,
   CanvasTexture,
   Color,
@@ -16,6 +16,7 @@ import {
   LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   PlaneGeometry,
   RepeatWrapping,
   RGBAFormat,
@@ -23,17 +24,9 @@ import {
   UnsignedByteType,
   Vector3,
 } from '@iwsdk/core';
-import type { Material, Object3D } from '@iwsdk/core';
+import type { Material } from '@iwsdk/core';
 import type { LanternLight } from './pure/lantern-light';
-import {
-  NIGHT_MARGIN,
-  RAIN_SLANT,
-  type NightLayer,
-  paintMoonPatch,
-  paintNight,
-  paintRain,
-  paintWall,
-} from './room-art';
+import { NIGHT_MARGIN, RAIN_SLANT, type NightLayer, paintNight, paintRain, paintWall } from './room-art';
 import { plasterNormals } from './pure/plaster-bump';
 import { ROOM_BACK_WALL_Z, ROOM_DEPTH_M, ROOM_MID_Z, ROOM_WALL_BEHIND_STAGE_M } from '../stage/stage-frame';
 import { CANDLE_REACH_M, type CandleBump, type CandleLight } from './candle-light';
@@ -52,12 +45,13 @@ const OUTSIDE_TINT = new Color(0.22, 0.26, 0.38);
 const RAIN_FALL = [2.2, 1.5] as const;
 /** The colour the window takes at the height of a lightning flash (it eases there from OUTSIDE_TINT by the flash). */
 const FLASH_TINT = new Color(0.62, 0.68, 0.82);
-/** How much a flash adds to the moonlight's patch on the floor, as a multiple of its usual brightness. */
-const FLASH_PATCH = 2.5;
 
 /** The window opening, in metres, and where it is in the room (the centre of the left wall's window). */
 const WINDOW_W = 1.1;
 const WINDOW_H = 1.3;
+/** The opening inside the window's frame (m), which the moon's light comes in at (the frame's posts and bars: bedroom-view.ts). */
+const OPENING_W = 0.84;
+const OPENING_H = 1.08;
 const WINDOW_Y = 1.45;
 const WINDOW_Z = -0.8;
 /** The outside layers, far to near: how many metres each slides across the window for every metre the head moves, and the size of
@@ -82,8 +76,6 @@ export const SPREAD_S = 1.5;
 export const DARKEN_S = 2;
 /** The room art's own colour, as a share of its painted colour (the light multiplies it). */
 const LIT_PEAK = 1.0;
-/** How bright the moonlight's patch on the floor is (it is added to the floor). */
-const MOON_PATCH = 0.07;
 /** How bright the candle's glow is at the end of the hold that lights it, as it catches (its full brightness is about 1). */
 const IGNITION_GLOW = 0.9;
 /**
@@ -95,7 +87,7 @@ const WAITING_GLOW = 3.5;
 const HANDOVER_S = 0.6;
 
 /** The pieces of the room dressing the room layout file places (`room` section). */
-export const DRESSING_PIECE_IDS: readonly string[] = ['moon-patch'];
+export const DRESSING_PIECE_IDS: readonly string[] = [];
 
 function paintedCanvas(
   w: number,
@@ -130,8 +122,13 @@ function plasterTexture(): DataTexture {
 
 export class RoomDressingView implements EditableSource {
   readonly group = new Group();
-  /** The pieces the room layout places (the moonlight's patch), for the room editor. */
+  /** The pieces the room layout places (none now), for the room editor. */
   private readonly pieces: EditablePiece[] = [];
+  /**
+   * The window's opening, which the moon's light comes in at (candle-light.ts): in its middle, on the wall, its +x into the room.
+   * The opening is inside the frame's posts and bars (bedroom-view.ts).
+   */
+  readonly moonWindow = new Object3D();
   /** The wallpaper wall behind the stage, kept to move it when the stage's distance is known. */
   readonly wall: Mesh;
 
@@ -140,7 +137,6 @@ export class RoomDressingView implements EditableSource {
   /** The window's own pictures (the night, the rain), which keep one cool colour whatever the room does. */
   private readonly outdoor: MeshBasicMaterial[] = [];
   private readonly rain: CanvasTexture[] = [];
-  private readonly moonPatch: MeshBasicMaterial;
   /** The outside layers' textures and how far each slides with the head (parallel to OUTSIDE_LAYERS). */
   private readonly outside: CanvasTexture[] = [];
   private readonly head = new Vector3();
@@ -156,7 +152,7 @@ export class RoomDressingView implements EditableSource {
   private spreadLevel = 0;
   private reachNow = SPREAD_FROM_M;
 
-  /** @param layout where the moonlight's patch is (the room layout file); its default where it says nothing */
+  /** @param layout where the layout file puts the pieces (none now); their defaults where it says nothing */
   constructor(private readonly layout: Readonly<RoomLayout> | null = null) {
     // The walls are solid and drawn first, so the plain walls of Damon's room behind them fail the depth test and cost nothing
     // to draw; everything on a wall sits a hair in front of it.
@@ -235,26 +231,16 @@ export class RoomDressingView implements EditableSource {
       rainLayers.push(layer);
     }
 
-    // The window's light on the floor: a slanted patch of cool moonlight cut by the cross bars, added to the floor.
-    const patch = this.quad(1.7, 1.7, this.texture(paintedCanvas(256, 256, paintMoonPatch)), true);
-    patch.rotation.x = -Math.PI / 2;
-    patch.position.set(-0.95, 0.008, -0.8);
-    patch.renderOrder = 3;
-    this.editable('moon-patch', patch);
-    (patch.material as MeshBasicMaterial).map!.anisotropy = 4; // the floor is seen at a slant
-    this.moonPatch = patch.material as MeshBasicMaterial;
-    this.moonPatch.blending = AdditiveBlending;
-    this.moonPatch.polygonOffset = true;
-    this.moonPatch.polygonOffsetFactor = -3;
-    this.moonPatch.polygonOffsetUnits = -3;
+    this.moonWindow.name = 'moon-window';
+    this.moonWindow.position.set(-1.995, WINDOW_Y, WINDOW_Z);
 
     // None of them moves inside the room: their matrices are made once (and `place` makes the wall's again), and they are
     // culled when out of view, so looking away from the window does not draw it.
-    for (const m of [this.wall, left, right, back, ...nightMeshes, ...rainLayers, patch]) {
+    for (const m of [this.wall, left, right, back, ...nightMeshes, ...rainLayers, this.moonWindow]) {
       m.matrixAutoUpdate = false;
       m.updateMatrix();
     }
-    this.group.add(this.wall, left, right, back, ...nightMeshes, ...rainLayers, patch);
+    this.group.add(this.wall, left, right, back, ...nightMeshes, ...rainLayers, this.moonWindow);
     this.lit.push(this.wall, left, right, back);
     // The walls are plaster: the candle catches its lumps (one tile about every PLASTER_TILE_M).
     this.bumps.set(this.wall.material as MeshBasicMaterial, {
@@ -283,7 +269,7 @@ export class RoomDressingView implements EditableSource {
     this.pieces.push(piece);
   }
 
-  /** The moonlight's patch, for the room editor. */
+  /** The pieces the room layout places, for the room editor. */
   editables(): readonly EditablePiece[] {
     return this.pieces;
   }
@@ -359,6 +345,7 @@ export class RoomDressingView implements EditableSource {
    */
   useCandleLight(candle: CandleLight): void {
     this.candle = candle;
+    candle.setMoonWindow(this.moonWindow, OPENING_W, OPENING_H);
     for (const m of this.lit) {
       const material = m.material as MeshBasicMaterial;
       material.color.setScalar(LIT_PEAK); // the art's own colour; the light does the rest
@@ -394,9 +381,8 @@ export class RoomDressingView implements EditableSource {
     this.candle?.set(brightness, flame ?? null, this.reachNow);
     const flash = this.lightning > 0 ? Math.min(1, this.lightning) : 0;
     for (const m of this.outdoor) m.color.copy(OUTSIDE_TINT).lerp(FLASH_TINT, flash);
-    // The moonlight on the floor stays as it is (the candle adds its light, it never takes the moon's away), but for a flash.
-    const patch = MOON_PATCH * (1 + FLASH_PATCH * flash);
-    this.moonPatch.color.setRGB(0.5 * patch, 0.62 * patch, patch);
+    // The moon's light through the window stays as it is (the candle adds its light, it never takes the moon's away), but for a flash.
+    this.candle?.setMoonFlash(flash);
   }
   /**
    * The candle's light spreading through the room: while `lit` it grows out from the flame to the whole room over SPREAD_S, and
