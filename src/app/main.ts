@@ -1330,11 +1330,7 @@ async function start(): Promise<void> {
     }
     startStory(index);
     const b = story.beat;
-    // Copied where a player would make it: at the outline, if the shape must be made there (FriendBeat.near).
-    if (play && b?.kind === 'friend') {
-      const at = b.near !== undefined && b.guide ? b.guide : null;
-      story.commit(b.shape, at ? at[0] : b.x + 0.12, at ? at[1] : b.y - 0.04);
-    }
+    if (play && b?.kind === 'friend') story.commit(b.shape, b.x + 0.12, b.y - 0.04);
     return `${scene.title ?? scene.id}${play ? ', playing' : ''}`;
   };
 
@@ -1608,8 +1604,6 @@ async function start(): Promise<void> {
               hold = Math.max(hold, st.committed === target ? 1 : st.candidate === target ? st.progress : 0);
           }
           followX = followY = NaN;
-          let middleX = NaN,
-            middleY = NaN;
           let followShape: Shape | null = null;
           if (followHand !== null) {
             const sh = projector.shadows[followHand];
@@ -1618,13 +1612,9 @@ async function start(): Promise<void> {
             const o = JOINT[wristAnchored && !story.mirroring ? 'wrist' : 'middle-finger-phalanx-proximal'] * 2;
             followX = sh.joints[o];
             followY = sh.joints[o + 1];
-            // The middle of the hand, which a shape made at the outline (FriendBeat.near) is measured from, as its commit is.
-            const m = JOINT['middle-finger-phalanx-proximal'] * 2;
-            middleX = sh.joints[m];
-            middleY = sh.joints[m + 1];
             followShape = shapes[followHand].state.committed;
           }
-          story.follow(followX, followY, followShape, middleX, middleY);
+          story.follow(followX, followY, followShape);
           story.update(storyStep);
           guide.update(
             storyStep,

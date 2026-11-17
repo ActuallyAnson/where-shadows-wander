@@ -220,11 +220,3 @@ export const OUTLINE_SHAPES: Readonly<Record<string, PuppetScene>> = {
  * which is drawn about its middle, stands to lie round her palm (scene 6).
  */
 export const FLAT_PALM_MID_Y = (PALM_Y + PALM_H / 2) * FRIEND_SCALE;
-
-/** How big each shape's outline is drawn, stage metres: its larger side (width or height), for FriendBeat.near. */
-export const OUTLINE_SIZE: Readonly<Record<string, number>> = Object.fromEntries(
-  Object.entries(OUTLINE_SHAPES).map(([shape, scene]) => {
-    const [hand, art] = scene.parts;
-    return [shape, Math.max(art.w, art.h) * (hand.scale ?? 1)];
-  }),
-);

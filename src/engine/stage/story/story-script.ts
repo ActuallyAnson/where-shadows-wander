@@ -19,10 +19,8 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
       // The gate into the story, once the candle's light is on the wall: the friend's flat hand, as in scene 6, rises a little
       // left of the middle with the outline of a flat hand facing it on the right, and waits for as long as it takes, so the
       // player can play with their own shadows and look round the room first. Their palm answering hers is a hello the goodbye
-      // answers, so it counts only made at the outline: the middle of the player's shadow within a generous 0.6 of the outline's
-      // size (its height, about 0.24 m) of the outline's middle.
-      // Her hand lowers away as usual (only the goodbye fades it), and the night they met begins.
-      { kind: 'friend', shape: 'flat', x: -0.3, y: 0.06, guide: [0.3, 0.06], near: 0.6 },
+      // answers. Her hand lowers away as usual (only the goodbye fades it), and the night they met begins.
+      { kind: 'friend', shape: 'flat', x: -0.3, y: 0.06, guide: [0.3, 0.06] },
       // The night they met: alone in his new room in the storm, he hides under his blanket; the girl from down the street comes
       // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
       { kind: 'memory', ...chapter('the-storm') },
