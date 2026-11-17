@@ -2,10 +2,11 @@
 // as on any day, and they go opposite ways: the boy off the right edge of the wall with his jar, the friend off the left. Just
 // before the edge the friend turns back and waves again, but the boy is already gone; the wave hangs there, unanswered, and then
 // the friend walks off too. The gate slides away to the right, and the park slides back in from the left, the wrong way, the
-// candle's light cooling and dimming: the park and the jar from scene 4, with only the boy sitting there. Then the park slides
-// slowly away, until the wall is empty for the first time since the candle was lit. Every time is in seconds from its start.
+// candle's light cooling and dimming: the park and the jar from scene 4, with only the boy sitting there. The firefly comes up
+// out of the jar, hangs over him a moment, and drifts away up past where she sat, out over the top of the wall; he watches it
+// go, then bows his head. Then the park slides slowly away, until the wall is empty for the first time since the candle was lit. Every time is in seconds from its start.
 import { slideKeys, type Chapter } from '../puppet/chapters';
-import { swingKeys, type Cue, type Key, type Track, type Wobble } from '../puppet/puppet-scene';
+import { swingKeys, type Cue, type Key, type PuppetPart, type Track, type Wobble } from '../puppet/puppet-scene';
 import {
   AUTUMN_TREE_X,
   BOY_GATE_X,
@@ -14,11 +15,23 @@ import {
   FRIEND_GATE_X,
   GATE_DEPTH,
   GATE_OFF_DX,
+  FRIEND_SIT_X,
   GATE_X,
+  JAR_GLOW,
   LEAVES,
 } from './fireflies';
 import { GRASS_W, PARK_FROM_DX, PARK_TREES } from './the-park';
-import { ARM_DOWN, STAND_ARM_DOWN, STAND_ARM_UP, WALK, fadeKeys, stepTracks } from './story-kit';
+import {
+  ARM_DOWN,
+  FLOOR_Y,
+  STAND_ARM_DOWN,
+  STAND_ARM_UP,
+  WALK,
+  fadeKeys,
+  firefly,
+  fireflyWobbles,
+  stepTracks,
+} from './story-kit';
 
 /** The boy waves back at the gate. */
 const WAVE_S = 0.4;
@@ -41,8 +54,14 @@ const GATE_OUT_S = TURN_AWAY_S + 2.0;
 const GATE_OUT_LEN_S = 4.5;
 const PARK_BACK_S = GATE_OUT_S + 1.0;
 const PARK_BACK_LEN_S = 5.5;
-/** He sits there, alone, and bows his head... */
-const BOW_S = PARK_BACK_S + PARK_BACK_LEN_S + 1.5;
+/** The firefly comes up out of the jar, hangs over it, and drifts away up past where she sat, out over the top of the wall. */
+const FLY_OUT_S = PARK_BACK_S + PARK_BACK_LEN_S + 1.2;
+const FLY_HANG_S = FLY_OUT_S + 1.3;
+const FLY_DRIFT_S = FLY_HANG_S + 2.0;
+const FLY_PAST_S = FLY_DRIFT_S + 2.6;
+const FLY_GONE_S = FLY_PAST_S + 3.4;
+/** He watches it go, sits there, alone, and bows his head... */
+const BOW_S = FLY_GONE_S + 1.2;
 /** ...and the park slides slowly away, leaving the wall empty. */
 const PARK_AWAY_S = BOW_S + 4.5;
 const PARK_AWAY_LEN_S = 7.0;
@@ -50,6 +69,10 @@ export const LAST_ORDINARY_DAY_LENGTH_S = PARK_AWAY_S + PARK_AWAY_LEN_S * 1.1 + 
 
 /** The jar in the grass in front of him (he faces left), towards where the friend sat. */
 const JAR_BESIDE_X = BOY_SIT_X - 0.12;
+/** The jar's mouth on the wall, once the park is back (the jar stands on the grass, 0.075 tall). */
+const JAR_MOUTH: readonly [number, number] = [JAR_BESIDE_X, FLOOR_Y + 0.07];
+
+const parts: PuppetPart[] = [...firefly('last-fly', JAR_MOUTH[0], JAR_MOUTH[1], 0.06)];
 
 const move = (t0: number, v: number, t1: number, to: number, ease: Key[2] = 'smooth'): Key[] => [
   [t0, v],
@@ -157,6 +180,45 @@ const tracks: Track[] = [
   { part: 'park-boy-jar', prop: 'opacity', keys: [[PARK_BACK_S - 0.3, 1], step(PARK_BACK_S - 0.2, 0)] },
   { part: 'park-jar', prop: 'opacity', keys: [step(PARK_BACK_S - 0.2, 1)] },
   { part: 'park-jar', prop: 'x', keys: [step(PARK_BACK_S - 0.2, JAR_BESIDE_X)] },
+  // The firefly still glows in the jar; then it comes up out of it (the jar going dark), hangs over him, and drifts away up
+  // past where she sat and out over the top of the wall.
+  {
+    part: 'park-jar-glow',
+    prop: 'opacity',
+    keys: [step(PARK_BACK_S - 0.2, JAR_GLOW), [FLY_OUT_S, JAR_GLOW], [FLY_OUT_S + 0.9, 0, 'smooth']],
+  },
+  {
+    part: 'last-fly',
+    prop: 'opacity',
+    keys: [
+      [FLY_OUT_S, 0],
+      [FLY_OUT_S + 0.5, 1, 'out'],
+      [FLY_PAST_S + 1.6, 1],
+      [FLY_GONE_S, 0, 'in'],
+    ],
+  },
+  {
+    part: 'last-fly',
+    prop: 'x',
+    keys: [
+      [FLY_OUT_S, JAR_MOUTH[0]],
+      [FLY_HANG_S, JAR_MOUTH[0] + 0.02, 'smooth'],
+      [FLY_DRIFT_S, JAR_MOUTH[0] - 0.01, 'smooth'],
+      [FLY_PAST_S, FRIEND_SIT_X, 'smooth'],
+      [FLY_GONE_S, FRIEND_SIT_X - 0.22, 'smooth'],
+    ],
+  },
+  {
+    part: 'last-fly',
+    prop: 'y',
+    keys: [
+      [FLY_OUT_S, JAR_MOUTH[1]],
+      [FLY_HANG_S, JAR_MOUTH[1] + 0.13, 'smooth'],
+      [FLY_DRIFT_S, JAR_MOUTH[1] + 0.16, 'smooth'],
+      [FLY_PAST_S, 0.25, 'smooth'],
+      [FLY_GONE_S, 0.66, 'smooth'],
+    ],
+  },
   // (He faces left, so his arm's angles are the other way about.)
   {
     part: 'park-boy-arm',
@@ -167,9 +229,13 @@ const tracks: Track[] = [
     part: 'park-boy-head',
     prop: 'angle',
     keys: [
+      // He looks up after the firefly as it goes, holds there a moment after it has gone, then bows his head.
       [PARK_BACK_S - 0.3, 0],
-      [BOW_S, 0],
-      [BOW_S + 1.6, 0.2, 'smooth'],
+      [FLY_HANG_S, 0],
+      [FLY_DRIFT_S, -0.08, 'smooth'],
+      [FLY_GONE_S - 1, -0.2, 'smooth'],
+      [BOW_S, -0.2],
+      [BOW_S + 2, 0.2, 'smooth'],
     ],
   },
   // The trees and the grass (the boy and the jar in it), each piece at its own depth.
@@ -191,11 +257,11 @@ const tracks: Track[] = [
   },
 ];
 
-const wobbles: Wobble[] = [];
+const wobbles: Wobble[] = fireflyWobbles('last-fly', 9);
 
 /**
  * The morning birds go on at the gate, which creaks as he goes through it. The light lowers as they leave the gate and the birds
- * stop as it slides off; the park slides back, and as it slides away a thin wind comes up on the emptying wall, and stays through
+ * stop as it slides off; the park slides back, a shimmer as the firefly leaves the jar, and as it slides away a thin wind comes up on the emptying wall, and stays through
  * the goodbye.
  */
 const cues: Cue[] = [
@@ -204,6 +270,7 @@ const cues: Cue[] = [
   { t: GATE_OUT_S, kind: 'mood', mood: 'low', seconds: 9 },
   { t: GATE_OUT_S, kind: 'bed', bed: null },
   { t: PARK_BACK_S, kind: 'sound', sound: 'slide', x: -0.4, y: 0 },
+  { t: FLY_OUT_S, kind: 'sound', sound: 'firefly', x: JAR_MOUTH[0], y: JAR_MOUTH[1] },
   { t: PARK_AWAY_S, kind: 'sound', sound: 'slide', x: 0.4, y: 0 },
   { t: PARK_AWAY_S + 2, kind: 'bed', bed: 'wind' },
 ];
@@ -211,7 +278,7 @@ const cues: Cue[] = [
 export const LAST_ORDINARY_DAY: Chapter = {
   id: 'last-ordinary-day',
   length: LAST_ORDINARY_DAY_LENGTH_S,
-  parts: [],
+  parts,
   tracks,
   wobbles,
   cues,

@@ -72,9 +72,9 @@ describe('the memories’ sounds', () => {
     expect(sounds('the-park')).toEqual(['slide', 'slide', 'run', 'run', 'laugh']);
   });
 
-  it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate in scene 5, swells and gusts in 6', () => {
+  it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate and lets the firefly go in scene 5, swells and gusts in 6', () => {
     expect(sounds('fireflies')).toEqual([...Array(10).fill('firefly'), 'jar', 'slide', 'slide', 'bell']);
-    expect(sounds('last-ordinary-day')).toEqual(['gate', 'slide', 'slide', 'slide']);
+    expect(sounds('last-ordinary-day')).toEqual(['gate', 'slide', 'slide', 'firefly', 'slide']);
     expect(sounds('goodbye')).toEqual(['palms', 'gust']);
   });
 
