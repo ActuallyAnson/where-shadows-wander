@@ -117,6 +117,23 @@ describe('EndingTimeline', () => {
     expect(e.creditsShowing).toBe(false);
   });
 
+  it('switches to creditsMusic only once the credits begin until the end or stop', () => {
+    const e = new EndingTimeline();
+    expect(e.creditsMusic).toBe(false);
+    e.start();
+    e.update(S.creditsAt - 0.1);
+    expect(e.creditsMusic).toBe(false);
+    e.update(0.2);
+    expect(e.creditsMusic).toBe(true);
+    e.update(S.endAt);
+    expect(e.creditsMusic).toBe(false);
+    e.start();
+    e.update(S.creditsAt + 1);
+    expect(e.creditsMusic).toBe(true);
+    e.stop();
+    expect(e.creditsMusic).toBe(false);
+  });
+
   it('holds still for a zero or negative step, and stops where it is', () => {
     const e = new EndingTimeline();
     e.start();

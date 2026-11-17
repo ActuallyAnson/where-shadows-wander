@@ -1846,8 +1846,8 @@ async function start(): Promise<void> {
         gameAudio.setFlame(rigPlaced && lanternLight.light.lit, candleView.flamePosition);
         roomDressing.windowPoint(windowAt);
         gameAudio.setRain(true, windowAt);
-        // The music, from the candle's lighting through the end (its fall and return there are the ending's dips on Bus.Music).
-        gameAudio.setMusic(sessionState !== 'title_vr');
+        // The main music until the credits begin, then the melodic credits BGM (its fall and return are the ending's dips on Bus.Music).
+        gameAudio.setMusic(sessionState === 'title_vr' ? false : ending.creditsMusic ? 'credits' : 'main');
         // The storm's thunder, and the one in the black that wakes him (scene 1).
         if (storm.thunder || wake.thunder) gameAudio.thunder(windowAt);
         // The story's bed (crickets at dusk, wind on the empty wall), from the wall.

@@ -34,7 +34,7 @@ describe('SOUND_DEFS', () => {
       expect(SOUND_DEFS[id].bus).toBe(Bus.Effects);
   });
 
-  it('loops only the flame, the rain, the music and the three story beds', () => {
+  it('loops only the flame, the rain, the music tracks and the three story beds', () => {
     expect(SOUND_DEFS.filter((d) => d.loop).map((d) => d.name)).toEqual([
       'crackle',
       'rain',
@@ -42,15 +42,18 @@ describe('SOUND_DEFS', () => {
       'crickets',
       'wind',
       'birds',
+      'credits',
     ]);
   });
 
-  it('plays the music flat on the music bus, and only from its file', () => {
-    const music = SOUND_DEFS[Sound.Music];
-    expect(music.bus).toBe(Bus.Music);
-    expect(music.flat).toBe(true);
-    expect(music.fileOnly).toBe(true);
-    expect(SOUND_DEFS.filter((d) => d.flat).map((d) => d.name)).toEqual(['music']);
+  it('plays the main and credits music flat on the music bus, and only from their files', () => {
+    for (const id of [Sound.Music, Sound.Credits]) {
+      const track = SOUND_DEFS[id];
+      expect(track.bus).toBe(Bus.Music);
+      expect(track.flat).toBe(true);
+      expect(track.fileOnly).toBe(true);
+    }
+    expect(SOUND_DEFS.filter((d) => d.flat).map((d) => d.name)).toEqual(['music', 'credits']);
   });
 
   it('plays the voices and the recorded story and night sounds only from their files, with no placeholder', () => {
@@ -75,6 +78,9 @@ describe('SOUND_DEFS', () => {
       'snuff',
       'breath',
       'birds',
+      'dooropen',
+      'doorclose',
+      'credits',
     ]);
   });
 

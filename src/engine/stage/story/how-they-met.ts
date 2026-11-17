@@ -45,8 +45,8 @@ const STEPS_OUT = [4.0, 4.6, 5.2];
 /** Both look up at the sound. */
 const H_LOOK = 0.5;
 /** The door's line of light opens, and later narrows and closes. */
-const H_DOOR = 1.5;
-const H_DOOR_SHUT = 3.9;
+export const H_DOOR = 1.5;
+export const H_DOOR_SHUT = 3.9;
 /** She scoots over and leans in, her hand going to the torch, and claps it over: the torch goes dark, and so does the room. */
 const H_REACH = 1.9;
 export const H_CLAP = 2.25;
@@ -484,9 +484,11 @@ const timed: Cue[] = [
   { t: RUMBLE_S, kind: 'sound', sound: 'rumble', x: WINDOW_X, y: WINDOW_Y },
   { t: LAUGH_S + 0.1, kind: 'sound', sound: 'laugh', x: TORCH_X, y: FLOOR_Y },
   ...hopPats(DOWN_HOPS_S, 2, DOWN_HOP_S, RABBIT_AT_HAND, RABBIT_REST),
-  // The hush: footsteps coming, the room's candle dimmed with the torch, footsteps going, the light back.
+  // The hush: footsteps coming, the door opening, the room's candle dimmed with the torch, the door shutting, footsteps going, the light back.
   ...STEPS_IN.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
+  { t: HUSH_S + H_DOOR, kind: 'sound', sound: 'dooropen', x: DOOR_X, y: FLOOR_Y },
   { t: HUSH_S + H_CLAP, kind: 'hush', level: HUSH_LEVEL, seconds: HUSH_DOWN_S },
+  { t: HUSH_S + H_DOOR_SHUT, kind: 'sound', sound: 'doorclose', x: DOOR_X, y: FLOOR_Y },
   ...STEPS_OUT.map((s, i): Cue => ({ t: HUSH_S + s, kind: 'step', variant: (i % 2) as 0 | 1, x: DOOR_X, y: FLOOR_Y })),
   { t: HUSH_S + H_LIFT, kind: 'hush', level: 1, seconds: HUSH_UP_S },
   // Not the full laugh: a short, stifled giggle, two kids who got away with it.

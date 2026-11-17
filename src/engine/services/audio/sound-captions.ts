@@ -20,7 +20,9 @@ export const CAPTIONS: Readonly<Partial<Record<SoundId, string>>> = {
   [Sound.Gate]: '[a gate creaks]',
   [Sound.Creak]: '[the house creaks]',
   [Sound.Gust]: '[a gust of wind]',
-  [Sound.Palms]: '[a warm swell]',
+  [Sound.DoorOpen]: '[a door opens]',
+  [Sound.DoorClose]: '[a door closes]',
+  [Sound.Palms]: '[a gentle piano plays]',
   [Sound.Snuff]: '[the candle hisses out]',
   [Sound.Breath]: '[a slow breath]',
 };

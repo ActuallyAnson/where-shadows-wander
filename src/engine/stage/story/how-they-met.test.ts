@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { POSE_STRIDE, bedAt } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
-import { H_CLAP, H_LIFT, HUSH_HAND, HUSH_LEVEL, HUSH_S, RABBIT_REST, TORCH_TOP_Y, TORCH_X } from './how-they-met';
+import {
+  H_CLAP,
+  H_DOOR,
+  H_DOOR_SHUT,
+  H_LIFT,
+  HUSH_HAND,
+  HUSH_LEVEL,
+  HUSH_S,
+  RABBIT_REST,
+  TORCH_TOP_Y,
+  TORCH_X,
+} from './how-they-met';
 import { SIT_REACH } from './story-kit';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
@@ -49,6 +60,11 @@ describe('the hush', () => {
     expect(rel.some((t) => t > HUSH_S + H_CLAP && t < HUSH_S + H_LIFT)).toBe(true);
     expect(pose('door-light', HUSH_S + H_CLAP + 0.5)[4]).toBeGreaterThan(0.2);
     expect(pose('door-light', at.end - at.start)[4]).toBe(0);
+    const doors = (STORY_STAGE.cues ?? []).filter(
+      (c) =>
+        c.kind === 'sound' && (c.sound === 'dooropen' || c.sound === 'doorclose') && c.t >= at.start && c.t <= at.end,
+    );
+    expect(doors.map((c) => c.t - at.start)).toEqual([HUSH_S + H_DOOR, HUSH_S + H_DOOR_SHUT]);
   });
 
   it('ends with the rabbit back on the blanket where the fox finds it', () => {
@@ -66,9 +82,20 @@ describe('the memories’ sounds', () => {
       .map((q) => (q.kind === 'sound' ? q.sound : ''));
   };
 
-  it('pulls the blanket over him and throws it up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
+  it('pulls the blanket over him and throws it up in the prologue; hops, far thunder, a laugh, door open/close and giggles in the fort', () => {
     expect(sounds('the-storm')).toEqual(['slide', 'blanket', 'click', 'blanket']);
-    expect(sounds('how-they-met')).toEqual(['hop', 'rumble', 'hop', 'hop', 'laugh', 'hop', 'hop', 'giggle']);
+    expect(sounds('how-they-met')).toEqual([
+      'hop',
+      'rumble',
+      'hop',
+      'hop',
+      'laugh',
+      'hop',
+      'hop',
+      'dooropen',
+      'doorclose',
+      'giggle',
+    ]);
     expect(sounds('the-park')).toEqual(['slide', 'slide', 'laugh']);
   });
 

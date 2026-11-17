@@ -9,7 +9,7 @@ Every sound, piece of music, model and font the game has, uses as a stand-in, or
 
 ## Sound effects
 
-Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`, `laugh`, `click`, `rumble`, `yawn`, `giggle`, `hop`, `blanket`, `run`, `jar`, `bell`, `gate`, `creak`, `gust`, `crickets`, `wind`, `birds`, `firefly`, `palms`, `slide`, `snuff`, `breath`; every sound effect has a recording. `laugh`, `yawn` and the story and night sounds from `giggle` on have no placeholder (a voice made in code sounds like a machine, and the rest are real recordings with nothing worth imitating): like the music they are `fileOnly`, silent until their file loads. A memory can also lay a loop under itself with a `bed` cue (`crickets` or `wind`, until the next `bed` cue); the bed is worked out from the story's time every frame (`bedAt`, `StoryDirector.bed`), so skipping a memory never leaves one running, and it fades in and out over a couple of seconds (`SoundDef.fadeS`). `creak` and `gust` also play between memories, now and then, from the house (`src/engine/stage/night-sounds.ts`). A memory plays a sound with a `sound` cue (`puppet-scene.ts`; the names a cue may use are `StorySound`), from its place on the wall. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
+Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is its file name (`src/assets/audio/sfx/<name>.ogg`). A file there replaces the sound made in code by `src/engine/services/audio/placeholder-sounds.ts` once it has loaded (`src/engine/services/audio/sound-files.ts`, a second or so after the page opens); a sound with no file, or whose file fails to load, keeps its placeholder. Files so far: `thunder`, `rain`, `covers`, `ignite`, `crackle`, `rustle`, `thump`, `release`, `tick`, `press`, `lost`, `step0`, `step1`, `dooropen`, `doorclose`, `laugh`, `click`, `rumble`, `yawn`, `giggle`, `hop`, `blanket`, `run`, `jar`, `bell`, `gate`, `creak`, `gust`, `crickets`, `wind`, `birds`, `firefly`, `palms`, `slide`, `snuff`, `breath`; every sound effect has a recording. `laugh`, `yawn`, `dooropen`, `doorclose` and the story and night sounds from `giggle` on have no placeholder (a voice made in code sounds like a machine, and the rest are real recordings with nothing worth imitating): like the music they are `fileOnly`, silent until their file loads. A memory can also lay a loop under itself with a `bed` cue (`crickets` or `wind`, until the next `bed` cue); the bed is worked out from the story's time every frame (`bedAt`, `StoryDirector.bed`), so skipping a memory never leaves one running, and it fades in and out over a couple of seconds (`SoundDef.fadeS`). `creak` and `gust` also play between memories, now and then, from the house (`src/engine/stage/night-sounds.ts`). A memory plays a sound with a `sound` cue (`puppet-scene.ts`; the names a cue may use are `StorySound`), from its place on the wall. A sound with a file has its placeholder rendered only if the file fails (`sound-prerender.ts` skips it). Credit each new one in `CREDITS.md` and in the end credits (`src/ui/credits/credits.ts`).
 
 ### In the game now (replace these first)
 
@@ -43,11 +43,13 @@ Each sound is defined in `src/engine/services/audio/sounds.ts`, and its name is 
 | `wind` | A thin, gentle wind, seamless loop (a story bed) | From the park sliding away at the end of scene 5, through the friend's lone hand and the goodbye, until he fades (scene 6), from the wall | Final: "Wind strong gusts in small hangar" by Angel_Perez_Grandi (CC BY 4.0), a 20 s loop, band-passed, very quiet. No placeholder |
 | `birds` | Birdsong, seamless loop (a story bed) | Scene 3's spring park from when it slides in until dusk (the crickets take over), and the morning at the school gate from the end of scene 4 until the gate slides off in scene 5, from the wall | Final: "Birdsong in Tuscany" by evernaut (CC BY 4.0), a 20 s loop. Birdsong only, no leaves in the breeze. No placeholder |
 | `firefly` | A tiny soft shimmer | Scene 4: as the firefly settles in the player's cup, and as each firefly comes down to the kids' hands | Final: "Magic Fireflies" by IENBA (CC0), 1.6 s. No placeholder |
-| `palms` | One warm swell | Scene 6, from palm meeting palm until the hands come apart. Captioned "[a warm swell]" | Final: "Xylovibez_Reverse_LoFi" by L0sts1gnal_404 (CC BY 4.0), the whole 8 s source played forward, stretched to 7.95 s: two rising swells, the first cresting as the view draws back to the kids, the second as their palms part (`goodbye.ts` times the cue to end then). No placeholder |
+| `palms` | Emotional piano phrase emphasizing the goodbye | Scene 6, from palm meeting palm through parting and the start of her fade (`0.05..12.05 s`). Captioned "[a gentle piano plays]" | Final: "Emotional Piano 005 (Am-80)" by Xinematix (CC0), 12.0 s mono, faded in and out. No placeholder |
 | `slide` | A soft, dry slide of card | Every time places slide on or off the wall (scenes 2 to 5), very quiet | Final: one slide of "sliding paper on table" by 123jorre456 (CC0), 0.85 s. No placeholder |
 | `snuff` | A small hiss as a flame gutters out | The end, just after his hand covers the flame (`ending-timeline.ts`), from the flame. Captioned "[the candle hisses out]" | Final: "Match Sizzle 02" by squareal (CC0), 1.75 s. A hiss as it is covered; nothing when the light finally goes. No placeholder |
 | `breath` | One slow breath in and out | The end, from the second heavy blink into the black before the credits (`ending-timeline.ts`), from his lap. Captioned "[a slow breath]" | Final: "Deep Breath 1_1" by Joao_Janz (CC0), 7.4 s. One breath: a second, slower one would say "slowing" better. No placeholder |
-| `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]"). Final: "Footsteps - Stone, Rock, Concrete, Cement" by SecureSubset (CC0), two of its steps, low-passed to sound beyond a door. Stone, not wood: swap if a wooden-floor take turns up |
+| `step0`, `step1` | A grown-up's soft footsteps on a wooden floor beyond a door, two takes to alternate; unhurried, not threatening | Scene 2's hush: footsteps coming and going outside the fort while she covers the torch (seven steps from the wall's right edge, captioned "[footsteps outside]") | Final: "Walk Footstep with Clothing Foley 6 (Hard Floor/Wooden)" by EvanBoyerman (CC BY 4.0), two soft low-passed variants to sound beyond a door, 0.58 s each |
+| `dooropen` | A door opening slowly outside the room | Scene 2's hush, as the door's line of light opens (`H_DOOR`, from the door's side). Captioned "[a door opens]" | Final: opening half of "Door opening and closing 7" by JakLocke (CC BY 4.0), cut to 2.1 s, band-limited. No placeholder |
+| `doorclose` | That door easing and clicking shut | Scene 2's hush, as the door's line of light closes (`H_DOOR_SHUT`, from the door's side). Captioned "[a door closes]" | Final: closing half of "Door opening and closing 7" by JakLocke (CC BY 4.0), cut to 1.4 s, band-limited. No placeholder |
 
 ### Sounds still needed
 
@@ -56,14 +58,20 @@ Each would be one more `Sound` in `sounds.ts`; a memory's would be one more name
 | Sound | Where (see `STORY.md`) | Why it helps | Status |
 |---|---|---|---|
 | Quilt pulled up, a head on the pillow | Scene 7, between the candle going out and the blinks | He lies back down: the mirror of `covers` in scene 1, so the night closes as it opened | Needed (`covers` played softer could stand in) |
+| Match-near-wick proximity sizzle / warmth hum | Scene 1, while the match approaches and heats the wick (`ignition.ts`) | Gives tactile and low-vision audio feedback during the 3 s ignition hold before `ignite` fires | Needed (improves onboarding and accessibility) |
+| Soft torch-cover pat / muffled cloth thump | Scene 2's hush, when the friend claps her hand over the torch (`H_CLAP`) | Grounds her sudden lunge and deepens the tactile link to covering the candle to pause | Needed |
+| Soft pause hush and relight breath | Scenes 1–6, when the player covers the flame to pause and uncovers it to resume | Confirms the cover-to-pause gesture immediately in audio without breaking the quiet mood | Needed |
+| Subtle shape-hold parchment breath / swell | Scenes 2–6, while a recognised shape hold fills before the commit `thump` | Lets players hear the hold progressing toward commit without looking away from their shadow | Needed (accessibility and responsiveness) |
+| Lighter rain loop for sleep easing | Scene 7, cross-faded with `rain` as he falls asleep (`ending-timeline.ts`) | Softens the patter naturally alongside the dimmer room instead of relying on volume dip alone | Needed |
 
 ## Music
 
-The music is one file, `src/assets/audio/music/music.ogg` (Sound `music` in `sounds.ts`). It plays flat (not placed in the room, so the same in both ears) on the music bus, and only from its file: until the file has loaded it is silent, and it has no placeholder. It is kept out of IWSDK's asset manifest (`src/app/assets.ts`) so it is decoded once, not twice.
+The music files live under `src/assets/audio/music/` (`music.ogg` is `Sound.Music` and `credits.ogg` is `Sound.Credits` in `sounds.ts`). Both play flat (not placed in the room, so the same in both ears) on the music bus, and only from their files: until a file has loaded it is silent, and neither has a placeholder. Everything under `audio/music/` is kept out of IWSDK's asset manifest (`src/app/assets.ts`) so it is decoded once, not twice.
 
 | Name | What it is | When it plays | Status |
 |---|---|---|---|
-| `music` | One quiet, bittersweet orchestral track (guitar, pads), looped | From the candle's lighting to the end: turned down under the pause menu, out with the candle as he falls asleep, back softly under the credits (`ending-timeline.ts`) | Final: "Emotional Mysterious Music" ("I Got Lost") by Migfus20 (CC BY 4.0), the whole 4:41 track, mono, 1.4 MB. Tune its level (`gain` in `sounds.ts`) by ear on a headset |
+| `music` | One quiet, bittersweet orchestral track (guitar, pads), looped | From the candle's lighting until the candle goes out in scene 7: turned down under the pause menu, out with the candle as he falls asleep (`ending-timeline.ts`) | Final: "Emotional Mysterious Music" ("I Got Lost") by Migfus20 (CC BY 4.0), the whole 4:41 track, mono, 1.4 MB. Tune its level (`gain` in `sounds.ts`) by ear on a headset |
+| `credits` | Quiet melodic synth pluck, pad and bass | Over the end credits and thank-you card (`ending-timeline.ts`, from `creditsAt` to `endAt`) | Final: "Atmospheric Melodic Synth - Pluck, Pad & Bass" by Jadis0x (CC0), 39.5 s excerpt trimmed from 16.0 s and faded, mono, 260 KB |
 
 ## 3D models
 
@@ -83,7 +91,9 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `cardboardBoxOpen.glb` | An open box, half unpacked, just inside the door, left of the bed's head (piece `box-open`) | Final: Kenney (CC0) |
 | `cardboardBoxFlat.glb` | A flat box beside it, under the folded blankets (piece `box-flat`) | Final: Quaternius (CC0) |
 | `blanketsFolded.glb` | Folded blankets on the flat box (piece `blankets`), a nod to the blanket fort | Final: "Blankets" by Poly by Google (CC BY 3.0). 19k triangles, the heaviest model; simplify if the frame budget needs it |
-| `toyFox.glb` | A toy fox on the rug by the boxes, looking at the bed (piece `fox`); her shape | Final: "Fox" by Poly by Google (CC BY 3.0). Texture cut from 2048 px PNG to 512 px JPEG (1 MB to 100 KB) |
+| `toyFox.glb` | A toy fox on the boxes, looking at the bed (piece `fox`); her shape | Final: "Fox" by Poly by Google (CC BY 3.0). Texture cut from 2048 px PNG to 512 px JPEG (1 MB to 100 KB) |
+| `toyRabbit.glb` | A toy rabbit on the rug, looking at the bed (piece `rabbit`); his shape | Final: "Rabbit" by Poly by Google (CC BY 3.0), rotated to Y-up/+Z-forward and scaled to metres |
+| `wallPainting.glb` | A framed landscape painting on the right wall above the moving boxes (piece `wall-painting`) | Final: "Wall painting" by jeremy (CC BY 3.0), rotated to +Z-forward and scaled to metres |
 | `desk.glb` | His desk under the window, against the left wall (piece `desk`) | Final: "Desk" by Quaternius (CC0) |
 | `deskChair.glb` | The desk's chair, pulled up to it, its back to the bed (piece `chair`); it replaced Kenney's `chair.glb` | Final: "Chair" by Quaternius (CC0) |
 | `pencilJar.glb` | A mug of pencils, scissors and a ruler on the desk (piece `pencils`) | Final: "Mug With Office Tool" by CreativeTrio (CC0) |
@@ -116,7 +126,7 @@ The room's props that were drawn in code were taken out, because the room looked
 
 | What was there | Where it was | Replace with | Status |
 |---|---|---|---|
-| Two framed pictures: a bird and the moon, and a hill under stars (pieces `picture-moon`, `picture-hill`) | Right wall, over the bed and the bed's foot | One or two picture-frame models, or a frame with a small image texture. A hill of stars echoes scene 6 | Needed (optional) |
+| Two framed pictures: a bird and the moon, and a hill under stars (pieces `picture-moon`, `picture-hill`) | Right wall, over the bed and the bed's foot | One or two picture-frame models, or a frame with a small image texture. A hill of stars echoes scene 6 | Partly done: `wallPainting.glb` hangs on the right wall above the moving boxes; a second framed picture or crayon drawing remains optional |
 | A wall shelf of books, a toy boat and a small lamp (piece `shelf`) | Back wall, above the nightstand, right of the bed's head | A wall-shelf model; `books.glb` and `lampRoundTable.glb` (in the repo, unused) could stand on it | Needed (optional) |
 | Things on the windowsill: a potted fern, a paper bird on two books, an unlit candle stub (piece `sill`) | The window's sill, left wall | Probably not needed: the desk with its pencils and globe is under the window now | Needed (optional) |
 | A tin can with a wooden spoon in it (piece `tin-can`) | On the floor by the bed | Nothing: a leftover from the old winter-cottage room | Not needed |
@@ -144,7 +154,7 @@ The puppets' cut-outs are painted by `src/engine/shadow/puppet-art.ts` (`PUPPET_
 | Glass jar (lid, maybe a string handle) | "The jar the friend gave him" on the desk, her firefly in it until scene 5, found empty by the last of the candle in scene 7 | Done: `glassJar.glb`, on the desk; the firefly is made in code (`jar-firefly-view.ts`) |
 | Moving boxes, 2 or 3, one open and half unpacked | The prologue shows he has just moved in; the real room can echo it | Done: `cardboardBoxStack.glb`, `cardboardBoxOpen.glb`, `cardboardBoxFlat.glb` |
 | Torch / flashlight | Hers, from the night they met, kept on the shelf or nightstand | Done: `flashlight.glb`, on the bookcase |
-| Stuffed rabbit (or fox) | The first shapes are the rabbit and the fox | Done: `toyFox.glb` (a fox figure rather than a plush); a rabbit would pair with it |
+| Stuffed rabbit (or fox) | The first shapes are the rabbit and the fox | Done: `toyFox.glb` on the boxes and `toyRabbit.glb` on the rug |
 | A blanket over a chair | Echoes the blanket fort in scene 2 | Partly: `blanketsFolded.glb`, folded on a box, not draped over the chair |
 
 ### Needed: a lived-in kid's bedroom
@@ -153,14 +163,17 @@ Keep everything off the wall ahead and out of the space between the candle and t
 
 | Model | Status |
 |---|---|
-| Nightstand (or place `sideTable.glb`) with an alarm clock | Partly: `nightstand.glb`; no alarm clock yet |
+| Nightstand (or place `sideTable.glb`) with an alarm clock | Partly: `nightstand.glb`; a quiet, dim bedside alarm clock would reinforce waking in the middle of the night |
 | Wardrobe | Done: `closet.glb` |
 | Desk and desk chair, with a pencil jar or a globe | Done: `desk.glb`, `deskChair.glb`, `pencilJar.glb`, `globe.glb` |
 | Toy chest, and a few loose toys (blocks, a toy car, a ball) | Needed |
+| Half-unpacked keepsakes for the open box and bookcase (folded paper animal, picture books) | Partly: `books.glb` is in the repo (unused); a small origami/paper-craft prop would tie into the paper-shadow theatre |
 | Curtains for the window, partly open | Done: `curtains.glb` |
-| The room's door, with coat hooks and a school bag | Done: `door.glb`, `coatRack.glb` (a standing coat rack, by the bookcase, not by the door: no room there), `backpack.glb` |
+| The room's door, with coat hooks and a school bag | Done: `door.glb`, `coatRack.glb`, `backpack.glb` |
 | Slippers by the bed | Done: `slippers.glb` |
-| Crayon drawings on a side wall | Needed (a framed picture model with a drawing as its texture) |
+| Crayon drawings on a side wall | Needed (a framed drawing of two kids or shadow shapes, e.g. beside `wallPainting.glb` or on the nightstand) |
+| Low-poly ceramic candle saucer and rumpled lap tray details | Needed (upgrades the procedural candle saucer right beneath the player's hands where gaze stays longest) |
+| Subtle 1K CC0 timber floorboard and matte plaster wall textures | Needed (replaces small procedural canvases to reduce dark-scene banding in VR and add warmth around the bed) |
 | String lights (unlit) | Needed |
 | Ceiling lamp (off) | Done: `ceilingLight.glb` |
 

@@ -27,7 +27,7 @@ export const Sound = {
   Thunder: 11,
   /** The bedclothes as he sits up in bed (scene 1, as his eyes open): a soft slide of heavy cloth. */
   Covers: 12,
-  /** The music: one track, looped, from the candle's lighting to the end (src/assets/audio/music/music.ogg). */
+  /** The music: one track, looped, from the candle's lighting until the candle goes out (src/assets/audio/music/music.ogg). */
   Music: 13,
   /** Two kids laughing together, from the wall (scene 2 after the rabbit and after the hush, scene 3 in the grass). */
   Laugh: 14,
@@ -61,7 +61,7 @@ export const Sound = {
   Wind: 28,
   /** A tiny soft shimmer: a firefly settling in the player's cupped shadow, and on the kids' hands (scene 4). */
   Firefly: 29,
-  /** A warm swell from palm meeting palm until the hands part (scene 6): the story's peak. */
+  /** Emotional piano played from palm meeting palm through parting and the start of her fade (scene 6): the story's peak. */
   Palms: 30,
   /** A soft, dry slide of card: the paper scenery sliding on or off the wall at a change of place. */
   Slide: 31,
@@ -71,6 +71,12 @@ export const Sound = {
   Breath: 33,
   /** Birdsong, a loop (a story bed): the spring park by day (scene 3) and the morning at the school gate (scenes 4 and 5). */
   Birds: 34,
+  /** A door opening slowly outside the fort (scene 2's hush), from the door's side. */
+  DoorOpen: 35,
+  /** The door clicking shut as the footsteps go (scene 2's hush), from the door's side. */
+  DoorClose: 36,
+  /** The melodic BGM for the end credits and thank-you card (ending-timeline.ts), flat on the music bus. */
+  Credits: 37,
 } as const;
 export type SoundId = (typeof Sound)[keyof typeof Sound];
 
@@ -114,6 +120,23 @@ function recorded(
     maxDistance: opts.far ? 20 : opts.near ? 4 : 8,
     fileOnly: true,
     ...(opts.fadeS === undefined ? {} : { fadeS: opts.fadeS }),
+  };
+}
+
+/** A flat, file-only looped track on the music bus. */
+function musicTrack(name: string): SoundDef {
+  return {
+    name,
+    bus: Bus.Music,
+    gain: 0.5,
+    loop: true,
+    priority: 0,
+    minGapS: 0,
+    // Flat, so the distances are not used.
+    refDistance: 1,
+    maxDistance: 1,
+    flat: true,
+    fileOnly: true,
   };
 }
 
@@ -251,19 +274,7 @@ export const SOUND_DEFS: readonly SoundDef[] = [
     refDistance: 1,
     maxDistance: 6,
   },
-  {
-    name: 'music',
-    bus: Bus.Music,
-    gain: 0.5,
-    loop: true,
-    priority: 0,
-    minGapS: 0,
-    // Flat, so the distances are not used.
-    refDistance: 1,
-    maxDistance: 1,
-    flat: true,
-    fileOnly: true,
-  },
+  musicTrack('music'),
   {
     name: 'laugh',
     bus: Bus.Effects,
@@ -329,6 +340,9 @@ export const SOUND_DEFS: readonly SoundDef[] = [
   recorded('snuff', 0.4, { near: true, priority: 3, minGapS: 4 }),
   recorded('breath', 0.35, { priority: 2, minGapS: 4 }),
   recorded('birds', 0.22, { loop: true, priority: 0, minGapS: 0, far: true, fadeS: 1.5 }),
+  recorded('dooropen', 0.4, { minGapS: 1 }),
+  recorded('doorclose', 0.4, { minGapS: 1 }),
+  musicTrack('credits'),
 ];
 /** How many sounds there are: one definition each, in the order of `Sound`. */
 export const SOUND_COUNT = SOUND_DEFS.length;
