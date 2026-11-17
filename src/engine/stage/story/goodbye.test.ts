@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ScenePlayer } from '../puppet/scene-player';
-import { GOODBYE_AT, GOODBYE_LENGTH_S } from './goodbye';
+import { GOODBYE_AT, GOODBYE_LENGTH_S, PALMS_AT_S, PALMS_LEN_S } from './goodbye';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
 const player = new ScenePlayer(STORY_STAGE);
@@ -72,5 +72,14 @@ describe('the goodbye', () => {
     expect(boy.y).toBeLessThan(-0.48);
     expect(at('goodbye-boy', GOODBYE_LENGTH_S).opacity).toBe(0);
     expect(at('goodbye-girl', GOODBYE_LENGTH_S).opacity).toBe(0);
+  });
+
+  it('plays the 12 s emotional piano from palm contact across parting and into her fade', () => {
+    const piano = (STORY_STAGE.cues ?? []).find(
+      (c) => c.kind === 'sound' && c.sound === 'palms' && c.t >= start && c.t <= start + GOODBYE_LENGTH_S,
+    );
+    expect(piano).toBeDefined();
+    expect(piano!.t - start).toBeCloseTo(PALMS_AT_S);
+    expect(PALMS_AT_S + PALMS_LEN_S).toBeLessThan(GOODBYE_LENGTH_S);
   });
 });

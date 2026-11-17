@@ -99,6 +99,8 @@ export const STORY_SOUNDS = [
   'firefly',
   'palms',
   'slide',
+  'dooropen',
+  'doorclose',
 ] as const;
 export type StorySound = (typeof STORY_SOUNDS)[number];
 

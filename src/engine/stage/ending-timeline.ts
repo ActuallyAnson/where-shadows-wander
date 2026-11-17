@@ -22,7 +22,7 @@ export interface EndingScript {
   readonly breathAt: number;
   /** The rain's level (1 as it was .. 0 silent): it eases as he sleeps. */
   readonly rainKeys: readonly WakeKey[];
-  /** The music's level (1 as it was .. 0 silent): out with the candle, back softly under the credits. */
+  /** The music bus level (1 as it was .. 0 silent): main track fades out with the candle, then credits BGM plays under the credits. */
   readonly musicKeys: readonly WakeKey[];
   /** When the credits start to roll, and how long they take to pass, seconds. */
   readonly creditsAt: number;
@@ -200,6 +200,11 @@ export class EndingTimeline {
     const s = this.script;
     const r = (this.t - s.creditsAt) / s.creditsS;
     return r <= 0 ? 0 : r >= 1 ? 1 : r;
+  }
+
+  /** Whether the credits melodic BGM (Sound.Credits) should play in place of the main track. */
+  get creditsMusic(): boolean {
+    return this.running && this.t >= this.script.creditsAt;
   }
 
   /** Whether the credits are on the wall of black now. */

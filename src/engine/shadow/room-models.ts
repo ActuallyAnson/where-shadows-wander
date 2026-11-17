@@ -111,8 +111,17 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   { id: 'box-open', ids: ['cardboardboxopen'], at: [-0.8, 0, 0.17], size: [0.42, 0.25], yaw: 0.25 },
   { id: 'box-flat', ids: ['cardboardboxflat'], at: [-1.3, 0, 0.15], size: [0.45, 0.34], yaw: Math.PI },
   { id: 'blankets', ids: ['blanketsfolded'], at: [-1.3, 0.235, 0.15], size: [0.4, 0.27], yaw: Math.PI + 0.1 },
-  // A toy fox (her shape, the second he learns) on the rug, by the boxes, looking at the bed (0.32 m nose to tail).
+  // A toy fox (her shape, the second he learns) and a toy rabbit (his shape, the first he learns) on the rug, looking at the bed.
   { id: 'fox', ids: ['toyfox'], at: [1.35, 0, -0.8], size: [0.1, 0.32], yaw: -1.07 },
+  { id: 'rabbit', ids: ['toyrabbit', 'toy-rabbit', 'rabbit'], at: [1.05, 0.004, -0.68], size: [0.12, 0.24], yaw: -0.9 },
+  // A framed landscape painting on the right wall above the moving boxes (clear of the door at z -0.956..0.094).
+  {
+    id: 'wall-painting',
+    ids: ['wallpainting', 'wall-painting'],
+    at: [1.965, 1.35, -1.24],
+    size: [0.48, 0.045],
+    yaw: -Math.PI / 2,
+  },
 ];
 
 /** The furniture's ids, as the layout file's `room` section names them. */

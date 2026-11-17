@@ -33,6 +33,8 @@ const STORY_SOUND_IDS: Readonly<Record<StorySound, SoundId>> = {
   firefly: Sound.Firefly,
   palms: Sound.Palms,
   slide: Sound.Slide,
+  dooropen: Sound.DoorOpen,
+  doorclose: Sound.DoorClose,
 };
 
 /** The loop each story bed plays. */
@@ -49,7 +51,7 @@ export class GameAudio {
   private readonly at = { x: 0, y: 0, z: 0 };
   private flameLit = false;
   private raining = false;
-  private music = false;
+  private musicTrack: typeof Sound.Music | typeof Sound.Credits | null = null;
   private bed: StoryBed | null = null;
 
   constructor(private readonly player: SoundPlayer) {}
@@ -136,10 +138,16 @@ export class GameAudio {
     this.raining = on;
   }
 
-  /** Call every frame: the music plays while `on` (it is flat, so it has no place in the room), once its file has loaded. */
-  setMusic(on: boolean): void {
-    if (on !== this.music) this.player.setLoop(Sound.Music, on, 0, 0, 0);
-    this.music = on;
+  /**
+   * Call every frame: plays `track` ('main' for the night's theme, 'credits' for the end credits; false or null for silent)
+   * flat on the music bus, once its file has loaded. Passing true is equivalent to 'main'.
+   */
+  setMusic(track: boolean | 'main' | 'credits' | null): void {
+    const want = track === true || track === 'main' ? Sound.Music : track === 'credits' ? Sound.Credits : null;
+    if (want === this.musicTrack) return;
+    if (this.musicTrack !== null) this.player.setLoop(this.musicTrack, false, 0, 0, 0);
+    if (want !== null) this.player.setLoop(want, true, 0, 0, 0);
+    this.musicTrack = want;
   }
 
   /** Thunder far off, from the window's side (`at`, its world position). */
