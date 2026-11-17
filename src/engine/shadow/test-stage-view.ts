@@ -32,6 +32,7 @@ import type { LanternLight } from './pure/lantern-light';
 import type { StagePlane } from './pure/stage-plane';
 import { RenderOrder } from './pure/render-order';
 import { LIGHT_POOL_RX_M, LIGHT_POOL_RY_M, stageEdgeGlsl } from './stage-edge-glsl';
+import { handShadowGlsl, handShadowOff, type HandShadowMap } from './hand-shadow-map';
 
 const PAPER = new Color(0xf2e6c9);
 /** On the room's wall: how far out (a share of the pool's radius) the candle's light stays solid before it starts to thin. */
@@ -39,8 +40,10 @@ const POOL_SOLID = 0.3;
 
 const vertex = /* glsl */ `
   varying vec2 vUv;
+  varying vec3 vWorld;
   void main() {
     vUv = uv;
+    vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -77,7 +80,9 @@ const fragment = /* glsl */ `
   uniform vec2 uPoolR;     // the candle's pool of light's radii, metres
   uniform float uPoolOn;   // 1: the stage is the middle of a pool of light on the room's wall; 0: a sheet with a darkened rim
   varying vec2 vUv;
+  varying vec3 vWorld;
 ${stageEdgeGlsl}
+${handShadowGlsl}
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -97,7 +102,7 @@ ${stageEdgeGlsl}
     vec2 su = p / uStage + 0.5; // 0..1 across the stage
     if (uHigh > 0.5) {
       if (su.x < 0.0 || su.x > 1.0 || su.y < 0.0 || su.y > 1.0) discard; // the plain, hard sheet: only the stage
-      gl_FragColor = vec4(1.0, 1.0, 1.0, uOpacity);
+      gl_FragColor = vec4(vec3(handShadowLit(vWorld)), uOpacity); // the hands' shadows, black at full strength
       #include <colorspace_fragment>
       return;
     }
@@ -168,6 +173,8 @@ ${stageEdgeGlsl}
       col *= mix(0.7, 1.0, smoothstep(0.0, 0.035 + 0.01 * blot, edge));
     }
 
+    // The hands' shadows take the candle's light away (hand-shadow-map.ts).
+    col *= handShadowLit(vWorld);
     gl_FragColor = vec4(col, alpha);
     #include <colorspace_fragment>
   }
@@ -203,9 +210,11 @@ export class TestStageView {
   /** Where the candle's pool of light is drawn ([width, height, centre x, centre y], stage metres; lightArea), or null for a sheet. */
   private pool: Float64Array | null = null;
 
-  constructor() {
+  /** `hands`: the hands' shadow map, whose shadows fall on the paper too (without one, none do). */
+  constructor(hands?: HandShadowMap) {
     this.paperMaterial = new ShaderMaterial({
       uniforms: {
+        ...(hands?.uniforms ?? handShadowOff()),
         uPaper: { value: PAPER.clone() },
         uFlame: { value: new Vector3(0, 0, 1) },
         uSize: { value: new Vector2(1.6, 1) },

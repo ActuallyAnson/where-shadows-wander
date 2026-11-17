@@ -47,6 +47,21 @@ describe('CandleLight.light', () => {
     map.dispose();
     candle.dispose();
   });
+
+  it("takes the hands' shadows (shared uniforms), unless asked not to, under its own program", () => {
+    const candle = new CandleLight();
+    const wall = new MeshBasicMaterial();
+    const glove = new MeshBasicMaterial();
+    candle.light(wall);
+    candle.light(glove, undefined, false);
+    const w = patched(wall);
+    expect(w.fragmentShader).toContain('#define CANDLE_HANDS');
+    expect(w.uniforms.uHandStrength).toBe(candle.hands.uniforms.uHandStrength);
+    expect(w.uniforms.uHandMap).toBe(candle.hands.uniforms.uHandMap);
+    expect(patched(glove).fragmentShader).not.toContain('#define CANDLE_HANDS');
+    expect(glove.customProgramCacheKey()).not.toBe(wall.customProgramCacheKey());
+    candle.dispose();
+  });
 });
 
 describe('CandleLight.fullBright', () => {

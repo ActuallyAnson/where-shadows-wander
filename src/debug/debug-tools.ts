@@ -2,7 +2,7 @@
 // the replay, the keyboard and a one-line HUD. Only ever reached through a dynamic import behind DEBUG_TOOLS
 // (debug-flag.ts), so a normal build does not contain it. With every tool off, the per-frame cost is one call that
 // returns at once.
-import type { Object3D, Scene } from '@iwsdk/core';
+import type { Scene } from '@iwsdk/core';
 import type { HandFrame, Handedness } from '../engine/hands/hand';
 import type { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
 import type { StagePlane } from '../engine/shadow/pure/stage-plane';
@@ -20,7 +20,6 @@ export interface DebugContext {
   handList: readonly HandFrame[];
   projector: ShadowProjector;
   stage: StagePlane;
-  shadowMesh: Object3D;
   sharpen: { settings: { strength: number } };
   lantern: { settings: { amplitude: number } };
   candleLight: { visible: boolean };
@@ -121,8 +120,7 @@ export class DebugTools {
     const c = this.ctx;
     switch (key) {
       case 'shadow':
-        c.shadowMesh.visible = on;
-        break;
+        break; // read by the frame loop (systems.shadow): the hands' shadow is cast with no strength while it is off
       case 'sharpen':
         c.sharpen.settings.strength = on ? c.settings.value.sharpen : 0;
         break;

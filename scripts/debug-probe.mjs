@@ -41,7 +41,7 @@ const state = () =>
   w(() => {
     const d = window.__wsw;
     return {
-      shadow: d.shadowRenderer.mesh.visible,
+      shadow: d.handShadow.strength > 0,
       sharpen: d.sharpen.settings.strength,
       flicker: d.lanternLight.settings.amplitude,
       candle: d.candleView.pointLight.visible,

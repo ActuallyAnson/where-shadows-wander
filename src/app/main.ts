@@ -32,7 +32,7 @@ import { ShapeRecognizer } from '../engine/hands/shape-recognizer';
 import { LanternLightModel } from '../engine/shadow/pure/lantern-light';
 import { ShadowSharpen } from '../engine/shadow/pure/shadow-sharpen';
 import { ShadowProjector } from '../engine/shadow/pure/shadow-projector';
-import { REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
+import { castPoint, REAL_WALL_SHADOW_SETTINGS } from '../engine/shadow/pure/real-wall';
 import { loadTesting, MENU_CHOICES, nextChoice, saveTesting, type MenuChoice } from './testing-options';
 import { MenuPanel } from '../ui/menu-panel/menu-panel';
 import { WallPauseView } from '../ui/menu-panel/wall-pause-view';
@@ -71,7 +71,7 @@ import { FORM_S, FRIEND_PUPPETS, friendSceneTime, OUTLINE_SHAPES } from '../engi
 import { ShapeGuide } from '../engine/stage/story/shape-guide';
 import { SHAPES, type Shape } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
-import { DEFAULT_SHADOW_OPACITY, ShadowRenderer } from '../engine/shadow/shadow-renderer';
+import { DEFAULT_SHADOW_OPACITY } from '../engine/shadow/hand-shadow-map';
 import { BACKDROP, TestStageView } from '../engine/shadow/test-stage-view';
 import { GameAudio } from '../engine/services/audio/game-audio';
 import { CaptioningPlayer } from '../engine/services/audio/sound-captions';
@@ -232,9 +232,14 @@ async function start(): Promise<void> {
   // friend's hand and the story's words fill most of the wall. The hands' own shadows (and the captions) keep the stage.
   const storyFrame = new StageFrame();
   const lantern = new Float64Array(3);
-  // The wall's shadow settings are in real-wall.ts (blend 0.65, a low edge blur).
+  // Where each hand's shadow falls, as the candle casts it (real-wall.ts): for the story, the shapes' rings and the debug tools.
+  // The shadow itself is drawn by the candle's light (CandleLight.hands, hand-shadow-map.ts).
   const projector = new ShadowProjector(REAL_WALL_SHADOW_SETTINGS);
-  const shadowRenderer = new ShadowRenderer();
+  /** Where the hands' shadows are cast from this frame: behind and above the flame, so they reach the wall (real-wall.ts). */
+  const castFrom = new Float64Array(3);
+  // How dark the hands' shadow is drawn: `baseOpacity` at full (high contrast: 1), and this frame's strength (faint while a
+  // memory plays) and softness (the sharpen effect).
+  const handShadow = { baseOpacity: DEFAULT_SHADOW_OPACITY, strength: 0, softness: 1 };
   // On the room's wall the stage is the middle of the candle's round pool of light, drawn over most of the wall (stage-edge-glsl.ts).
   const lightPoolArea = new Float64Array(4);
   // Each hand's shadow sharpens as its shape is recognised (candidate), and snaps crisp on commit.
@@ -257,7 +262,10 @@ async function start(): Promise<void> {
       if (flickerTest === null) lanternLight.settings.amplitude = e.matches ? 0.3 : 1;
     });
   const cameraQuat = new Quaternion();
-  const stageView = new TestStageView();
+  // The candle as a real light for the room: everything in it is lit per pixel by the flame, the props cast baked shadows and
+  // the hands cast theirs every frame.
+  const candleLight = new CandleLight();
+  const stageView = new TestStageView(candleLight.hands);
   stageView.flameVisible = false; // Retired stand-in flame; CandleView renders the procedural candle & flame
   stageView.mood = 0.4; // the wall's warmth: a still evening (the story may set it later)
   const candleView = new CandleView();
@@ -272,8 +280,6 @@ async function start(): Promise<void> {
   const roomDressing = new RoomDressingView(bedroomLayout.layout);
   bedroomView.group.add(roomDressing.group);
   bedroomView.setWallsCovered(true); // the dressing's painted walls cover them
-  // The candle as a real light for the room: everything in it is lit per pixel by the flame, and the props cast baked shadows.
-  const candleLight = new CandleLight();
   roomDressing.useCandleLight(candleLight);
   bedroomView.useCandleLight(candleLight);
   bedTray.useCandleLight(candleLight);
@@ -440,7 +446,6 @@ async function start(): Promise<void> {
     stageView.group,
     wallPauseView.group,
     bedroomView.group,
-    shadowRenderer.mesh,
     friendView.group,
     friendOutView.group,
     guideView.group,
@@ -534,7 +539,7 @@ async function start(): Promise<void> {
   // High contrast: a bright white wall and fully solid shadows (the room art, when it exists, reads the same setting).
   const applyContrast = () => {
     stageView.highContrast = settings.value.highContrast;
-    shadowRenderer.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
+    handShadow.baseOpacity = settings.value.highContrast ? 1 : DEFAULT_SHADOW_OPACITY;
   };
   settings.subscribe((key) => {
     if (key === null || key === 'highContrast') applyContrast();
@@ -666,6 +671,7 @@ async function start(): Promise<void> {
     stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
     storyFrame.setStoryArea(stageFrame, STORY_SCALE, lightPoolArea[3]);
     stageView.place(stage, lantern);
+    candleLight.hands.place(stage, lightPoolArea); // the hands' shadows are cast onto the wall's lit area
     candleView.place(lantern);
 
     // The pause menu is drawn on the wall: it lives in the stage's frame.
@@ -728,6 +734,7 @@ async function start(): Promise<void> {
   let handVisual: HandVisual = capsuleHands;
   let passthrough = false; // set from the session's blend mode: over passthrough the real hands are visible
   world.scene.add(handVisual.object);
+  candleLight.hands.setCasters(handVisual.object);
   // One visual per glove, kept once made: a model's bones are posed in place, so it cannot be set up from them again.
   const gloveVisuals = new Map<GloveId, HandVisual>([['plain', capsuleHands]]);
   let gloveId = readGlove();
@@ -738,6 +745,7 @@ async function start(): Promise<void> {
     world.scene.remove(handVisual.object);
     handVisual = next;
     world.scene.add(next.object);
+    candleLight.hands.setCasters(next.object); // the hands the player sees are the ones that cast
   };
   const chooseGlove = (id: GloveId) => {
     gloveId = id;
@@ -910,7 +918,6 @@ async function start(): Promise<void> {
       handList,
       projector,
       stage,
-      shadowMesh: shadowRenderer.mesh,
       sharpen,
       lantern: lanternLight,
       candleLight: candleView.pointLight,
@@ -1495,13 +1502,11 @@ async function start(): Promise<void> {
         }
         timings.begin(SLOT.shadow);
         try {
-          shadowRenderer.mesh.visible = shadowsVisible;
-          projector.update(hands.hands, stage, candleView.flamePosition);
+          projector.update(hands.hands, stage, castPoint(stage, candleView.flamePosition, castFrom));
           if (!paused) {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
             shapeRing.onShapeEvents(shapes.events, projector.shadows);
           }
-          shadowRenderer.setPool(lightPoolArea, stageView.flameOnWall.x, stageView.flameOnWall.y);
           // Full when the story calls for a hand (or none is playing, or a menu needs it); faint while a memory plays.
           // High contrast keeps it fully solid throughout.
           const handCalled =
@@ -1510,23 +1515,19 @@ async function start(): Promise<void> {
             (story.waitingForShape && story.friendOpacity > 0) ||
             story.waitingForSleep;
           const handLevel = settings.value.highContrast ? 1 : handPresence.update(step, handCalled, story.handHidden);
-          shadowRenderer.update(
-            projector.shadows,
-            stage,
-            sharpen.look,
-            shadowsVisible ? candleView.occlusion * handLevel : 0,
-            step,
-          );
-          // The debug tools' shadow switch (Alt+1) holds it hidden: the lines above show it again every frame.
-          if (debug && !debug.controller.systems.shadow) shadowRenderer.mesh.visible = false;
+          // The hands' shadow is cast by the candle (drawn after the hands are posed, below): how dark it is, and how soft (a
+          // recognised shape sharpens it). The candle's own dimming (a hand near the flame) is the light's, so not counted here.
+          // The debug tools' shadow switch (Alt+1) holds it hidden.
+          const shadowOn = shadowsVisible && !(debug && !debug.controller.systems.shadow);
+          handShadow.strength = shadowOn ? handShadow.baseOpacity * handLevel : 0;
+          handShadow.softness = Math.min(sharpen.look.left.blurScale, sharpen.look.right.blurScale);
           shapeRing.update(
             paused ? 0 : step,
             stage,
-            shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion * handLevel : 0,
+            shadowsVisible ? handShadow.baseOpacity * candleView.occlusion * handLevel : 0,
           );
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
-          const lineOpacity =
-            shadowsVisible && !menu.group.visible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
+          const lineOpacity = shadowsVisible && !menu.group.visible ? handShadow.baseOpacity * candleView.occlusion : 0;
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
           // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
           const storyStep = paused || sessionState !== 'playing' ? 0 : step;
@@ -1601,7 +1602,7 @@ async function start(): Promise<void> {
             guideScene = (story.friendShape !== null ? OUTLINE_SHAPES[story.friendShape] : undefined) ?? friendScene;
           // How dark her hand's shadow is; how much of it is there (fading, changing shape) goes in separately, so a fading hand
           // covers the scenery less rather than paling over it (PuppetView.update).
-          const friendLight = shadowsVisible ? shadowRenderer.baseOpacity * candleView.occlusion : 0;
+          const friendLight = shadowsVisible ? handShadow.baseOpacity * candleView.occlusion : 0;
           if (friendScene && story.friendOpacity > 0.001) {
             let fp = friendPlayers.get(friendScene);
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
@@ -1637,7 +1638,7 @@ async function start(): Promise<void> {
             guideView.update(
               gp,
               storyFrame,
-              shadowsVisible ? shadowRenderer.baseOpacity * strength * candleView.occlusion : 0,
+              shadowsVisible ? handShadow.baseOpacity * strength * candleView.occlusion : 0,
               guide.presence,
             );
           } else guideView.hide();
@@ -1833,6 +1834,14 @@ async function start(): Promise<void> {
           !paused,
           handEye,
         );
+        // The hands as posed this frame cast their shadow from the flame onto the room (hand-shadow-map.ts).
+        candleLight.hands.update(
+          world.renderer,
+          world.scene,
+          rigPlaced && candleView.lit ? castPoint(stage, candleView.flamePosition, castFrom) : null,
+          handShadow.strength,
+          handShadow.softness,
+        );
         timings.end(SLOT.handVisual);
       } catch (e) {
         failures.report('hands drawing', e);
@@ -1874,7 +1883,7 @@ async function start(): Promise<void> {
         menu,
         showMenu,
         stageView,
-        shadowRenderer,
+        handShadow,
         captionLine,
         soundPool,
         governor,

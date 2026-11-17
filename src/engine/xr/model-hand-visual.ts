@@ -154,7 +154,7 @@ class Glove {
     const m = new MeshBasicMaterial({ map: std.map ?? null, side: src.side });
     if (std.color) m.color.copy(std.color);
     const fade = this.fadeUniform;
-    if (candle) candle.light(m);
+    if (candle) candle.light(m, undefined, false); // the hands' own shadows do not fall on the glove
     const lit = m.onBeforeCompile;
     m.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms, renderer: WebGLRenderer) => {
       if (candle) {

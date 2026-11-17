@@ -1,5 +1,5 @@
 // The candle as a real light for the bedroom: every room surface is lit by it per pixel (by how far it is from the flame and how
-// squarely it faces it), and the room's static props cast shadows from it.
+// squarely it faces it), the room's static props cast shadows from it, and so do the player's hands (`hands`, drawn every frame).
 //
 // The room's materials stay MeshBasicMaterial (its painted look is tuned unlit); `light(material)` patches one so its colour is
 // multiplied by the candle's light. A real three.js light would light everything, the candle and tray inches from the flame too,
@@ -19,6 +19,7 @@ import {
   WebGLCubeRenderTarget,
 } from '@iwsdk/core';
 import type { Material, MeshBasicMaterial, Scene, Texture, WebGLRenderer } from '@iwsdk/core';
+import { HandShadowMap, handShadowGlsl } from './hand-shadow-map';
 
 /** The layer only the shadow casters are on (as well as the default one), so the bake draws nothing else. */
 export const CASTER_LAYER = 7;
@@ -97,8 +98,9 @@ export interface CandleBump {
  * What a patched material adds to its fragment shader: the candle's light at this point, shadows included. With `bump`, the
  * normal is leaned by a normal map first, so the light catches the surface's lumps (most where it rakes, at the pool's edge).
  */
-const lightGlsl = (bump: boolean) => /* glsl */ `
+const lightGlsl = (bump: boolean, hands: boolean) => /* glsl */ `
   ${bump ? '#define CANDLE_BUMP' : ''}
+  ${hands ? '#define CANDLE_HANDS' : ''}
   uniform vec3 uCandlePos;
   uniform float uFullBright;
   uniform float uCandleIntensity;
@@ -121,6 +123,7 @@ const lightGlsl = (bump: boolean) => /* glsl */ `
     varying vec3 vCandleBitangent;
   #endif
   ${packGlsl}
+  ${handShadowGlsl}
   float candleShadowTap(vec3 dir, float dist) {
     float stored = candleUnpack(textureCube(uCandleShadow, dir)) * uCandleFar;
     return dist - (0.03 + 0.015 * dist) <= stored ? 1.0 : 0.0;
@@ -161,12 +164,18 @@ const lightGlsl = (bump: boolean) => /* glsl */ `
       lit = (candleShadowTap(dir, dist) + candleShadowTap(dir + t1 * o, dist) + candleShadowTap(dir - t1 * o, dist) +
              candleShadowTap(dir + t2 * o, dist) + candleShadowTap(dir - t2 * o, dist)) / 5.0;
     }
+    // The hands' shadows, cast this frame (hand-shadow-map.ts).
+    #ifdef CANDLE_HANDS
+      lit *= handShadowLit(vCandleWorld);
+    #endif
     // One model, two lights: the moon's everywhere, and the candle's added where it reaches.
     return uMoonLight + uCandleColour * (uCandleIntensity * reach * facing * beam * lit);
   }
 `;
 
 export class CandleLight {
+  /** The hands' shadows: cast by this light every frame, onto everything it lights (hand-shadow-map.ts). */
+  readonly hands = new HandShadowMap();
   /** Shared by every patched material, so setting one value here sets it everywhere. */
   readonly uniforms = {
     uCandlePos: { value: new Vector3() },
@@ -218,8 +227,9 @@ export class CandleLight {
    * Makes `material` lit by the room's light: its colour (the surface's own, its albedo) is multiplied by the moon's light plus
    * the candle's. This is the room's only lighting: nothing else should tint the material for the light. `bump` (flat quads
    * only): a normal map whose lumps the light catches; how strongly is shared by all, `uniforms.uCandleBumpStrength`.
+   * `hands` false: the hands' shadows do not fall on it (the gloves themselves: their shadow is not cast from the flame).
    */
-  light(material: MeshBasicMaterial, bump?: CandleBump): void {
+  light(material: MeshBasicMaterial, bump?: CandleBump, hands = true): void {
     const u = this.uniforms;
     const own = bump
       ? { uCandleBump: { value: bump.map }, uCandleBumpRepeat: { value: new Vector2(bump.repeat[0], bump.repeat[1]) } }
@@ -234,7 +244,7 @@ export class CandleLight {
           vCandleBitangent = mat3(modelMatrix) * vec3(0.0, 1.0, 0.0);`
       : '';
     material.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, u, own);
+      Object.assign(shader.uniforms, u, this.hands.uniforms, own);
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
@@ -253,14 +263,14 @@ export class CandleLight {
           vCandleNormal = mat3(modelMatrix) * candleN;${bumpVertex}`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n${lightGlsl(!!bump)}`)
+        .replace('#include <common>', `#include <common>\n${lightGlsl(!!bump, hands)}`)
         // Full bright (debug) also lifts the dark tones: the room's own colours are near black.
         .replace(
           '#include <opaque_fragment>',
           'outgoingLight *= candleLight();\nif (uFullBright > 0.5) outgoingLight = sqrt(outgoingLight);\n#include <opaque_fragment>',
         );
     };
-    material.customProgramCacheKey = () => (bump ? 'candle-light-3-bump' : 'candle-light-3');
+    material.customProgramCacheKey = () => `candle-light-4${bump ? '-bump' : ''}${hands ? '-hands' : ''}`;
     material.needsUpdate = true;
   }
 
@@ -376,6 +386,7 @@ export class CandleLight {
 
   dispose(): void {
     this.target.dispose();
+    this.hands.dispose();
     for (const m of this.casterMaterials) m.dispose();
   }
 }

@@ -1,23 +1,31 @@
-// How hand shadows are projected onto the real paper wall (A's StageFrame, 2 m ahead). Plain TypeScript.
+// Where the hands' shadows are cast from on the room's wall. Plain TypeScript.
 //
-// blend 0.65 toward orthographic: the wall is fixed, so the size of a shadow only varies with how far a hand is
-// from the lantern. At 0.9 that variation is tiny (+-2 %) but a puppet hand's shadow is only 10 x 24 cm on a
-// 1.6 m wall; at 0.65 it is about 15 x 35 cm and still steady (+-8 %). (0.9 is the GDD value for keeping size
-// steady when the WALL distance varies, which it does not here.) The edge blur is capped low: at the default
-// 0.03 per metre every capsule of a hand 1.5 m from the wall gets the 2 cm maximum, 20 % of a shadow's width,
-// and the gaps between fingers close.
-// The blend alone changes a shadow's size only ~25 % across the arm's reach, which reads as no change at all; sizeLightBackM
-// adds a near light's growth on top (about 2x between a hand at the flame and one at arm's length) without moving the shadow.
-// A night light fixed behind the player (the bedroom proposal) would need these re-tuned.
-// A hand behind the candle keeps a dim, blurred shadow (a third as dark, a 4 cm blur): out of focus, not gone, so the player
-// sees where it is and brings it forward into focus.
+// The shadows are real: the hands' meshes are drawn from a light into a shadow map each frame, and the wall (and anything else
+// the candle lights) is darker where they block it (hand-shadow-map.ts). But they are not cast from the flame itself. The candle
+// stands on the lap tray, low and only a hand's breadth behind where hands rest, so from the flame a resting hand's shadow would
+// be thrown metres up, onto the ceiling. They are cast instead from a point CAST_BACK_M behind the flame (away from the wall) and
+// CAST_UP_M above it, about level with resting hands, as a lamp behind a shadow puppeteer would: a resting hand's shadow then
+// falls on the middle of the stage, about 20 by 47 cm, a little bigger as it nears the light and smaller as it goes toward the
+// wall. The candle still lights the wall; its light is what the shadow takes away.
+//
+// The projector (shadow-projector.ts) projects the joints from the same point in plain perspective (these settings), so where the
+// story places her hand and the memories, and the shapes' rings, match the shadow that is drawn.
 import type { ShadowSettings } from './shadow-projector';
+import type { StagePlane } from './stage-plane';
+
+/** How far behind the flame (away from the wall) and above it the hands' shadows are cast from, metres. Tune in the headset. */
+export const CAST_BACK_M = 1.2;
+export const CAST_UP_M = 0.3;
 
 export const REAL_WALL_SHADOW_SETTINGS: Partial<ShadowSettings> = {
-  blend: 0.65,
-  blurPerM: 0.005,
-  maxBlurM: 0.008,
-  behindOpacity: 0.35,
-  behindBlurM: 0.04,
-  sizeLightBackM: 0.75,
+  blend: 0,
+  behindOpacity: 0,
+  behindBlurM: 0,
+  sizeLightBackM: 0,
 };
+
+/** Writes the point the hands' shadows are cast from (world, m), for the flame at `flame` and the wall `stage`. Allocates nothing. */
+export function castPoint(stage: StagePlane, flame: Readonly<ArrayLike<number>>, out: Float64Array): Float64Array {
+  for (let i = 0; i < 3; i++) out[i] = flame[i] + stage.normal[i] * CAST_BACK_M + stage.up[i] * CAST_UP_M;
+  return out;
+}
