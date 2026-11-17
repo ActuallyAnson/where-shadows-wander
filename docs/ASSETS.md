@@ -77,7 +77,7 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 | `bookcaseOpen.glb` | Bookcase on the right wall | Final |
 | `rugRound.glb` | Round rug | Final |
 | `pottedPlant.glb` | A small potted plant on the nightstand | Final |
-| `glassJar.glb` | The jar she gave him, lid on, on top of the bookcase (piece `jar`): half seen in scene 1, the last of the candle finds it in scene 7 | Final: "Glass Jar" by Jarlan Perez (CC BY 3.0) |
+| `glassJar.glb` | The jar she gave him, lid on, on his desk under the window (piece `jar`): her firefly glows in it from scene 1 until it leaves in scene 5; the last of the candle finds it empty in scene 7 | Final: "Glass Jar" by Jarlan Perez (CC BY 3.0) |
 | `flashlight.glb` | Her torch from the night they met, lying beside the jar (piece `torch`) | Final: "Time Hotel 7.07" by S. Paul Michael (CC BY 3.0), body recoloured from black to faded red so it shows in the dark |
 | `cardboardBoxStack.glb` | A stack of taped moving boxes in the front right corner (piece `boxes`): he has just moved in | Final: Quaternius (CC0) |
 | `cardboardBoxOpen.glb` | An open box, half unpacked, just inside the door, left of the bed's head (piece `box-open`) | Final: Kenney (CC0) |
@@ -142,7 +142,7 @@ The puppets' cut-outs are painted by `src/engine/shadow/puppet-art.ts` (`PUPPET_
 
 | Model | Why | Status |
 |---|---|---|
-| Glass jar (lid, maybe a string handle) | "The jar the friend gave him" on the shelf, seen in scene 1 and lit by the last of the candle in scene 7 | Done: `glassJar.glb`, on the bookcase |
+| Glass jar (lid, maybe a string handle) | "The jar the friend gave him" on the desk, her firefly in it until scene 5, found empty by the last of the candle in scene 7 | Done: `glassJar.glb`, on the desk; the firefly is made in code (`jar-firefly-view.ts`) |
 | Moving boxes, 2 or 3, one open and half unpacked | The prologue shows he has just moved in; the real room can echo it | Done: `cardboardBoxStack.glb`, `cardboardBoxOpen.glb`, `cardboardBoxFlat.glb` |
 | Torch / flashlight | Hers, from the night they met, kept on the shelf or nightstand | Done: `flashlight.glb`, on the bookcase |
 | Stuffed rabbit (or fox) | The first shapes are the rabbit and the fox | Done: `toyFox.glb` (a fox figure rather than a plush); a rabbit would pair with it |

@@ -55,7 +55,7 @@ const GATE_OUT_LEN_S = 4.5;
 const PARK_BACK_S = GATE_OUT_S + 1.0;
 const PARK_BACK_LEN_S = 5.5;
 /** The firefly comes up out of the jar, hangs over it, and drifts away up past where she sat, out over the top of the wall. */
-const FLY_OUT_S = PARK_BACK_S + PARK_BACK_LEN_S + 1.2;
+export const FLY_OUT_S = PARK_BACK_S + PARK_BACK_LEN_S + 1.2;
 const FLY_HANG_S = FLY_OUT_S + 1.3;
 const FLY_DRIFT_S = FLY_HANG_S + 2.0;
 const FLY_PAST_S = FLY_DRIFT_S + 2.6;

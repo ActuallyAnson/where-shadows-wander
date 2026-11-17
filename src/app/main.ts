@@ -23,6 +23,7 @@ import { DEBUG_TOOLS } from '../debug/debug-flag';
 import type { DebugTools } from '../debug/debug-tools';
 import { Diagnostics } from '../debug/diagnostics';
 import { CandleView } from '../engine/render/candle-view';
+import { JarFireflyView } from '../engine/render/jar-firefly-view';
 import { TitleLighterView } from '../engine/render/title-lighter-view';
 import { BedTrayView } from '../engine/render/room/bed-tray-view';
 import { BedroomView } from '../engine/render/room/bedroom-view';
@@ -61,6 +62,8 @@ import type { Cue, PuppetScene } from '../engine/stage/puppet/puppet-scene';
 import { ScenePlayer } from '../engine/stage/puppet/scene-player';
 import { StoryDirector } from '../engine/stage/story/story-director';
 import { SleepHint } from '../engine/stage/story/sleep-hint';
+import { JarFirefly } from '../engine/stage/story/jar-firefly';
+import { STORY_STAGE } from '../engine/stage/story/story-stage';
 import { LightHush } from '../engine/stage/story/light-hush';
 import { IgnitionHold } from '../engine/stage/ignition';
 import { writeCoverHand } from '../engine/hands/cover-hand';
@@ -286,7 +289,10 @@ async function start(): Promise<void> {
   // Real furniture (models credited in CREDITS.md) wherever its .glb is in src/assets/models.
   const roomModels = new RoomModels((id) => id in assetManifest, bedroomLayout.layout);
   roomDressing.group.add(roomModels.group);
-  void roomModels.load(candleLight);
+  // Her firefly, glowing in the jar on his desk until it leaves the jar on the wall in scene 5 (jar-firefly.ts).
+  const jarFirefly = new JarFirefly();
+  const jarFireflyView = new JarFireflyView();
+  void roomModels.load(candleLight).then(() => jarFireflyView.setJar(roomModels.group.getObjectByName('jar') ?? null));
   // Models placed with the room editor (layout entries that name a `model`), loaded through the asset manifest, in the
   // room or on the lap.
   const manifestModels: ModelLoader = async (id) => {
@@ -446,6 +452,7 @@ async function start(): Promise<void> {
     stageView.group,
     wallPauseView.group,
     bedroomView.group,
+    jarFireflyView.glow.mesh,
     friendView.group,
     friendOutView.group,
     guideView.group,
@@ -1781,6 +1788,13 @@ async function start(): Promise<void> {
         }
         ghostHand.update(ghostFrame, sleepHint.ghost);
         candleView.update(lanternLight.light, cameraQuat);
+        const shown = story.memory;
+        jarFirefly.update(
+          paused ? 0 : step,
+          shown !== null && shown.scene === STORY_STAGE ? shown.time : null,
+          sessionState === 'title_vr',
+        );
+        jarFireflyView.update(jarFirefly.glow, cameraQuat);
       } catch (e) {
         failures.report('lighting', e);
       }

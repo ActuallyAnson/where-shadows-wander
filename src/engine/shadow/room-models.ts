@@ -95,10 +95,11 @@ export const ROOM_PIECES: readonly RoomPiece[] = [
   // The light in the ceiling (2.5 m), over the middle of the room, unlit: it hangs 0.67 m, high above the stage wall's view.
   { id: 'ceiling-light', ids: ['ceilinglight'], at: [0, 2.5 - 0.67, -0.45], size: [0.4, 0.4] },
 
-  // Her keepsakes, on top of the bookcase (1.32 m up), behind the player's right shoulder: half seen in the dark at first, and
-  // found by the last of the candle in scene 7 (docs/STORY.md). The jar she gave him on the firefly night (0.17 m tall, its lid
-  // on) and her torch from the night they met, lying on its side, its lens turned into the room.
-  { id: 'jar', ids: ['glassjar'], at: [1.5, 1.32, 0.3], size: [0.11, 0.11] },
+  // The jar she gave him on the firefly night (0.17 m tall, its lid on), on his desk between the pencils and the globe, under
+  // the window: her firefly glows in it (jar-firefly-view.ts) until it leaves the jar on the wall in scene 5 (docs/STORY.md).
+  { id: 'jar', ids: ['glassjar'], at: [-1.64, 0.607, -0.66], size: [0.11, 0.11] },
+  // Her torch from the night they met, on top of the bookcase (1.32 m up), behind the player's right shoulder, lying on its
+  // side, its lens turned into the room.
   { id: 'torch', ids: ['flashlight'], at: [1.72, 1.32, 0.28], size: [0.07, 0.2], yaw: -Math.PI / 2 + 0.3 },
   // He has just moved in (the prologue's boxes): a stack of taped boxes in the corner ahead on the right (0.68 m high), by the
   // pictures; behind his left shoulder, in front of the door, an open box half unpacked and a flat one with folded blankets on
