@@ -246,8 +246,13 @@ describe('the story script', () => {
     expect(validateScene(STORY_STAGE)).toEqual([]);
   });
 
-  it('scene 2 opens on the night they met, then the friend’s rabbit, and its memory starts from the player’s rabbit', () => {
-    const [prologue, first, second] = STORY_SCRIPT[0].beats;
+  it('scene 2 waits on her flat hand, then the night they met, then the friend’s rabbit, its memory from the player’s rabbit', () => {
+    const [gate, prologue, first, second] = STORY_SCRIPT[0].beats;
+    // The gate into the story: her flat hand left of the middle, its outline facing it on the right.
+    expect(gate).toMatchObject({ kind: 'friend', shape: 'flat' });
+    if (gate.kind !== 'friend') throw new Error('no gate');
+    expect(gate.x).toBeLessThan(0);
+    expect(gate.guide).toEqual([-gate.x, gate.y]);
     expect(prologue).toMatchObject({ kind: 'memory', start: STORY_CHAPTER['the-storm'].start });
     expect(prologue).not.toHaveProperty('from');
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });

@@ -40,7 +40,7 @@ Each memory (scenes 2 to 5) ends on a picture that leads into the next one, and 
     - **She's waiting.** Once the shape is recognised and being held, her hand leans a few centimetres toward the player's, so a player who has it right keeps holding it.
 3.  **The shadow joins the story.** The player's shadow becomes a puppet in the picture that's already there (the fox pounces on the rabbit, the cup holds a firefly), and that puppet carries the story into the next place.
 
-Scene 2 is the only memory that plays before its friend's hand: a short prologue, the night they met, shows who she is and puts the fort on the wall, and her hand rises over it once she has raised her own. Scene 6 is the friend's hand with nothing behind it, and that emptiness is the point.
+Before any memory, her flat hand waits on the empty wall as the gate into the story (scene 1). Scene 2 is the only memory that plays before its friend's hand for its shape: a short prologue, the night they met, shows who she is and puts the fort on the wall, and her hand rises over it once she has raised her own. Scene 6 is the friend's hand with nothing behind it, and that emptiness is the point.
 
 This is the tutorial, the help for a stuck player, and the friend's presence in one.
 
@@ -64,7 +64,7 @@ Like a shadow theatre with rod puppets on a track:
 
 | # | Scene | Season | Shape | Leads into the next with |
 |----|----|----|----|----|
-| 1 | Waking | the stormy night now | none (light the candle) | The candle's light on the wall, like the torch in the fort |
+| 1 | Waking | the stormy night now | light the candle; Flat, to begin | The friend's flat hand in the candle's light, a hello |
 | 2 | How they met | winter, a stormy night | Rabbit | The friend makes a fox with the torch: "now this one" |
 | 3 | The park | spring | Fox | Running into the evening; the first firefly |
 | 4 | Fireflies | summer | Cup | The friend gives him the jar; they walk on towards school |
@@ -78,12 +78,13 @@ Fist and spread are not used: a fist reads as anger and is the easiest shape to 
 
 - **Purpose:** set the mood without a word. He is awake, alone and it is late. Plant the wave the story will end on.
 - **What happens:** BEGIN fades the title to black (built). The headset stays black. In it, his friend slowly gathers: a faint pale glow of a girl lifting a hand to wave, soft-edged and never quite clear, like a dream (built). Then far off thunder rolls, low and muffled, and the dream goes with it: it is what woke him (built). While it rumbles away his eyes open on the room: a slow, heavy blink, a quicker, wider one, and they stay open (built). After the second blink he sits up: the covers slide down to his lap with a soft rustle of cloth (built). He is in his bed: the cover lies over his legs, the pillow where he lay is behind him, and the tray across his lap holds the candle (built). The room is dark and cold blue. A short silence, then the room tone. On his desk under the window, a small green-gold light glows in a glass jar. The player lights the candle (built), and the room warms a little.
-- **The player:** lights the candle.
-- **Leads into scene 2:** the candle throws its light on the wall, and the night they met begins in it: his room in the same storm. It begins only once the player looks up at the wall (lighting the candle, they are looking down at it): their eyes must rest on the wall for about 2 s in all, a glance away holding the count. If they look elsewhere, after a few seconds the candle's light on the wall slowly swells and settles to draw the eye up; it never starts without them (`src/engine/stage/look-to-start.ts`).
+- **The player:** lights the candle, then answers the friend's flat hand on the wall when ready.
+- **Leads into scene 2:** the candle throws its light on the wall, and the friend's flat hand rises into it, the same painted hand as in scene 6, a little left of the middle (`x -0.3`), with the outline of a flat hand facing it on the right (`x 0.3`). It waits for as long as it takes, so the player can play with their own hand shadows and look round the room before the story begins. When the player's flat hand answers it, her hand lowers away below the wall (only the goodbye fades it) and the night they met begins: his room in the same storm. The hello, palm to palm, is what the goodbye in scene 6 answers. It is the first beat of scene 2 in `story-script.ts`. The hand rises only once the player looks up at the wall (lighting the candle, they are looking down at it): their eyes must rest on the wall for about 2 s in all, a glance away holding the count. If they look elsewhere, after a few seconds the candle's light on the wall slowly swells and settles to draw the eye up; it never starts without them (`src/engine/stage/look-to-start.ts`).
 - **Must make the player feel:** lonely, then a little safer once the light is there.
 - **Built already:** the fade to black, the blinks (`src/engine/stage/wake-timeline.ts` has the timing, `src/engine/shadow/wake-view.ts` draws it; `__wsw.playWake()` replays it), the cold room, lighting the candle.
 - **Lighting it (`src/engine/stage/ignition.ts`):** the match's flame held within 15 cm of the wick for 3 s lights it. From 35 cm the wick answers the match: its glow brightens, grows and pulses faster, and the match's flame leans toward it and grows a little. If the match drifts off, the progress holds for 0.8 s and then drains slowly (about a third as fast as it fills), so a shaky hand doesn't have to start again.
 - **In the room:** the jar (`glassJar.glb`, piece `jar` in `room-models.ts`) stands on the desk under the window, to the player's left, between the pencils and the globe, her firefly in it, drifting slowly about the jar and flashing, a soft pulse every 2 to 3 s and dim between (`src/engine/stage/story/jar-firefly.ts` says how bright and where, and when it leaves from the story's time; `src/engine/render/jar-firefly-view.ts` draws it); her torch lies on top of the bookcase behind the player's right shoulder; moving boxes, folded blankets, a wall painting (`wallPainting.glb`), a toy fox on the boxes and a toy rabbit on the rug dress the room.
+- **To try:** whether players explore their shadows before answering the flat hand, or answer it at once; whether her hand should lower or fade after the hello.
 - **To try:** whether the friend in the dream reads as a friend and never as a figure to fear (keep it small, soft and brief); `__wsw.playWake()` replays it. A whispered "noo…" was tried in the dark and dropped (it read wrong); the timeline still has a slot for a word. Whether the dream's wave should match the friend's flat hand in scene 6 closely enough to be recognised.
 
 ### 2. How they met
