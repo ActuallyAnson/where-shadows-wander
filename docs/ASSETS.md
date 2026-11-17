@@ -73,7 +73,7 @@ Files live in `src/assets/models/`; the pieces are placed by `src/engine/shadow/
 
 | File | What | Status |
 |---|---|---|
-| `bedSingle.glb` | The bed he sits up in | Final |
+| `bedSingle.glb` | The bed he sits up in, its own cover over his legs | Final |
 | `bookcaseOpen.glb` | Bookcase on the right wall | Final |
 | `rugRound.glb` | Round rug | Final |
 | `pottedPlant.glb` | A small potted plant on the nightstand | Final |
