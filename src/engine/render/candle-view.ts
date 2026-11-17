@@ -9,10 +9,11 @@
 // - Dynamic Scene Light: non-shadow-casting PointLight matching the flame position and flickering with it.
 // - Interactive feedback (the candle stays where it is put: it is not picked up, so the light never moves in play):
 //   - Wick Indicator: soft pulsing warm glow hovering over the wick when the candle is unlit.
-//   - Palm Covering & Deliberate Pause: hovering a palm over the flame displays a radial progress ring filling
-//     clockwise over 3.0 seconds before extinguishing the candle and pausing.
-//   - Sleep mode (the end, scene 7): covering puts the candle out instead of pausing, so there is no pause ring; the flame
-//     shrinks and its light dims as the cover goes on, and a hand starts to dim it from further off.
+//   - Light occlusion: a hand near the flame dims its light, at any time.
+//   - Sleep mode (the end, scene 7): only then does a cover count. A palm (or two cupped hands) held over the flame for
+//     3 s covers it (isCovered), which puts the candle out; the flame shrinks and its light dims as the cover goes on, and a
+//     hand starts to dim it from further off. Covering never pauses the game (the system menu does).
+//   - Ignition ring: a radial ring fills round the wick as the matchstick lights it.
 //   - Match near (the start): the wick's glow brightens, grows and quickens as the matchstick comes near it.
 //
 // Zero allocations per frame. All Three.js objects imported through @iwsdk/core.
@@ -35,7 +36,7 @@ import { createPalm, derivePalm, type HandFrame, type Handedness } from '../hand
 import { LanternGlow } from '../shadow/lantern-glow';
 import type { LanternLight } from '../shadow/pure/lantern-light';
 
-export const COVER_PAUSE_DURATION_S = 3.0;
+export const COVER_SLEEP_S = 3.0;
 /** How far from the flame (m) a hand starts to dim it: in play, and at the end (sleep mode), where it answers from further off. */
 const OCCLUDE_REACH_M = 0.16;
 const SLEEP_OCCLUDE_REACH_M = 0.3;
@@ -106,7 +107,7 @@ export class CandleView {
 
   private readonly wickIndicator: Mesh;
 
-  // Deliberate pause radial gauge
+  // The ignition ring round the wick (a cover never shows one)
   private readonly coverProgressGeometry: PlaneGeometry;
   private readonly coverProgressMaterial: ShaderMaterial;
   private readonly coverProgressMesh: Mesh;
@@ -204,7 +205,7 @@ export class CandleView {
     this.wickIndicator.position.set(0, 0.098, 0);
     this.wickIndicator.visible = false;
 
-    // 8. Deliberate Pause Radial Gauge: fills clockwise over 3.0 seconds when hands cup/cover flame
+    // 8. Ignition ring: fills clockwise as the matchstick lights the wick
     this.coverProgressGeometry = new PlaneGeometry(0.2, 0.2);
     this.coverProgressMaterial = new ShaderMaterial({
       vertexShader: COVER_RING_VERT,
@@ -256,14 +257,14 @@ export class CandleView {
     }
   }
 
-  /** Whether a player's palm is currently covering the flame to pause. */
+  /** Whether a palm has covered the flame long enough to put it out (sleep mode only: scene 7's sleep). */
   get isCovered(): boolean {
     return this._isCovered;
   }
 
-  /** Progress (0.0 to 1.0) of the 3-second palm cover hold toward triggering pause. */
+  /** Progress (0.0 to 1.0) of the 3-second palm cover that puts the flame out (sleep mode only). */
   get coverProgress(): number {
-    return Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
+    return Math.min(1.0, this.coverTimer / COVER_SLEEP_S);
   }
 
   /** The end: the flame starts going out from how it looks now (call as the cover is committed, before resetCover's next update). */
@@ -326,7 +327,7 @@ export class CandleView {
   }
 
   /**
-   * Updates light occlusion and palm-over-flame pause detection.
+   * Updates light occlusion and, in sleep mode, palm-over-flame cover detection.
    * Zero per-frame allocations.
    */
   updateInteraction(hands: Readonly<Record<Handedness, HandFrame>>, delta: number): void {
@@ -372,9 +373,10 @@ export class CandleView {
       this.lightOcclusion = 1.0;
     }
 
-    // Dual-hand cupping or single-hand hovering to extinguish flame and pause (not while it is already going out, at the end)
+    // Dual-hand cupping or single-hand hovering to put the flame out: only in sleep mode (scene 7), never to pause, and not
+    // while it is already going out.
     let coveringFlame = false;
-    if (this._lit && !this.outActive) {
+    if (this._lit && !this.outActive && this.sleepMode) {
       // 1. Check dual-hand cupping (both hands around or above flame)
       if (leftTracked && rightTracked) {
         const dflx = this.leftPalm[0] - fx;
@@ -432,23 +434,13 @@ export class CandleView {
       }
     }
 
+    // The cover shows as the flame going out (update), never as a ring.
     if (coveringFlame) {
       this.coverTimer += delta;
-      const progress = Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
-      this.coverProgressMaterial.uniforms.uProgress.value = progress;
-      this.coverProgressMesh.visible = progress > 0.005;
-      if (this.coverTimer >= COVER_PAUSE_DURATION_S) {
-        this._isCovered = true;
-      }
+      if (this.coverTimer >= COVER_SLEEP_S) this._isCovered = true;
     } else {
       this.coverTimer = Math.max(0, this.coverTimer - delta * 1.5);
-      const progress = Math.min(1.0, this.coverTimer / COVER_PAUSE_DURATION_S);
-      this.coverProgressMaterial.uniforms.uProgress.value = progress;
-      this.coverProgressMesh.visible = progress > 0.005;
-      if (this.coverTimer <= 0) {
-        this._isCovered = false;
-        this.coverProgressMesh.visible = false;
-      }
+      if (this.coverTimer <= 0) this._isCovered = false;
     }
   }
 
@@ -503,7 +495,7 @@ export class CandleView {
       this.flame.mesh.scale.setScalar(0.4);
     }
     if (this.sleepMode) {
-      // Going out, not pausing: no ring; the flame bows under a near hand and shrinks, and its light dims, as the cover goes on.
+      // Going out: no ring; the flame bows under a near hand and shrinks, and its light dims, as the cover goes on.
       const cover = this.coverProgress;
       this.coverProgressMesh.visible = false;
       this.flame.mesh.scale.setScalar((1 - 0.75 * cover) * (0.55 + 0.45 * this.lightOcclusion));

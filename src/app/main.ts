@@ -4,7 +4,8 @@
 // ESLint (eslint.config.js). See docs/adr/0001-iwsdk-as-xr-and-view-layer.md.
 //
 // What runs (docs/adr/0016-story-shadow-theatre.md): the bedroom, lighting the candle, the hands' shadows on the
-// wall, the story told in shadow puppets (docs/STORY.md), covering the flame to pause, and at the end to sleep.
+// wall, the story told in shadow puppets (docs/STORY.md), and at the end covering the flame to sleep. The headset's system
+// menu (or taking it off) pauses it.
 // docs/ARCHITECTURE.md walks through one frame.
 import {
   AmbientLight,
@@ -223,7 +224,7 @@ async function start(): Promise<void> {
   // Shape recognition on both hands every frame; the story listens to its commits.
   const shapes = new ShapeRecognizer();
   // Lantern gestures. Nothing listens to them now that the candle stays on its saucer (only the diagnostics count them):
-  // covering the flame is read by CandleView, and no lantern is set, so a resting fist near it never reads as "pause".
+  // covering the flame (scene 7's sleep) is read by CandleView, and no lantern is set, so a resting fist near it is nothing.
   const gestures = new GestureDetector();
   gestures.setLantern(null);
   let clock = 0;
@@ -532,9 +533,11 @@ async function start(): Promise<void> {
   );
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
-  // Sound holds still with the game: the system menu, the headset off, or the page hidden.
-  /** The pause menu: the flame goes out, the sound dips and the wall offers Resume. Covering the flame and the headset's system
-   *  menu (or taking the headset off) both land here, so the story is never left running behind the player's back. */
+  /**
+   * The pause menu: the flame goes out, the sound dips and the wall offers Resume. The headset's system menu (or taking the
+   * headset off) opens it while the story plays, so the player comes back to Resume, not to a story that ran on without them.
+   * Covering the flame does not pause: it is only scene 7's way to sleep.
+   */
   const enterPause = () => {
     sessionState = 'paused';
     candleView.lit = false;
@@ -546,6 +549,7 @@ async function start(): Promise<void> {
   visibility.subscribe((_state, paused) => {
     if (paused && sessionState === 'playing') enterPause();
   });
+  // Sound holds still with the game: the system menu, the headset off, or the page hidden.
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
@@ -1516,14 +1520,13 @@ async function start(): Promise<void> {
           if (caught) igniteCandle();
         } else {
           titleLighter.visible = false;
+          // Covering the flame counts only in scene 7's wait (CandleView.sleepMode), where it is sleep; it never pauses.
           if (sessionState === 'playing') {
             if (candleView.isCovered && story.sleep()) fallAsleep();
             else if (candleView.isCovered && coverEndsTest) {
               // The test switch: the end, wherever the story is.
               stopStory();
               fallAsleep();
-            } else if (candleView.isCovered) {
-              enterPause();
             }
           } else if (sessionState === 'paused') {
             const isControllerTrigger = frame ? controllerPressed(frame) : false;
@@ -1564,7 +1567,7 @@ async function start(): Promise<void> {
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
           const lineOpacity = shadowsVisible && !menu.group.visible ? handShadow.baseOpacity * candleView.occlusion : 0;
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
-          // The puppet story: it holds still while paused (the flame covered) and its shadows go with the candle's light.
+          // The puppet story: it holds still while paused (the pause menu) and its shadows go with the candle's light.
           const storyStep = paused || sessionState !== 'playing' ? 0 : step;
           if (lookToStart.waiting || lookToStart.pulse > 0) {
             world.camera.getWorldPosition(lookEye);
@@ -1794,7 +1797,7 @@ async function start(): Promise<void> {
         roomDressing.lightning = storm.flash;
         roomDressing.update(lanternLight.light, candleView.lit ? roomLight : 0, candleView.flamePosition);
         // The room is dark until the candle is lit; then its light spreads out from the flame to the walls, and draws
-        // back when the flame is covered (the pause).
+        // back while the candle is out (the pause menu).
         roomDressing.spread(candleView.lit, step);
         if (ending.active)
           moonLift = ending.moon; // the end: the moon dims as he falls asleep, as it rose when the candle caught
@@ -1817,9 +1820,10 @@ async function start(): Promise<void> {
         candleLight.bakeIfDirty(world.renderer, world.scene);
         // While paused the rain holds still (the head still moves the layers), and the dust, shaft and sparkles are skipped.
         roomDressing.tick(sessionState === 'paused' ? 0 : step, settingsHead);
-        // The end: covering the flame puts it out (no pause ring), and a ghost hand shows that it is what's wanted now.
+        // The end: covering the flame puts it out, and a ghost hand shows that it is what's wanted now. Only then (and under the
+        // test switch that lets covering end the story anywhere) does the candle count a cover at all.
         const sleepWait = sessionState === 'playing' && story.waitingForSleep;
-        candleView.sleepMode = sleepWait;
+        candleView.sleepMode = sleepWait || (coverEndsTest && sessionState === 'playing');
         sleepHint.update(paused ? 0 : step, sleepWait, 1 - candleView.occlusion, candleView.coverProgress);
         if (sleepHint.sayWord) storyLine.say(SLEEP_WORD, 0, 6);
         if (sleepHint.ghost > 0) {

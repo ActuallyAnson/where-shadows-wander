@@ -33,7 +33,7 @@ The wall shows a story, played as a shadow-puppet theatre ([ADR 0016](adr/0016-s
 - **The wall shows a story,** played as a shadow-puppet theatre in detail.
 - **The puppets are 2D cut-outs** (silhouette art in parts, with pivots) placed between the candle and the wall and cast from the flame, so their shadows grow, blur and flicker like real ones.
 - **The player moves the story on** by making a named shape with their hands when the story asks for one.
-- **The room, the candle, the hand shadows and the cover-flame pause** are part of the game from the first moment to the last.
+- **The room, the candle and the hand shadows** are part of the game from the first moment to the last. The headset's system menu pauses it; covering the flame is kept for the end.
 
 #### A night of remembering
 
@@ -264,7 +264,7 @@ Where Shadows Wander is entered in the Entertainment track as immersive storytel
 | Hands-first, completable without a controller | Hands are the only input; no controller code path is needed |
 | Seated-optimised (airplane seat test) | All play happens seated (the kid sitting up in bed in a virtual bedroom), with the wall in view and the hands within reach |
 | Passthrough (judged for purpose if used) | Not used. The entry leans on hands-first design, the first five minutes, accessibility and polish instead |
-| Easy in and out (one bus stop test) | Light the candle to start, cover the flame to pause |
+| Easy in and out (one bus stop test) | Light the candle to start; the headset's system menu (or taking it off) pauses |
 | Original, not a wrapper (take it away test) | All of the game is built in-house; no third-party service |
 | New Experience division | Codebase started on or after 24 Sep 2026 |
 

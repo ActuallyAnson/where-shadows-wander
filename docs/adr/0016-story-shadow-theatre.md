@@ -22,7 +22,7 @@ What does work is the candle, the room and seeing your own hands' shadows on the
   - the VR title and lighting the candle;
   - the hands' shadows on the wall (projector, renderer, StageFrame, the light pool);
   - the shape recogniser and gestures;
-  - covering the flame to pause (the wall menu: Resume, Settings);
+  - covering the flame to pause (the wall menu: Resume, Settings); since [ADR 0020](0020-pause-from-the-system-menu.md) the headset's system menu opens that menu instead, and covering the flame counts only in scene 7;
   - the Hand Lab, saves, settings, menus, audio, diagnostics and the debug tools.
 - **The session is three states:** `title_vr` → `playing` (the candle lit, the shadows on) ⇄ `paused`.
 - **Saves move to version 3:** the settings and the day last played. A v2 save migrates without loss of either (ADR 0010's machinery is unchanged).

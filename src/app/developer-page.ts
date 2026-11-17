@@ -81,7 +81,7 @@ export function developerPage(h: DeveloperPageHooks): ExtraPageItems {
       {
         id: 'cover-ends',
         label: 'Covering ends the story (test)',
-        help: 'Covering the lit flame plays the end (the candle going out, the blinks, the credits) at any point, not only in scene 7. Off, it pauses as usual.',
+        help: 'Covering the lit flame plays the end (the candle going out, the blinks, the credits) at any point, not only in scene 7. Off, covering the flame does nothing before scene 7.',
         text: () => (h.coverEnds() ? 'ON' : 'off'),
         press: () => h.setCoverEnds(!h.coverEnds()),
       },
