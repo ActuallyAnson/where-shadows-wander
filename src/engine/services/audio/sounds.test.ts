@@ -3,9 +3,9 @@ import { Bus } from './mixer';
 import { Cooldowns, Sound, SOUND_COUNT, SOUND_DEFS, soundForShapeEvent } from './sounds';
 
 describe('soundForShapeEvent', () => {
-  it('rustles when a shape is recognised and thumps when it commits, and is silent on cancel', () => {
-    expect(soundForShapeEvent('candidate')).toBe(Sound.Rustle);
-    expect(soundForShapeEvent('commit')).toBe(Sound.Thump);
+  it('is silent when a shape is recognised, when it commits and on cancel', () => {
+    expect(soundForShapeEvent('candidate')).toBeNull();
+    expect(soundForShapeEvent('commit')).toBeNull();
     expect(soundForShapeEvent('cancel')).toBeNull();
   });
 

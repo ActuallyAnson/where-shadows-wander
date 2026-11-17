@@ -334,13 +334,11 @@ export const SOUND_DEFS: readonly SoundDef[] = [
 export const SOUND_COUNT = SOUND_DEFS.length;
 
 /**
- * The sound a shape event makes, or null for none: a paper rustle when recognised, a thump when it commits, a soft
- * letting-go when it is released, and a soft sigh when it was released because tracking was lost.
+ * The sound a shape event makes, or null for none. Recognising and committing a shape are silent (the wall already shows
+ * them, and the sounds only distracted); letting go makes a soft sound, and so does losing tracking.
  */
 export function soundForShapeEvent(type: ShapeEventType, reason: ReleaseReason | null = null): SoundId | null {
-  if (type === 'candidate') return Sound.Rustle;
-  if (type === 'commit') return Sound.Thump;
-  // Letting go because another shape just committed is part of that commit's thump, not a sound of its own.
+  // Letting go because another shape just committed is not a sound of its own.
   if (type === 'release') return reason === 'lost' ? Sound.Lost : reason === 'switch' ? null : Sound.Release;
   return null;
 }

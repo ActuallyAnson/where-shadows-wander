@@ -53,7 +53,6 @@ import { LookToStart, looksAtStage } from '../engine/stage/look-to-start';
 import { MATCH_GRIP, PosedHand } from '../engine/hands/posed-hand';
 import { MOCK_HEAD, placeLantern, yawOf } from '../engine/shadow/pure/test-rig';
 import { FrameInspector } from './frame-inspector';
-import { ShapeRingView } from '../engine/shadow/shape-ring-view';
 import { QualityGovernor } from '../engine/shadow/pure/quality-governor';
 import { StoryLineView } from '../engine/shadow/story-line-view';
 import { GhostOutlines } from '../engine/shadow/ghost-outline';
@@ -72,7 +71,14 @@ import { writeCoverHand } from '../engine/hands/cover-hand';
 import { GhostHandView } from '../engine/render/ghost-hand-view';
 import { STORY_SCRIPT } from '../engine/stage/story/story-script';
 import { CANDLE_MOODS, CandleMoodBlend, type CandleMoodName } from '../engine/stage/story/candle-mood';
-import { FORM_S, FRIEND_PUPPETS, friendSceneTime, OUTLINE_SHAPES } from '../engine/stage/story/friend-puppet';
+import {
+  FORM_S,
+  FRIEND_PUPPETS,
+  FRIEND_WAVE,
+  friendSceneTime,
+  OUTLINE_SHAPES,
+  WAVE_LOWER_TURN,
+} from '../engine/stage/story/friend-puppet';
 import { ShapeGuide } from '../engine/stage/story/shape-guide';
 import { SHAPES, type Shape } from '../engine/hands/shapes';
 import { Bus } from '../engine/services/audio/mixer';
@@ -333,6 +339,14 @@ async function start(): Promise<void> {
   const START_MOON_LIFT = 0.35;
   const MOON_SETTLE_S = 3;
   let moonLift = START_MOON_LIFT;
+  /**
+   * Scene 7's wait: while the game waits for the player to cover the flame, the room's light (the candle's on the walls and
+   * furniture, the moon's through the window) eases down to this share, so most of the room goes dark and the player looks to the
+   * candle. It eases over about SLEEP_DIM_TAU_S, holds through the end (which dims from there), and comes back in the story.
+   */
+  const SLEEP_DIM = 0.15;
+  const SLEEP_DIM_TAU_S = 1.2;
+  let sleepDim = 1;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
   const ambientLight = new AmbientLight(0x101422, 0.008);
   // The captions (a setting): a small line of ink low on the wall that names the sounds.
@@ -442,12 +456,10 @@ async function start(): Promise<void> {
   const inspector = new FrameInspector(world.renderer.info, governor);
   let governorOn = false;
   let appliedLevel = 0;
-  const shapeRing = new ShapeRingView();
-  /** What the quality level means: the paper's scenery and the rings are switched by it here. */
+  /** What the quality level means: the paper's scenery is switched by it here. */
   const applyGovernor = () => {
     appliedLevel = governor.level;
     stageView.backdrop = governor.isOn('backdrop') ? BACKDROP : 0;
-    shapeRing.ringsOn = governor.isOn('ring');
   };
   const wallPauseView = new WallPauseView();
   world.scene.add(
@@ -462,7 +474,6 @@ async function start(): Promise<void> {
     storyTitle.group,
     storyLine.group,
     captionLine.group,
-    shapeRing.group,
     candleView.group,
     ghostHand.object,
     titleLighter.group,
@@ -1118,6 +1129,7 @@ async function start(): Promise<void> {
       sessionState = 'title_vr';
       ignition.reset();
       moonLift = START_MOON_LIFT;
+      sleepDim = 1;
       candleView.ignitionProgress = 0;
       candleView.lit = false;
       titleLighter.visible = false;
@@ -1261,7 +1273,7 @@ async function start(): Promise<void> {
    */
   const fallAsleep = () => {
     sessionState = 'asleep';
-    endLightFrom = candleView.occlusion;
+    endLightFrom = candleView.occlusion * sleepDim;
     candleView.beginGoingOut();
     candleView.resetCover();
     ending.start();
@@ -1522,7 +1534,6 @@ async function start(): Promise<void> {
           projector.update(hands.hands, stage, castPoint(stage, candleView.flamePosition, castFrom));
           if (!paused) {
             gameAudio.onShapeEvents(shapes.events, projector.shadows, stage);
-            shapeRing.onShapeEvents(shapes.events, projector.shadows);
           }
           // Full when the story calls for a hand (or none is playing, or a menu needs it); faint while a memory plays.
           // High contrast keeps it fully solid throughout.
@@ -1538,11 +1549,6 @@ async function start(): Promise<void> {
           const shadowOn = shadowsVisible && !(debug && !debug.controller.systems.shadow);
           handShadow.strength = shadowOn ? handShadow.baseOpacity * handLevel : 0;
           handShadow.softness = Math.min(sharpen.look.left.blurScale, sharpen.look.right.blurScale);
-          shapeRing.update(
-            paused ? 0 : step,
-            stage,
-            shadowsVisible ? handShadow.baseOpacity * candleView.occlusion * handLevel : 0,
-          );
           // The captions' line on the wall: it waits while paused and is not shown under a menu.
           const lineOpacity = shadowsVisible && !menu.group.visible ? handShadow.baseOpacity * candleView.occlusion : 0;
           captionLine.update(paused || sessionState !== 'playing' ? 0 : step, stage, lineOpacity);
@@ -1625,6 +1631,11 @@ async function start(): Promise<void> {
             if (!fp) friendPlayers.set(friendScene, (fp = new ScenePlayer(friendScene)));
             fp.offset[0] = story.friendX + story.friendDX + guide.leanX;
             fp.offset[1] = story.friendY + story.friendDY + guide.leanY - story.friendDrop;
+            // Scene 5's wave: the palm turns at the wrist as the hand goes down, not held upright all the way.
+            if (friendScene === FRIEND_WAVE) {
+              const palm = fp.indexOf('palm');
+              if (palm >= 0) fp.spin[palm] = WAVE_LOWER_TURN * story.friendLower;
+            }
             fp.seek(friendSceneTime(story.friendShapeT));
             friendView.load(friendScene);
             friendView.update(fp, storyFrame, friendLight, story.friendOpacity * story.friendSwapIn);
@@ -1738,9 +1749,16 @@ async function start(): Promise<void> {
         // the cover left it.
         if (!story.memory?.playing) lightHush.reset();
         else lightHush.update(paused ? 0 : step);
+        // Scene 7's wait: the room goes dark but for the flame. It holds while paused and through the end (which dims from
+        // there), and eases back to full anywhere else.
+        const sleepWaiting = sessionState === 'playing' && story.waitingForSleep;
+        if (sleepWaiting || (sessionState !== 'asleep' && sessionState !== 'paused')) {
+          const toward = sleepWaiting ? SLEEP_DIM : 1;
+          sleepDim += (toward - sleepDim) * (1 - Math.exp(-step / SLEEP_DIM_TAU_S));
+        }
         const roomLight = ending.active
           ? endLightFrom * ending.candle
-          : candleView.occlusion * lightHush.level * (1 - GHOST_DIP * sleepHint.dip);
+          : candleView.occlusion * lightHush.level * (1 - GHOST_DIP * sleepHint.dip) * sleepDim;
         stageView.applyLight(
           lanternLight.light,
           cameraQuat,
@@ -1766,7 +1784,7 @@ async function start(): Promise<void> {
           const settle = (step * Math.abs(START_MOON_LIFT - 1)) / MOON_SETTLE_S;
           moonLift = moonLift > 1 ? Math.max(1, moonLift - settle) : Math.min(1, moonLift + settle);
         }
-        candleLight.setMoon(moonLift);
+        candleLight.setMoon(moonLift * sleepDim);
         if (story.sceneIndex !== moodScene) {
           moodScene = story.sceneIndex;
           const askedMood = story.candleMood;
@@ -1774,7 +1792,8 @@ async function start(): Promise<void> {
         }
         candleMood.update(step);
         const glow = 1 + guide.boost;
-        candleLight.setColour(candleMood.light[0] * glow, candleMood.light[1] * glow, candleMood.light[2] * glow);
+        const lit = glow * sleepDim;
+        candleLight.setColour(candleMood.light[0] * lit, candleMood.light[1] * lit, candleMood.light[2] * lit);
         stageView.setTint(candleMood.wall[0], candleMood.wall[1], candleMood.wall[2]);
         candleView.setMoodTint(candleMood.flame[0], candleMood.flame[1], candleMood.flame[2]);
         candleLight.bakeIfDirty(world.renderer, world.scene);
@@ -1914,7 +1933,6 @@ async function start(): Promise<void> {
         soundPool,
         governor,
         inspector,
-        shapeRing,
         openSettings,
         shapes,
         gestures,

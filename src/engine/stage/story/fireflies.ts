@@ -28,7 +28,17 @@ import {
   standingKid,
   stepTracks,
 } from './story-kit';
-import { FIREFLY_HOVER, FRIEND_LIES_X, GRASS_W, LYING_ARM, PARK_FROM_DX, PARK_TREES, STARS, starId } from './the-park';
+import {
+  BOY_FACING,
+  FIREFLY_HOVER,
+  FRIEND_LIES_X,
+  GRASS_W,
+  LYING_ARM,
+  PARK_FROM_DX,
+  PARK_TREES,
+  STARS,
+  starId,
+} from './the-park';
 
 /** The firefly sits in the player's cup this long (the handoff), glowing brighter, then goes back to hover over the kids. */
 export const CUP_HOLD_S = 2.6;
@@ -94,7 +104,7 @@ export const FIREFLIES_LENGTH_S = RAISE_S + 1.6;
  * fireflies.test.ts checks these against the puppets).
  */
 export const FRIEND_HAND: readonly [number, number] = [-0.255, 0.031];
-export const BOY_HAND: readonly [number, number] = [0.158, 0.047];
+export const BOY_HAND: readonly [number, number] = [0.442, 0.047];
 /** The fireflies' light on a lying kid's hand, along the arm from the shoulder (unscaled). */
 const LYING_HAND_ALONG = 0.07;
 
@@ -411,8 +421,9 @@ const tracks: Track[] = [
     part: 'run-boy-arm-front',
     prop: 'angle',
     keys: [
-      ...move(BOY_REACH_S, LYING_ARM, BOY_REACH_S + REACH_LEN_S, -1.45),
-      ...move(ARMS_DOWN_S + 0.2, -1.45, ARMS_DOWN_S + 0.2 + ARMS_DOWN_LEN_S, LYING_ARM),
+      // He lies facing left (scene 3), so his turns are hers mirrored.
+      ...move(BOY_REACH_S, LYING_ARM * BOY_FACING, BOY_REACH_S + REACH_LEN_S, -1.45 * BOY_FACING),
+      ...move(ARMS_DOWN_S + 0.2, -1.45 * BOY_FACING, ARMS_DOWN_S + 0.2 + ARMS_DOWN_LEN_S, LYING_ARM * BOY_FACING),
     ],
   },
   {
@@ -424,7 +435,7 @@ const tracks: Track[] = [
   { part: 'run-boy-hand-glow', prop: 'opacity', keys: handGlowKeys(false) },
   // They watch them go, heads back.
   { part: 'run-friend-head', prop: 'angle', keys: move(RELEASE_S, 0, RELEASE_S + 0.8, 0.2) },
-  { part: 'run-boy-head', prop: 'angle', keys: move(RELEASE_S + 0.3, 0, RELEASE_S + 1.1, 0.2) },
+  { part: 'run-boy-head', prop: 'angle', keys: move(RELEASE_S + 0.3, 0, RELEASE_S + 1.1, 0.2 * BOY_FACING) },
   // They sit up: the lying kids give way to the sitting ones.
   { part: 'run-boy', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 1, 0) },
   { part: 'run-friend', prop: 'opacity', keys: fadeKeys(SIT_S, CROSS_S, 1, 0) },

@@ -91,9 +91,9 @@ Which shapes the story asks for, and where, is part of writing it. The rabbit an
 
 1.  The shadow always mirrors the live hand, so the player sees their real silhouette.
 
-2.  When a shape is recognised, its shadow sharpens and a soft paper rustle plays.
+2.  When a shape is recognised, its shadow sharpens. There is no sound and no ring: the wall shows it.
 
-3.  Holding the shape for about 0.4 seconds (1 s for the rabbit and fox) commits it, with a soft thump. A commit is what moves the story on.
+3.  Holding the shape for about 0.4 seconds (1 s for the rabbit and fox) commits it, silently. A commit is what moves the story on.
 
 4.  Releasing the shape returns the shadow to a plain hand.
 
@@ -115,7 +115,7 @@ The whole game is black silhouettes on a warm, candle-lit wall, a style that loo
 
 ### Audio
 
-- **Built:** a paper rustle when a shape is recognised and a soft thump when it commits, from where that hand's shadow is; the candle's whoosh when lit, and its crackle. The candle can't be picked up: it stays on the tray, so the light the shadows are cast from never moves.
+- **Built:** a soft slide when a shape is let go, from where that hand's shadow is (recognising and committing a shape are silent); the candle's whoosh when lit, and its crackle. The candle can't be picked up: it stays on the tray, so the light the shadows are cast from never moves.
 
 - **For the story:** the sounds made in code that nothing played (a chime, the room tone, a clock, wind and placeholder music) are gone; the music, the rain and the thunder are the palette, and anything new a scene needs is listed in `docs/ASSETS.md`. The music is quiet and bittersweet: one track ("I Got Lost" by Migfus20) under the whole story, and the night ends in near silence as he falls asleep.
 

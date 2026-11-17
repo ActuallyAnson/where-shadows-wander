@@ -35,11 +35,11 @@ function setup() {
 const push = (q: ShapeEventQueue, type: ShapeEventType, hand: 'left' | 'right') => q.push(type, hand, 'flat', 0, 0, 0);
 
 describe('GameAudio.onShapeEvents', () => {
-  it('rustles on candidate, thumps on commit, lets go on release, and ignores cancel', () => {
+  it('is silent on candidate and commit, lets go on release, and ignores cancel', () => {
     const { audio, queue, shadows, stage, rec } = setup();
     for (const t of ['candidate', 'cancel', 'commit', 'release'] as const) push(queue, t, 'right');
     audio.onShapeEvents(queue, shadows, stage);
-    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Rustle, Sound.Thump, Sound.Release]);
+    expect(rec.plays.map((p) => p.id)).toEqual([Sound.Release]);
   });
 
   it('falls low when tracking was lost, and stays silent when another shape took over', () => {
@@ -55,7 +55,7 @@ describe('GameAudio.onShapeEvents', () => {
     const { audio, queue, shadows, stage, rec } = setup();
     shadows.left.active = true;
     shadows.left.bounds.set([-0.5, 0.1, -0.3, 0.3]);
-    push(queue, 'candidate', 'left');
+    push(queue, 'release', 'left');
     audio.onShapeEvents(queue, shadows, stage);
     expect(rec.plays[0].x).toBeCloseTo(-0.4, 6);
     expect(rec.plays[0].y).toBeCloseTo(1.2, 6);
@@ -64,8 +64,8 @@ describe('GameAudio.onShapeEvents', () => {
 
   it('with no shadow, uses that hand’s side of the wall', () => {
     const { audio, queue, shadows, stage, rec } = setup();
-    push(queue, 'commit', 'left');
-    push(queue, 'commit', 'right');
+    push(queue, 'release', 'left');
+    push(queue, 'release', 'right');
     audio.onShapeEvents(queue, shadows, stage);
     expect(rec.plays[0].x).toBeCloseTo(-0.4, 6);
     expect(rec.plays[1].x).toBeCloseTo(0.4, 6);
@@ -73,8 +73,8 @@ describe('GameAudio.onShapeEvents', () => {
 
   it('keys each sound by hand, so the two hands have their own gaps', () => {
     const { audio, queue, shadows, stage, rec } = setup();
-    push(queue, 'commit', 'left');
-    push(queue, 'commit', 'right');
+    push(queue, 'release', 'left');
+    push(queue, 'release', 'right');
     audio.onShapeEvents(queue, shadows, stage);
     expect(rec.plays.map((p) => p.key)).toEqual([0, 1]);
   });
@@ -83,7 +83,7 @@ describe('GameAudio.onShapeEvents', () => {
     const { audio, queue, shadows, stage, rec } = setup();
     shadows.right.active = true;
     shadows.right.bounds.set([3, -5, 4, -4]);
-    push(queue, 'candidate', 'right');
+    push(queue, 'release', 'right');
     audio.onShapeEvents(queue, shadows, stage);
     expect(rec.plays[0].x).toBeCloseTo(0.8, 6);
     expect(rec.plays[0].y).toBeCloseTo(0.5, 6);

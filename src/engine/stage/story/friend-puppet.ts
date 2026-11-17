@@ -164,6 +164,12 @@ export const FRIEND_FLAT: PuppetScene = {
 /** The flat hand waving: it opens, waves side to side from the wrist a few times, rests, and waves again. */
 const WAVE_SWING = 0.28;
 const WAVE_PERIOD_S = 1.1;
+/**
+ * As the waving hand goes down (or comes up) its palm turns about the wrist, the fingers leaning away from the middle of the wall
+ * like a hand let go of, not held upright all the way down: this many radians at the bottom, eased by how far down it is
+ * (story-director's friendLower).
+ */
+export const WAVE_LOWER_TURN = 0.95;
 export const FRIEND_WAVE: PuppetScene = {
   id: 'friend-wave',
   length: FORM_S + CYCLE_S,

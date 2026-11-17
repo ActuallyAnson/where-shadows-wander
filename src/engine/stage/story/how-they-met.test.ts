@@ -69,7 +69,7 @@ describe('the memories’ sounds', () => {
   it('pulls the blanket over him and throws it up in the prologue; hops, far thunder, a laugh and giggles in the fort', () => {
     expect(sounds('the-storm')).toEqual(['slide', 'blanket', 'click', 'blanket']);
     expect(sounds('how-they-met')).toEqual(['hop', 'rumble', 'hop', 'hop', 'laugh', 'hop', 'hop', 'giggle']);
-    expect(sounds('the-park')).toEqual(['slide', 'slide', 'run', 'run', 'laugh']);
+    expect(sounds('the-park')).toEqual(['slide', 'slide', 'laugh']);
   });
 
   it('shimmers fireflies, clinks the jar and rings a far bell in scene 4, creaks the gate and lets the firefly go in scene 5, swells and gusts in 6', () => {

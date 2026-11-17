@@ -9,16 +9,14 @@ describe('the render order', () => {
     expect(validatePasses()).toEqual([]);
   });
 
-  it('keeps the order the game already had: the paper under the shadows under the sprites, the rings over', () => {
+  it('keeps the order the game already had: the paper under the shadows under the sprites', () => {
     expect(RenderOrder.paper).toBeLessThan(RenderOrder.shadow);
     expect(RenderOrder.shadow).toBeLessThan(RenderOrder.sprite);
-    expect(RenderOrder.sprite).toBeLessThan(RenderOrder.ring);
     expect(RenderOrder.fade).toBeGreaterThan(RenderOrder.ghost);
   });
 
   it('says which layers may be switched off (the decoration), and never the paper, the shadows or the sprites', () => {
     const optional = PASSES.filter((p) => p.optional).map((p) => p.id);
-    expect(optional).toEqual(expect.arrayContaining(['ring']));
     for (const must of ['paper', 'shadow', 'sprite', 'fade']) expect(optional).not.toContain(must);
   });
 
