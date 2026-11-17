@@ -14,6 +14,7 @@ import {
   validateStory,
   type StoryScene,
 } from './story-director';
+import { OUTLINE_SIZE } from './friend-puppet';
 import { STORY_SCRIPT } from './story-script';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
@@ -254,7 +255,7 @@ describe('the story script', () => {
     expect(gate.x).toBeLessThan(0);
     expect(gate.guide).toEqual([-gate.x, gate.y]);
     // Made at the outline, with a generous margin.
-    expect(gate.near).toBeGreaterThanOrEqual(0.2);
+    expect(gate.near).toBeGreaterThanOrEqual(0.5);
     expect(prologue).toMatchObject({ kind: 'memory', start: STORY_CHAPTER['the-storm'].start });
     expect(prologue).not.toHaveProperty('from');
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });
@@ -459,20 +460,22 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
       {
         id: 'gate',
         beats: [
-          { kind: 'friend', shape: 'flat', x: -0.3, y: 0, guide: [0.3, 0], near: 0.25 },
+          { kind: 'friend', shape: 'flat', x: -0.3, y: 0, guide: [0.3, 0], near: 0.6 },
           { kind: 'wait', seconds: 1 },
         ],
       },
     ];
 
-    it('turns down the shape made far from the outline, and takes it made near it, within the margin', () => {
+    it('turns down the shape made far from the outline, and takes it made near it, within a share of the outline’s size', () => {
+      const reach = 0.6 * OUTLINE_SIZE.flat;
+      expect(OUTLINE_SIZE.flat).toBeCloseTo(0.3 * 1.35);
       const d = new StoryDirector(atOutline);
       d.start();
       expect(d.commit('flat', -0.3, 0)).toBe(false);
       expect(d.commit('flat', NaN, NaN)).toBe(false);
-      expect(d.commit('flat', 0.3 + 0.26, 0)).toBe(false);
+      expect(d.commit('flat', 0.3 + reach + 0.01, 0)).toBe(false);
       expect(d.waitingForShape).toBe(true);
-      expect(d.commit('flat', 0.3 + 0.15, 0.15)).toBe(true);
+      expect(d.commit('flat', 0.3 + reach * 0.7, reach * 0.7)).toBe(true);
       expect(d.waitingForShape).toBe(false);
     });
 
@@ -489,10 +492,14 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
       d.start();
       d.follow(-0.2, 0, 'flat');
       run(d, FRIEND_DELAY_S + FRIEND_IN_S + 1, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      // Measured from the middle of the hand, not the point it is followed by (a flat hand's wrist).
+      d.follow(0.3, 0, 'flat', -0.2, 0);
+      run(d, FRIEND_DELAY_S + FRIEND_IN_S + 1, 0.1);
       d.follow(0.3, 0, 'fist');
       run(d, 1, 0.1);
       expect(d.waitingForShape).toBe(true);
-      d.follow(0.35, 0.1, 'flat');
+      d.follow(0.6, 0, 'flat', 0.35, 0.1);
       run(d, 0.1, 0.1);
       expect(d.waitingForShape).toBe(false);
     });
@@ -500,6 +507,9 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     it('is a story problem without an outline to make it at', () => {
       expect(
         validateStory([{ id: 'x', beats: [{ kind: 'friend', shape: 'flat', x: 0, y: 0, near: 0.2 }] }]),
+      ).toHaveLength(1);
+      expect(
+        validateStory([{ id: 'x', beats: [{ kind: 'friend', shape: 'fist', x: 0, y: 0, guide: [0, 0], near: 0.2 }] }]),
       ).toHaveLength(1);
       expect(validateStory(atOutline)).toEqual([]);
     });

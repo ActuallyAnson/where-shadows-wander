@@ -1605,6 +1605,8 @@ async function start(): Promise<void> {
               hold = Math.max(hold, st.committed === target ? 1 : st.candidate === target ? st.progress : 0);
           }
           followX = followY = NaN;
+          let middleX = NaN,
+            middleY = NaN;
           let followShape: Shape | null = null;
           if (followHand !== null) {
             const sh = projector.shadows[followHand];
@@ -1613,9 +1615,13 @@ async function start(): Promise<void> {
             const o = JOINT[wristAnchored && !story.mirroring ? 'wrist' : 'middle-finger-phalanx-proximal'] * 2;
             followX = sh.joints[o];
             followY = sh.joints[o + 1];
+            // The middle of the hand, which a shape made at the outline (FriendBeat.near) is measured from, as its commit is.
+            const m = JOINT['middle-finger-phalanx-proximal'] * 2;
+            middleX = sh.joints[m];
+            middleY = sh.joints[m + 1];
             followShape = shapes[followHand].state.committed;
           }
-          story.follow(followX, followY, followShape);
+          story.follow(followX, followY, followShape, middleX, middleY);
           story.update(storyStep);
           guide.update(
             storyStep,

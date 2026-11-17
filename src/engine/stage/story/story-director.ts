@@ -9,7 +9,7 @@ import type { Shape } from '../../hands/shapes';
 import { POSE_STRIDE, bedAt, type Cue, type PuppetScene, type StoryBed } from '../puppet/puppet-scene';
 import { ScenePlayer } from '../puppet/scene-player';
 import type { CandleMoodName } from './candle-mood';
-import { FRIEND_PUPPETS } from './friend-puppet';
+import { FRIEND_PUPPETS, OUTLINE_SIZE } from './friend-puppet';
 
 /** The friend's hand shows `shape`, its shadow at `x`, `y` (metres right and up from the wall's centre), and waits. */
 export interface FriendBeat {
@@ -36,9 +36,9 @@ export interface FriendBeat {
    */
   readonly guide?: readonly [number, number] | false;
   /**
-   * The shape counts only made at the outline: the player's shadow (the wrist of a flat hand, else the middle of the hand) must
-   * be within this many stage metres of `guide` (which it needs). A shape already held counts once it is moved there. Default:
-   * anywhere on the wall.
+   * The shape counts only made at the outline: the middle of the player's hand shadow must be within this many of the outline's
+   * sizes (OUTLINE_SIZE, its larger side) of the outline's middle, `guide` (which it needs), so a bigger outline gives more room.
+   * A shape already held counts once it is moved there. Default: anywhere on the wall.
    */
   readonly near?: number;
 }
@@ -117,7 +117,7 @@ export const HANDOFF_S = 1.6;
 /** Whether a shadow at `x`, `y` is close enough to the outline for the beat's shape to count (FriendBeat.near). */
 function inReach(b: FriendBeat, x: number, y: number): boolean {
   if (b.near === undefined || !b.guide) return true;
-  return Math.hypot(x - b.guide[0], y - b.guide[1]) <= b.near;
+  return Math.hypot(x - b.guide[0], y - b.guide[1]) <= b.near * (OUTLINE_SIZE[b.shape] ?? 0);
 }
 
 const smooth = (k: number) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
@@ -129,7 +129,11 @@ export function validateStory(scenes: readonly StoryScene[]): string[] {
     if (s.beats.length === 0) problems.push(`${s.id} has no beats`);
     for (const b of s.beats) {
       if (b.kind === 'wait' && !(b.seconds >= 0)) problems.push(`${s.id} waits for ${b.seconds} s`);
-      if (b.kind === 'friend' && b.near !== undefined && !(b.near > 0 && Array.isArray(b.guide)))
+      if (
+        b.kind === 'friend' &&
+        b.near !== undefined &&
+        !(b.near > 0 && Array.isArray(b.guide) && b.shape in OUTLINE_SIZE)
+      )
         problems.push(`${s.id}: a friend's ${b.shape} asks to be made near an outline it has no place for`);
       if (b.kind !== 'memory') continue;
       const start = b.start ?? 0,
@@ -182,6 +186,9 @@ export class StoryDirector {
   private mirrorOY = NaN;
   private playerX = NaN;
   private playerY = NaN;
+  /** The middle of the player's hand shadow (FriendBeat.near measures from it). */
+  private playerMX = NaN;
+  private playerMY = NaN;
   private playerShape: Shape | null = null;
   /** Her hand's clock (friendT) when it began forming the shape it shows. */
   private formAt = FRIEND_FORM_AT_S;
@@ -236,11 +243,14 @@ export class StoryDirector {
 
   /**
    * Where the player's hand shadow is on the wall (NaN, NaN without one) and the shape it holds (committed), if any: what the
-   * friend's hand copies while it mirrors. Once per frame, before update.
+   * friend's hand copies while it mirrors; `mx`, `my` is the middle of the hand, if `x`, `y` is another point of it (a flat
+   * hand's wrist). Once per frame, before update.
    */
-  follow(x: number, y: number, shape: Shape | null): void {
+  follow(x: number, y: number, shape: Shape | null, mx = x, my = y): void {
     this.playerX = x;
     this.playerY = y;
+    this.playerMX = mx;
+    this.playerMY = my;
     this.playerShape = shape;
   }
 
@@ -381,9 +391,9 @@ export class StoryDirector {
             b.near !== undefined &&
             this.friendLevel >= 1 &&
             this.playerShape === b.shape &&
-            inReach(b, this.playerX, this.playerY)
+            inReach(b, this.playerMX, this.playerMY)
           )
-            this.commit(b.shape, this.playerX, this.playerY);
+            this.commit(b.shape, this.playerMX, this.playerMY);
         }
       } else {
         this.friendT += dt;

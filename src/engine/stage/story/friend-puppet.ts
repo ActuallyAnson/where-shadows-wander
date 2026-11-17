@@ -212,3 +212,11 @@ export const OUTLINE_SHAPES: Readonly<Record<string, PuppetScene>> = {
   cup: outline('cup', 0.26, 0.2),
   flat: outline('flat', 0.2, 0.3),
 };
+
+/** How big each shape's outline is drawn, stage metres: its larger side (width or height), for FriendBeat.near. */
+export const OUTLINE_SIZE: Readonly<Record<string, number>> = Object.fromEntries(
+  Object.entries(OUTLINE_SHAPES).map(([shape, scene]) => {
+    const [hand, art] = scene.parts;
+    return [shape, Math.max(art.w, art.h) * (hand.scale ?? 1)];
+  }),
+);
