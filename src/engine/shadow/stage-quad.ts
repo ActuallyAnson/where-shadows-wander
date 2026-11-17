@@ -22,14 +22,13 @@ export function placeOnStage(
     o = stage.origin;
   const c = Math.cos(angle),
     sn = Math.sin(angle);
-  // The quad's own x axis is (c, sn) and its y axis (-sn, c), in the stage's right/up coordinates.
-  const ax = (i: number) => (r[i] * c + u[i] * sn) * w;
-  const ay = (i: number) => (-r[i] * sn + u[i] * c) * h;
+  // The quad's own x axis is (c, sn) and its y axis (-sn, c), in the stage's right/up coordinates. Written out rather than
+  // as small helper closures: those are allocated on every call where V8 does not optimise them away (Node 22 does not).
   // prettier-ignore
   scratch.set(
-    ax(0), ay(0), nn[0], o[0] + r[0] * x + u[0] * y + nn[0] * lift,
-    ax(1), ay(1), nn[1], o[1] + r[1] * x + u[1] * y + nn[1] * lift,
-    ax(2), ay(2), nn[2], o[2] + r[2] * x + u[2] * y + nn[2] * lift,
+    (r[0] * c + u[0] * sn) * w, (-r[0] * sn + u[0] * c) * h, nn[0], o[0] + r[0] * x + u[0] * y + nn[0] * lift,
+    (r[1] * c + u[1] * sn) * w, (-r[1] * sn + u[1] * c) * h, nn[1], o[1] + r[1] * x + u[1] * y + nn[1] * lift,
+    (r[2] * c + u[2] * sn) * w, (-r[2] * sn + u[2] * c) * h, nn[2], o[2] + r[2] * x + u[2] * y + nn[2] * lift,
     0, 0, 0, 1,
   );
   q.matrix.copy(scratch);
