@@ -1,12 +1,15 @@
 // The shape guide's ghost as an outline (shape-guide.ts): her painted hand (friend-puppet.ts), posed once as it holds its shape,
-// drawn as one silhouette and turned into a thin line just outside its edge, mirrored left to right so it faces her hand. The
-// parts are joined first, so there is no line where an ear crosses the head or the hand meets the arm: only the shape's own
-// edge. The line lies outside the shape, so a shadow that fills it leaves the line showing, as a frame it fits. Baked into a
+// drawn as one silhouette and turned into a thin line just outside its edge, mirrored left to right so it faces her hand. Only
+// the hand: her arm ('friend-arm') is left out and each painted hand is drawn without its forearm (PUPPET_HAND_ONLY). The
+// parts are joined first, so there is no line where an ear crosses the head: only the shape's own edge. The line lies outside the shape, so a shadow that fills it leaves the line showing, as a frame it fits. Baked into a
 // canvas once per shape (on first use); PuppetView draws it as a one-part scene, its art looked up in `art`.
 import type { PuppetScene } from '../stage/puppet/puppet-scene';
 import { POSE_STRIDE } from '../stage/puppet/puppet-scene';
 import { ScenePlayer } from '../stage/puppet/scene-player';
-import { PUPPET_ART, type PuppetPainter } from './puppet-art';
+import { PUPPET_ART, PUPPET_HAND_ONLY, type PuppetPainter } from './puppet-art';
+
+/** Her arm's art: not part of the outline. */
+const ARM_ART = 'friend-arm';
 
 /** The line's width, story metres (about 2 cm on the wall), and how soft its edges are, as a share of it. */
 export const OUTLINE_LINE_M = 0.008;
@@ -56,8 +59,8 @@ function bake(scene: PuppetScene, t: number, art: Record<string, PuppetPainter>)
     maxX = -Infinity,
     maxY = -Infinity;
   scene.parts.forEach((part, i) => {
-    if (!part.art || part.look === 'glow') return;
-    const paint = PUPPET_ART[part.art];
+    if (!part.art || part.look === 'glow' || part.art === ARM_ART) return;
+    const paint = PUPPET_HAND_ONLY[part.art] ?? PUPPET_ART[part.art];
     if (!paint) return;
     const b = i * POSE_STRIDE;
     const o = world[b + 4];

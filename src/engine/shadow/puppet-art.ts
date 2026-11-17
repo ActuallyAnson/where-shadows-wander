@@ -607,15 +607,7 @@ function finger(g: CanvasRenderingContext2D, w: number, h: number, pts: readonly
 }
 
 function friendRabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
-  // A hand side on, facing right, the forearm rising into it from the lower left: the back of the hand is the back of the
-  // rabbit's head, the ring and little fingers curled under it are its cheek and jaw, and the thumb laid along them to their
-  // tips is the top of its muzzle; the gap the thumb leaves above the curled fingers is its eye. (The ears, the index and
-  // middle fingers, are parts of their own: 'friend-ear'.)
-  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
-    g.beginPath();
-    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
-    g.fill();
-  };
+  // A hand side on, facing right, the forearm rising into it from the lower left (the hand itself: friendRabbitHand).
   // The forearm, a child's: wrist narrower than the arm below it.
   g.beginPath();
   g.moveTo(0.02 * w, h);
@@ -624,6 +616,19 @@ function friendRabbit(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.quadraticCurveTo(0.36 * w, 0.8 * h, 0.34 * w, h);
   g.closePath();
   g.fill();
+  friendRabbitHand(g, w, h);
+}
+
+function friendRabbitHand(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The rabbit hand without its forearm: the back of the hand is the back of the rabbit's head, the ring and little fingers
+  // curled under it are its cheek and jaw, and the thumb laid along them to their tips is the top of its muzzle; the gap the
+  // thumb leaves above the curled fingers is its eye. (The ears, the index and middle fingers, are parts of their own:
+  // 'friend-ear'.)
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
   // The back of the hand: the head, round.
   e(0.42, 0.42, 0.22, 0.19, -0.2);
   // The knuckles along its top, under the ears.
@@ -652,15 +657,7 @@ function friendEar(g: CanvasRenderingContext2D, w: number, h: number): void {
 }
 
 function friendFox(g: CanvasRenderingContext2D, w: number, h: number): void {
-  // A hand side on, facing right, the forearm rising into it from the lower left: the back of the hand is the fox's head, the
-  // middle and ring fingers laid straight forward to meet the thumb's tip are its long pointed snout, and the thumb under them its
-  // jaw; the gap the thumb leaves under the fingers' root is its eye. (The ears, the index and little fingers standing up, are
-  // parts of their own: 'friend-ear'.)
-  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
-    g.beginPath();
-    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
-    g.fill();
-  };
+  // A hand side on, facing right, the forearm rising into it from the lower left (the hand itself: friendFoxHand).
   // The forearm, a child's: wrist narrower than the arm below it.
   g.beginPath();
   g.moveTo(0.02 * w, h);
@@ -669,6 +666,19 @@ function friendFox(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.quadraticCurveTo(0.33 * w, 0.8 * h, 0.32 * w, h);
   g.closePath();
   g.fill();
+  friendFoxHand(g, w, h);
+}
+
+function friendFoxHand(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The fox hand without its forearm: the back of the hand is the fox's head, the middle and ring fingers laid straight
+  // forward to meet the thumb's tip are its long pointed snout, and the thumb under them its jaw; the gap the thumb leaves
+  // under the fingers' root is its eye. (The ears, the index and little fingers standing up, are parts of their own:
+  // 'friend-ear'.)
+  const e = (x: number, y: number, rx: number, ry: number, rot = 0) => {
+    g.beginPath();
+    g.ellipse(x * w, y * h, rx * w, ry * h, rot, 0, Math.PI * 2);
+    g.fill();
+  };
   // The back of the hand: the head.
   e(0.36, 0.44, 0.19, 0.17, -0.2);
   e(0.4, 0.3, 0.09, 0.06, -0.3);
@@ -914,7 +924,7 @@ function autumnTree(g: CanvasRenderingContext2D, w: number, h: number): void {
 function friendCup(g: CanvasRenderingContext2D, w: number, h: number): void {
   // A hand held palm up and cupped, side on, the forearm rising into it from the lower left: the heel of the hand and the thumb
   // standing up at the left, the hollow of the palm, and the base of the fingers at the right (the fingers that curl up are a
-  // part of their own: 'friend-ear').
+  // part of their own: 'friend-ear'). The hand itself, without the forearm: friendCupHand.
   g.beginPath();
   g.moveTo(0.0 * w, h);
   g.quadraticCurveTo(0.16 * w, 0.82 * h, 0.26 * w, 0.66 * h);
@@ -922,6 +932,11 @@ function friendCup(g: CanvasRenderingContext2D, w: number, h: number): void {
   g.quadraticCurveTo(0.3 * w, 0.88 * h, 0.3 * w, h);
   g.closePath();
   g.fill();
+  friendCupHand(g, w, h);
+}
+
+function friendCupHand(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The cupped hand without its forearm: the bowl of the palm and the thumb standing up at its near side.
   // The palm: a bowl, its top hollowed.
   g.beginPath();
   g.moveTo(0.22 * w, 0.5 * h);
@@ -949,14 +964,25 @@ function friendArm(g: CanvasRenderingContext2D, w: number, h: number): void {
 
 function friendPalm(g: CanvasRenderingContext2D, w: number, h: number): void {
   // A small hand held up flat, its palm to the light: the wrist and forearm below, the palm, and four fingers together standing
-  // up from it. The thumb is a part of its own ('friend-ear').
+  // up from it. The thumb is a part of its own ('friend-ear'). The hand itself, without the forearm: friendPalmHand.
   g.beginPath();
   g.moveTo(0.3 * w, h);
   g.lineTo(0.32 * w, 0.66 * h);
+  g.lineTo(0.68 * w, 0.66 * h);
+  g.lineTo(0.7 * w, h);
+  g.closePath();
+  g.fill();
+  friendPalmHand(g, w, h);
+}
+
+function friendPalmHand(g: CanvasRenderingContext2D, w: number, h: number): void {
+  // The flat hand without its forearm: the palm, its heel rounded off where the wrist would go, and the four fingers.
+  g.beginPath();
+  g.moveTo(0.32 * w, 0.66 * h);
   g.quadraticCurveTo(0.22 * w, 0.56 * h, 0.24 * w, 0.42 * h);
   g.lineTo(0.76 * w, 0.42 * h);
   g.quadraticCurveTo(0.8 * w, 0.58 * h, 0.68 * w, 0.66 * h);
-  g.lineTo(0.7 * w, h);
+  g.quadraticCurveTo(0.5 * w, 0.72 * h, 0.32 * w, 0.66 * h);
   g.closePath();
   g.fill();
   const fingers: readonly (readonly [number, number])[] = [
@@ -1029,6 +1055,17 @@ export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
   blanket,
   beam,
   'door-light': doorLight,
+};
+
+/**
+ * The friend's painted hands without their forearms, by the art name of the whole: the shape guide's outline
+ * (ghost-outline.ts) is drawn round these, so it shows only the hand. Her arm ('friend-arm') has no entry: it is left out.
+ */
+export const PUPPET_HAND_ONLY: Readonly<Record<string, PuppetPainter>> = {
+  'friend-rabbit': friendRabbitHand,
+  'friend-fox': friendFoxHand,
+  'friend-cup': friendCupHand,
+  'friend-palm': friendPalmHand,
 };
 
 /** Whether a part's art names an image file rather than a painted cut-out. */
