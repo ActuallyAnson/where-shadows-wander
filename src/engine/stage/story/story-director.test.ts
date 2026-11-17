@@ -253,6 +253,8 @@ describe('the story script', () => {
     if (gate.kind !== 'friend') throw new Error('no gate');
     expect(gate.x).toBeLessThan(0);
     expect(gate.guide).toEqual([-gate.x, gate.y]);
+    // Made at the outline, with a generous margin.
+    expect(gate.near).toBeGreaterThanOrEqual(0.2);
     expect(prologue).toMatchObject({ kind: 'memory', start: STORY_CHAPTER['the-storm'].start });
     expect(prologue).not.toHaveProperty('from');
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });
@@ -443,12 +445,64 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
       const b = d.beat;
       if (b?.kind === 'friend') {
         run(d, FRIEND_DELAY_S + 0.5, 0.1);
-        expect(d.commit(b.shape, 0, 0)).toBe(true);
+        const at = b.guide ? b.guide : [0, 0];
+        expect(d.commit(b.shape, at[0], at[1])).toBe(true);
       }
       run(d, 70, 0.1);
     }
     expect(d.waitingForSleep).toBe(true);
     expect(d.sleep()).toBe(true);
+  });
+
+  describe('a shape that counts only made at the outline (FriendBeat.near)', () => {
+    const atOutline: StoryScene[] = [
+      {
+        id: 'gate',
+        beats: [
+          { kind: 'friend', shape: 'flat', x: -0.3, y: 0, guide: [0.3, 0], near: 0.25 },
+          { kind: 'wait', seconds: 1 },
+        ],
+      },
+    ];
+
+    it('turns down the shape made far from the outline, and takes it made near it, within the margin', () => {
+      const d = new StoryDirector(atOutline);
+      d.start();
+      expect(d.commit('flat', -0.3, 0)).toBe(false);
+      expect(d.commit('flat', NaN, NaN)).toBe(false);
+      expect(d.commit('flat', 0.3 + 0.26, 0)).toBe(false);
+      expect(d.waitingForShape).toBe(true);
+      expect(d.commit('flat', 0.3 + 0.15, 0.15)).toBe(true);
+      expect(d.waitingForShape).toBe(false);
+    });
+
+    it('takes a shape held from before once it is moved onto the outline, after her hand is in place', () => {
+      const d = new StoryDirector(atOutline);
+      d.start();
+      // Held at the outline while her hand is still rising: not yet.
+      d.follow(0.3, 0, 'flat');
+      run(d, FRIEND_DELAY_S + 0.5, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      run(d, FRIEND_IN_S, 0.1);
+      expect(d.waitingForShape).toBe(false);
+      // Held away from it, it waits; the wrong shape at it, it waits.
+      d.start();
+      d.follow(-0.2, 0, 'flat');
+      run(d, FRIEND_DELAY_S + FRIEND_IN_S + 1, 0.1);
+      d.follow(0.3, 0, 'fist');
+      run(d, 1, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      d.follow(0.35, 0.1, 'flat');
+      run(d, 0.1, 0.1);
+      expect(d.waitingForShape).toBe(false);
+    });
+
+    it('is a story problem without an outline to make it at', () => {
+      expect(
+        validateStory([{ id: 'x', beats: [{ kind: 'friend', shape: 'flat', x: 0, y: 0, near: 0.2 }] }]),
+      ).toHaveLength(1);
+      expect(validateStory(atOutline)).toEqual([]);
+    });
   });
 
   describe('a hand that copies the player’s first (FriendBeat.mirror)', () => {

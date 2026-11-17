@@ -1326,7 +1326,11 @@ async function start(): Promise<void> {
     }
     startStory(index);
     const b = story.beat;
-    if (play && b?.kind === 'friend') story.commit(b.shape, b.x + 0.12, b.y - 0.04);
+    // Copied where a player would make it: at the outline, if the shape must be made there (FriendBeat.near).
+    if (play && b?.kind === 'friend') {
+      const at = b.near !== undefined && b.guide ? b.guide : null;
+      story.commit(b.shape, at ? at[0] : b.x + 0.12, at ? at[1] : b.y - 0.04);
+    }
     return `${scene.title ?? scene.id}${play ? ', playing' : ''}`;
   };
 
