@@ -1,40 +1,38 @@
 // The hands' shadows, cast by a light. Each frame the hands (whatever glove is drawn: the same meshes the player sees) are drawn
-// from the light into a shadow map: the distance from the light to the nearest bit of hand, in each direction toward the wall.
-// Every candle-lit surface (candle-light.ts) and the stage's paper (test-stage-view.ts) looks up whether a hand is nearer the
-// light than it is, and the candle's light is taken away there. So the shadow has the hand's true outline, is as big as the light
-// makes it, and as soft: its edge widens with how far the surface is behind the hand (the light has a size), sharp near the hand.
-// Where the light is cast from (behind the flame, so the shadows reach the wall) is real-wall.ts's castPoint.
+// from the light into a cube shadow map: the distance from the light to the nearest bit of hand, in every direction. Every
+// candle-lit surface (candle-light.ts: the walls, floor, ceiling, bed and tray) and the stage's paper (test-stage-view.ts) looks
+// up whether a hand is nearer the light than it is, and the candle's light is taken away there. So the shadow has the hand's true
+// outline, falls wherever the light throws it (any wall), is as big as the light makes it, and as soft: its edge widens with how
+// far the surface is behind the hand (the light has a size), sharp near the hand. Where the light is cast from (behind the
+// flame, so the shadows reach the front wall) is real-wall.ts's castPoint.
 //
-// The map's camera sits on the light and looks square at the wall, its frustum cut to the wall's lit area, so the map's pixels
-// are spread evenly over the wall. How dark the shadow is (`strength`, 0 none .. 1 all the candle's light) is the game's to set:
-// the hand's shadow goes faint while a memory plays. Nothing is allocated per frame.
+// The shadow takes away the candle's light, so it is as strong as that light is where it falls: full on the front wall the candle
+// is aimed at, fainter on the side walls. How dark it is at most (`strength`, 0 none .. 1 all the candle's light) is the game's
+// to set: the hand's shadow goes faint while a memory plays. Nothing is allocated per frame.
 import {
   Color,
+  CubeCamera,
   DoubleSide,
-  Matrix4,
   NearestFilter,
-  PerspectiveCamera,
   ShaderMaterial,
-  Vector2,
   Vector3,
-  WebGLRenderTarget,
+  WebGLCubeRenderTarget,
 } from '@iwsdk/core';
 import type { Object3D, Scene, Texture, WebGLRenderer } from '@iwsdk/core';
-import type { StagePlane } from './pure/stage-plane';
 
 /** The layer only the hands are on (as well as their own), so the shadow pass draws nothing else. CASTER_LAYER is 7. */
 export const HAND_CASTER_LAYER = 8;
 /** How dark the hand's shadow is at full strength: the share of the candle's light it takes (high contrast uses 1). */
 export const DEFAULT_SHADOW_OPACITY = 0.88;
-/** The map's size (square), and its range from the light (m). */
-const MAP_SIZE = 1024;
+/** Each cube face's size, and the map's range from the light (m). About 3 mm a texel on a wall 1 m from the light. */
+const MAP_SIZE = 512;
 const MAP_NEAR = 0.02;
-const MAP_FAR = 6;
-/** How much further than the wall's lit area the map reaches on each side (m): the shadow can fall a little past it. */
-const MAP_MARGIN_M = 0.15;
+const MAP_FAR = 8;
+/** One texel's angle seen from the light, near a face's middle (radians). */
+const TEXEL_RAD = 2 / MAP_SIZE;
 /**
  * The light's size for the shadow's softness (m): the edge's width is this times (surface's distance - hand's) / hand's, about
- * 1.2 cm on the wall for a resting hand. Tune in the headset.
+ * 1.2 cm on the front wall for a resting hand. Tune in the headset.
  */
 export const LIGHT_SIZE_M = 0.01;
 /** The nearest a hand comes to the light (m): how wide the shadow's edge can be, and so how far round a point to look for hands. */
@@ -82,43 +80,43 @@ const casterFragment = /* glsl */ `
  * strength in a full shadow). Needs `uniforms` (below) on its material.
  */
 export const handShadowGlsl = /* glsl */ `
-  uniform sampler2D uHandMap;
-  uniform mat4 uHandMatrix;     // world to the map's clip space
+  uniform samplerCube uHandMap;
   uniform vec3 uHandLight;
   uniform float uHandStrength;  // 0: no shadow (and nothing is looked up)
   uniform float uHandSoft;      // the light's size, m (the sharpen effect shrinks it)
-  uniform vec2 uHandScale;      // the map's uv per radian seen from the light, across and up
   ${packGlsl}
-  float handDist(vec2 uv) {
-    return handUnpack(texture2D(uHandMap, uv)) * ${MAP_FAR.toFixed(1)};
+  float handDist(vec3 dir) {
+    return handUnpack(textureCube(uHandMap, dir)) * ${MAP_FAR.toFixed(1)};
   }
   float handShadowLit(vec3 world) {
     if (uHandStrength <= 0.0) return 1.0;
-    vec4 c = uHandMatrix * vec4(world, 1.0);
-    if (c.w <= 0.0) return 1.0;
-    vec2 uv = c.xy / c.w * 0.5 + 0.5;
-    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 1.0;
-    float d = length(world - uHandLight);
+    vec3 toP = world - uHandLight;
+    float d = length(toP);
+    if (d < 1e-4) return 1.0;
+    vec3 dir = toP / d;
+    // Two directions across the ray, for looking round it (offsets in radians, small enough to add to the unit ray).
+    vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    vec3 t2 = cross(dir, t1);
     float bias = 0.006 + 0.004 * d;
     // Look for hands nearer the light round here, as wide as the softest edge could be (a hand as near the light as one comes).
-    vec2 search = uHandScale * (uHandSoft * 0.5 / ${NEAREST_HAND_M.toFixed(2)} + 1.5 / ${MAP_SIZE.toFixed(1)});
+    float search = uHandSoft * 0.5 / ${NEAREST_HAND_M.toFixed(2)} + ${(1.5 * TEXEL_RAD).toFixed(5)};
     float blockers = 0.0;
     float sum = 0.0;
     for (int i = 0; i < 9; i++) {
       float a = float(i) * 2.399963;
-      float r = i == 0 ? 0.0 : sqrt(float(i) / 8.0);
-      float s = handDist(uv + vec2(cos(a), sin(a)) * r * search);
+      float r = i == 0 ? 0.0 : sqrt(float(i) / 8.0) * search;
+      float s = handDist(dir + (t1 * cos(a) + t2 * sin(a)) * r);
       if (s < d - bias) { blockers += 1.0; sum += s; }
     }
     if (blockers < 0.5) return 1.0;
     // Half the edge's width (seen from the light, in radians) from how far behind the hands this point is.
     float db = sum / blockers;
-    vec2 radius = uHandScale * max(0.5 * uHandSoft * (d - db) / (db * d), 0.0) + vec2(1.5 / ${MAP_SIZE.toFixed(1)});
+    float radius = max(0.5 * uHandSoft * (d - db) / (db * d), 0.0) + ${(1.5 * TEXEL_RAD).toFixed(5)};
     float lit = 0.0;
     for (int i = 0; i < 16; i++) {
       float a = float(i) * 2.399963 + 0.7;
-      float r = sqrt((float(i) + 0.5) / 16.0);
-      lit += handDist(uv + vec2(cos(a), sin(a)) * r * radius) < d - bias ? 0.0 : 1.0;
+      float r = sqrt((float(i) + 0.5) / 16.0) * radius;
+      lit += handDist(dir + (t1 * cos(a) + t2 * sin(a)) * r) < d - bias ? 0.0 : 1.0;
     }
     return 1.0 - uHandStrength * (1.0 - lit / 16.0);
   }
@@ -128,11 +126,9 @@ export const handShadowGlsl = /* glsl */ `
 export function handShadowOff(): HandShadowMap['uniforms'] {
   return {
     uHandMap: { value: null },
-    uHandMatrix: { value: new Matrix4() },
     uHandLight: { value: new Vector3() },
     uHandStrength: { value: 0 },
     uHandSoft: { value: LIGHT_SIZE_M },
-    uHandScale: { value: new Vector2(1, 1) },
   };
 }
 
@@ -140,45 +136,32 @@ export class HandShadowMap {
   /** For every receiver's material (shared: setting a value here sets it everywhere). */
   readonly uniforms = {
     uHandMap: { value: null as Texture | null },
-    uHandMatrix: { value: new Matrix4() },
     uHandLight: { value: new Vector3() },
     uHandStrength: { value: 0 },
     uHandSoft: { value: LIGHT_SIZE_M },
-    uHandScale: { value: new Vector2(1, 1) },
   };
-  private readonly target: WebGLRenderTarget;
-  private readonly camera = new PerspectiveCamera();
+  private readonly target: WebGLCubeRenderTarget;
+  private readonly camera: CubeCamera;
   private readonly material: ShaderMaterial;
   private readonly lightUniform = { value: new Vector3() };
-  private stage: StagePlane | null = null;
-  /** The wall's lit area: [width, height, centre x, centre y], metres from the stage's centre (lightArea). */
-  private readonly area = new Float64Array(4);
   private casters: Object3D | null = null;
   private readonly clear = new Color();
-  private readonly look = new Matrix4();
 
   constructor() {
-    this.target = new WebGLRenderTarget(MAP_SIZE, MAP_SIZE, {
+    this.target = new WebGLCubeRenderTarget(MAP_SIZE, {
       generateMipmaps: false,
       minFilter: NearestFilter,
       magFilter: NearestFilter,
-      depthBuffer: true,
     });
     this.uniforms.uHandMap.value = this.target.texture;
-    this.camera.layers.set(HAND_CASTER_LAYER);
-    this.camera.matrixAutoUpdate = false;
+    this.camera = new CubeCamera(MAP_NEAR, MAP_FAR, this.target);
+    for (const c of this.camera.children) c.layers.set(HAND_CASTER_LAYER);
     this.material = new ShaderMaterial({
       uniforms: { uLight: this.lightUniform },
       vertexShader: casterVertex,
       fragmentShader: casterFragment,
       side: DoubleSide,
     });
-  }
-
-  /** The wall the shadows fall on, and its lit area ([width, height, centre x, centre y], stage metres). Call when either moves. */
-  place(stage: StagePlane, area: Readonly<ArrayLike<number>>): void {
-    this.stage = stage;
-    for (let i = 0; i < 4; i++) this.area[i] = area[i];
   }
 
   /**
@@ -192,9 +175,8 @@ export class HandShadowMap {
 
   /**
    * Draws the hands' shadow map from the light at `from` (world, m: real-wall.ts's castPoint), and sets how dark the shadow is
-   * (`strength`, 0..1) and how soft (`softness`, 1 the light's own size, less for a sharpened shadow). With no light, no stage,
-   * or strength 0, there is no shadow and nothing is drawn. Call once a frame, after the hands are posed and before the scene
-   * is drawn.
+   * (`strength`, 0..1) and how soft (`softness`, 1 the light's own size, less for a sharpened shadow). With no light or strength
+   * 0 there is no shadow and nothing is drawn. Call once a frame, after the hands are posed and before the scene is drawn.
    */
   update(
     renderer: WebGLRenderer,
@@ -204,75 +186,31 @@ export class HandShadowMap {
     softness = 1,
   ): void {
     const u = this.uniforms;
-    const st = this.stage;
     const root = this.casters;
     u.uHandStrength.value = 0;
-    if (!from || !st || !root || !(strength > 0.001)) return;
-    // The light's place relative to the wall: across, up, and out in front of it.
-    const fx = from[0] - st.origin[0],
-      fy = from[1] - st.origin[1],
-      fz = from[2] - st.origin[2];
-    const lx = fx * st.right[0] + fy * st.right[1] + fz * st.right[2];
-    const ly = fx * st.up[0] + fy * st.up[1] + fz * st.up[2];
-    const dist = fx * st.normal[0] + fy * st.normal[1] + fz * st.normal[2];
-    if (dist < 0.1) return; // the light at (or behind) the wall: nothing between them to cast
-
-    // The camera on the light, looking square at the wall (along -normal, up the stage's up), its frustum cut to the lit area.
-    const r = st.right,
-      up = st.up,
-      n = st.normal;
-    // prettier-ignore
-    this.look.set(
-      r[0], up[0], n[0], from[0],
-      r[1], up[1], n[1], from[1],
-      r[2], up[2], n[2], from[2],
-      0, 0, 0, 1,
-    );
-    const cam = this.camera;
-    cam.matrixWorld.copy(this.look);
-    cam.matrixWorldInverse.copy(this.look).invert();
-    const a = this.area;
-    const left = (a[2] - a[0] / 2 - MAP_MARGIN_M - lx) / dist,
-      right = (a[2] + a[0] / 2 + MAP_MARGIN_M - lx) / dist,
-      bottom = (a[3] - a[1] / 2 - MAP_MARGIN_M - ly) / dist,
-      top = (a[3] + a[1] / 2 + MAP_MARGIN_M - ly) / dist;
-    cam.projectionMatrix.makePerspective(
-      left * MAP_NEAR,
-      right * MAP_NEAR,
-      top * MAP_NEAR,
-      bottom * MAP_NEAR,
-      MAP_NEAR,
-      MAP_FAR,
-    );
-    cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
-    u.uHandMatrix.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
-    u.uHandScale.value.set(1 / (right - left), 1 / (top - bottom));
+    if (!from || !root || !(strength > 0.001)) return;
     u.uHandLight.value.set(from[0], from[1], from[2]);
     this.lightUniform.value.set(from[0], from[1], from[2]);
+    this.camera.position.set(from[0], from[1], from[2]);
+    this.camera.updateMatrixWorld(true);
 
     // The hands are drawn into the map whether or not the player sees them (over passthrough, or faded near the eyes).
+    // CubeCamera.update draws the six faces with XR off and puts the render target back.
     const visible = root.visible;
     root.visible = true;
     const override = scene.overrideMaterial;
     const background = scene.background;
     const fog = scene.fog;
-    const xr = renderer.xr.enabled;
-    const previous = renderer.getRenderTarget();
     renderer.getClearColor(this.clear);
     const alpha = renderer.getClearAlpha();
     scene.overrideMaterial = this.material;
     scene.background = null;
     scene.fog = null;
-    renderer.xr.enabled = false; // or the headset's cameras would be used instead of this one
+    renderer.setClearColor(0xffffff, 1); // no hand in this direction: as far as can be
     try {
-      renderer.setRenderTarget(this.target);
-      renderer.setClearColor(0xffffff, 1); // no hand in this direction: as far as can be
-      renderer.clear(true, true, false);
-      renderer.render(scene, cam);
+      this.camera.update(renderer, scene);
     } finally {
-      renderer.setRenderTarget(previous);
       renderer.setClearColor(this.clear, alpha);
-      renderer.xr.enabled = xr;
       scene.overrideMaterial = override;
       scene.background = background;
       scene.fog = fog;

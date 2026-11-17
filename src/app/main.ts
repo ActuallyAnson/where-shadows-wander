@@ -671,7 +671,6 @@ async function start(): Promise<void> {
     stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
     storyFrame.setStoryArea(stageFrame, STORY_SCALE, lightPoolArea[3]);
     stageView.place(stage, lantern);
-    candleLight.hands.place(stage, lightPoolArea); // the hands' shadows are cast onto the wall's lit area
     candleView.place(lantern);
 
     // The pause menu is drawn on the wall: it lives in the stage's frame.
