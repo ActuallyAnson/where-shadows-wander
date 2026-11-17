@@ -5,6 +5,7 @@
 // change it on the way.
 import type { StoryScene } from './story-director';
 import { CUP_HOLD_S } from './fireflies';
+import { FLAT_PALM_MID_Y } from './friend-puppet';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
 const chapter = (id: string) => ({ scene: STORY_STAGE, ...STORY_CHAPTER[id] });
@@ -15,6 +16,13 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     title: '2 · How they met',
     candle: 'rainy',
     beats: [
+      // The gate into the story, once the candle's light is on the wall: the friend's flat hand, as in scene 6, rises a little
+      // left of the middle with the outline of a flat hand facing it on the right, and waits for as long as it takes, so the
+      // player can play with their own shadows and look round the room first. Their palm answering hers is a hello the goodbye
+      // answers, so it counts only made at the outline: the middle of the player's shadow within a generous 0.6 of the outline's
+      // size (its height, about 0.24 m) of the outline's middle.
+      // Her hand lowers away as usual (only the goodbye fades it), and the night they met begins.
+      { kind: 'friend', shape: 'flat', x: -0.3, y: 0.06, guide: [0.3, 0.06], near: 0.6 },
       // The night they met: alone in his new room in the storm, he hides under his blanket; the girl from down the street comes
       // in with her torch, puts the blanket up into a fort over them both, and raises her hand.
       { kind: 'memory', ...chapter('the-storm') },
@@ -67,8 +75,9 @@ export const STORY_SCRIPT: readonly StoryScene[] = [
     candle: 'low',
     beats: [
       // The empty wall, and the friend's hand held up flat, alone: the wave from the gate and from the dream. When the player's
-      // hand meets it, the touch takes its place at once...
-      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 0.5, leave: 'fade', guide: false },
+      // hand meets it, the touch takes its place at once... The flat outline lies round her own palm, mirrored, so it shows where
+      // the player's palm meets hers (any flat hand still answers it, anywhere on the wall).
+      { kind: 'friend', shape: 'flat', x: 0, y: 0.06, out: 0.5, leave: 'fade', guide: [0, 0.06 + FLAT_PALM_MID_Y] },
       // ...which turns clockwise as the view draws back: two hands, side on, palm to palm, the boy's and the girl's, the two
       // kids from the waist up. Their palms part, she fades, and he bows his head and fades. The player's own shadow fades
       // out meanwhile, so the puppets are all there is.

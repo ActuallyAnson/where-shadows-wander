@@ -14,6 +14,7 @@ import {
   validateStory,
   type StoryScene,
 } from './story-director';
+import { FORM_S, FRIEND_FLAT, OUTLINE_SIZE } from './friend-puppet';
 import { STORY_SCRIPT } from './story-script';
 import { STORY_CHAPTER, STORY_STAGE } from './story-stage';
 
@@ -246,8 +247,15 @@ describe('the story script', () => {
     expect(validateScene(STORY_STAGE)).toEqual([]);
   });
 
-  it('scene 2 opens on the night they met, then the friend’s rabbit, and its memory starts from the player’s rabbit', () => {
-    const [prologue, first, second] = STORY_SCRIPT[0].beats;
+  it('scene 2 waits on her flat hand, then the night they met, then the friend’s rabbit, its memory from the player’s rabbit', () => {
+    const [gate, prologue, first, second] = STORY_SCRIPT[0].beats;
+    // The gate into the story: her flat hand left of the middle, its outline facing it on the right.
+    expect(gate).toMatchObject({ kind: 'friend', shape: 'flat' });
+    if (gate.kind !== 'friend') throw new Error('no gate');
+    expect(gate.x).toBeLessThan(0);
+    expect(gate.guide).toEqual([-gate.x, gate.y]);
+    // Made at the outline, with a generous margin.
+    expect(gate.near).toBeGreaterThanOrEqual(0.5);
     expect(prologue).toMatchObject({ kind: 'memory', start: STORY_CHAPTER['the-storm'].start });
     expect(prologue).not.toHaveProperty('from');
     expect(first).toMatchObject({ kind: 'friend', shape: 'rabbit' });
@@ -417,18 +425,40 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
     expect(d.handHidden).toBe(false);
   });
 
-  it('reports friendGuide false only when a friend beat asks to hide the outline (goodbye)', () => {
-    const goodbyeIndex = STORY_SCRIPT.findIndex((s) => s.id === 'goodbye');
-    expect(goodbyeIndex).toBeGreaterThan(0);
+  it('reports friendGuide false only when a friend beat asks to hide the outline', () => {
     const d = new StoryDirector(STORY_SCRIPT);
     d.start(0);
-    d.skipMemory();
     expect(d.beat?.kind).toBe('friend');
     expect(d.friendGuide).toBe(true);
+    const hidden = new StoryDirector([
+      { id: 'x', beats: [{ kind: 'friend', shape: 'flat', x: 0, y: 0, guide: false }] },
+    ]);
+    hidden.start();
+    expect(hidden.friendGuide).toBe(false);
+    expect(hidden.guideX).toBeNaN();
+    expect(hidden.guideY).toBeNaN();
+  });
+
+  it('lays the outline in scene 6 round her own palm: the middle of the flat hand as drawn, as it waits', () => {
+    const goodbyeIndex = STORY_SCRIPT.findIndex((s) => s.id === 'goodbye');
+    const d = new StoryDirector(STORY_SCRIPT);
     d.start(goodbyeIndex);
-    expect(d.friendGuide).toBe(false);
-    expect(d.guideX).toBeNaN();
-    expect(d.guideY).toBeNaN();
+    const b = d.beat;
+    if (b?.kind !== 'friend') throw new Error('scene 6 opens on her hand');
+    expect(d.friendGuide).toBe(true);
+    const palm = new ScenePlayer(FRIEND_FLAT);
+    palm.offset[0] = b.x;
+    palm.offset[1] = b.y;
+    palm.seek(FORM_S);
+    const i = palm.partIndex('palm');
+    const part = FRIEND_FLAT.parts[i];
+    // Held upright as it waits, the palm stands on its bottom edge: its middle is half its drawn height above that.
+    expect(palm.world[i * POSE_STRIDE + 2]).toBeCloseTo(0);
+    const midY = palm.world[i * POSE_STRIDE + 1] + (part.h * palm.world[i * POSE_STRIDE + 3]) / 2;
+    expect(d.guideX).toBeCloseTo(palm.world[i * POSE_STRIDE]);
+    expect(d.guideY).toBeCloseTo(midY);
+    // The outline is the palm's own size, so it lies just round it.
+    expect(OUTLINE_SIZE.flat).toBeCloseTo(part.h * palm.world[i * POSE_STRIDE + 3]);
   });
 
   it('plays the whole story, a shape at a time, to sleep', () => {
@@ -438,12 +468,73 @@ describe('StoryDirector: waits, sleep and checkpoints', () => {
       const b = d.beat;
       if (b?.kind === 'friend') {
         run(d, FRIEND_DELAY_S + 0.5, 0.1);
-        expect(d.commit(b.shape, 0, 0)).toBe(true);
+        const at = b.guide ? b.guide : [0, 0];
+        expect(d.commit(b.shape, at[0], at[1])).toBe(true);
       }
       run(d, 70, 0.1);
     }
     expect(d.waitingForSleep).toBe(true);
     expect(d.sleep()).toBe(true);
+  });
+
+  describe('a shape that counts only made at the outline (FriendBeat.near)', () => {
+    const atOutline: StoryScene[] = [
+      {
+        id: 'gate',
+        beats: [
+          { kind: 'friend', shape: 'flat', x: -0.3, y: 0, guide: [0.3, 0], near: 0.6 },
+          { kind: 'wait', seconds: 1 },
+        ],
+      },
+    ];
+
+    it('turns down the shape made far from the outline, and takes it made near it, within a share of the outline’s size', () => {
+      const reach = 0.6 * OUTLINE_SIZE.flat;
+      expect(OUTLINE_SIZE.flat).toBeCloseTo(0.3 * 1.35);
+      const d = new StoryDirector(atOutline);
+      d.start();
+      expect(d.commit('flat', -0.3, 0)).toBe(false);
+      expect(d.commit('flat', NaN, NaN)).toBe(false);
+      expect(d.commit('flat', 0.3 + reach + 0.01, 0)).toBe(false);
+      expect(d.waitingForShape).toBe(true);
+      expect(d.commit('flat', 0.3 + reach * 0.7, reach * 0.7)).toBe(true);
+      expect(d.waitingForShape).toBe(false);
+    });
+
+    it('takes a shape held from before once it is moved onto the outline, after her hand is in place', () => {
+      const d = new StoryDirector(atOutline);
+      d.start();
+      // Held at the outline while her hand is still rising: not yet.
+      d.follow(0.3, 0, 'flat');
+      run(d, FRIEND_DELAY_S + 0.5, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      run(d, FRIEND_IN_S, 0.1);
+      expect(d.waitingForShape).toBe(false);
+      // Held away from it, it waits; the wrong shape at it, it waits.
+      d.start();
+      d.follow(-0.2, 0, 'flat');
+      run(d, FRIEND_DELAY_S + FRIEND_IN_S + 1, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      // Measured from the middle of the hand, not the point it is followed by (a flat hand's wrist).
+      d.follow(0.3, 0, 'flat', -0.2, 0);
+      run(d, FRIEND_DELAY_S + FRIEND_IN_S + 1, 0.1);
+      d.follow(0.3, 0, 'fist');
+      run(d, 1, 0.1);
+      expect(d.waitingForShape).toBe(true);
+      d.follow(0.6, 0, 'flat', 0.35, 0.1);
+      run(d, 0.1, 0.1);
+      expect(d.waitingForShape).toBe(false);
+    });
+
+    it('is a story problem without an outline to make it at', () => {
+      expect(
+        validateStory([{ id: 'x', beats: [{ kind: 'friend', shape: 'flat', x: 0, y: 0, near: 0.2 }] }]),
+      ).toHaveLength(1);
+      expect(
+        validateStory([{ id: 'x', beats: [{ kind: 'friend', shape: 'fist', x: 0, y: 0, guide: [0, 0], near: 0.2 }] }]),
+      ).toHaveLength(1);
+      expect(validateStory(atOutline)).toEqual([]);
+    });
   });
 
   describe('a hand that copies the player’s first (FriendBeat.mirror)', () => {

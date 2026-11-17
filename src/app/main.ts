@@ -533,6 +533,19 @@ async function start(): Promise<void> {
   // Where the listener is: the head's position, forward and up, read from the camera's matrix each frame.
   const audioPose = new Float64Array(9);
   // Sound holds still with the game: the system menu, the headset off, or the page hidden.
+  /** The pause menu: the flame goes out, the sound dips and the wall offers Resume. Covering the flame and the headset's system
+   *  menu (or taking the headset off) both land here, so the story is never left running behind the player's back. */
+  const enterPause = () => {
+    sessionState = 'paused';
+    candleView.lit = false;
+    candleView.resetCover();
+    audio.mixer.setLift(Bus.Ambience, 0.15);
+    audio.mixer.setLift(Bus.Music, 0.25);
+    wallPauseView.show();
+  };
+  visibility.subscribe((_state, paused) => {
+    if (paused && sessionState === 'playing') enterPause();
+  });
   const syncAudioPause = () => audio.setPaused(visibility.paused || document.hidden);
   visibility.subscribe(syncAudioPause);
   document.addEventListener('visibilitychange', syncAudioPause);
@@ -1313,7 +1326,11 @@ async function start(): Promise<void> {
     }
     startStory(index);
     const b = story.beat;
-    if (play && b?.kind === 'friend') story.commit(b.shape, b.x + 0.12, b.y - 0.04);
+    // Copied where a player would make it: at the outline, if the shape must be made there (FriendBeat.near).
+    if (play && b?.kind === 'friend') {
+      const at = b.near !== undefined && b.guide ? b.guide : null;
+      story.commit(b.shape, at ? at[0] : b.x + 0.12, at ? at[1] : b.y - 0.04);
+    }
     return `${scene.title ?? scene.id}${play ? ', playing' : ''}`;
   };
 
@@ -1506,12 +1523,7 @@ async function start(): Promise<void> {
               stopStory();
               fallAsleep();
             } else if (candleView.isCovered) {
-              sessionState = 'paused';
-              candleView.lit = false;
-              candleView.resetCover();
-              audio.mixer.setLift(Bus.Ambience, 0.15);
-              audio.mixer.setLift(Bus.Music, 0.25);
-              wallPauseView.show();
+              enterPause();
             }
           } else if (sessionState === 'paused') {
             const isControllerTrigger = frame ? controllerPressed(frame) : false;
@@ -1593,6 +1605,8 @@ async function start(): Promise<void> {
               hold = Math.max(hold, st.committed === target ? 1 : st.candidate === target ? st.progress : 0);
           }
           followX = followY = NaN;
+          let middleX = NaN,
+            middleY = NaN;
           let followShape: Shape | null = null;
           if (followHand !== null) {
             const sh = projector.shadows[followHand];
@@ -1601,9 +1615,13 @@ async function start(): Promise<void> {
             const o = JOINT[wristAnchored && !story.mirroring ? 'wrist' : 'middle-finger-phalanx-proximal'] * 2;
             followX = sh.joints[o];
             followY = sh.joints[o + 1];
+            // The middle of the hand, which a shape made at the outline (FriendBeat.near) is measured from, as its commit is.
+            const m = JOINT['middle-finger-phalanx-proximal'] * 2;
+            middleX = sh.joints[m];
+            middleY = sh.joints[m + 1];
             followShape = shapes[followHand].state.committed;
           }
-          story.follow(followX, followY, followShape);
+          story.follow(followX, followY, followShape, middleX, middleY);
           story.update(storyStep);
           guide.update(
             storyStep,
