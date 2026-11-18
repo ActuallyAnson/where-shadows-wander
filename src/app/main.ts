@@ -344,8 +344,9 @@ async function start(): Promise<void> {
    * Scene 7's wait: while the game waits for the player to cover the flame, the room's light (the candle's on the walls and
    * furniture, the moon's through the window) eases down to this share, so most of the room goes dark and the player looks to the
    * candle. It eases over about SLEEP_DIM_TAU_S, holds through the end (which dims from there), and comes back in the story.
+   * A hand covering the flame takes it down to half of this (SLEEP_OCCLUDE_FLOOR in candle-view.ts).
    */
-  const SLEEP_DIM = 0.15;
+  const SLEEP_DIM = 0.3;
   const SLEEP_DIM_TAU_S = 1.2;
   let sleepDim = 1;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
