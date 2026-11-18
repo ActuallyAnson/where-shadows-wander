@@ -344,8 +344,9 @@ async function start(): Promise<void> {
    * Scene 7's wait: while the game waits for the player to cover the flame, the room's light (the candle's on the walls and
    * furniture, the moon's through the window) eases down to this share, so most of the room goes dark and the player looks to the
    * candle. It eases over about SLEEP_DIM_TAU_S, holds through the end (which dims from there), and comes back in the story.
+   * A hand covering the flame takes it down to half of this (SLEEP_OCCLUDE_FLOOR in candle-view.ts).
    */
-  const SLEEP_DIM = 0.15;
+  const SLEEP_DIM = 0.3;
   const SLEEP_DIM_TAU_S = 1.2;
   let sleepDim = 1;
   // The moon's faint blue light, the same all night (the candle adds its own light; it never replaces this).
@@ -707,6 +708,8 @@ async function start(): Promise<void> {
     lantern[1] = saucerPos[1];
     lantern[2] = saucerPos[2];
 
+    // A flat hand may face the wall (a wave), so the recogniser needs to know which way it faces.
+    shapes.setWallNormal(stage.normal);
     stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
     storyFrame.setStoryArea(stageFrame, STORY_SCALE, lightPoolArea[3]);
     stageView.place(stage, lantern);
@@ -1497,8 +1500,9 @@ async function start(): Promise<void> {
           titleLighter.update(heldHand.frame, cameraQuat, clock);
 
           // Only the matchstick's flame lights the candle: a bare hand near the wick does not.
+          // Not while he is still waking (the blinks): only once his eyes are open and the right glove shows with the match.
           let matchDistance = Infinity;
-          if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
+          if (!wake.playing && hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
             const dlx = titleLighter.flamePosition[0] - candleView.flamePosition[0];
             const dly = titleLighter.flamePosition[1] - candleView.flamePosition[1];
             const dlz = titleLighter.flamePosition[2] - candleView.flamePosition[2];

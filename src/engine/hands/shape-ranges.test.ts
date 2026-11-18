@@ -74,6 +74,36 @@ describe('shape ranges', () => {
       expect(classify('fox', 'right', { roll, pitch: 0, yaw: 0 }), `fox rolled ${roll}`).not.toBe('fox');
   });
 
+  it('a flat hand held up with its palm to the wall (a wave) is flat, turned about a little', () => {
+    // Pitch 90 stands the hand up, its palm toward the wall straight ahead (-z).
+    for (const side of ['left', 'right'] as const)
+      for (const yaw of [-30, 0, 30])
+        for (const pitch of [70, 90, 110])
+          for (const roll of [-20, 0, 20])
+            expect(classify('flat', side, { roll, pitch, yaw }), `${side} ${yaw} ${pitch} ${roll}`).toBe('flat');
+    // Turned to face the player instead, it is not.
+    expect(classify('flat', 'right', { roll: 0, pitch: -90, yaw: 0 })).toBeNull();
+  });
+
+  it('a flat hand faces the wall it is given, wherever the wall is', () => {
+    const pose = clonePose(PRESETS.flat);
+    pose.pitchDeg = 90; // palm toward -z
+    const hand = writeHandPose(pose, W, createHandFrame('right'));
+    const toward = computeHandFeatures(hand, createHandFeatures(), undefined, null, [0, 0, 1])!;
+    expect(toward.palmWall).toBeCloseTo(-1, 3);
+    expect(bestShape(toward)).toBe('flat');
+    // A wall off to the side (its normal along +x) is not what this palm faces.
+    const aside = computeHandFeatures(hand, createHandFeatures(), undefined, null, [1, 0, 0])!;
+    expect(bestShape(aside)).toBeNull();
+  });
+
+  it('a fox thumb on a palm to the wall is still a flat hand, not a fox', () => {
+    const pose = clonePose(PRESETS.flat);
+    pose.pitchDeg = 90;
+    pose.thumb.abductDeg = 70;
+    expect(bestShape(handFeatures(writeHandPose(pose, W, createHandFrame('right')))!)).not.toBe('fox');
+  });
+
   it('a plain V, the thumb left loose or tucked, is a rabbit', () => {
     for (const t of [
       { curl: 0.1, abductDeg: 40 },

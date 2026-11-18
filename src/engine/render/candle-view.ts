@@ -42,6 +42,11 @@ const OCCLUDE_REACH_M = 0.16;
 const SLEEP_OCCLUDE_REACH_M = 0.3;
 /** Closer than this (m) a hand smothers the light completely. */
 const OCCLUDE_FULL_M = 0.04;
+/**
+ * At the end (sleep mode) a hand over the flame dims its light only this far (0.5: to half), so the room the end dims from
+ * (SLEEP_DIM in main.ts) goes from 30% to 15% under the cover, not to black.
+ */
+const SLEEP_OCCLUDE_FLOOR = 0.5;
 
 const COVER_RING_VERT = /* glsl */ `
   varying vec2 vUv;
@@ -368,7 +373,8 @@ export class CandleView {
     if (minFlameDist < reach) {
       // Smoothly ramp from 0.0 (smothered at <= 4cm) to 1.0 (clear at the reach)
       const t = Math.max(0.0, Math.min(1.0, (minFlameDist - OCCLUDE_FULL_M) / (reach - OCCLUDE_FULL_M)));
-      this.lightOcclusion = t * t * (3 - 2 * t);
+      const open = t * t * (3 - 2 * t);
+      this.lightOcclusion = this.sleepMode ? SLEEP_OCCLUDE_FLOOR + (1 - SLEEP_OCCLUDE_FLOOR) * open : open;
     } else {
       this.lightOcclusion = 1.0;
     }
@@ -484,10 +490,11 @@ export class CandleView {
       return;
     }
 
+    // Lit: the ignition ring is done with (it stopped at full when the wick caught), and a cover never shows one.
     this.wickIndicator.visible = false;
+    this.coverProgressMesh.visible = false;
     this.flame.mesh.visible = true;
     this.flame.update(light, cameraQuaternion);
-    this.coverProgressMesh.quaternion.copy(cameraQuaternion);
     this.setPointLightColour(light);
     const coverFactor = this._isCovered ? 0.15 : 1.0;
     this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion * coverFactor;

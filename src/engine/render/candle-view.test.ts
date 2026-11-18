@@ -264,6 +264,12 @@ describe('CandleView', () => {
     candle.updateInteraction({ left, right }, 0.016);
     expect(candle.occlusion).toBeLessThan(1);
 
+    // Right over the flame it dims only to half at the end (the room goes from 30% to 15%, not to black).
+    setPalm(left, 0.0, 0.86, -0.4);
+    candle.updateInteraction({ left, right }, 0.016);
+    expect(candle.occlusion).toBe(0.5);
+    candle.resetCover();
+
     // Covering it: no ring, and the flame shrinks and its light dims as the cover goes on.
     setHandJointsDown(left, 0.0, 0.89, -0.4);
     candle.updateInteraction({ left, right }, 0.3);
@@ -334,6 +340,14 @@ describe('CandleView', () => {
     candle.update(light as never, quat);
     expect(candle.flame.mesh.visible).toBe(true);
     expect(candle.flame.mesh.scale.x).toBeCloseTo(1.0);
+    const ring = candle.group.children[7];
+    expect(ring.visible).toBe(true);
+
+    // Once it catches, the ring goes: a lit candle shows none.
+    candle.ignitionProgress = 0;
+    candle.lit = true;
+    candle.update(light as never, quat);
+    expect(ring.visible).toBe(false);
   });
 
   it('disposes resources cleanly without error', () => {

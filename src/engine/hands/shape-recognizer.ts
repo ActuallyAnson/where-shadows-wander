@@ -3,7 +3,13 @@
 // Plain TypeScript: no IWSDK, no three.js. Allocates nothing per update.
 import type { HandFrame, Handedness, Vec3 } from './hand';
 import { CalibrationRun, createCurlBias, type CurlBias } from './hand-calibration';
-import { computeHandFeatures, createHandFeatures, WORLD_UP, type HandFeatures } from './hand-features';
+import {
+  computeHandFeatures,
+  createHandFeatures,
+  WALL_TOWARD_PLAYER,
+  WORLD_UP,
+  type HandFeatures,
+} from './hand-features';
 import { ShapeClassifier, type ClassifierConfig } from './shape-classifier';
 import { ShapeEventQueue } from './shape-events';
 import { SHAPES, type Shape } from './shapes';
@@ -22,10 +28,12 @@ export class ShapeRecognizer {
   /** Commits per shape since start, for diagnostics. */
   readonly commits = Object.fromEntries(SHAPES.map((s) => [s, 0])) as Record<Shape, number>;
   /**
-   * What a palm's direction is compared against (the palm-to-stage feature): up for the tabletop theatre, so flat
-   * means palm down. Nothing feeds the real wall's normal in yet, so flat still means palm down there too.
+   * What a palm's direction is compared against (the palm-to-stage feature): up, so palm down and palm up (a cup) are
+   * read against the floor whatever the wall does.
    */
   readonly stageNormal: Vec3 = [...WORLD_UP];
+  /** The wall's normal, toward the player (StageFrame.normal): a flat hand may face it, as a wave does. */
+  readonly wallNormal: Vec3 = [...WALL_TOWARD_PLAYER];
   /** Each hand's baseline finger curl (hand-calibration.ts); zeros until calibrated. */
   readonly calibration: Record<Handedness, CurlBias> = { left: createCurlBias(), right: createCurlBias() };
   /** A calibration in progress, if any; read its state and progress for the UI. */
@@ -69,6 +77,13 @@ export class ShapeRecognizer {
     this.stageNormal[2] = n[2];
   }
 
+  /** Sets the wall's normal (toward the player), whenever the wall is placed. */
+  setWallNormal(n: ArrayLike<number>): void {
+    this.wallNormal[0] = n[0];
+    this.wallNormal[1] = n[1];
+    this.wallNormal[2] = n[2];
+  }
+
   /**
    * Accessibility: 1 = normal, up to MAX_TOLERANCE; each step widens every
    * shape's ranges by one unit. Beyond that the shapes overlap too much to tell apart.
@@ -94,10 +109,16 @@ export class ShapeRecognizer {
   private step(c: ShapeClassifier, hand: HandFrame, dt: number, t: number): void {
     const run = this.calibrating;
     if (run && run.hand === c.hand && run.state === 'collecting') {
-      if (run.add(computeHandFeatures(hand, this.raw, this.stageNormal), dt) === 'done')
+      if (run.add(computeHandFeatures(hand, this.raw, this.stageNormal, null, this.wallNormal), dt) === 'done')
         this.setCalibration(c.hand, run.bias);
     }
-    const f = computeHandFeatures(hand, this.features[c.hand], this.stageNormal, this.calibration[c.hand]);
+    const f = computeHandFeatures(
+      hand,
+      this.features[c.hand],
+      this.stageNormal,
+      this.calibration[c.hand],
+      this.wallNormal,
+    );
     this.valid[c.hand] = f !== null;
     c.update(f, hand.validJoints, dt, t, this.events);
   }
