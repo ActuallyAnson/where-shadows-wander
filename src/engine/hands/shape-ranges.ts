@@ -37,8 +37,15 @@ export const F = {
    * with 3 mm of noise, overlapping a relaxed hand); the mean drifts far less.
    */
   meanCurl: 11,
+  /** Palm normal · the wall's normal: -1 = palm faces the wall. */
+  palmWall: 12,
+  /**
+   * How squarely the palm faces a surface it could lie flat on: the floor below or the wall ahead, whichever it faces more
+   * (the smaller of palmStage and palmWall). -1 = palm down, or palm to the wall as in a wave.
+   */
+  palmFlat: 13,
 } as const;
-export const FEATURE_COUNT = 12;
+export const FEATURE_COUNT = 14;
 
 /** One tolerance unit per feature. */
 // prettier-ignore
@@ -49,6 +56,7 @@ export const FEATURE_SCALE: readonly number[] = [
   8,                            // thumb angle, degrees
   0.08, 0.08,                   // tip gaps, hand lengths
   0.1,                          // mean curl
+  0.15, 0.15,                   // palm normal · wall normal, and palm flat
 ];
 
 /** Lower and upper bound per feature; ±Infinity = doesn't matter. */
@@ -70,12 +78,15 @@ function ranges(bounds: Partial<Record<keyof typeof F, [number, number]>>): Shap
 const ANY = Infinity;
 
 export const SHAPE_RANGES: Readonly<Record<Shape, ShapeRanges>> = {
-  /** Palm down, fingers together, thumb alongside. */
+  /**
+   * Fingers together, thumb alongside, the palm down or toward the wall. Toward the wall is how the story shows it (a wave,
+   * palm to palm with the friend's hand); palm down is kept so the labelled recordings still read.
+   */
   flat: ranges({
     meanCurl: [-ANY, 0.19],
     maxCurl: [-ANY, 0.35],
     spreadDeg: [-ANY, 18],
-    palmStage: [-ANY, -0.5],
+    palmFlat: [-ANY, -0.5],
     thumbFwdDeg: [-ANY, 50],
   }),
   /** Closed hand, any orientation. */
@@ -96,14 +107,15 @@ export const SHAPE_RANGES: Readonly<Record<Shape, ShapeRanges>> = {
   }),
   /**
    * Fingers straight and together, thumb up as an ear (away from the fingers),
-   * the hand turned so the palm faces sideways. The palm bounds keep a palm-down
-   * flat hand (whose thumb often sits 45° out) from reading as a fox.
+   * the hand turned so the palm faces sideways. The palm bounds keep a flat hand
+   * (palm down or toward the wall, whose thumb often sits 45° out) from reading as a fox.
    */
   fox: ranges({
     meanCurl: [-ANY, 0.19],
     maxCurl: [-ANY, 0.35],
     spreadDeg: [-ANY, 18],
     palmStage: [-0.7, 0.7],
+    palmWall: [-0.8, ANY],
     thumbFwdDeg: [38, ANY],
   }),
 };
@@ -122,6 +134,8 @@ export function packFeatures(f: HandFeatures, out: Float32Array): Float32Array {
   out[F.tipGapIndex] = f.tipGap[0];
   out[F.tipGapRingPinky] = Math.min(f.tipGap[2], f.tipGap[3]);
   out[F.meanCurl] = f.meanCurl;
+  out[F.palmWall] = f.palmWall;
+  out[F.palmFlat] = Math.min(f.palmStage, f.palmWall);
   return out;
 }
 

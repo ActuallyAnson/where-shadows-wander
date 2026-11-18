@@ -174,18 +174,18 @@ Shapes are recognised from the hand skeleton, not the shadow image. WebXR provid
 | Finger curl (per finger) | Angle sum along each finger's joints, normalised 0–1 |
 | Thumb pinch | Distance from thumb tip to each fingertip |
 | Finger spread | Angle between adjacent finger directions |
-| Palm orientation | Derived palm normal relative to the stage plane |
+| Palm orientation | Derived palm normal against world up, and against the wall's normal |
 
-Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): `hand-features.ts` measures per-finger curl (and the mean, smallest and largest of the four fingers), the thumb tip's distance to every fingertip divided by the hand's length, spread between neighbouring fingers and between index and pinky in the palm plane, the palm normal against the stage normal, and the thumb's angle to the palm's forward direction. `shape-ranges.ts` holds each shape's ranges, `shape-classifier.ts` the hold-to-commit state machine, and `shape-recognizer.ts` runs both hands each frame. The Hand Lab and webcam bench cards show the classifier live.
+Implementation (`src/engine/hands`, plain TypeScript, no allocation per frame): `hand-features.ts` measures per-finger curl (and the mean, smallest and largest of the four fingers), the thumb tip's distance to every fingertip divided by the hand's length, spread between neighbouring fingers and between index and pinky in the palm plane, the palm normal against world up and against the wall's normal, and the thumb's angle to the palm's forward direction. `shape-ranges.ts` holds each shape's ranges, `shape-classifier.ts` the hold-to-commit state machine, and `shape-recognizer.ts` runs both hands each frame. The Hand Lab and webcam bench cards show the classifier live.
 
 | Shape | Ranges (starting values, tuned with recordings) |
 |----|----|
-| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing the stage (palm · stage normal ≤ −0.5), thumb within 50° of the fingers |
+| Flat | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, palm facing down or toward the wall (palm · up or palm · wall normal ≤ −0.5, [ADR 0021](adr/0021-flat-faces-the-wall.md)), thumb within 50° of the fingers |
 | Fist | every finger curl ≥ 0.65 |
-| Cup | every finger curl 0.15–0.6, palm facing away from the stage (≥ 0.5) |
+| Cup | every finger curl 0.15–0.6, palm facing up (palm · up ≥ 0.5) |
 | Spread | mean curl ≤ 0.19 and no finger above 0.35, index–pinky spread ≥ 25° |
 | Rabbit | index and middle curl ≤ 0.25, ring and pinky ≥ 0.4; the thumb is not checked |
-| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 38° from the fingers, palm facing sideways (palm · stage normal −0.7 to 0.7) |
+| Fox | mean curl ≤ 0.19 and no finger above 0.35, spread ≤ 18°, thumb ≥ 38° from the fingers, palm facing sideways (palm · up −0.7 to 0.7, and not toward the wall: palm · wall normal ≥ −0.8) |
 
 Each feature has a tolerance unit (0.1 curl, 5° spread, 0.15 palm dot, 8° thumb angle, 0.08 hand lengths). The tolerance slider (1 to 3) widens every range by whole units; hysteresis keeps a committed shape for one more unit. A shape is only picked if it leads any other matching shape by a quarter of a unit.
 

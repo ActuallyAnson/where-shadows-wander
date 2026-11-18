@@ -707,6 +707,8 @@ async function start(): Promise<void> {
     lantern[1] = saucerPos[1];
     lantern[2] = saucerPos[2];
 
+    // A flat hand may face the wall (a wave), so the recogniser needs to know which way it faces.
+    shapes.setWallNormal(stage.normal);
     stageView.setPool(lightArea(true, stage.origin[1], stage.width, stage.height, lightPoolArea));
     storyFrame.setStoryArea(stageFrame, STORY_SCALE, lightPoolArea[3]);
     stageView.place(stage, lantern);

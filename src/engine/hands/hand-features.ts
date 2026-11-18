@@ -10,6 +10,8 @@ export type FingerName = (typeof FINGER_NAMES)[number];
 
 /** Up in scene space: the stage normal for the tabletop theatre. */
 export const WORLD_UP: Readonly<Vec3> = [0, 1, 0];
+/** The wall's normal (out of the wall, toward the player) until the app sets the real one: a wall straight ahead, at -z. */
+export const WALL_TOWARD_PLAYER: Readonly<Vec3> = [0, 0, 1];
 
 /** Joint chains from the base of each finger to its tip. */
 const CHAINS: Readonly<Record<FingerName, readonly number[]>> = {
@@ -56,6 +58,8 @@ export interface HandFeatures {
   palmStage: number;
   /** Palm normal · world up. */
   palmUp: number;
+  /** Palm normal · the wall's normal (toward the player): -1 = palm faces the wall, as in a wave at it. */
+  palmWall: number;
   /** Angle between the thumb (proximal joint to tip) and the palm's forward direction, degrees: about 15 flat, 75 fox. */
   thumbFwdDeg: number;
   /** How far the thumb rises out of the palm toward the back of the hand: unit thumb direction · -palm normal. */
@@ -76,6 +80,7 @@ export function createHandFeatures(): HandFeatures {
     palm: createPalm(),
     palmStage: 0,
     palmUp: 0,
+    palmWall: 0,
     thumbFwdDeg: 0,
     thumbElev: 0,
   };
@@ -95,12 +100,14 @@ const projectedOk = [false, false, false, false];
  * @param curlBias each finger's curl when the hand is held flat (FINGER_NAMES
  *   order, from hand-calibration.ts): curl is measured from there, rescaled so a
  *   full curl still reads 1. Removes a player's (or a tracker's) baseline bend.
+ * @param wallNormal the wall's normal, toward the player (StageFrame.normal).
  */
 export function computeHandFeatures(
   hand: HandFrame,
   out: HandFeatures,
   stageNormal: Readonly<Vec3> = WORLD_UP,
   curlBias: ArrayLike<number> | null = null,
+  wallNormal: Readonly<Vec3> = WALL_TOWARD_PLAYER,
 ): HandFeatures | null {
   if (!hand.tracked || hand.validJoints < 25) return null;
   const p = hand.positions;
@@ -146,6 +153,7 @@ export function computeHandFeatures(
 
   out.palmStage = n[0] * stageNormal[0] + n[1] * stageNormal[1] + n[2] * stageNormal[2];
   out.palmUp = n[1];
+  out.palmWall = n[0] * wallNormal[0] + n[1] * wallNormal[1] + n[2] * wallNormal[2];
 
   direction(p, JOINT['thumb-phalanx-proximal'], thumbTip, a);
   const len = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
