@@ -484,10 +484,11 @@ export class CandleView {
       return;
     }
 
+    // Lit: the ignition ring is done with (it stopped at full when the wick caught), and a cover never shows one.
     this.wickIndicator.visible = false;
+    this.coverProgressMesh.visible = false;
     this.flame.mesh.visible = true;
     this.flame.update(light, cameraQuaternion);
-    this.coverProgressMesh.quaternion.copy(cameraQuaternion);
     this.setPointLightColour(light);
     const coverFactor = this._isCovered ? 0.15 : 1.0;
     this.pointLight.intensity = (light.lit ? light.intensity * 1.5 : 0) * this.lightOcclusion * coverFactor;

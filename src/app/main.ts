@@ -1499,8 +1499,9 @@ async function start(): Promise<void> {
           titleLighter.update(heldHand.frame, cameraQuat, clock);
 
           // Only the matchstick's flame lights the candle: a bare hand near the wick does not.
+          // Not while he is still waking (the blinks): only once his eyes are open and the right glove shows with the match.
           let matchDistance = Infinity;
-          if (hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
+          if (!wake.playing && hands.hands.right.tracked && hands.hands.right.validJoints >= 5) {
             const dlx = titleLighter.flamePosition[0] - candleView.flamePosition[0];
             const dly = titleLighter.flamePosition[1] - candleView.flamePosition[1];
             const dlz = titleLighter.flamePosition[2] - candleView.flamePosition[2];
