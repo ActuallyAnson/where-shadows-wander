@@ -1063,9 +1063,11 @@ function outlineCup(g: CanvasRenderingContext2D, w: number, h: number): void {
 }
 
 function outlineFlat(g: CanvasRenderingContext2D, w: number, h: number): void {
-  // A hand held up flat: the palm, the fingers together, the thumb a little out at its side.
+  // A hand held up flat: the palm, the fingers together, the thumb a little out at its side. The thumb is on the right here
+  // because the shape guide mirrors every outline (ghost-outline.ts): on the wall it is on the left, the shadow of a right hand
+  // held up with its back to the player, so most players fit it with the hand they'd use anyway.
   friendPalmHand(g, w, h);
-  finger(g, w, h, [0.3, 0.6, 0.2, 0.48, 0.16, 0.4], 0.16);
+  finger(g, w, h, [0.7, 0.6, 0.8, 0.48, 0.84, 0.4], 0.16);
 }
 
 export const PUPPET_ART: Readonly<Record<string, PuppetPainter>> = {
