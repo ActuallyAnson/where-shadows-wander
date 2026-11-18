@@ -195,6 +195,12 @@ Small and light-looking, placed within a seated reach (the tray, the bed's edges
 | `src/ui/title-screen/fonts/cinzel-decorative-*` | Title lettering (Cinzel Decorative, SIL OFL 1.1) | Final |
 | `src/ui/menu-panel/fonts/cinzel-latin-400-normal.woff2` | Pause and end screens (Cinzel, SIL OFL 1.1) | Final |
 
+## Icons
+
+| File | What | Status |
+|---|---|---|
+| `public/favicon.ico` | Browser tab icon for `index.html` and `webcam.html`: a lit candle on the night background (`#14161c`), 16 to 256 px. Our own, drawn in code with Pillow | Final |
+
 ## Getting new assets
 
 ### Workflow
